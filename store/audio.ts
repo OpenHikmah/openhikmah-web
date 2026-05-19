@@ -38,12 +38,7 @@ function getAudio(): HTMLAudioElement {
   return _audio!;
 }
 
-function loadAndPlay(
-  verse: AudioVerse,
-  queue: AudioVerse[],
-  queueIndex: number,
-  onEnded: () => void
-) {
+function loadAndPlay(verse: AudioVerse, onEnded: () => void) {
   const a = getAudio();
   a.onended = onEnded;
   a.src = getAudioUrl(verse.surah, verse.ayah);
@@ -68,7 +63,7 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
       queue: [verse],
       queueIndex: 0,
     });
-    loadAndPlay(verse, [verse], 0, () => get()._onEnded())
+    loadAndPlay(verse, () => get()._onEnded())
       .then(() => set({ isLoading: false }))
       .catch(() => set({ isPlaying: false, isLoading: false }));
   },
@@ -84,7 +79,7 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
       queue: verses,
       queueIndex: 0,
     });
-    loadAndPlay(first, verses, 0, () => get()._onEnded())
+    loadAndPlay(first, () => get()._onEnded())
       .then(() => set({ isLoading: false }))
       .catch(() => set({ isPlaying: false, isLoading: false }));
   },
@@ -125,7 +120,7 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
     }
     const verse = queue[nextIdx];
     set({ currentRef: verse.ref, currentSurahName: verse.surahName, queueIndex: nextIdx, isLoading: true });
-    loadAndPlay(verse, queue, nextIdx, () => get()._onEnded())
+    loadAndPlay(verse, () => get()._onEnded())
       .then(() => set({ isLoading: false }))
       .catch(() => set({ isPlaying: false, isLoading: false }));
   },
@@ -136,7 +131,7 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
     if (prevIdx < 0) return;
     const verse = queue[prevIdx];
     set({ currentRef: verse.ref, currentSurahName: verse.surahName, queueIndex: prevIdx, isLoading: true });
-    loadAndPlay(verse, queue, prevIdx, () => get()._onEnded())
+    loadAndPlay(verse, () => get()._onEnded())
       .then(() => set({ isLoading: false }))
       .catch(() => set({ isPlaying: false, isLoading: false }));
   },
