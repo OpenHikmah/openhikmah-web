@@ -37,8 +37,10 @@ export async function buildAuthUrl(): Promise<{
   });
 
   const authBase = process.env.NEXT_PUBLIC_QF_AUTH_BASE ?? "";
+  // Ory Hydra (used by QF) exposes /oauth2/auth — override via NEXT_PUBLIC_QF_AUTHORIZE_PATH if needed
+  const authorizePath = process.env.NEXT_PUBLIC_QF_AUTHORIZE_PATH ?? "/oauth2/auth";
   return {
-    url: `${authBase}/oauth2/authorize?${params.toString()}`,
+    url: `${authBase}${authorizePath}?${params.toString()}`,
     codeVerifier,
     state,
   };

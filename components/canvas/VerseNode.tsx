@@ -6,8 +6,9 @@ import type { Verse, EdgeKind } from "@/types/quran";
 import { useCanvasStore } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import { cn } from "@/lib/utils";
-import { Loader2, Plus, Heart } from "lucide-react";
+import { Loader2, Plus, Heart, Volume2 } from "lucide-react";
 import { ExpandMenu } from "./ExpandMenu";
+import { useAudioStore } from "@/store/audio";
 
 type VerseNodeData = Verse & { isRoot?: boolean; isLoading?: boolean };
 
@@ -23,6 +24,13 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
 
   const isBookmarked = useAuthStore((s) => s.isBookmarked(verse.ref));
   const toggleBookmark = useAuthStore((s) => s.toggleBookmark);
+
+  const playVerse = useAudioStore((s) => s.playVerse);
+  const currentRef = useAudioStore((s) => s.currentRef);
+  const isPlaying = useAudioStore((s) => s.isPlaying);
+  const pauseAudio = useAudioStore((s) => s.pause);
+  const resumeAudio = useAudioStore((s) => s.resume);
+  const isThisPlaying = currentRef === verse.ref && isPlaying;
 
   const isExpanding = expandingNodeId === id;
   const expandMenuOpen = openExpandNodeId === id;
@@ -81,6 +89,26 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
             >
               {verse.ref}
             </span>
+            <button
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isThisPlaying) {
+                  pauseAudio();
+                } else if (currentRef === verse.ref) {
+                  resumeAudio();
+                } else {
+                  playVerse({ ref: verse.ref, surah: verse.surah, ayah: verse.ayah, surahName: verse.surahName });
+                }
+              }}
+              aria-label={isThisPlaying ? "Pause recitation" : "Play recitation"}
+              className="w-5 h-5 flex items-center justify-center rounded transition-colors cursor-pointer"
+              style={{
+                color: currentRef === verse.ref ? "var(--color-teal)" : "var(--color-text-muted)",
+              }}
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+            </button>
             <button
               onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => {

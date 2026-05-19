@@ -5,8 +5,9 @@ vi.mock("@xyflow/react", () => ({
   applyEdgeChanges: vi.fn((changes: unknown[], edges: unknown[]) => edges),
 }));
 
-import { useCanvasStore } from "@/store/canvas";
+import { useCanvasStore, serializeCanvas, deserializeCanvas } from "@/store/canvas";
 import type { Verse, CanvasEdge } from "@/types/quran";
+import type { Node, Edge } from "@xyflow/react";
 
 const baseVerse: Verse = {
   surah: 2,
@@ -169,5 +170,157 @@ describe("canvas store", () => {
     expect(s.sidebarContent).toBeNull();
     expect(s.pendingExpand).toBeNull();
     expect(s.pendingAutoExpand).toBeNull();
+  });
+});
+
+// ── serializeCanvas / deserializeCanvas ────────────────────────────────────────
+
+describe("serializeCanvas", () => {
+  const verse1: Verse = { ...baseVerse };
+
+  it("produces v:1 format", () => {
+    const saved = serializeCanvas([], []);
+    expect(saved.v).toBe(1);
+    expect(saved.nodes).toEqual([]);
+    expect(saved.edges).toEqual([]);
+  });
+
+  it("serializes node position and verse data", () => {
+    const node: Node = {
+      id: "node-5",
+      type: "verse",
+      position: { x: 100, y: 200 },
+      data: { ...verse1 } as unknown as Record<string, unknown>,
+    };
+    const saved = serializeCanvas([node], []);
+    expect(saved.nodes).toHaveLength(1);
+    expect(saved.nodes[0]).toMatchObject({
+      id: "node-5",
+      x: 100,
+      y: 200,
+    });
+  });
+
+  it("serializes edge kind, label, and reason", () => {
+    const edge: Edge = {
+      id: "edge-1",
+      source: "node-1",
+      target: "node-2",
+      data: { kind: "thematic", label: "Tawakkul", reason: "Both speak of reliance." },
+    };
+    const saved = serializeCanvas([], [edge]);
+    expect(saved.edges).toHaveLength(1);
+    expect(saved.edges[0]).toMatchObject({
+      id: "edge-1",
+      source: "node-1",
+      target: "node-2",
+      kind: "thematic",
+      label: "Tawakkul",
+      reason: "Both speak of reliance.",
+    });
+  });
+
+  it("defaults missing kind to 'thematic'", () => {
+    const edge: Edge = {
+      id: "edge-1",
+      source: "node-1",
+      target: "node-2",
+      data: {},
+    };
+    const saved = serializeCanvas([], [edge]);
+    expect(saved.edges[0].kind).toBe("thematic");
+  });
+});
+
+describe("deserializeCanvas", () => {
+  it("restores nodes with correct type and position", () => {
+    const saved = {
+      v: 1 as const,
+      nodes: [{ id: "node-7", x: 50, y: 80, verse: baseVerse }],
+      edges: [],
+    };
+    const { nodes } = deserializeCanvas(saved);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].id).toBe("node-7");
+    expect(nodes[0].type).toBe("verse");
+    expect(nodes[0].position).toEqual({ x: 50, y: 80 });
+  });
+
+  it("restores edges with correct type and animated flag", () => {
+    const saved = {
+      v: 1 as const,
+      nodes: [],
+      edges: [{ id: "edge-3", source: "node-1", target: "node-2", kind: "root" as const, label: "root", reason: "shared root" }],
+    };
+    const { edges } = deserializeCanvas(saved);
+    expect(edges).toHaveLength(1);
+    expect(edges[0].type).toBe("hikmah");
+    expect(edges[0].animated).toBe(true);
+    expect((edges[0].data as { kind: string }).kind).toBe("root");
+  });
+
+  it("round-trips through serialize → deserialize", () => {
+    const store = useCanvasStore.getState();
+    store.reset();
+    const id1 = store.addVerseNode(baseVerse, { x: 10, y: 20 });
+    const id2 = store.addVerseNode(
+      { ...baseVerse, ref: "1:1" as const, surah: 1, ayah: 1, surahName: "Al-Fatihah", surahNameArabic: "الفاتحة" },
+      { x: 300, y: 20 }
+    );
+    store.addConnectionEdge({
+      id: "edge-rt",
+      source: id1,
+      target: id2,
+      type: "hikmah",
+      data: { kind: "thematic", label: "patience", reason: "both discuss sabr" },
+    });
+
+    const { nodes, edges } = useCanvasStore.getState();
+    const saved = serializeCanvas(nodes, edges);
+    const restored = deserializeCanvas(saved);
+
+    expect(restored.nodes).toHaveLength(2);
+    expect(restored.edges).toHaveLength(1);
+    expect(restored.nodes[0].id).toBe(id1);
+    expect(restored.nodes[1].id).toBe(id2);
+    expect((restored.edges[0].data as { kind: string }).kind).toBe("thematic");
+  });
+});
+
+describe("restoreCanvas", () => {
+  it("loads saved state and clears UI state", () => {
+    const store = useCanvasStore.getState();
+    store.setSelectedNode("old-node");
+    store.setSidebarContent({ type: "node", verse: baseVerse });
+
+    store.restoreCanvas({
+      v: 1,
+      nodes: [{ id: "node-3", x: 0, y: 0, verse: baseVerse }],
+      edges: [],
+    });
+
+    const s = useCanvasStore.getState();
+    expect(s.nodes).toHaveLength(1);
+    expect(s.edges).toHaveLength(0);
+    expect(s.selectedNodeId).toBeNull();
+    expect(s.sidebarContent).toBeNull();
+    expect(s.pendingExpand).toBeNull();
+  });
+
+  it("restores node id counter so new nodes don't collide", () => {
+    const store = useCanvasStore.getState();
+    store.restoreCanvas({
+      v: 1,
+      nodes: [{ id: "node-10", x: 0, y: 0, verse: baseVerse }],
+      edges: [],
+    });
+
+    const newId = store.addVerseNode(
+      { ...baseVerse, ref: "3:18" as const, surah: 3, ayah: 18 },
+      { x: 0, y: 0 }
+    );
+    // New node must have a numeric id greater than 10
+    const num = parseInt(newId.replace("node-", ""), 10);
+    expect(num).toBeGreaterThan(10);
   });
 });
