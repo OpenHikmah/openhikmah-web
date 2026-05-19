@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useEffect, useState } from "react";
 import type { EdgeKind } from "@/types/quran";
 
 interface ExpandMenuProps {
@@ -38,9 +39,21 @@ const OPTIONS: Array<{
 ];
 
 export function ExpandMenu({ onSelect, onClose }: ExpandMenuProps) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [openUp, setOpenUp] = useState(false);
+
+  useEffect(() => {
+    if (!menuRef.current) return;
+    const rect = menuRef.current.getBoundingClientRect();
+    if (rect.bottom > window.innerHeight - 16) {
+      setOpenUp(true);
+    }
+  }, []);
+
   return (
     <div
-      className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-48"
+      ref={menuRef}
+      className={`absolute left-1/2 -translate-x-1/2 w-48 ${openUp ? "bottom-full mb-1" : "top-full mt-1"}`}
       style={{ zIndex: 9999 }}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
