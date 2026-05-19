@@ -37,6 +37,9 @@ jobs:
     # Actual secrets are set in Vercel project settings for deployments.
     env:
       ANTHROPIC_API_KEY: sk-ant-placeholder
+      AI_PROVIDER: claude
+      GEMINI_API_KEY: placeholder-gemini-key
+      GEMINI_MODEL: gemini-2.0-flash
       NEXT_PUBLIC_QF_CLIENT_ID: placeholder-client-id
       QF_API_BASE: https://placeholder.example.com
       QF_AUTH_BASE: https://placeholder.example.com

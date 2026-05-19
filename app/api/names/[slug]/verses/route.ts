@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { unstable_cache } from "next/cache";
+import { callAI } from "@/lib/ai";
 import { getNameBySlug } from "@/lib/divine-names";
 import { getSurahName } from "@/lib/surah-names";
 import type { VerseRef } from "@/types/quran";
-
-const client = new Anthropic();
 
 interface NameVerse {
   ref: VerseRef;
@@ -76,26 +74,13 @@ const getVersesBySlug = unstable_cache(
     const name = getNameBySlug(slug);
     if (!name) return [];
 
-    const message = await client.messages.create({
-      model: "claude-opus-4-7",
-      max_tokens: 8000,
-      thinking: { type: "adaptive" },
-      messages: [
-        {
-          role: "user",
-          content: buildPrompt(name.arabic, name.transliteration, name.meaning, name.description),
-        },
-      ],
-    });
-
-    const textBlock = message.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") return [];
+    const text = await callAI(buildPrompt(name.arabic, name.transliteration, name.meaning, name.description));
 
     let rawItems: Array<{ ref: string; reason: string }>;
     try {
-      const match = textBlock.text.match(/\[[\s\S]*\]/);
+      const match = text.match(/\[[\s\S]*\]/);
       if (!match) return [];
-      rawItems = JSON.parse(match[0]);
+      rawItems = JSON.parse(match[0]) as Array<{ ref: string; reason: string }>;
     } catch {
       return [];
     }
