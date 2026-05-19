@@ -163,17 +163,18 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" />
+        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <Dialog.Content
           className="fixed top-[15%] left-1/2 -translate-x-1/2 w-full max-w-lg z-50 outline-none px-4"
           aria-describedby={undefined}
         >
           <Dialog.Title className="sr-only">Search Quran Verses</Dialog.Title>
           <div
-            className="rounded-2xl border shadow-2xl overflow-hidden"
+            className="rounded-md border overflow-hidden"
             style={{
               background: "var(--color-surface)",
               borderColor: "var(--color-border)",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
             }}
           >
             {/* Input bar */}
@@ -266,7 +267,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
               {showSeedVerses && (
                 <div className="p-3">
                   <p
-                    className="text-xs px-2 mb-2 uppercase tracking-wider font-mono"
+                    className="text-xs px-2 mb-2 font-mono"
                     style={{ color: "var(--color-text-muted)" }}
                   >
                     Popular starting points
@@ -330,25 +331,25 @@ function VerseCard({
 
   return (
     <div
-      className="m-3 rounded-xl border p-4 space-y-3"
+      className="m-3 rounded-md border p-3 space-y-3"
       style={{
         background: "var(--color-surface-raised)",
         borderColor: "var(--color-border)",
       }}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span
-          className="text-xs font-mono uppercase tracking-wider"
+          className="text-xs font-mono"
           style={{ color: "var(--color-text-secondary)" }}
         >
           {verse.surahName}
         </span>
         <span
-          className="text-xs font-mono px-2 py-0.5 rounded-full border"
+          className="text-xs font-mono px-1.5 py-0.5 rounded border shrink-0"
           style={{
             color: "var(--color-gold)",
             borderColor: "var(--color-gold)",
-            background: "rgba(201,168,76,0.1)",
+            background: "rgba(201,168,76,0.08)",
           }}
         >
           {verse.ref}
@@ -373,7 +374,7 @@ function VerseCard({
         onClick={handleClick}
         disabled={alreadyAdded || submitting}
         className={cn(
-          "w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all",
+          "w-full flex items-center justify-center gap-2 py-2 rounded text-xs font-medium transition-colors cursor-pointer",
           alreadyAdded || submitting
             ? "cursor-not-allowed opacity-60"
             : "hover:brightness-110 active:scale-[0.98]"

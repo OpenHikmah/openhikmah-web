@@ -40,29 +40,19 @@ const OPTIONS: Array<{
 export function ExpandMenu({ onSelect, onClose }: ExpandMenuProps) {
   return (
     <div
-      className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-52"
+      className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-48"
       style={{ zIndex: 9999 }}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
       <div
-        className="rounded-xl border overflow-hidden shadow-2xl"
+        className="rounded-md border overflow-hidden"
         style={{
           background: "var(--color-surface-overlay)",
           borderColor: "var(--color-border)",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
         }}
       >
-        <div
-          className="px-3 py-2 border-b"
-          style={{ borderColor: "var(--color-border)" }}
-        >
-          <p
-            className="text-xs font-mono uppercase tracking-wider"
-            style={{ color: "var(--color-text-muted)" }}
-          >
-            Expand connections
-          </p>
-        </div>
         {OPTIONS.map((opt) => (
           <button
             key={opt.kind}
@@ -70,23 +60,23 @@ export function ExpandMenu({ onSelect, onClose }: ExpandMenuProps) {
               onSelect(opt.kind);
               onClose();
             }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-white/5"
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors cursor-pointer hover:bg-white/5"
           >
             <span
-              className="w-6 h-6 rounded-md flex items-center justify-center text-sm font-mono shrink-0"
-              style={{ background: `${opt.color}22`, color: opt.color }}
+              className="w-5 h-5 rounded flex items-center justify-center text-xs font-mono shrink-0"
+              style={{ background: `${opt.color}1a`, color: opt.color }}
             >
               {opt.icon}
             </span>
             <div className="min-w-0">
               <p
-                className="text-sm font-medium leading-tight"
+                className="text-xs font-medium"
                 style={{ color: "var(--color-text-primary)" }}
               >
                 {opt.label}
               </p>
               <p
-                className="text-xs leading-tight"
+                className="text-xs"
                 style={{ color: "var(--color-text-muted)" }}
               >
                 {opt.description}

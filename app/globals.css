@@ -51,6 +51,16 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* Every interactive element gets a pointer — no exceptions */
+  button,
+  [role="button"],
+  a,
+  label[for],
+  select,
+  [tabindex]:not([tabindex="-1"]) {
+    cursor: pointer;
+  }
+
   ::selection {
     background: color-mix(in srgb, var(--color-gold) 30%, transparent);
   }
@@ -89,23 +99,12 @@
     letter-spacing: 0.02em;
   }
 
-  .glass {
-    background: color-mix(in srgb, var(--color-surface-raised) 80%, transparent);
-    backdrop-filter: blur(12px);
-    border: 1px solid var(--color-border);
+  /* Node selection states — border-only, no colored glows */
+  .node-selected {
+    border-color: var(--color-gold) !important;
   }
 
-  .gold-glow {
-    box-shadow: 0 0 20px color-mix(in srgb, var(--color-gold) 20%, transparent);
-  }
-
-  .teal-glow {
-    box-shadow: 0 0 20px color-mix(in srgb, var(--color-teal) 20%, transparent);
-  }
-
-  .geometric-bg {
-    background-image:
-      radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--color-gold) 4%, transparent) 0%, transparent 50%),
-      radial-gradient(circle at 80% 80%, color-mix(in srgb, var(--color-teal) 4%, transparent) 0%, transparent 50%);
+  .node-expanding {
+    border-color: var(--color-teal) !important;
   }
 }

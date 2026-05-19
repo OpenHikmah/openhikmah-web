@@ -52,7 +52,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden geometric-bg">
+    <div className="flex flex-col h-screen w-screen overflow-hidden" style={{ background: "var(--color-bg)" }}>
       <Header onSearchOpen={() => setSearchOpen(true)} />
 
       <main className="flex-1 relative overflow-hidden">

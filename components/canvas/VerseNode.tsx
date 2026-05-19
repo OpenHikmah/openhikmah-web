@@ -23,12 +23,10 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
   const isExpanding = expandingNodeId === id;
   const expandMenuOpen = openExpandNodeId === id;
 
-  // Open sidebar when this node is selected
   useEffect(() => {
     if (selected) {
       setSidebarContent({ type: "node", verse: verse as Verse });
     }
-    // Sidebar is closed explicitly via its X button, not here
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
@@ -40,13 +38,11 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
     <div
       onClick={() => setSelectedNode(selected ? null : id)}
       className={cn(
-        "relative w-72 rounded-xl border transition-all duration-300 cursor-pointer select-none",
+        "relative w-72 rounded-lg border transition-colors duration-150 cursor-pointer select-none",
         "bg-[var(--color-surface-raised)] border-[var(--color-border)]",
-        selected && "border-[var(--color-gold)] gold-glow",
-        isExpanding && "border-[var(--color-teal)] teal-glow",
-        !selected &&
-          !isExpanding &&
-          "hover:border-[var(--color-border)] hover:brightness-110"
+        selected && "node-selected",
+        isExpanding && "node-expanding",
+        !selected && !isExpanding && "hover:border-[var(--color-text-muted)]"
       )}
     >
       <Handle
@@ -55,24 +51,22 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
         className="!w-2 !h-2 !bg-[var(--color-border)] !border-[var(--color-border-subtle)]"
       />
 
-      <div className="p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-mono tracking-wider uppercase" style={{ color: "var(--color-text-muted)" }}>
+      <div className="p-3 space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <span
+            className="text-xs font-mono truncate"
+            style={{ color: "var(--color-text-muted)" }}
+          >
             {verse.surahName}
           </span>
           <span
-            className={cn(
-              "text-xs font-mono px-2 py-0.5 rounded-full border",
-              verse.isRoot
-                ? "border-opacity-40 bg-opacity-10"
-                : ""
-            )}
+            className="text-xs font-mono px-1.5 py-0.5 rounded border shrink-0"
             style={
               verse.isRoot
                 ? {
                     color: "var(--color-gold)",
                     borderColor: "var(--color-gold)",
-                    background: "rgba(201,168,76,0.1)",
+                    background: "rgba(201,168,76,0.08)",
                   }
                 : {
                     color: "var(--color-text-muted)",
@@ -85,7 +79,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
         </div>
 
         <p
-          className="font-arabic text-right text-base leading-loose"
+          className="font-arabic text-right text-sm leading-loose"
           style={{ color: "var(--color-text-primary)" }}
         >
           {verse.arabicText}
@@ -101,7 +95,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
 
       {/* Expand button */}
       <div
-        className="flex justify-center pb-3"
+        className="flex justify-center pb-2.5"
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
@@ -113,15 +107,15 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
           }}
           disabled={isExpanding}
           className={cn(
-            "w-7 h-7 rounded-full border flex items-center justify-center transition-all",
+            "w-6 h-6 rounded border flex items-center justify-center transition-colors cursor-pointer",
             expandMenuOpen
-              ? "border-teal-500 text-teal-400 bg-teal-900/20"
-              : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-teal-600 hover:text-teal-400",
+              ? "border-[var(--color-teal)] text-[var(--color-teal)]"
+              : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-teal)] hover:text-[var(--color-teal)]",
             "disabled:opacity-40 disabled:cursor-not-allowed"
           )}
           title="Expand connections"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="w-3 h-3" />
         </button>
       </div>
 
@@ -133,8 +127,8 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
       )}
 
       {isExpanding && (
-        <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-[var(--color-surface-raised)]/60 backdrop-blur-sm">
-          <Loader2 className="w-5 h-5 text-teal-400 animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[var(--color-surface-raised)]/70">
+          <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--color-teal)" }} />
         </div>
       )}
 
