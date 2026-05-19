@@ -1,7 +1,12 @@
 "use client";
 
 import { create } from "zustand";
-import type { Verse, CanvasEdge } from "@/types/quran";
+import type {
+  Verse,
+  CanvasEdge,
+  SidebarContent,
+  PendingExpand,
+} from "@/types/quran";
 import type { Node, Edge, NodeChange, EdgeChange } from "@xyflow/react";
 import { applyNodeChanges, applyEdgeChanges } from "@xyflow/react";
 
@@ -10,6 +15,10 @@ interface CanvasStore {
   edges: Edge[];
   selectedNodeId: string | null;
   expandingNodeId: string | null;
+  openExpandNodeId: string | null;
+  sidebarContent: SidebarContent | null;
+  pendingExpand: PendingExpand | null;
+  pendingAutoExpand: string | null;
 
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
@@ -20,8 +29,13 @@ interface CanvasStore {
   addConnectionEdge: (edge: CanvasEdge) => void;
   setSelectedNode: (id: string | null) => void;
   setExpandingNode: (id: string | null) => void;
+  setOpenExpandNodeId: (id: string | null) => void;
+  setSidebarContent: (content: SidebarContent | null) => void;
+  setPendingExpand: (action: PendingExpand | null) => void;
+  setPendingAutoExpand: (nodeId: string | null) => void;
   hasNode: (ref: string) => boolean;
   getNodeByRef: (ref: string) => Node | undefined;
+  getNodeById: (id: string) => Node | undefined;
   reset: () => void;
 }
 
@@ -33,6 +47,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   edges: [],
   selectedNodeId: null,
   expandingNodeId: null,
+  openExpandNodeId: null,
+  sidebarContent: null,
+  pendingExpand: null,
+  pendingAutoExpand: null,
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
@@ -84,6 +102,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   setSelectedNode: (id) => set({ selectedNodeId: id }),
   setExpandingNode: (id) => set({ expandingNodeId: id }),
+  setOpenExpandNodeId: (id) => set({ openExpandNodeId: id }),
+  setSidebarContent: (content) => set({ sidebarContent: content }),
+  setPendingExpand: (action) => set({ pendingExpand: action }),
+  setPendingAutoExpand: (nodeId) => set({ pendingAutoExpand: nodeId }),
 
   hasNode: (ref) =>
     get().nodes.some((n) => (n.data as unknown as Verse)?.ref === ref),
@@ -91,6 +113,17 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   getNodeByRef: (ref) =>
     get().nodes.find((n) => (n.data as unknown as Verse)?.ref === ref),
 
+  getNodeById: (id) => get().nodes.find((n) => n.id === id),
+
   reset: () =>
-    set({ nodes: [], edges: [], selectedNodeId: null, expandingNodeId: null }),
+    set({
+      nodes: [],
+      edges: [],
+      selectedNodeId: null,
+      expandingNodeId: null,
+      openExpandNodeId: null,
+      sidebarContent: null,
+      pendingExpand: null,
+      pendingAutoExpand: null,
+    }),
 }));

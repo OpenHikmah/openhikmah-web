@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "code-review": {
+      "source": "coderabbitai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-review/SKILL.md",
+      "computedHash": "6d117c3f8797e0c770c6b00a646a07028f3440b5d8042e8f841e88ed1116788f"
+    },
     "frontend-design": {
       "source": "anthropics/skills",
       "sourceType": "github",
@@ -13,11 +19,29 @@
       "skillPath": "skills/git-commit/SKILL.md",
       "computedHash": "2607fc60629b82b257136dd2a7a373f0a4466c0b49df7746d845d59313c99b21"
     },
+    "karpathy-guidelines": {
+      "source": "szkocot/andrej-karpathy-skills",
+      "sourceType": "github",
+      "skillPath": "skills/karpathy-guidelines/SKILL.md",
+      "computedHash": "41e8ca055bbde13d240776a14a076a59614057200340c243130a76ba4e64cac8"
+    },
+    "runtime-debug": {
+      "source": "vercel/next.js",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/runtime-debug/SKILL.md",
+      "computedHash": "48309aa1199d010befe0e3a24e6804a5611dad9281d3ed30161458c8de282149"
+    },
     "uncodixfy": {
-      "source": "cyxzdev/Uncodixfy",
+      "source": "cyxzdev/uncodixfy",
       "sourceType": "github",
       "skillPath": "SKILL.md",
       "computedHash": "deac2e88f3fc4a66aa95c77b509b5d22c189dfdb87caa24d3db85516f4600776"
+    },
+    "web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/web-design-guidelines/SKILL.md",
+      "computedHash": "f3bc47f890f42a44db1007ab390709ec368e4b8c089baee6b0007182236ac474"
     }
   }
 }

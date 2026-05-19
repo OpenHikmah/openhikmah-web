@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Search, Sparkles } from "lucide-react";
+import { BookOpen, Search, RotateCcw } from "lucide-react";
 import { useCanvasStore } from "@/store/canvas";
 
 interface HeaderProps {
@@ -12,39 +12,63 @@ export function Header({ onSearchOpen }: HeaderProps) {
   const nodeCount = useCanvasStore((s) => s.nodes.length);
 
   return (
-    <header className="flex items-center justify-between px-6 py-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] z-10 shrink-0">
-      <button
-        onClick={reset}
-        className="flex items-center gap-2.5 group"
-      >
-        <div className="w-7 h-7 rounded-lg bg-[var(--color-gold)] bg-opacity-15 flex items-center justify-center border border-[var(--color-gold)] border-opacity-30 group-hover:border-opacity-60 transition-all">
-          <BookOpen className="w-3.5 h-3.5 text-[var(--color-gold)]" />
-        </div>
-        <span className="text-sm font-semibold tracking-wide text-[var(--color-text-primary)]">
+    <header
+      className="flex items-center justify-between px-4 h-12 shrink-0"
+      style={{
+        background: "var(--color-surface)",
+        borderBottom: "1px solid var(--color-border)",
+      }}
+    >
+      {/* Logo */}
+      <div className="flex items-center gap-2">
+        <BookOpen className="w-4 h-4" style={{ color: "var(--color-gold)" }} />
+        <span
+          className="text-sm font-medium"
+          style={{ color: "var(--color-text-primary)" }}
+        >
           Open Hikmah
         </span>
-      </button>
+      </div>
 
+      {/* Right controls */}
       <div className="flex items-center gap-2">
         {nodeCount > 0 && (
-          <span className="text-xs text-[var(--color-text-muted)] font-mono mr-2">
+          <span
+            className="text-xs font-mono"
+            style={{ color: "var(--color-text-muted)" }}
+          >
             {nodeCount} verse{nodeCount !== 1 ? "s" : ""}
           </span>
         )}
 
+        {nodeCount > 0 && (
+          <button
+            onClick={reset}
+            title="Clear canvas"
+            aria-label="Clear all verses from canvas"
+            className="w-7 h-7 rounded border flex items-center justify-center transition-colors cursor-pointer hover:border-red-700 hover:text-red-400"
+            style={{
+              borderColor: "var(--color-border)",
+              color: "var(--color-text-muted)",
+            }}
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+        )}
+
         <button
           onClick={onSearchOpen}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-all"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs transition-colors cursor-pointer border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
         >
           <Search className="w-3.5 h-3.5" />
-          <span>Search verses</span>
-          <kbd className="ml-1 text-[10px] text-[var(--color-text-muted)] font-mono">⌘K</kbd>
+          <span>Search</span>
+          <kbd
+            className="ml-0.5 text-[10px] font-mono px-1 rounded"
+            style={{ color: "var(--color-text-muted)", background: "var(--color-surface-overlay)" }}
+          >
+            ⌘K
+          </kbd>
         </button>
-
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-[var(--color-teal)] border border-[var(--color-teal)] border-opacity-30 bg-[var(--color-teal)] bg-opacity-5">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>AI-powered</span>
-        </div>
       </div>
     </header>
   );
