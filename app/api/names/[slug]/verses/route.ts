@@ -26,12 +26,8 @@ async function fetchVerseData(ref: string): Promise<Omit<NameVerse, "reason"> | 
 
   try {
     const [arabicRes, translationRes] = await Promise.all([
-      fetch(`https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/ar.alafasy`, {
-        next: { revalidate: 86400 },
-      }),
-      fetch(`https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/en.sahih`, {
-        next: { revalidate: 86400 },
-      }),
+      fetch(`https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/ar.alafasy`),
+      fetch(`https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/en.sahih`),
     ]);
     if (!arabicRes.ok || !translationRes.ok) return null;
     const [arabicData, translationData] = await Promise.all([arabicRes.json(), translationRes.json()]);
