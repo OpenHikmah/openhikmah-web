@@ -1,19 +1,34 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState, useEffect } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import type { Verse } from "@/types/quran";
+import type { Verse, EdgeKind } from "@/types/quran";
 import { useCanvasStore } from "@/store/canvas";
 import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
+import { ExpandMenu } from "./ExpandMenu";
 
 type VerseNodeData = Verse & { isRoot?: boolean; isLoading?: boolean };
 
 function VerseNodeInner({ id, data, selected }: NodeProps) {
   const verse = data as unknown as VerseNodeData;
+  const [expandMenuOpen, setExpandMenuOpen] = useState(false);
+
   const expandingNodeId = useCanvasStore((s) => s.expandingNodeId);
   const setSelected = useCanvasStore((s) => s.setSelectedNode);
+  const setSidebarContent = useCanvasStore((s) => s.setSidebarContent);
+  const setPendingExpand = useCanvasStore((s) => s.setPendingExpand);
   const isExpanding = expandingNodeId === id;
+
+  useEffect(() => {
+    if (selected) {
+      setSidebarContent({ type: "node", verse: verse as Verse });
+    }
+  }, [selected, verse, setSidebarContent]);
+
+  const handleExpandSelect = (kind: EdgeKind) => {
+    setPendingExpand({ nodeId: id, ref: verse.ref, kind });
+  };
 
   return (
     <div
@@ -23,7 +38,9 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
         "bg-[var(--color-surface-raised)] border-[var(--color-border)]",
         selected && "border-[var(--color-gold)] gold-glow",
         isExpanding && "border-[var(--color-teal)] teal-glow",
-        !selected && !isExpanding && "hover:border-[var(--color-border-subtle)] hover:border-opacity-80"
+        !selected &&
+          !isExpanding &&
+          "hover:border-[var(--color-border-subtle)] hover:border-opacity-80"
       )}
     >
       <Handle
@@ -57,6 +74,38 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
           {verse.translation}
         </p>
       </div>
+
+      <div
+        className="flex justify-center pb-3"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpandMenuOpen((o) => !o);
+          }}
+          disabled={isExpanding}
+          className={cn(
+            "w-7 h-7 rounded-full border flex items-center justify-center transition-all",
+            "hover:border-[var(--color-teal)] hover:text-[var(--color-teal)]",
+            expandMenuOpen
+              ? "border-[var(--color-teal)] text-[var(--color-teal)] bg-[var(--color-teal)] bg-opacity-10"
+              : "border-[var(--color-border)] text-[var(--color-text-muted)]",
+            "disabled:opacity-40 disabled:cursor-not-allowed"
+          )}
+          title="Expand connections"
+        >
+          <Plus className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {expandMenuOpen && (
+        <ExpandMenu
+          onSelect={handleExpandSelect}
+          onClose={() => setExpandMenuOpen(false)}
+        />
+      )}
 
       {isExpanding && (
         <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-[var(--color-surface-raised)] bg-opacity-60 backdrop-blur-sm">
