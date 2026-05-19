@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { activityLog, users } from "@/lib/db/schema";
-import { requireUser } from "@/lib/social-auth";
+import { requireUser, invalidateTokenCache } from "@/lib/social-auth";
 
 const VALID_TYPES = new Set(["verse_added", "connection_made", "hadith_read"]);
 
@@ -72,8 +72,10 @@ export async function POST(req: NextRequest) {
       })
       .where(eq(users.id, userId));
 
-    // Invalidate token cache entry so next requireUser() call gets fresh streak
-    // (the cache is module-level in social-auth.ts; we clear by importing its map)
+    // Invalidate cache so next request re-reads fresh streak from DB
+    const rawAuth = req.headers.get("authorization");
+    const token = rawAuth?.startsWith("Bearer ") ? rawAuth.slice(7) : null;
+    if (token) invalidateTokenCache(token);
   }
 
   return NextResponse.json({

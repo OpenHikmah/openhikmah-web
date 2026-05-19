@@ -6,6 +6,7 @@ import type { User } from "@/lib/db/schema";
 
 vi.mock("@/lib/social-auth", () => ({
   requireUser: vi.fn(),
+  invalidateTokenCache: vi.fn(),
 }));
 
 // Drizzle query-chain mock: every method returns a chainable thenable

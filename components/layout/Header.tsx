@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, Search, RotateCcw, LogIn, LogOut, Sparkles, Trophy, Share2, ListMusic } from "lucide-react";
+import { BookOpen, Search, RotateCcw, LogIn, LogOut, Sparkles, Trophy, Share2, ListMusic, Heart } from "lucide-react";
 import { useCanvasStore, serializeCanvas } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
@@ -25,6 +25,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
   const edges = useCanvasStore((s) => s.edges);
   const nodeCount = nodes.length;
   const accessToken = useAuthStore((s) => s.accessToken);
+  const bookmarkCount = useAuthStore((s) => s.bookmarks.length);
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const userId = useSocialStore((s) => s.userId);
 
@@ -145,6 +146,17 @@ export function Header({ onSearchOpen }: HeaderProps) {
             className="w-7 h-7 rounded border flex items-center justify-center transition-colors border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-teal)] hover:text-[var(--color-teal)]"
           >
             <Trophy className="w-3.5 h-3.5" />
+          </Link>
+        )}
+
+        {bookmarkCount > 0 && (
+          <Link
+            href="/bookmarks"
+            title="Bookmarks"
+            className="flex items-center gap-1 px-2 py-1.5 rounded border text-xs transition-colors border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
+          >
+            <Heart className="w-3.5 h-3.5" />
+            <span>{bookmarkCount}</span>
           </Link>
         )}
 

@@ -1,9 +1,66 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X } from "lucide-react";
+import { X, ChevronDown, ChevronRight } from "lucide-react";
 import { useCanvasStore } from "@/store/canvas";
+import { useState, useEffect } from "react";
 import type { EdgeKind } from "@/types/quran";
+
+function TafsirSection({ surah, ayah }: { surah: number; ayah: number }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setText(null);
+    setOpen(false);
+  }, [surah, ayah]);
+
+  const handleOpen = async () => {
+    if (open) { setOpen(false); return; }
+    setOpen(true);
+    if (text !== null) return;
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `https://api.alquran.cloud/v1/ayah/${surah}:${ayah}/editions/en.ibn-kathir`
+      );
+      const json = await res.json();
+      setText(json?.data?.[0]?.text ?? "Tafsir unavailable.");
+    } catch {
+      setText("Could not load tafsir.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="rounded-md border"
+      style={{ borderColor: "var(--color-border)", background: "var(--color-surface-raised)" }}
+    >
+      <button
+        onClick={handleOpen}
+        className="w-full flex items-center justify-between px-3 py-2 cursor-pointer"
+        style={{ color: "var(--color-text-secondary)" }}
+      >
+        <span className="text-xs font-medium">Ibn Kathir Tafsir</span>
+        {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+      </button>
+      {open && (
+        <div className="px-3 pb-3">
+          {loading ? (
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Loading…</p>
+          ) : (
+            <p className="text-xs leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
+              {text}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const KIND_LABEL: Record<EdgeKind, string> = {
   thematic: "Thematic",
@@ -91,6 +148,8 @@ export function ContextSidebar() {
                 >
                   {sidebarContent.verse.translation}
                 </p>
+
+                <TafsirSection surah={sidebarContent.verse.surah} ayah={sidebarContent.verse.ayah} />
               </>
             )}
 

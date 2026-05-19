@@ -9,8 +9,12 @@ export interface AuthedUser {
 }
 
 // Simple in-process cache: token → user  (clears on server restart, good enough)
-const tokenCache = new Map<string, { user: User; expiresAt: number }>();
+export const tokenCache = new Map<string, { user: User; expiresAt: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+export function invalidateTokenCache(token: string): void {
+  tokenCache.delete(token);
+}
 
 /**
  * Extracts the Bearer token from the request, resolves the user from the DB,

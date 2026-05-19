@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
 
   // Include self on leaderboard
   const allIds = [userId, ...friendIds];
+  if (allIds.length === 0) return NextResponse.json([]);
 
   const leaderboard = await db
     .select({

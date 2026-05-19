@@ -135,7 +135,7 @@ The multi-stage `Dockerfile` produces a minimal production image using Next.js `
 docker build \
   --build-arg NEXT_PUBLIC_APP_URL=https://yourdomain.com \
   --build-arg NEXT_PUBLIC_QF_CLIENT_ID=your-client-id \
-  --build-arg NEXT_PUBLIC_QF_AUTH_BASE=https://prelive-oauth2.quran.foundation \
+  --build-arg NEXT_PUBLIC_QF_AUTH_BASE=https://oauth2.quran.foundation \
   -t open-hikmah-app:latest .
 
 # Run with all runtime secrets injected
@@ -143,12 +143,12 @@ docker run -d \
   -p 127.0.0.1:3000:3000 \
   -e ANTHROPIC_API_KEY=sk-ant-... \
   -e QF_CLIENT_SECRET=... \
-  -e QF_API_BASE=https://api.quran.com \
-  -e QF_AUTH_BASE=https://prelive-oauth2.quran.foundation \
+  -e QF_API_BASE=https://apis.quran.foundation \
+  -e QF_AUTH_BASE=https://oauth2.quran.foundation \
   -e DATABASE_URL=postgresql://openh:YOURPASSWORD@db:5432/open_hikmah \
   -e NEXT_PUBLIC_APP_URL=https://yourdomain.com \
   -e NEXT_PUBLIC_QF_CLIENT_ID=your-client-id \
-  -e NEXT_PUBLIC_QF_AUTH_BASE=https://prelive-oauth2.quran.foundation \
+  -e NEXT_PUBLIC_QF_AUTH_BASE=https://oauth2.quran.foundation \
   open-hikmah-app:latest
 ```
 
@@ -170,8 +170,8 @@ See [`.env.example`](.env.example) for the full list with descriptions.
 |----------|----------|-------------|
 | `ANTHROPIC_API_KEY` | Yes | Anthropic API key for verse connections and divine name content |
 | `QF_CLIENT_SECRET` | Yes | Quran Foundation OAuth2 client secret |
-| `QF_API_BASE` | Yes | Quran Foundation API base URL (e.g. `https://api.quran.com`) |
-| `QF_AUTH_BASE` | Yes | QF auth server URL (e.g. `https://prelive-oauth2.quran.foundation`) |
+| `QF_API_BASE` | Yes | Quran Foundation API base URL (`https://apis.quran.foundation`) |
+| `QF_AUTH_BASE` | Yes | QF auth server URL (`https://oauth2.quran.foundation`) |
 | `DATABASE_URL` | Yes | PostgreSQL connection string (`postgresql://user:pass@host:5432/db`) |
 | `NEXT_PUBLIC_QF_CLIENT_ID` | Yes | OAuth2 client ID — embedded in client bundle |
 | `NEXT_PUBLIC_QF_AUTH_BASE` | Yes | Auth server URL — embedded in client bundle |

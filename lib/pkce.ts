@@ -30,7 +30,7 @@ export async function buildAuthUrl(): Promise<{
     response_type: "code",
     client_id: process.env.NEXT_PUBLIC_QF_CLIENT_ID ?? "",
     redirect_uri: redirectUri,
-    scope: "openid offline_access bookmark",
+    scope: process.env.NEXT_PUBLIC_QF_SCOPE ?? "openid offline_access",
     state,
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
