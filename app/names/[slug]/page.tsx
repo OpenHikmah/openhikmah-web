@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, BookOpen } from "lucide-react";
 import { getNameBySlug, DIVINE_NAMES, CATEGORY_LABELS, type NameCategory } from "@/lib/divine-names";
 import { NameVerses } from "./NameVerses";
+import { NameReflection } from "./NameReflection";
+import { NamePairings } from "./NamePairings";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -147,15 +149,24 @@ export default async function NameDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Verses section */}
-      <div className="max-w-3xl mx-auto px-6 py-10">
-        <h2
-          className="text-xs font-mono uppercase tracking-widest mb-6"
-          style={{ color: "var(--color-text-muted)" }}
-        >
-          Verses of this Name
-        </h2>
-        <NameVerses slug={slug} accent={styles.accent} />
+      {/* Reflection + Pairings + Verses */}
+      <div className="max-w-3xl mx-auto px-6 py-10 space-y-10">
+        {/* Believer's Reflection */}
+        <NameReflection slug={slug} accent={styles.accent} />
+
+        {/* Structural Pairings */}
+        <NamePairings slug={slug} accent={styles.accent} />
+
+        {/* Verse Feed */}
+        <div>
+          <h2
+            className="text-xs font-mono uppercase tracking-widest mb-6"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            Verses of this Name
+          </h2>
+          <NameVerses slug={slug} accent={styles.accent} />
+        </div>
       </div>
 
       {/* Name navigation */}
