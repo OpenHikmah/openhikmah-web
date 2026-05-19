@@ -1,9 +1,8 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { unstable_cache } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
+import { callAI } from "@/lib/ai";
 import type { ConnectionResult, EdgeKind, VerseRef } from "@/types/quran";
 import { getSurahName } from "@/lib/surah-names";
-
-const client = new Anthropic();
 
 const KIND_INSTRUCTIONS: Record<EdgeKind, string> = {
   thematic:
@@ -60,14 +59,8 @@ async function fetchVerseData(ref: string): Promise<{
 
   try {
     const [arabicRes, translationRes] = await Promise.all([
-      fetch(
-        `https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/ar.alafasy`,
-        { next: { revalidate: 86400 } }
-      ),
-      fetch(
-        `https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/en.sahih`,
-        { next: { revalidate: 86400 } }
-      ),
+      fetch(`https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/ar.alafasy`),
+      fetch(`https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/en.sahih`),
     ]);
 
     if (!arabicRes.ok || !translationRes.ok) return null;
@@ -90,6 +83,53 @@ async function fetchVerseData(ref: string): Promise<{
   }
 }
 
+const getCachedConnections = unstable_cache(
+  async (
+    fromRef: string,
+    arabicText: string,
+    translation: string,
+    kind: EdgeKind
+  ): Promise<ConnectionResult[]> => {
+    const text = await callAI(buildPrompt(fromRef, arabicText, translation, kind));
+
+    let rawConnections: Array<{ ref: string; reason: string }>;
+    try {
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) throw new Error("No JSON array found");
+      rawConnections = JSON.parse(jsonMatch[0]);
+    } catch {
+      return [];
+    }
+
+    const verseDataResults = await Promise.all(
+      rawConnections.slice(0, 3).map((c) => fetchVerseData(c.ref))
+    );
+
+    return rawConnections
+      .slice(0, 3)
+      .map((c, i) => {
+        const verseData = verseDataResults[i];
+        if (!verseData) return null;
+        const [surahStr, ayahStr] = c.ref.split(":");
+        const result: ConnectionResult = {
+          surah: parseInt(surahStr, 10),
+          ayah: parseInt(ayahStr, 10),
+          ref: c.ref as VerseRef,
+          arabicText: verseData.arabicText,
+          translation: verseData.translation,
+          surahName: verseData.surahName,
+          surahNameArabic: verseData.surahNameArabic,
+          reason: c.reason,
+          kind,
+        };
+        return result;
+      })
+      .filter((c): c is ConnectionResult => c !== null);
+  },
+  ["connections-v1"],
+  { revalidate: 86400 * 30 }
+);
+
 export async function POST(req: NextRequest) {
   let body: { fromRef?: string; kind?: string; arabicText?: string; translation?: string };
   try {
@@ -111,60 +151,7 @@ export async function POST(req: NextRequest) {
   const edgeKind = kind as EdgeKind;
 
   try {
-    const message = await client.messages.create({
-      model: "claude-opus-4-7",
-      max_tokens: 16000,
-      thinking: { type: "adaptive" },
-      messages: [
-        {
-          role: "user",
-          content: buildPrompt(fromRef, arabicText, translation, edgeKind),
-        },
-      ],
-    });
-
-    const textContent = message.content.find((b) => b.type === "text");
-    if (!textContent || textContent.type !== "text") {
-      return NextResponse.json({ error: "No response from AI" }, { status: 500 });
-    }
-
-    let rawConnections: Array<{ ref: string; reason: string }>;
-    try {
-      const jsonMatch = textContent.text.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) throw new Error("No JSON array found");
-      rawConnections = JSON.parse(jsonMatch[0]);
-    } catch {
-      return NextResponse.json(
-        { error: "Failed to parse AI response" },
-        { status: 500 }
-      );
-    }
-
-    const verseDataResults = await Promise.all(
-      rawConnections.slice(0, 3).map((c) => fetchVerseData(c.ref))
-    );
-
-    const connections: ConnectionResult[] = rawConnections
-      .slice(0, 3)
-      .map((c, i) => {
-        const verseData = verseDataResults[i];
-        if (!verseData) return null;
-
-        const [surahStr, ayahStr] = c.ref.split(":");
-        const result: ConnectionResult = {
-          surah: parseInt(surahStr, 10),
-          ayah: parseInt(ayahStr, 10),
-          ref: c.ref as VerseRef,
-          arabicText: verseData.arabicText,
-          translation: verseData.translation,
-          surahName: verseData.surahName,
-          surahNameArabic: verseData.surahNameArabic,
-          reason: c.reason,
-          kind: edgeKind,
-        };
-        return result;
-      })
-      .filter((c): c is ConnectionResult => c !== null);
+    const connections = await getCachedConnections(fromRef, arabicText, translation, edgeKind);
 
     if (connections.length === 0) {
       return NextResponse.json({ error: "Could not resolve any verses" }, { status: 500 });
