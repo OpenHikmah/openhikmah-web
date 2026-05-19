@@ -151,7 +151,9 @@ export async function POST(req: NextRequest) {
         if (!verseData) return null;
 
         const [surahStr, ayahStr] = c.ref.split(":");
-        return {
+        const result: ConnectionResult = {
+          surah: parseInt(surahStr, 10),
+          ayah: parseInt(ayahStr, 10),
           ref: c.ref as VerseRef,
           arabicText: verseData.arabicText,
           translation: verseData.translation,
@@ -159,9 +161,8 @@ export async function POST(req: NextRequest) {
           surahNameArabic: verseData.surahNameArabic,
           reason: c.reason,
           kind: edgeKind,
-          surah: parseInt(surahStr, 10),
-          ayah: parseInt(ayahStr, 10),
-        } satisfies ConnectionResult;
+        };
+        return result;
       })
       .filter((c): c is ConnectionResult => c !== null);
 

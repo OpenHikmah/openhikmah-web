@@ -30,6 +30,8 @@ export interface CanvasEdge {
 }
 
 export interface ConnectionResult {
+  surah: number;
+  ayah: number;
   ref: VerseRef;
   arabicText: string;
   translation: string;

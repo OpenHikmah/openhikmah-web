@@ -84,7 +84,7 @@ function CanvasInner() {
           if (hasNode(conn.ref)) continue;
 
           const pos = radialPos(sourcePos, i, connections.length);
-          const newId = addVerseNode(conn as Verse, pos);
+          const newId = addVerseNode(conn as unknown as Verse, pos);
           newNodeIds.push(newId);
 
           addConnectionEdge({

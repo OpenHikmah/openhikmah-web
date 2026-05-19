@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { Header } from "@/components/layout/Header";
 import { SearchDialog } from "@/components/search/SearchDialog";
 import { EmptyState } from "@/components/canvas/EmptyState";
+import { ContextSidebar } from "@/components/layout/ContextSidebar";
 import { useCanvasStore } from "@/store/canvas";
 
 const HikmahCanvas = dynamic(
@@ -37,6 +38,7 @@ export default function Home() {
           <EmptyState onSearchOpen={() => setSearchOpen(true)} />
         )}
         <HikmahCanvas />
+        <ContextSidebar />
       </main>
 
       <SearchDialog
