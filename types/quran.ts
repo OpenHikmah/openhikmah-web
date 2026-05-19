@@ -26,5 +26,39 @@ export interface CanvasEdge {
   source: string;
   target: string;
   type: "hikmah";
-  data: { kind: EdgeKind; label: string };
+  data: { kind: EdgeKind; label: string; reason?: string };
+}
+
+export interface ConnectionResult {
+  ref: VerseRef;
+  arabicText: string;
+  translation: string;
+  surahName: string;
+  surahNameArabic: string;
+  reason: string;
+  kind: EdgeKind;
+}
+
+export interface SearchResult {
+  ref: VerseRef;
+  surahName: string;
+  surahNameArabic: string;
+  snippet: string;
+}
+
+export type SidebarContent =
+  | { type: "node"; verse: Verse }
+  | {
+      type: "edge";
+      fromVerse: Verse;
+      toVerse: Verse;
+      reason: string;
+      kind: EdgeKind;
+      label: string;
+    };
+
+export interface PendingExpand {
+  nodeId: string;
+  ref: VerseRef;
+  kind: EdgeKind;
 }
