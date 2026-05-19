@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, Search, RotateCcw, LogIn, LogOut, Sparkles } from "lucide-react";
+import { BookOpen, Search, RotateCcw, LogIn, LogOut, Sparkles, Trophy } from "lucide-react";
 import { useCanvasStore } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
+import { useSocialStore } from "@/store/social";
 import { buildAuthUrl } from "@/lib/pkce";
+import { StreakBadge } from "@/components/social/StreakBadge";
 
 interface HeaderProps {
   onSearchOpen: () => void;
@@ -15,6 +17,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
   const nodeCount = useCanvasStore((s) => s.nodes.length);
   const accessToken = useAuthStore((s) => s.accessToken);
   const clearAuth = useAuthStore((s) => s.clearAuth);
+  const userId = useSocialStore((s) => s.userId);
 
   const handleSignIn = async () => {
     const { url, codeVerifier, state } = await buildAuthUrl();
@@ -66,6 +69,18 @@ export function Header({ onSearchOpen }: HeaderProps) {
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
+        )}
+
+        <StreakBadge />
+
+        {accessToken && userId && (
+          <Link
+            href="/social"
+            title="Friends & Leaderboard"
+            className="w-7 h-7 rounded border flex items-center justify-center transition-colors border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-teal)] hover:text-[var(--color-teal)]"
+          >
+            <Trophy className="w-3.5 h-3.5" />
+          </Link>
         )}
 
         <Link

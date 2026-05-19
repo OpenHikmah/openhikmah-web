@@ -14,6 +14,7 @@ import "@xyflow/react/dist/style.css";
 import { VerseNode } from "./VerseNode";
 import { HikmahEdge } from "./HikmahEdge";
 import { useCanvasStore } from "@/store/canvas";
+import { useActivityTracker } from "@/hooks/useActivityTracker";
 import type { ConnectionResult, Verse } from "@/types/quran";
 
 const nodeTypes = { verse: VerseNode };
@@ -35,6 +36,8 @@ function radialPos(
 }
 
 function CanvasInner() {
+  useActivityTracker();
+
   const reactFlow = useReactFlow();
   const expandingRef = useRef(false);
   const mountedRef = useRef(true);
