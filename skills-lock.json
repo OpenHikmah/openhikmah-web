@@ -31,6 +31,12 @@
       "skillPath": ".agents/skills/runtime-debug/SKILL.md",
       "computedHash": "48309aa1199d010befe0e3a24e6804a5611dad9281d3ed30161458c8de282149"
     },
+    "security-review": {
+      "source": "getsentry/skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-review/SKILL.md",
+      "computedHash": "ec9792f5fd065e020c48ab5a57707c83435c286c449ba98dfa726d7b1842c868"
+    },
     "uncodixfy": {
       "source": "cyxzdev/uncodixfy",
       "sourceType": "github",

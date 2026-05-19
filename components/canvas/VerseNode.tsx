@@ -4,8 +4,9 @@ import { memo, useEffect } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { Verse, EdgeKind } from "@/types/quran";
 import { useCanvasStore } from "@/store/canvas";
+import { useAuthStore } from "@/store/auth";
 import { cn } from "@/lib/utils";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Heart } from "lucide-react";
 import { ExpandMenu } from "./ExpandMenu";
 
 type VerseNodeData = Verse & { isRoot?: boolean; isLoading?: boolean };
@@ -19,6 +20,9 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
   const setOpenExpandNodeId = useCanvasStore((s) => s.setOpenExpandNodeId);
   const setSidebarContent = useCanvasStore((s) => s.setSidebarContent);
   const setPendingExpand = useCanvasStore((s) => s.setPendingExpand);
+
+  const isBookmarked = useAuthStore((s) => s.isBookmarked(verse.ref));
+  const toggleBookmark = useAuthStore((s) => s.toggleBookmark);
 
   const isExpanding = expandingNodeId === id;
   const expandMenuOpen = openExpandNodeId === id;
@@ -59,23 +63,42 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
           >
             {verse.surahName}
           </span>
-          <span
-            className="text-xs font-mono px-1.5 py-0.5 rounded border shrink-0"
-            style={
-              verse.isRoot
-                ? {
-                    color: "var(--color-gold)",
-                    borderColor: "var(--color-gold)",
-                    background: "rgba(201,168,76,0.08)",
-                  }
-                : {
-                    color: "var(--color-text-muted)",
-                    borderColor: "var(--color-border)",
-                  }
-            }
-          >
-            {verse.ref}
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span
+              className="text-xs font-mono px-1.5 py-0.5 rounded border"
+              style={
+                verse.isRoot
+                  ? {
+                      color: "var(--color-gold)",
+                      borderColor: "var(--color-gold)",
+                      background: "rgba(201,168,76,0.08)",
+                    }
+                  : {
+                      color: "var(--color-text-muted)",
+                      borderColor: "var(--color-border)",
+                    }
+              }
+            >
+              {verse.ref}
+            </span>
+            <button
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleBookmark(verse.ref);
+              }}
+              aria-label={isBookmarked ? "Remove bookmark" : "Bookmark verse"}
+              className="w-5 h-5 flex items-center justify-center rounded transition-colors cursor-pointer hover:text-[var(--color-gold)]"
+              style={{
+                color: isBookmarked ? "var(--color-gold)" : "var(--color-text-muted)",
+              }}
+            >
+              <Heart
+                className="w-3.5 h-3.5"
+                fill={isBookmarked ? "currentColor" : "none"}
+              />
+            </button>
+          </div>
         </div>
 
         <p
