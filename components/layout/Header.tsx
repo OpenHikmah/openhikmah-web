@@ -1,7 +1,9 @@
 "use client";
 
-import { BookOpen, Search, RotateCcw } from "lucide-react";
+import { BookOpen, Search, RotateCcw, LogIn, LogOut } from "lucide-react";
 import { useCanvasStore } from "@/store/canvas";
+import { useAuthStore } from "@/store/auth";
+import { buildAuthUrl } from "@/lib/pkce";
 
 interface HeaderProps {
   onSearchOpen: () => void;
@@ -10,6 +12,14 @@ interface HeaderProps {
 export function Header({ onSearchOpen }: HeaderProps) {
   const reset = useCanvasStore((s) => s.reset);
   const nodeCount = useCanvasStore((s) => s.nodes.length);
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const clearAuth = useAuthStore((s) => s.clearAuth);
+
+  const handleSignIn = async () => {
+    const { url, codeVerifier } = await buildAuthUrl();
+    sessionStorage.setItem("pkce_code_verifier", codeVerifier);
+    window.location.href = url;
+  };
 
   return (
     <header
@@ -69,6 +79,26 @@ export function Header({ onSearchOpen }: HeaderProps) {
             ⌘K
           </kbd>
         </button>
+
+        {accessToken ? (
+          <button
+            onClick={clearAuth}
+            title="Sign out"
+            aria-label="Sign out"
+            className="w-7 h-7 rounded border flex items-center justify-center transition-colors cursor-pointer hover:border-[var(--color-text-secondary)] hover:text-[var(--color-text-secondary)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
+        ) : (
+          <button
+            onClick={handleSignIn}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs transition-colors cursor-pointer border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-teal)] hover:text-[var(--color-teal)]"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Sign in</span>
+          </button>
+        )}
       </div>
     </header>
   );

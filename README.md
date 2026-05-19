@@ -1,36 +1,112 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Open Hikmah
 
-## Getting Started
+A theological sensemaking tool for the Quran. Instead of reading linearly, you build a knowledge graph — verses connected by theme, shared Arabic root words, or contrasting concepts. Start from any verse or topic, expand outward, and watch the Quran's internal architecture emerge.
 
-First, run the development server:
+**Live:** [openhikmah.com](https://openhikmah.com)
+
+---
+
+## Features
+
+- **Semantic Explorer** — Infinite canvas where verse nodes connect via AI-generated edges (thematic, root word, contrast). Click any node to read the full verse and tafsir. Click any edge to see the theological reason for the connection.
+- **AI Connections** — Claude (`claude-opus-4-7`) finds three related verses for each expansion, grounded in the Maturidi/Hanafi tradition with strict Tanzih framing.
+- **Verse Search** — Direct ref lookup (`2:255`) or semantic text search. Results appear as preview cards with a single "Map Connections" action.
+- **Bookmarks** — Save verses to your Quran Foundation account. Syncs across devices via the Quran Foundation User API.
+- **Divine Names** *(coming soon)* — All 99 Asma-ul-Husna with Maturidi taxonomy, root morphology, verse feeds, and Takhalluq reflections.
+
+---
+
+## Tech Stack
+
+| Layer | Choice |
+|-------|--------|
+| Framework | Next.js 16 (App Router), React 19, TypeScript |
+| Canvas | @xyflow/react v12 |
+| State | Zustand v5 |
+| Styling | Tailwind CSS v4, Framer Motion |
+| AI | Anthropic SDK — `claude-opus-4-7` with adaptive thinking |
+| Quran data | alquran.cloud (verse text), api.quran.com (search) |
+| User data | Quran Foundation User API (OAuth2 PKCE — bookmarks) |
+
+---
+
+## Local Development
+
+**1. Clone and install**
+
+```bash
+git clone https://github.com/Nazm-AI/open-hikmah
+cd open-hikmah
+npm install
+```
+
+**2. Set up environment**
+
+```bash
+cp .env.example .env.local
+# Fill in all values in .env.local — see comments for where to get each one
+```
+
+**3. Run**
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment Variables
 
-## Learn More
+See [`.env.example`](.env.example) for the full list with descriptions. Required variables:
 
-To learn more about Next.js, take a look at the following resources:
+| Variable | Description |
+|----------|-------------|
+| `ANTHROPIC_API_KEY` | Anthropic API key for verse connections |
+| `QF_CLIENT_SECRET` | Quran Foundation OAuth2 client secret |
+| `QF_API_BASE` | Quran Foundation API base URL |
+| `QF_AUTH_BASE` | Quran Foundation auth server URL |
+| `NEXT_PUBLIC_QF_CLIENT_ID` | OAuth2 client ID (public) |
+| `NEXT_PUBLIC_QF_AUTH_BASE` | Auth server URL (public, for PKCE redirect) |
+| `NEXT_PUBLIC_APP_URL` | Your deployment URL (used in OAuth redirect URI) |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deployment
 
-## Deploy on Vercel
+The app is deployed on Vercel with a custom domain.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**Deploy your own:**
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Push to GitHub and import the repo at [vercel.com/new](https://vercel.com/new)
+2. Add all environment variables from `.env.example` in Vercel's project settings
+3. Under **Domains**, add your custom domain and follow the DNS instructions
+4. Register `https://yourdomain.com/auth/callback` as a redirect URI with Quran Foundation
+
+---
+
+## Project Structure
+
+```
+app/
+  api/
+    connections/     # POST — Claude AI finds related verses
+    search/          # GET  — Verse search (ref or text)
+    verse/           # GET  — Single verse fetch
+    bookmarks/       # GET/POST/DELETE — Quran Foundation User API
+    auth/exchange/   # POST — OAuth2 PKCE token exchange
+  auth/callback/     # OAuth2 redirect landing page
+components/
+  canvas/            # React Flow nodes, edges, expand menu
+  layout/            # Header, context sidebar
+  search/            # Search dialog
+lib/
+  pkce.ts            # PKCE auth URL builder
+  surah-names.ts     # Shared surah name lookup
+store/
+  canvas.ts          # Verse graph state (Zustand)
+  auth.ts            # Auth + bookmarks state (Zustand + persist)
+types/
+  quran.ts           # Shared TypeScript types
+```
