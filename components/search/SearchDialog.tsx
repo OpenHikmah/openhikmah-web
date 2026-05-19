@@ -37,20 +37,9 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const hasNode = useCanvasStore((s) => s.hasNode);
   const nodes = useCanvasStore((s) => s.nodes);
 
+  // Focus input when dialog opens — no setState, so this is safe in an effect
   useEffect(() => {
-    if (open) {
-      setQuery("");
-      setPreviewVerse(null);
-      setSearchResults([]);
-      setPreviewError(false);
-      setLoading(false);
-      setIsSearching(false);
-      setTimeout(() => inputRef.current?.focus(), 50);
-    } else {
-      // Cancel in-flight requests on close
-      abortRef.current?.abort();
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    }
+    if (open) setTimeout(() => inputRef.current?.focus(), 50);
   }, [open]);
 
   const fetchPreview = useCallback(async (ref: string, signal: AbortSignal) => {
@@ -93,24 +82,14 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     abortRef.current?.abort();
 
     const trimmed = query.trim();
-    if (!trimmed) {
-      setPreviewVerse(null);
-      setSearchResults([]);
-      setPreviewError(false);
-      setLoading(false);
-      setIsSearching(false);
-      return;
-    }
+    if (!trimmed) return;
 
     const controller = new AbortController();
     abortRef.current = controller;
 
     if (/^\d+:\d+$/.test(trimmed)) {
-      setSearchResults([]);
       debounceRef.current = setTimeout(() => fetchPreview(trimmed, controller.signal), 250);
     } else {
-      setPreviewVerse(null);
-      setPreviewError(false);
       debounceRef.current = setTimeout(() => fetchSearch(trimmed, controller.signal), 420);
     }
 
@@ -161,7 +140,23 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const showResults = searchResults.length > 0 && !isSearching;
 
   return (
-    <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) {
+          // Reset all state and cancel requests when dialog closes
+          abortRef.current?.abort();
+          if (debounceRef.current) clearTimeout(debounceRef.current);
+          setQuery("");
+          setPreviewVerse(null);
+          setSearchResults([]);
+          setPreviewError(false);
+          setLoading(false);
+          setIsSearching(false);
+          onClose();
+        }
+      }}
+    >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <Dialog.Content
@@ -196,7 +191,19 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
               <input
                 ref={inputRef}
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setQuery(v);
+                  if (!v.trim()) {
+                    abortRef.current?.abort();
+                    if (debounceRef.current) clearTimeout(debounceRef.current);
+                    setPreviewVerse(null);
+                    setSearchResults([]);
+                    setPreviewError(false);
+                    setLoading(false);
+                    setIsSearching(false);
+                  }
+                }}
                 placeholder="Search topics, or enter a ref like 2:255…"
                 className="flex-1 bg-transparent text-sm outline-none"
                 style={{ color: "var(--color-text-primary)" }}

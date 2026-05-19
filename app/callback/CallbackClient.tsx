@@ -56,7 +56,10 @@ export function CallbackClient({ code, state, error }: Props) {
       .catch(() => {
         router.replace("/");
       });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // ^ intentionally empty — didRun.current prevents double-fire in StrictMode;
+  //   code/state/error come from URL params and never change after mount
 
   return (
     <div
