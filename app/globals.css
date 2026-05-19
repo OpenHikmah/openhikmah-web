@@ -1,26 +1,104 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  /* Brand colors */
+  --color-gold: #c9a84c;
+  --color-gold-muted: #8a6d2c;
+  --color-teal: #0d9488;
+  --color-teal-dim: #0f766e;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /* Surface layers */
+  --color-bg: #0a0f1a;
+  --color-surface: #111827;
+  --color-surface-raised: #1a2233;
+  --color-surface-overlay: #1e2d40;
+
+  /* Borders */
+  --color-border: #1f2d3d;
+  --color-border-subtle: #162130;
+
+  /* Text */
+  --color-text-primary: #f0f4f8;
+  --color-text-secondary: #8899aa;
+  --color-text-muted: #4a5a6a;
+
+  /* Semantic */
+  --color-theme-edge: #0d9488;
+  --color-root-edge: #c9a84c;
+  --color-contrast-edge: #e05252;
+
+  /* Fonts */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-arabic: var(--font-amiri);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    height: 100%;
+    color-scheme: dark;
+  }
+
+  body {
+    min-height: 100%;
+    background-color: var(--color-bg);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans), system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-gold) 30%, transparent);
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-surface);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-muted);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  .font-arabic {
+    font-family: var(--font-arabic), 'Amiri', 'Traditional Arabic', serif;
+    direction: rtl;
+    line-height: 2;
+    letter-spacing: 0.02em;
+  }
+
+  .glass {
+    background: color-mix(in srgb, var(--color-surface-raised) 80%, transparent);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--color-border);
+  }
+
+  .gold-glow {
+    box-shadow: 0 0 20px color-mix(in srgb, var(--color-gold) 20%, transparent);
+  }
+
+  .teal-glow {
+    box-shadow: 0 0 20px color-mix(in srgb, var(--color-teal) 20%, transparent);
+  }
+
+  .geometric-bg {
+    background-image:
+      radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--color-gold) 4%, transparent) 0%, transparent 50%),
+      radial-gradient(circle at 80% 80%, color-mix(in srgb, var(--color-teal) 4%, transparent) 0%, transparent 50%);
+  }
 }
