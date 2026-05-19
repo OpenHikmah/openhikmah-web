@@ -1,6 +1,7 @@
 "use client";
 
-import { BookOpen, Search, RotateCcw, LogIn, LogOut } from "lucide-react";
+import Link from "next/link";
+import { BookOpen, Search, RotateCcw, LogIn, LogOut, Sparkles } from "lucide-react";
 import { useCanvasStore } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import { buildAuthUrl } from "@/lib/pkce";
@@ -66,6 +67,14 @@ export function Header({ onSearchOpen }: HeaderProps) {
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
         )}
+
+        <Link
+          href="/names"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs transition-colors border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>99 Names</span>
+        </Link>
 
         <button
           onClick={onSearchOpen}

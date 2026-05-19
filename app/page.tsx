@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Header } from "@/components/layout/Header";
 import { SearchDialog } from "@/components/search/SearchDialog";
 import { EmptyState } from "@/components/canvas/EmptyState";
 import { ContextSidebar } from "@/components/layout/ContextSidebar";
 import { useCanvasStore } from "@/store/canvas";
+import type { Verse } from "@/types/quran";
 
 const HikmahCanvas = dynamic(
   () => import("@/components/canvas/HikmahCanvas").then((m) => m.HikmahCanvas),
@@ -25,13 +27,42 @@ const HikmahCanvas = dynamic(
   }
 );
 
+function VerseLoader() {
+  const searchParams = useSearchParams();
+  const addVerseNode = useCanvasStore((s) => s.addVerseNode);
+  const setPendingAutoExpand = useCanvasStore((s) => s.setPendingAutoExpand);
+  const handledRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const verseRef = searchParams.get("verse");
+    if (!verseRef || handledRef.current === verseRef) return;
+    if (!/^\d+:\d+$/.test(verseRef)) return;
+
+    handledRef.current = verseRef;
+    const [surah, ayah] = verseRef.split(":");
+
+    fetch(`/api/verse/${surah}/${ayah}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((verse: Verse | null) => {
+        if (!verse) return;
+        const nodeId = addVerseNode({ ...verse, isRoot: true }, { x: 0, y: 0 });
+        setPendingAutoExpand(nodeId);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("verse");
+        window.history.replaceState(null, "", url.toString());
+      })
+      .catch(() => {});
+  }, [searchParams, addVerseNode, setPendingAutoExpand]);
+
+  return null;
+}
+
 export default function Home() {
   const [searchOpen, setSearchOpen] = useState(false);
   const nodes = useCanvasStore((s) => s.nodes);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Don't hijack shortcuts when user is typing in an input
       const target = e.target as HTMLElement;
       const isInput =
         target instanceof HTMLInputElement ||
@@ -53,6 +84,10 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden" style={{ background: "var(--color-bg)" }}>
+      <Suspense>
+        <VerseLoader />
+      </Suspense>
+
       <Header onSearchOpen={() => setSearchOpen(true)} />
 
       <main className="flex-1 relative overflow-hidden">
