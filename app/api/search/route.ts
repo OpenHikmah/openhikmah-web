@@ -26,13 +26,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const url = `https://api.quran.com/v4/search?q=${encodeURIComponent(q)}&size=10&language=en&page=1`;
+    const url = `https://api.quran.com/api/v4/search?q=${encodeURIComponent(q)}&size=10&language=en&page=1`;
     const res = await fetch(url, {
       headers: { Accept: "application/json" },
       next: { revalidate: 300 },
     });
 
     if (!res.ok) {
+      console.error(`Search API error: ${res.status} ${res.statusText}`);
       return NextResponse.json([], { status: 200 });
     }
 

@@ -46,6 +46,7 @@ jobs:
       QF_CLIENT_SECRET: placeholder-secret
       NEXT_PUBLIC_APP_URL: https://openhikmah.com
       NEXT_PUBLIC_QF_AUTH_BASE: https://placeholder.example.com
+      DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
     steps:
       - uses: actions/checkout@v4
 

@@ -1,20 +1,59 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, Search, RotateCcw, LogIn, LogOut, Sparkles } from "lucide-react";
-import { useCanvasStore } from "@/store/canvas";
+import { BookOpen, Search, RotateCcw, LogIn, LogOut, Sparkles, Trophy, Share2, ListMusic, Heart } from "lucide-react";
+import { useCanvasStore, serializeCanvas } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
+import { useSocialStore } from "@/store/social";
+import { useAudioStore } from "@/store/audio";
+import type { AudioVerse } from "@/store/audio";
+import type { Verse } from "@/types/quran";
 import { buildAuthUrl } from "@/lib/pkce";
+import { buildShareUrl } from "@/hooks/useCanvasPersistence";
+import { StreakBadge } from "@/components/social/StreakBadge";
+import { useState } from "react";
 
 interface HeaderProps {
   onSearchOpen: () => void;
 }
 
 export function Header({ onSearchOpen }: HeaderProps) {
+  const [copied, setCopied] = useState(false);
+
   const reset = useCanvasStore((s) => s.reset);
-  const nodeCount = useCanvasStore((s) => s.nodes.length);
+  const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
+  const nodeCount = nodes.length;
   const accessToken = useAuthStore((s) => s.accessToken);
+  const bookmarkCount = useAuthStore((s) => s.bookmarks.length);
   const clearAuth = useAuthStore((s) => s.clearAuth);
+  const userId = useSocialStore((s) => s.userId);
+
+  const playGraph = useAudioStore((s) => s.playGraph);
+  const audioCurrentRef = useAudioStore((s) => s.currentRef);
+  const stopAudio = useAudioStore((s) => s.stop);
+
+  const handlePlayGraph = () => {
+    if (audioCurrentRef) {
+      stopAudio();
+      return;
+    }
+    // Sort nodes in Quran order (by surah then ayah)
+    const verses: AudioVerse[] = [...nodes]
+      .map((n) => n.data as unknown as Verse)
+      .filter((v) => v?.surah && v?.ayah)
+      .sort((a, b) => a.surah !== b.surah ? a.surah - b.surah : a.ayah - b.ayah)
+      .map((v) => ({ ref: v.ref, surah: v.surah, ayah: v.ayah, surahName: v.surahName }));
+    if (verses.length > 0) playGraph(verses);
+  };
+
+  const handleShare = () => {
+    const url = buildShareUrl(serializeCanvas(nodes, edges));
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   const handleSignIn = async () => {
     const { url, codeVerifier, state } = await buildAuthUrl();
@@ -55,6 +94,36 @@ export function Header({ onSearchOpen }: HeaderProps) {
 
         {nodeCount > 0 && (
           <button
+            onClick={handleShare}
+            title="Copy shareable link"
+            aria-label="Copy shareable canvas link"
+            className="w-7 h-7 rounded border flex items-center justify-center transition-colors cursor-pointer"
+            style={{
+              borderColor: copied ? "var(--color-teal)" : "var(--color-border)",
+              color: copied ? "var(--color-teal)" : "var(--color-text-muted)",
+            }}
+          >
+            <Share2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {nodeCount > 0 && (
+          <button
+            onClick={handlePlayGraph}
+            title={audioCurrentRef ? "Stop playback" : "Play all verses in Quran order"}
+            aria-label={audioCurrentRef ? "Stop audio playback" : "Play Graph — recite all verses"}
+            className="w-7 h-7 rounded border flex items-center justify-center transition-colors cursor-pointer"
+            style={{
+              borderColor: audioCurrentRef ? "var(--color-teal)" : "var(--color-border)",
+              color: audioCurrentRef ? "var(--color-teal)" : "var(--color-text-muted)",
+            }}
+          >
+            <ListMusic className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {nodeCount > 0 && (
+          <button
             onClick={reset}
             title="Clear canvas"
             aria-label="Clear all verses from canvas"
@@ -66,6 +135,29 @@ export function Header({ onSearchOpen }: HeaderProps) {
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
+        )}
+
+        <StreakBadge />
+
+        {accessToken && userId && (
+          <Link
+            href="/social"
+            title="Friends & Leaderboard"
+            className="w-7 h-7 rounded border flex items-center justify-center transition-colors border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-teal)] hover:text-[var(--color-teal)]"
+          >
+            <Trophy className="w-3.5 h-3.5" />
+          </Link>
+        )}
+
+        {bookmarkCount > 0 && (
+          <Link
+            href="/bookmarks"
+            title="Bookmarks"
+            className="flex items-center gap-1 px-2 py-1.5 rounded border text-xs transition-colors border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
+          >
+            <Heart className="w-3.5 h-3.5" />
+            <span>{bookmarkCount}</span>
+          </Link>
         )}
 
         <Link

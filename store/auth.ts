@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { useSocialStore } from "@/store/social";
 
 interface AuthStore {
   // Tokens kept in memory only — not persisted (prevents localStorage XSS exposure)
@@ -27,8 +28,10 @@ export const useAuthStore = create<AuthStore>()(
       setTokens: (accessToken, refreshToken) =>
         set({ accessToken, refreshToken }),
 
-      clearAuth: () =>
-        set({ accessToken: null, refreshToken: null, bookmarks: [] }),
+      clearAuth: () => {
+        set({ accessToken: null, refreshToken: null, bookmarks: [] });
+        useSocialStore.getState().clearSocial();
+      },
 
       isBookmarked: (ref) => get().bookmarks.includes(ref),
 

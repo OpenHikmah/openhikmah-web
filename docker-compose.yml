@@ -1,0 +1,55 @@
+services:
+  app:
+    build:
+      context: .
+      # NEXT_PUBLIC_* vars must be present at build time so Next.js
+      # can embed them in the client bundle. They come from .env on the server.
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+        NEXT_PUBLIC_QF_CLIENT_ID: ${NEXT_PUBLIC_QF_CLIENT_ID}
+        NEXT_PUBLIC_QF_AUTH_BASE: ${NEXT_PUBLIC_QF_AUTH_BASE}
+    image: open-hikmah-app:latest
+    restart: unless-stopped
+    # Bind only to localhost — nginx proxies public traffic in
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AI_PROVIDER=${AI_PROVIDER:-claude}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-opus-4-7}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
+      - QF_CLIENT_SECRET=${QF_CLIENT_SECRET}
+      - QF_API_BASE=${QF_API_BASE}
+      - QF_AUTH_BASE=${QF_AUTH_BASE}
+      - NEXT_PUBLIC_QF_CLIENT_ID=${NEXT_PUBLIC_QF_CLIENT_ID}
+      - NEXT_PUBLIC_QF_AUTH_BASE=${NEXT_PUBLIC_QF_AUTH_BASE}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+      - DATABASE_URL=postgresql://openh:${DB_PASSWORD}@db:5432/open_hikmah
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: open_hikmah
+      POSTGRES_USER: openh
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openh -d open_hikmah"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

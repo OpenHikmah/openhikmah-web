@@ -1,0 +1,12 @@
+.next
+node_modules
+.git
+.env*
+*.md
+coverage
+__tests__
+.github
+.agents
+scripts
+hosting.md
+plan.md

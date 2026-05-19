@@ -6,9 +6,72 @@ import type {
   CanvasEdge,
   SidebarContent,
   PendingExpand,
+  EdgeKind,
 } from "@/types/quran";
 import type { Node, Edge, NodeChange, EdgeChange } from "@xyflow/react";
 import { applyNodeChanges, applyEdgeChanges } from "@xyflow/react";
+
+// ─── Persistence helpers ───────────────────────────────────────────────────────
+
+export interface SavedNode {
+  id: string;
+  x: number;
+  y: number;
+  verse: Verse;
+}
+
+export interface SavedEdge {
+  id: string;
+  source: string;
+  target: string;
+  kind: EdgeKind;
+  label: string;
+  reason: string;
+}
+
+export interface SavedCanvas {
+  v: 1;
+  nodes: SavedNode[];
+  edges: SavedEdge[];
+}
+
+export function serializeCanvas(nodes: Node[], edges: Edge[]): SavedCanvas {
+  return {
+    v: 1,
+    nodes: nodes.map((n) => ({
+      id: n.id,
+      x: n.position.x,
+      y: n.position.y,
+      verse: n.data as unknown as Verse,
+    })),
+    edges: edges.map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      kind: ((e.data as { kind?: EdgeKind })?.kind ?? "thematic") as EdgeKind,
+      label: (e.data as { label?: string })?.label ?? "",
+      reason: (e.data as { reason?: string })?.reason ?? "",
+    })),
+  };
+}
+
+export function deserializeCanvas(saved: SavedCanvas): { nodes: Node[]; edges: Edge[] } {
+  const nodes: Node[] = saved.nodes.map((n) => ({
+    id: n.id,
+    type: "verse",
+    position: { x: n.x, y: n.y },
+    data: { ...n.verse } as unknown as Record<string, unknown>,
+  }));
+  const edges: Edge[] = saved.edges.map((e) => ({
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    type: "hikmah",
+    animated: true,
+    data: { kind: e.kind, label: e.label, reason: e.reason },
+  }));
+  return { nodes, edges };
+}
 
 interface CanvasStore {
   nodes: Node[];
@@ -37,6 +100,7 @@ interface CanvasStore {
   getNodeByRef: (ref: string) => Node | undefined;
   getNodeById: (id: string) => Node | undefined;
   reset: () => void;
+  restoreCanvas: (saved: SavedCanvas) => void;
 }
 
 let nodeIdCounter = 0;
@@ -126,4 +190,23 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       pendingExpand: null,
       pendingAutoExpand: null,
     }),
+
+  restoreCanvas: (saved: SavedCanvas) => {
+    const { nodes, edges } = deserializeCanvas(saved);
+    const maxNum = nodes.reduce((max, n) => {
+      const m = n.id.match(/^node-(\d+)$/);
+      return m ? Math.max(max, parseInt(m[1], 10)) : max;
+    }, 0);
+    nodeIdCounter = maxNum;
+    set({
+      nodes,
+      edges,
+      selectedNodeId: null,
+      expandingNodeId: null,
+      openExpandNodeId: null,
+      sidebarContent: null,
+      pendingExpand: null,
+      pendingAutoExpand: null,
+    });
+  },
 }));

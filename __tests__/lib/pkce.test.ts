@@ -11,7 +11,8 @@ describe("buildAuthUrl", () => {
 
   it("url contains the auth base and authorize path", async () => {
     const { url } = await buildAuthUrl();
-    expect(url).toContain("oauth2/authorize");
+    // Default path is /oauth2/auth (Ory Hydra); overrideable via NEXT_PUBLIC_QF_AUTHORIZE_PATH
+    expect(url).toContain("oauth2/auth");
     expect(url).toContain(process.env.NEXT_PUBLIC_QF_AUTH_BASE!);
   });
 

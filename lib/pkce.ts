@@ -30,15 +30,17 @@ export async function buildAuthUrl(): Promise<{
     response_type: "code",
     client_id: process.env.NEXT_PUBLIC_QF_CLIENT_ID ?? "",
     redirect_uri: redirectUri,
-    scope: "openid offline_access bookmark",
+    scope: process.env.NEXT_PUBLIC_QF_SCOPE ?? "openid offline_access",
     state,
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
   });
 
   const authBase = process.env.NEXT_PUBLIC_QF_AUTH_BASE ?? "";
+  // Ory Hydra (used by QF) exposes /oauth2/auth — override via NEXT_PUBLIC_QF_AUTHORIZE_PATH if needed
+  const authorizePath = process.env.NEXT_PUBLIC_QF_AUTHORIZE_PATH ?? "/oauth2/auth";
   return {
-    url: `${authBase}/oauth2/authorize?${params.toString()}`,
+    url: `${authBase}${authorizePath}?${params.toString()}`,
     codeVerifier,
     state,
   };
