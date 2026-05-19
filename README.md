@@ -128,13 +128,17 @@ The app will be available at `http://localhost:3000`.
 
 ### Production deployment
 
-The multi-stage `Dockerfile` produces a minimal production image using Next.js `output: "standalone"`:
+The multi-stage `Dockerfile` produces a minimal production image using Next.js `output: "standalone"`.
+
+> **Two QF environments:**
+> - **Pre-production** (`prelive-oauth2.quran.foundation`, client `e5d0eb0d-...`) — all features enabled; use for testing
+> - **Production** (`oauth2.quran.foundation`, client `041a809d-...`) — auth disabled by default; requires QF to enable
 
 ```bash
 # Build image (pass public env vars as build args)
 docker build \
-  --build-arg NEXT_PUBLIC_APP_URL=https://yourdomain.com \
-  --build-arg NEXT_PUBLIC_QF_CLIENT_ID=your-client-id \
+  --build-arg NEXT_PUBLIC_APP_URL=https://openhikmah.com \
+  --build-arg NEXT_PUBLIC_QF_CLIENT_ID=041a809d-1797-401f-a41e-dc83ea13ead8 \
   --build-arg NEXT_PUBLIC_QF_AUTH_BASE=https://oauth2.quran.foundation \
   -t open-hikmah-app:latest .
 
@@ -142,12 +146,12 @@ docker build \
 docker run -d \
   -p 127.0.0.1:3000:3000 \
   -e ANTHROPIC_API_KEY=sk-ant-... \
-  -e QF_CLIENT_SECRET=... \
+  -e QF_CLIENT_SECRET=MR5CGlNc4yz7L2z7zVVVqCCZC8 \
   -e QF_API_BASE=https://apis.quran.foundation \
   -e QF_AUTH_BASE=https://oauth2.quran.foundation \
   -e DATABASE_URL=postgresql://openh:YOURPASSWORD@db:5432/open_hikmah \
-  -e NEXT_PUBLIC_APP_URL=https://yourdomain.com \
-  -e NEXT_PUBLIC_QF_CLIENT_ID=your-client-id \
+  -e NEXT_PUBLIC_APP_URL=https://openhikmah.com \
+  -e NEXT_PUBLIC_QF_CLIENT_ID=041a809d-1797-401f-a41e-dc83ea13ead8 \
   -e NEXT_PUBLIC_QF_AUTH_BASE=https://oauth2.quran.foundation \
   open-hikmah-app:latest
 ```
