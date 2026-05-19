@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
+import { useSocialStore } from "@/store/social";
 import { Loader2 } from "lucide-react";
 
 interface Props {
@@ -14,6 +15,7 @@ interface Props {
 export function CallbackClient({ code, state, error }: Props) {
   const router = useRouter();
   const { setTokens, loadRemoteBookmarks } = useAuthStore();
+  const { setProfile } = useSocialStore();
   const didRun = useRef(false);
 
   useEffect(() => {
@@ -48,10 +50,18 @@ export function CallbackClient({ code, state, error }: Props) {
         if (!res.ok) throw new Error("exchange failed");
         return res.json();
       })
-      .then(async ({ accessToken, refreshToken }) => {
+      .then(async ({ accessToken, refreshToken, userId, username, isNewUser }) => {
         setTokens(accessToken, refreshToken ?? null);
+
+        // Populate social profile if the server resolved user identity
+        if (userId && username) {
+          setProfile({ userId, username });
+        }
+
         await loadRemoteBookmarks();
-        router.replace("/");
+
+        // New users pick a username before using the app
+        router.replace(isNewUser ? "/onboarding" : "/");
       })
       .catch(() => {
         router.replace("/");
