@@ -28,32 +28,7 @@ export function useCanvasPersistence() {
   const hydratedRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // On mount: restore from ?share=<id> first, then localStorage
-  useEffect(() => {
-    if (hydratedRef.current) return;
-    hydratedRef.current = true;
-
-    const params = new URLSearchParams(window.location.search);
-    const shareId = params.get("share");
-
-    if (shareId && /^[a-f0-9]{10}$/.test(shareId)) {
-      // Clean the share param from URL immediately so refreshing doesn't re-fetch
-      const cleanUrl = new URL(window.location.href);
-      cleanUrl.searchParams.delete("share");
-      window.history.replaceState(null, "", cleanUrl.toString());
-
-      fetch(`/api/share/${shareId}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((saved: SavedCanvas | null) => {
-          if (saved?.v === 1 && saved.nodes.length > 0) {
-            restoreCanvas(saved);
-          }
-        })
-        .catch(() => {});
-      return;
-    }
-
-    // Fall back to localStorage
+  function tryRestoreFromLocalStorage() {
     try {
       const raw = localStorage.getItem(LS_KEY);
       if (raw) {
@@ -65,6 +40,38 @@ export function useCanvasPersistence() {
     } catch {
       // Corrupt localStorage — ignore
     }
+  }
+
+  // On mount: restore from ?share=<id> first, then localStorage
+  useEffect(() => {
+    if (hydratedRef.current) return;
+    hydratedRef.current = true;
+
+    const params = new URLSearchParams(window.location.search);
+    const shareId = params.get("share");
+
+    if (shareId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(shareId)) {
+      fetch(`/api/share/${shareId}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((saved: SavedCanvas | null) => {
+          if (saved?.v === 1 && saved.nodes.length > 0) {
+            restoreCanvas(saved);
+            // Only clean the URL once we've successfully restored — preserves the
+            // share link for retry if the fetch fails or returns invalid data.
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete("share");
+            window.history.replaceState(null, "", cleanUrl.toString());
+          } else {
+            tryRestoreFromLocalStorage();
+          }
+        })
+        .catch(() => {
+          tryRestoreFromLocalStorage();
+        });
+      return;
+    }
+
+    tryRestoreFromLocalStorage();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
