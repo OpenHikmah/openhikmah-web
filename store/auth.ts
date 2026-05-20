@@ -5,13 +5,12 @@ import { persist } from "zustand/middleware";
 import { useSocialStore } from "@/store/social";
 
 interface AuthStore {
-  // Tokens kept in memory only — not persisted (prevents localStorage XSS exposure)
+  // Access token kept in memory — restored on page load via /api/auth/refresh (HttpOnly cookie)
   accessToken: string | null;
-  refreshToken: string | null;
   // Bookmarks are non-sensitive and are persisted for offline use
   bookmarks: string[];
 
-  setTokens: (accessToken: string, refreshToken: string | null) => void;
+  setTokens: (accessToken: string) => void;
   clearAuth: () => void;
   toggleBookmark: (ref: string) => void;
   isBookmarked: (ref: string) => boolean;
@@ -22,14 +21,12 @@ export const useAuthStore = create<AuthStore>()(
   persist(
     (set, get) => ({
       accessToken: null,
-      refreshToken: null,
       bookmarks: [],
 
-      setTokens: (accessToken, refreshToken) =>
-        set({ accessToken, refreshToken }),
+      setTokens: (accessToken) => set({ accessToken }),
 
       clearAuth: () => {
-        set({ accessToken: null, refreshToken: null, bookmarks: [] });
+        set({ accessToken: null, bookmarks: [] });
         useSocialStore.getState().clearSocial();
       },
 

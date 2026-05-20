@@ -65,6 +65,11 @@ export function Header({ onSearchOpen }: HeaderProps) {
     }
   };
 
+  const handleSignOut = async () => {
+    await fetch("/api/auth/signout", { method: "POST" }).catch(() => {});
+    clearAuth();
+  };
+
   const handleSignIn = async () => {
     const { url, codeVerifier, state, nonce } = await buildAuthUrl();
     sessionStorage.setItem("pkce_code_verifier", codeVerifier);
@@ -209,7 +214,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
               <span>{username ?? "signed in"}</span>
             </div>
             <button
-              onClick={clearAuth}
+              onClick={handleSignOut}
               title="Sign out"
               aria-label="Sign out"
               className="w-7 h-7 rounded border flex items-center justify-center transition-colors cursor-pointer hover:border-[var(--color-text-secondary)] hover:text-[var(--color-text-secondary)]"

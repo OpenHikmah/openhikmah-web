@@ -63,9 +63,9 @@ export function CallbackClient({ code, state, error }: Props) {
         }
         return res.json();
       })
-      .then(async ({ accessToken, refreshToken, userId, username, isNewUser }) => {
+      .then(async ({ accessToken, userId, username, isNewUser }) => {
         if (!accessToken) throw new Error("No access token in response.");
-        setTokens(accessToken, refreshToken ?? null);
+        setTokens(accessToken);
 
         if (userId && username) {
           setProfile({ userId, username });
