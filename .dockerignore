@@ -8,5 +8,6 @@ __tests__
 .github
 .agents
 scripts
+!scripts/migrate.mjs
 hosting.md
 plan.md
