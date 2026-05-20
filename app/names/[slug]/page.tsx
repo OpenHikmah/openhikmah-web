@@ -132,21 +132,6 @@ export default async function NameDetailPage({ params }: Props) {
         >
           {name.description}
         </p>
-
-        <div
-          className="mt-6 text-xs px-4 py-3 rounded-lg max-w-lg mx-auto text-left"
-          style={{
-            background: "var(--color-surface-raised)",
-            border: "1px solid var(--color-border)",
-            color: "var(--color-text-muted)",
-          }}
-        >
-          <span className="font-mono" style={{ color: styles.accent }}>
-            {categoryLabel.en} · {categoryLabel.ar}
-          </span>
-          <span className="mx-2" style={{ color: "var(--color-border)" }}>|</span>
-          {categoryLabel.description}
-        </div>
       </div>
 
       {/* Reflection + Pairings + Verses */}
