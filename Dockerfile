@@ -52,9 +52,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/lib/db/migrations ./lib/db/migrations
 
-# postgres is bundled into Next.js chunks and not left in standalone node_modules,
-# so the migration script can't resolve it without this explicit copy.
+# postgres and drizzle-orm are bundled into Next.js chunks and not left in
+# standalone node_modules, so migrate.mjs can't resolve them without these copies.
 COPY --from=deps /app/node_modules/postgres ./node_modules/postgres
+COPY --from=deps /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
 
 USER nextjs
 EXPOSE 3000
