@@ -46,6 +46,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Migration runner — node scripts/migrate.mjs (uses drizzle-orm, no drizzle-kit needed)
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.mjs ./scripts/migrate.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/lib/db/migrations ./lib/db/migrations
+
 USER nextjs
 EXPOSE 3000
 CMD ["node", "server.js"]
