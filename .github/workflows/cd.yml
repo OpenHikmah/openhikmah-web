@@ -1,0 +1,23 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
+
+jobs:
+  deploy:
+    name: Deploy to Coolify
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Trigger Coolify deployment
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X GET "${{ secrets.COOLIFY_WEBHOOK_URL }}")
+          echo "Coolify responded: HTTP $status"
+          if [[ "$status" != "2"* ]]; then
+            echo "Deploy webhook failed"
+            exit 1
+          fi
