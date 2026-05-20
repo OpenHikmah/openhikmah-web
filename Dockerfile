@@ -50,6 +50,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/lib/db/migrations ./lib/db/migrations
 
+# postgres is bundled into Next.js chunks and not left in standalone node_modules,
+# so the migration script can't resolve it without this explicit copy.
+COPY --from=deps /app/node_modules/postgres ./node_modules/postgres
+
 USER nextjs
 EXPOSE 3000
 CMD ["node", "server.js"]
