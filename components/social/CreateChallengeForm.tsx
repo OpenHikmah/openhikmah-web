@@ -11,13 +11,14 @@ interface AcceptedFriend {
 
 interface Props {
   friends: AcceptedFriend[];
+  loadingFriends?: boolean;
   onCreated: () => void;
 }
 
 const DURATIONS = ["24h", "48h", "7d"] as const;
 type Duration = (typeof DURATIONS)[number];
 
-export function CreateChallengeForm({ friends, onCreated }: Props) {
+export function CreateChallengeForm({ friends, loadingFriends, onCreated }: Props) {
   const accessToken = useAuthStore((s) => s.accessToken);
   const [selectedFriend, setSelectedFriend] = useState("");
   const [duration, setDuration] = useState<Duration>("24h");
@@ -64,6 +65,14 @@ export function CreateChallengeForm({ friends, onCreated }: Props) {
       setSending(false);
     }
   };
+
+  if (loadingFriends) {
+    return (
+      <div className="flex justify-center py-4">
+        <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--color-teal)" }} />
+      </div>
+    );
+  }
 
   if (friends.length === 0) {
     return (

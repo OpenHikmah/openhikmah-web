@@ -46,10 +46,18 @@ export async function PATCH(
     return NextResponse.json({ error: "Challenge is no longer pending" }, { status: 409 });
   }
 
-  const newStatus = action === "accept" ? "active" : "declined";
+  // On accept, reset the clock from acceptance time so both parties compete the same window.
+  // On decline, just flip the status.
+  const now = new Date();
+  const durationMs = challenge.endsAt.getTime() - challenge.startsAt.getTime();
+  const setFields =
+    action === "accept"
+      ? { status: "active" as const, startsAt: now, endsAt: new Date(now.getTime() + durationMs) }
+      : { status: "declined" as const };
+
   const [updated] = await db
     .update(challenges)
-    .set({ status: newStatus })
+    .set(setFields)
     .where(eq(challenges.id, challengeId))
     .returning();
 

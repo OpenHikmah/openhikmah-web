@@ -209,6 +209,7 @@ export default function SocialPage() {
               friends={(friends as { status: string; friend: { id: number; username: string } | null }[])
                 .filter((f) => f.status === "accepted" && f.friend)
                 .map((f) => f.friend!)}
+              loadingFriends={loadingFriends}
               onCreated={fetchChallenges}
             />
             {loadingChallenges ? (

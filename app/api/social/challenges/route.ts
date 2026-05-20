@@ -18,11 +18,13 @@ async function getScore(userId: number, challenge: Challenge): Promise<number> {
     .where(
       and(
         eq(activityLog.userId, userId),
+        eq(activityLog.activityType, challenge.activityType),
         gte(activityLog.occurredAt, challenge.startsAt),
         lte(activityLog.occurredAt, challenge.endsAt)
       )
     );
-  return row?.score ?? 0;
+  // PG returns COUNT as a bigint string via node-postgres; cast to number
+  return Number(row?.score ?? 0);
 }
 
 export async function GET(req: NextRequest) {
