@@ -245,21 +245,61 @@ describe("GET /api/social/challenges", () => {
     });
     mockSelect
       .mockReturnValueOnce(makeDbChain([expired]))
-      .mockReturnValueOnce(makeDbChain([{ score: 3 }]))         // challengerScore
-      .mockReturnValueOnce(makeDbChain([{ score: 1 }]))         // challengedScore
+      .mockReturnValueOnce(makeDbChain([{ score: 3 }]))         // challengerScore (resolution)
+      .mockReturnValueOnce(makeDbChain([{ score: 1 }]))         // challengedScore (resolution)
+      .mockReturnValueOnce(makeDbChain([                        // users
+        { id: 1, username: "alice" },
+        { id: 2, username: "bob" },
+      ]));
+    // No further score queries expected — cached scores are reused in enrichment
+    mockUpdate.mockReturnValue(makeDbChain([]));
+    const res = await GET(makeGetReq());
+    expect(res.status).toBe(200);
+    expect(mockUpdate).toHaveBeenCalled();
+    const body = await res.json();
+    expect(body[0].status).toBe("completed");
+    expect(body[0].winnerId).toBe(1); // challenger (score 3) beats challenged (score 1)
+    expect(body[0].challengerScore).toBe(3);
+    expect(body[0].challengedScore).toBe(1);
+  });
+
+  it("scores are fetched for active (non-expired) challenges", async () => {
+    authedAs(makeUser({ id: 1 }));
+    const active = makeChallenge({
+      status: "active",
+      endsAt: new Date(Date.now() + 3_600_000), // 1 hour from now
+    });
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([active]))
       .mockReturnValueOnce(makeDbChain([                        // users
         { id: 1, username: "alice" },
         { id: 2, username: "bob" },
       ]))
-      .mockReturnValue(makeDbChain([{ score: 0 }]));
-    mockUpdate.mockReturnValue(makeDbChain([]));
+      .mockReturnValueOnce(makeDbChain([{ score: 2 }]))         // challengerScore (enrichment)
+      .mockReturnValueOnce(makeDbChain([{ score: 5 }]));        // challengedScore (enrichment)
     const res = await GET(makeGetReq());
     expect(res.status).toBe(200);
-    // DB update should have been called to mark completed
-    expect(mockUpdate).toHaveBeenCalled();
     const body = await res.json();
-    expect(body[0].status).toBe("completed");
-    expect(body[0].winnerId).toBe(1); // challenger had higher score
+    expect(body[0].status).toBe("active");
+    expect(body[0].challengerScore).toBe(2);
+    expect(body[0].challengedScore).toBe(5);
+  });
+
+  it("scores are not fetched for pending challenges", async () => {
+    authedAs(makeUser({ id: 1 }));
+    const pending = makeChallenge({ status: "pending" });
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([pending]))
+      .mockReturnValueOnce(makeDbChain([                        // users
+        { id: 1, username: "alice" },
+        { id: 2, username: "bob" },
+      ]));
+    // No additional mockReturnValueOnce — if scores were fetched this would fail
+    const res = await GET(makeGetReq());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body[0].challengerScore).toBe(0);
+    expect(body[0].challengedScore).toBe(0);
   });
 });
 

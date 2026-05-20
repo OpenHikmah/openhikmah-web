@@ -42,7 +42,9 @@ export async function GET(req: NextRequest) {
 
   const now = new Date();
 
-  // Lazily resolve expired active challenges
+  // Lazily resolve expired active challenges; cache scores to avoid a second fetch below.
+  const resolvedScores = new Map<number, { challengerScore: number; challengedScore: number }>();
+
   for (const c of rows) {
     if (c.status === "active" && c.endsAt < now) {
       const [challengerScore, challengedScore] = await Promise.all([
@@ -59,6 +61,7 @@ export async function GET(req: NextRequest) {
         .where(eq(challenges.id, c.id));
       c.status = "completed";
       c.winnerId = winnerId;
+      resolvedScores.set(c.id, { challengerScore, challengedScore });
     }
   }
 
@@ -73,11 +76,14 @@ export async function GET(req: NextRequest) {
       : [];
   const userMap = new Map(userRows.map((u) => [u.id, u.username]));
 
-  // Enrich with scores for active + completed challenges
+  // Enrich with scores for active + completed challenges; reuse cached scores where available.
   const enriched = await Promise.all(
     rows.map(async (c) => {
       const needsScores = c.status === "active" || c.status === "completed";
-      const [challengerScore, challengedScore] = needsScores
+      const cached = resolvedScores.get(c.id);
+      const [challengerScore, challengedScore] = cached
+        ? [cached.challengerScore, cached.challengedScore]
+        : needsScores
         ? await Promise.all([getScore(c.challengerId, c), getScore(c.challengedId, c)])
         : [0, 0];
       return {

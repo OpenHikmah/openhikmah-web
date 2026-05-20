@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { Loader2, Trophy, Clock } from "lucide-react";
@@ -25,15 +25,29 @@ interface Props {
   onUpdate: () => void;
 }
 
-function useCountdown(endsAt: string): string {
-  const end = new Date(endsAt).getTime();
-  const now = Date.now();
-  const diff = end - now;
+function formatCountdown(endsAt: string): string {
+  const diff = new Date(endsAt).getTime() - Date.now();
   if (diff <= 0) return "Ended";
   const h = Math.floor(diff / 3_600_000);
   const m = Math.floor((diff % 3_600_000) / 60_000);
   if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h left`;
   return `${h}h ${m}m left`;
+}
+
+function useCountdown(endsAt: string): string {
+  const [label, setLabel] = useState(() => formatCountdown(endsAt));
+
+  useEffect(() => {
+    if (new Date(endsAt).getTime() <= Date.now()) return;
+    const id = setInterval(() => {
+      const next = formatCountdown(endsAt);
+      setLabel(next);
+      if (next === "Ended") clearInterval(id);
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [endsAt]);
+
+  return label;
 }
 
 function ChallengeCard({
