@@ -36,7 +36,7 @@ export async function buildAuthUrl(): Promise<{
     response_type: "code",
     client_id: process.env.NEXT_PUBLIC_QF_CLIENT_ID ?? "",
     redirect_uri: redirectUri,
-    scope: process.env.NEXT_PUBLIC_QF_SCOPE ?? "openid offline_access user collection",
+    scope: process.env.NEXT_PUBLIC_QF_SCOPE ?? "openid offline_access user",
     state,
     nonce,
     code_challenge: codeChallenge,
