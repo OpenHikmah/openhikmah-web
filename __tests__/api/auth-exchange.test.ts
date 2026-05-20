@@ -38,7 +38,7 @@ describe("POST /api/auth/exchange", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns accessToken and refreshToken on success", async () => {
+  it("returns accessToken in body and sets refresh token as HttpOnly cookie", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -51,10 +51,13 @@ describe("POST /api/auth/exchange", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.accessToken).toBe("access-123");
-    expect(body.refreshToken).toBe("refresh-456");
+    expect(body.refreshToken).toBeUndefined();
+    const setCookie = res.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain("qf_refresh_token=refresh-456");
+    expect(setCookie.toLowerCase()).toContain("httponly");
   });
 
-  it("returns null refreshToken when not provided by server", async () => {
+  it("does not set cookie when server provides no refresh token", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ access_token: "access-123" }),
@@ -62,7 +65,8 @@ describe("POST /api/auth/exchange", () => {
 
     const res = await POST(makeReq({ code: "auth-code", codeVerifier: "verifier" }));
     const body = await res.json();
-    expect(body.refreshToken).toBeNull();
+    expect(body.accessToken).toBe("access-123");
+    expect(res.headers.get("set-cookie")).toBeNull();
   });
 
   it("sends correct grant_type and code to token endpoint", async () => {
