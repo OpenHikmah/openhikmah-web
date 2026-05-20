@@ -109,6 +109,14 @@ export const challenges = pgTable(
   ]
 );
 
+// ─── Shared Canvases ──────────────────────────────────────────────────────────
+
+export const sharedCanvases = pgTable("shared_canvases", {
+  id: text("id").primaryKey(),
+  data: text("data").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─── Exported types ───────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
@@ -116,3 +124,4 @@ export type NewUser = typeof users.$inferInsert;
 export type Friendship = typeof friendships.$inferSelect;
 export type ActivityLogEntry = typeof activityLog.$inferSelect;
 export type Challenge = typeof challenges.$inferSelect;
+export type SharedCanvas = typeof sharedCanvases.$inferSelect;

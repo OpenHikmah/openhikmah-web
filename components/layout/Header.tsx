@@ -47,12 +47,21 @@ export function Header({ onSearchOpen }: HeaderProps) {
     if (verses.length > 0) playGraph(verses);
   };
 
-  const handleShare = () => {
-    const url = buildShareUrl(serializeCanvas(nodes, edges));
-    navigator.clipboard.writeText(url).then(() => {
+  const [sharing, setSharing] = useState(false);
+
+  const handleShare = async () => {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      const url = await buildShareUrl(serializeCanvas(nodes, edges));
+      await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    } catch {
+      // Share API or clipboard failed — silent
+    } finally {
+      setSharing(false);
+    }
   };
 
   const handleSignIn = async () => {
@@ -95,9 +104,10 @@ export function Header({ onSearchOpen }: HeaderProps) {
         {nodeCount > 0 && (
           <button
             onClick={handleShare}
-            title="Copy shareable link"
+            disabled={sharing}
+            title={sharing ? "Generating link…" : "Copy shareable link"}
             aria-label="Copy shareable canvas link"
-            className="w-7 h-7 rounded border flex items-center justify-center transition-colors cursor-pointer"
+            className="w-7 h-7 rounded border flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait"
             style={{
               borderColor: copied ? "var(--color-teal)" : "var(--color-border)",
               color: copied ? "var(--color-teal)" : "var(--color-text-muted)",
