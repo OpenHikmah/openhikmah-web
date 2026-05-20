@@ -2,15 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BookOpen, Trash2, ArrowLeft } from "lucide-react";
+import { BookOpen, Trash2, ArrowLeft, ExternalLink } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import type { Verse } from "@/types/quran";
+
+// Module-level cache — survives re-renders without touching refs during render
+const verseCache = new Map<string, Verse>();
 
 export default function BookmarksPage() {
   const bookmarks = useAuthStore((s) => s.bookmarks);
   const toggleBookmark = useAuthStore((s) => s.toggleBookmark);
   const [verses, setVerses] = useState<Map<string, Verse>>(new Map());
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(bookmarks.length > 0);
 
   useEffect(() => {
     if (bookmarks.length === 0) return;
@@ -18,37 +21,25 @@ export default function BookmarksPage() {
     setLoading(true);
     Promise.all(
       bookmarks.map(async (ref) => {
-        if (verses.has(ref)) return [ref, verses.get(ref)!] as const;
+        const cached = verseCache.get(ref);
+        if (cached) return [ref, cached] as const;
         try {
-          const [surah, ayah] = ref.split(":").map(Number);
-          const res = await fetch(
-            `https://api.alquran.cloud/v1/ayah/${surah}:${ayah}/editions/quran-uthmani,en.asad`
-          );
-          const json = await res.json();
-          const [arabic, eng] = json.data as Array<{ text: string; surah: { englishName: string; name: string } }>;
-          const verse: Verse = {
-            surah,
-            ayah,
-            ref: ref as Verse["ref"],
-            arabicText: arabic.text,
-            translation: eng.text,
-            surahName: arabic.surah.englishName,
-            surahNameArabic: arabic.surah.name,
-          };
+          const [surah, ayah] = ref.split(":");
+          const res = await fetch(`/api/verse/${surah}/${ayah}`);
+          if (!res.ok) return [ref, null] as const;
+          const verse = await res.json() as Verse;
+          verseCache.set(ref, verse);
           return [ref, verse] as const;
         } catch {
           return [ref, null] as const;
         }
       })
     ).then((entries) => {
-      setVerses(
-        new Map(
-          entries.filter((e): e is [string, Verse] => e[1] !== null)
-        )
-      );
+      setVerses(new Map(entries.filter((e): e is [string, Verse] => e[1] !== null)));
       setLoading(false);
     });
-  }, [bookmarks.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookmarks.join(",")]);
 
   return (
     <div
@@ -138,14 +129,24 @@ export default function BookmarksPage() {
                         </span>
                       )}
                     </div>
-                    <button
-                      onClick={() => toggleBookmark(ref)}
-                      title="Remove bookmark"
-                      className="w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer hover:text-red-400"
-                      style={{ color: "var(--color-text-muted)" }}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <Link
+                        href={`/?verse=${ref}`}
+                        title="Open in canvas"
+                        className="w-6 h-6 rounded flex items-center justify-center transition-colors hover:text-[var(--color-teal)]"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </Link>
+                      <button
+                        onClick={() => toggleBookmark(ref)}
+                        title="Remove bookmark"
+                        className="w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer hover:text-red-400"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   {verse ? (

@@ -19,19 +19,26 @@ export async function buildAuthUrl(): Promise<{
   url: string;
   codeVerifier: string;
   state: string;
+  nonce: string;
 }> {
   const codeVerifier = randomString(128);
   const codeChallenge = await sha256Base64url(codeVerifier);
   const state = randomString(32);
+  // nonce is required by the QF OIDC server when requesting the openid scope
+  const nonce = randomString(32);
 
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/callback`;
 
+  // Docs-required scopes: openid offline_access user collection
+  // user   → userinfo / profile claims
+  // collection → bookmarks and collection APIs
   const params = new URLSearchParams({
     response_type: "code",
     client_id: process.env.NEXT_PUBLIC_QF_CLIENT_ID ?? "",
     redirect_uri: redirectUri,
-    scope: process.env.NEXT_PUBLIC_QF_SCOPE ?? "openid offline_access",
+    scope: process.env.NEXT_PUBLIC_QF_SCOPE ?? "openid offline_access user collection",
     state,
+    nonce,
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
   });
@@ -43,5 +50,6 @@ export async function buildAuthUrl(): Promise<{
     url: `${authBase}${authorizePath}?${params.toString()}`,
     codeVerifier,
     state,
+    nonce,
   };
 }

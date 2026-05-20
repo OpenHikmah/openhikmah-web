@@ -8,40 +8,26 @@ describe("auth store", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     localStorage.clear();
-    // Reset store to initial state
-    useAuthStore.setState({
-      accessToken: null,
-      refreshToken: null,
-      bookmarks: [],
-    });
+    useAuthStore.setState({ accessToken: null, bookmarks: [] });
   });
 
-  it("initial state has null tokens and empty bookmarks", () => {
+  it("initial state has null token and empty bookmarks", () => {
     const s = useAuthStore.getState();
     expect(s.accessToken).toBeNull();
-    expect(s.refreshToken).toBeNull();
     expect(s.bookmarks).toEqual([]);
   });
 
-  it("setTokens stores access and refresh tokens", () => {
-    useAuthStore.getState().setTokens("access-abc", "refresh-xyz");
+  it("setTokens stores the access token", () => {
+    useAuthStore.getState().setTokens("access-abc");
     expect(useAuthStore.getState().accessToken).toBe("access-abc");
-    expect(useAuthStore.getState().refreshToken).toBe("refresh-xyz");
   });
 
-  it("setTokens accepts null refreshToken", () => {
-    useAuthStore.getState().setTokens("access-abc", null);
-    expect(useAuthStore.getState().accessToken).toBe("access-abc");
-    expect(useAuthStore.getState().refreshToken).toBeNull();
-  });
-
-  it("clearAuth resets tokens and bookmarks", () => {
-    useAuthStore.getState().setTokens("tok", "ref");
+  it("clearAuth resets token and bookmarks", () => {
+    useAuthStore.getState().setTokens("tok");
     useAuthStore.setState({ bookmarks: ["2:255"] });
     useAuthStore.getState().clearAuth();
     const s = useAuthStore.getState();
     expect(s.accessToken).toBeNull();
-    expect(s.refreshToken).toBeNull();
     expect(s.bookmarks).toEqual([]);
   });
 

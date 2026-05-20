@@ -7,10 +7,13 @@ import { useSocialStore } from "@/store/social";
 import { AddFriendForm } from "@/components/social/AddFriendForm";
 import { FriendList } from "@/components/social/FriendList";
 import { LeaderboardTable } from "@/components/social/LeaderboardTable";
-import { BookOpen, Loader2, Users, Trophy } from "lucide-react";
+import { CreateChallengeForm } from "@/components/social/CreateChallengeForm";
+import { ChallengeList } from "@/components/social/ChallengeList";
+import type { EnrichedChallenge } from "@/components/social/ChallengeList";
+import { BookOpen, Loader2, Users, Trophy, Swords } from "lucide-react";
 import Link from "next/link";
 
-type Tab = "friends" | "leaderboard";
+type Tab = "friends" | "leaderboard" | "challenges";
 
 export default function SocialPage() {
   const router = useRouter();
@@ -21,8 +24,10 @@ export default function SocialPage() {
   const [tab, setTab] = useState<Tab>("leaderboard");
   const [friends, setFriends] = useState<unknown[]>([]);
   const [leaderboard, setLeaderboard] = useState<unknown[]>([]);
+  const [challengesList, setChallengesList] = useState<EnrichedChallenge[]>([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+  const [loadingChallenges, setLoadingChallenges] = useState(false);
 
   const fetchFriends = useCallback(async () => {
     if (!accessToken) return;
@@ -47,6 +52,19 @@ export default function SocialPage() {
       if (res.ok) setLeaderboard(await res.json());
     } finally {
       setLoadingLeaderboard(false);
+    }
+  }, [accessToken]);
+
+  const fetchChallenges = useCallback(async () => {
+    if (!accessToken) return;
+    setLoadingChallenges(true);
+    try {
+      const res = await fetch("/api/social/challenges", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.ok) setChallengesList(await res.json());
+    } finally {
+      setLoadingChallenges(false);
     }
   }, [accessToken]);
 
@@ -78,6 +96,16 @@ export default function SocialPage() {
       .then((data) => setLeaderboard(data))
       .catch(() => {})
       .finally(() => setLoadingLeaderboard(false));
+
+    setLoadingChallenges(true);
+    fetch("/api/social/challenges", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal,
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: EnrichedChallenge[]) => setChallengesList(data))
+      .catch(() => {})
+      .finally(() => setLoadingChallenges(false));
 
     return () => ctrl.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,7 +156,7 @@ export default function SocialPage() {
           className="flex rounded-lg border overflow-hidden"
           style={{ borderColor: "var(--color-border)" }}
         >
-          {(["leaderboard", "friends"] as Tab[]).map((t) => (
+          {(["leaderboard", "friends", "challenges"] as Tab[]).map((t, i, arr) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -136,15 +164,17 @@ export default function SocialPage() {
               style={{
                 background: tab === t ? "var(--color-surface-raised)" : "transparent",
                 color: tab === t ? "var(--color-text-primary)" : "var(--color-text-muted)",
-                borderRight: t === "leaderboard" ? "1px solid var(--color-border)" : "none",
+                borderRight: i < arr.length - 1 ? "1px solid var(--color-border)" : "none",
               }}
             >
               {t === "leaderboard" ? (
                 <Trophy className="w-3.5 h-3.5" />
-              ) : (
+              ) : t === "friends" ? (
                 <Users className="w-3.5 h-3.5" />
+              ) : (
+                <Swords className="w-3.5 h-3.5" />
               )}
-              {t === "leaderboard" ? "Leaderboard" : "Friends"}
+              {t === "leaderboard" ? "Leaderboard" : t === "friends" ? "Friends" : "Challenges"}
             </button>
           ))}
         </div>
@@ -169,6 +199,25 @@ export default function SocialPage() {
                   fetchLeaderboard();
                 }}
               />
+            )}
+          </div>
+        )}
+
+        {tab === "challenges" && (
+          <div className="space-y-4">
+            <CreateChallengeForm
+              friends={(friends as { status: string; friend: { id: number; username: string } | null }[])
+                .filter((f) => f.status === "accepted" && f.friend)
+                .map((f) => f.friend!)}
+              loadingFriends={loadingFriends}
+              onCreated={fetchChallenges}
+            />
+            {loadingChallenges ? (
+              <div className="flex justify-center py-4">
+                <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--color-teal)" }} />
+              </div>
+            ) : (
+              <ChallengeList challenges={challengesList} onUpdate={fetchChallenges} />
             )}
           </div>
         )}

@@ -14,13 +14,6 @@ export interface Verse {
 
 export type EdgeKind = "thematic" | "root" | "contrast";
 
-export interface Connection {
-  fromRef: VerseRef;
-  toRef: VerseRef;
-  kind: EdgeKind;
-  label: string;
-}
-
 export interface CanvasEdge {
   id: string;
   source: string;

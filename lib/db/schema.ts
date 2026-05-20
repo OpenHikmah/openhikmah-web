@@ -92,7 +92,7 @@ export const challenges = pgTable(
     challengedId: integer("challenged_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    verseRef: text("verse_ref").notNull(),
+    verseRef: text("verse_ref"),
     activityType: text("activity_type").notNull().default("connection_made"),
     // 'pending' | 'active' | 'completed' | 'declined'
     status: text("status").notNull().default("pending"),
