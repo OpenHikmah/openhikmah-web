@@ -79,8 +79,8 @@ export function Header({ onSearchOpen }: HeaderProps) {
         borderBottom: "1px solid var(--color-border)",
       }}
     >
-      {/* Logo */}
-      <div className="flex items-center gap-2">
+      {/* Logo — click to go home */}
+      <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
         <BookOpen className="w-4 h-4" style={{ color: "var(--color-gold)" }} />
         <span
           className="text-sm font-medium"
@@ -88,7 +88,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
         >
           Open Hikmah
         </span>
-      </div>
+      </Link>
 
       {/* Right controls */}
       <div className="flex items-center gap-2">
