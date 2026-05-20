@@ -34,12 +34,14 @@ export function CallbackClient({ code, state, error }: Props) {
     if (!codeVerifier || !expectedState || expectedState !== state) {
       sessionStorage.removeItem("pkce_code_verifier");
       sessionStorage.removeItem("pkce_state");
+      sessionStorage.removeItem("pkce_nonce");
       router.replace("/");
       return;
     }
 
     sessionStorage.removeItem("pkce_code_verifier");
     sessionStorage.removeItem("pkce_state");
+    sessionStorage.removeItem("pkce_nonce");
 
     fetch("/api/auth/exchange", {
       method: "POST",

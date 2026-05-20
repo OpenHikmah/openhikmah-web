@@ -65,9 +65,10 @@ export function Header({ onSearchOpen }: HeaderProps) {
   };
 
   const handleSignIn = async () => {
-    const { url, codeVerifier, state } = await buildAuthUrl();
+    const { url, codeVerifier, state, nonce } = await buildAuthUrl();
     sessionStorage.setItem("pkce_code_verifier", codeVerifier);
     sessionStorage.setItem("pkce_state", state);
+    sessionStorage.setItem("pkce_nonce", nonce);
     window.location.href = url;
   };
 

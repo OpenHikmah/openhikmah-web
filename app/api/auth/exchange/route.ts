@@ -29,19 +29,26 @@ export async function POST(req: NextRequest) {
   const tokenUrl = `${process.env.QF_AUTH_BASE}/oauth2/token`;
 
   try {
-    // Step 1: Exchange code for tokens
+    // Step 1: Exchange code for tokens.
+    // Confidential clients must authenticate via HTTP Basic Auth (RFC 6749 §2.3.1 / Ory Hydra
+    // requirement). client_id and client_secret must NOT appear in the form body.
     const params = new URLSearchParams({
       grant_type: "authorization_code",
       code,
       redirect_uri: redirectUri,
       code_verifier: codeVerifier,
-      client_id: process.env.NEXT_PUBLIC_QF_CLIENT_ID!,
-      client_secret: process.env.QF_CLIENT_SECRET!,
     });
+
+    const clientId = process.env.NEXT_PUBLIC_QF_CLIENT_ID!;
+    const clientSecret = process.env.QF_CLIENT_SECRET!;
+    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 
     const res = await fetch(tokenUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${basicAuth}`,
+      },
       body: params.toString(),
     });
 
