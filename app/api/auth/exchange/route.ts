@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
     };
     const accessToken = data.access_token;
     const refreshToken = data.refresh_token ?? null;
+    const COOKIE_NAME = "qf_refresh_token";
 
     // Step 2: Resolve QF user identity and upsert our user record.
     // If this fails (QF userinfo unreachable), degrade gracefully — tokens
@@ -119,13 +120,20 @@ export async function POST(req: NextRequest) {
       console.error("Social profile upsert failed (non-fatal):", err);
     }
 
-    return NextResponse.json({
-      accessToken,
-      refreshToken,
-      userId,
-      username,
-      isNewUser,
-    });
+    const response = NextResponse.json({ accessToken, userId, username, isNewUser });
+
+    // Refresh token goes in an HttpOnly cookie — never exposed to JS (XSS-safe).
+    if (refreshToken) {
+      response.cookies.set(COOKIE_NAME, refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      });
+    }
+
+    return response;
   } catch (err) {
     console.error("Auth exchange error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
