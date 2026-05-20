@@ -1,0 +1,1 @@
+ALTER TABLE "challenges" ALTER COLUMN "verse_ref" DROP NOT NULL;
