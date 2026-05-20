@@ -24,6 +24,7 @@ export function CallbackClient({ code, state, error }: Props) {
     didRun.current = true;
 
     if (error || !code) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFailReason(error ?? "No authorization code received.");
       return;
     }

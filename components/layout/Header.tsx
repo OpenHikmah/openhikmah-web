@@ -27,7 +27,6 @@ export function Header({ onSearchOpen }: HeaderProps) {
   const accessToken = useAuthStore((s) => s.accessToken);
   const bookmarkCount = useAuthStore((s) => s.bookmarks.length);
   const clearAuth = useAuthStore((s) => s.clearAuth);
-  const userId = useSocialStore((s) => s.userId);
   const username = useSocialStore((s) => s.username);
 
   const playGraph = useAudioStore((s) => s.playGraph);

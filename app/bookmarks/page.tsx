@@ -1,31 +1,34 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BookOpen, Trash2, ArrowLeft, ExternalLink } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import type { Verse } from "@/types/quran";
+
+// Module-level cache — survives re-renders without touching refs during render
+const verseCache = new Map<string, Verse>();
 
 export default function BookmarksPage() {
   const bookmarks = useAuthStore((s) => s.bookmarks);
   const toggleBookmark = useAuthStore((s) => s.toggleBookmark);
   const [verses, setVerses] = useState<Map<string, Verse>>(new Map());
   const [loading, setLoading] = useState(bookmarks.length > 0);
-  const versesRef = useRef(verses);
-  versesRef.current = verses;
 
   useEffect(() => {
     if (bookmarks.length === 0) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     Promise.all(
       bookmarks.map(async (ref) => {
-        const cached = versesRef.current.get(ref);
+        const cached = verseCache.get(ref);
         if (cached) return [ref, cached] as const;
         try {
           const [surah, ayah] = ref.split(":");
           const res = await fetch(`/api/verse/${surah}/${ayah}`);
           if (!res.ok) return [ref, null] as const;
           const verse = await res.json() as Verse;
+          verseCache.set(ref, verse);
           return [ref, verse] as const;
         } catch {
           return [ref, null] as const;
