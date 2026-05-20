@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
@@ -15,10 +15,11 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  if (!accessToken) {
-    router.replace("/");
-    return null;
-  }
+  useEffect(() => {
+    if (!accessToken) router.replace("/");
+  }, [accessToken, router]);
+
+  if (!accessToken) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

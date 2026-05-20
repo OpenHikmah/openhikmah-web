@@ -28,6 +28,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
   const bookmarkCount = useAuthStore((s) => s.bookmarks.length);
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const userId = useSocialStore((s) => s.userId);
+  const username = useSocialStore((s) => s.username);
 
   const playGraph = useAudioStore((s) => s.playGraph);
   const audioCurrentRef = useAudioStore((s) => s.currentRef);
@@ -150,7 +151,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
 
         <StreakBadge />
 
-        {accessToken && userId && (
+        {accessToken && (
           <Link
             href="/social"
             title="Friends & Leaderboard"
@@ -160,14 +161,14 @@ export function Header({ onSearchOpen }: HeaderProps) {
           </Link>
         )}
 
-        {bookmarkCount > 0 && (
+        {accessToken && (
           <Link
             href="/bookmarks"
             title="Bookmarks"
             className="flex items-center gap-1 px-2 py-1.5 rounded border text-xs transition-colors border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)]"
           >
             <Heart className="w-3.5 h-3.5" />
-            <span>{bookmarkCount}</span>
+            {bookmarkCount > 0 && <span>{bookmarkCount}</span>}
           </Link>
         )}
 
@@ -194,15 +195,29 @@ export function Header({ onSearchOpen }: HeaderProps) {
         </button>
 
         {accessToken ? (
-          <button
-            onClick={clearAuth}
-            title="Sign out"
-            aria-label="Sign out"
-            className="w-7 h-7 rounded border flex items-center justify-center transition-colors cursor-pointer hover:border-[var(--color-text-secondary)] hover:text-[var(--color-text-secondary)]"
-            style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
-          >
-            <LogOut className="w-3.5 h-3.5" />
-          </button>
+          <>
+            <div
+              className="flex items-center gap-1.5 px-2 py-1 rounded border text-xs font-mono"
+              style={{ borderColor: "var(--color-teal)", color: "var(--color-teal)" }}
+            >
+              <span
+                className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0"
+                style={{ background: "var(--color-teal)", color: "var(--color-bg)" }}
+              >
+                {(username ?? "?")[0].toUpperCase()}
+              </span>
+              <span>{username ?? "signed in"}</span>
+            </div>
+            <button
+              onClick={clearAuth}
+              title="Sign out"
+              aria-label="Sign out"
+              className="w-7 h-7 rounded border flex items-center justify-center transition-colors cursor-pointer hover:border-[var(--color-text-secondary)] hover:text-[var(--color-text-secondary)]"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </>
         ) : (
           <button
             onClick={handleSignIn}

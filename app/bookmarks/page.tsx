@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BookOpen, Trash2, ArrowLeft, ExternalLink } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
@@ -11,14 +11,16 @@ export default function BookmarksPage() {
   const toggleBookmark = useAuthStore((s) => s.toggleBookmark);
   const [verses, setVerses] = useState<Map<string, Verse>>(new Map());
   const [loading, setLoading] = useState(bookmarks.length > 0);
+  const versesRef = useRef(verses);
+  versesRef.current = verses;
 
   useEffect(() => {
     if (bookmarks.length === 0) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     Promise.all(
       bookmarks.map(async (ref) => {
-        if (verses.has(ref)) return [ref, verses.get(ref)!] as const;
+        const cached = versesRef.current.get(ref);
+        if (cached) return [ref, cached] as const;
         try {
           const [surah, ayah] = ref.split(":");
           const res = await fetch(`/api/verse/${surah}/${ayah}`);
@@ -30,14 +32,11 @@ export default function BookmarksPage() {
         }
       })
     ).then((entries) => {
-      setVerses(
-        new Map(
-          entries.filter((e): e is [string, Verse] => e[1] !== null)
-        )
-      );
+      setVerses(new Map(entries.filter((e): e is [string, Verse] => e[1] !== null)));
       setLoading(false);
     });
-  }, [bookmarks.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookmarks.join(",")]);
 
   return (
     <div

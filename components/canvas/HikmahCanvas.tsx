@@ -5,7 +5,6 @@ import {
   ReactFlow,
   Background,
   BackgroundVariant,
-  Controls,
   useReactFlow,
   ReactFlowProvider,
   type Edge,
@@ -218,15 +217,6 @@ function CanvasInner() {
           size={1}
           color="var(--color-border)"
           style={{ opacity: 0.4 }}
-        />
-        <Controls
-          showInteractive={false}
-          style={{
-            background: "var(--color-surface-raised)",
-            border: "1px solid var(--color-border)",
-            borderRadius: "12px",
-            overflow: "hidden",
-          }}
         />
       </ReactFlow>
     </div>
