@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 interface SocialProfile {
   userId: number;
@@ -18,20 +19,28 @@ interface SocialStore {
   bumpStreak: (newStreak: number, newLongest?: number) => void;
 }
 
-export const useSocialStore = create<SocialStore>()((set) => ({
-  userId: null,
-  username: null,
-  streak: 0,
-  longestStreak: 0,
+export const useSocialStore = create<SocialStore>()(
+  persist(
+    (set) => ({
+      userId: null,
+      username: null,
+      streak: 0,
+      longestStreak: 0,
 
-  setProfile: ({ userId, username }) => set({ userId, username }),
+      setProfile: ({ userId, username }) => set({ userId, username }),
 
-  clearSocial: () =>
-    set({ userId: null, username: null, streak: 0, longestStreak: 0 }),
+      clearSocial: () =>
+        set({ userId: null, username: null, streak: 0, longestStreak: 0 }),
 
-  bumpStreak: (newStreak, newLongest) =>
-    set((s) => ({
-      streak: newStreak,
-      longestStreak: newLongest ?? Math.max(s.longestStreak, newStreak),
-    })),
-}));
+      bumpStreak: (newStreak, newLongest) =>
+        set((s) => ({
+          streak: newStreak,
+          longestStreak: newLongest ?? Math.max(s.longestStreak, newStreak),
+        })),
+    }),
+    {
+      name: "open-hikmah-social",
+      partialize: (s) => ({ userId: s.userId, username: s.username }),
+    }
+  )
+);
