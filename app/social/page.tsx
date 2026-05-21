@@ -28,6 +28,8 @@ export default function SocialPage() {
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
   const [loadingChallenges, setLoadingChallenges] = useState(false);
+  // true while session restoration is still in-flight (accessToken set but userId not yet)
+  const [profileLoading, setProfileLoading] = useState(true);
 
   const fetchFriends = useCallback(async () => {
     if (!accessToken) return;
@@ -68,11 +70,24 @@ export default function SocialPage() {
     }
   }, [accessToken]);
 
+  // Clear profileLoading once userId resolves, or after 4s timeout
   useEffect(() => {
-    if (!accessToken || !userId) {
+    if (userId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setProfileLoading(false);
+      return;
+    }
+    if (!accessToken) return;
+    const timer = setTimeout(() => setProfileLoading(false), 4000);
+    return () => clearTimeout(timer);
+  }, [userId, accessToken]);
+
+  useEffect(() => {
+    if (!accessToken) {
       router.replace("/");
       return;
     }
+    if (!userId) return;
     const ctrl = new AbortController();
     const { signal } = ctrl;
 
@@ -111,7 +126,35 @@ export default function SocialPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, userId]);
 
-  if (!accessToken || !userId) return null;
+  if (!accessToken) return null;
+
+  if (!userId) {
+    if (profileLoading) {
+      return (
+        <div
+          className="min-h-screen flex items-center justify-center"
+          style={{ background: "var(--color-bg)" }}
+        >
+          <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--color-teal)" }} />
+        </div>
+      );
+    }
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "var(--color-bg)" }}
+      >
+        <div className="text-center space-y-3 px-4">
+          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+            Your profile couldn&apos;t load. Please sign out and try again.
+          </p>
+          <Link href="/" className="text-xs underline" style={{ color: "var(--color-teal)" }}>
+            Back to canvas
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

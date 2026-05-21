@@ -10,6 +10,7 @@ function SessionRestorer() {
   const setTokens = useAuthStore((s) => s.setTokens);
   const loadRemoteBookmarks = useAuthStore((s) => s.loadRemoteBookmarks);
   const setProfile = useSocialStore((s) => s.setProfile);
+  const bumpStreak = useSocialStore((s) => s.bumpStreak);
   const didRun = useRef(false);
 
   useEffect(() => {
@@ -29,8 +30,11 @@ function SessionRestorer() {
         ]);
 
         if (profileRes.ok) {
-          const p = await profileRes.json() as { id?: number; username?: string };
-          if (p.id && p.username) setProfile({ userId: p.id, username: p.username });
+          const p = await profileRes.json() as { id?: number; username?: string; currentStreak?: number; longestStreak?: number };
+          if (p.id && p.username) {
+            setProfile({ userId: p.id, username: p.username });
+            if (p.currentStreak !== undefined) bumpStreak(p.currentStreak, p.longestStreak);
+          }
         }
       })
       .catch(() => {});
