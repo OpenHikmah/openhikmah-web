@@ -118,6 +118,26 @@ export const sharedCanvases = pgTable("shared_canvases", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ─── Saved Workspaces ─────────────────────────────────────────────────────────
+
+export const savedWorkspaces = pgTable(
+  "saved_workspaces",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    data: text("data").notNull(),
+    nodeCount: integer("node_count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("saved_workspaces_user_idx").on(t.userId),
+  ]
+);
+
 // ─── Bookmarks ────────────────────────────────────────────────────────────────
 
 export const bookmarks = pgTable(
@@ -167,3 +187,5 @@ export type VerseNote = typeof verseNotes.$inferSelect;
 export type NewVerseNote = typeof verseNotes.$inferInsert;
 export type Bookmark = typeof bookmarks.$inferSelect;
 export type NewBookmark = typeof bookmarks.$inferInsert;
+export type SavedWorkspace = typeof savedWorkspaces.$inferSelect;
+export type NewSavedWorkspace = typeof savedWorkspaces.$inferInsert;
