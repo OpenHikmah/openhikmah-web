@@ -21,6 +21,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
   const [sharing, setSharing] = useState(false);
   const [workspaceSaved, setWorkspaceSaved] = useState(false);
   const [workspaceSaving, setWorkspaceSaving] = useState(false);
+  const [workspaceSaveError, setWorkspaceSaveError] = useState(false);
 
   const reset = useCanvasStore((s) => s.reset);
   const nodes = useCanvasStore((s) => s.nodes);
@@ -96,9 +97,13 @@ export function Header({ onSearchOpen }: HeaderProps) {
       if (res.ok) {
         setWorkspaceSaved(true);
         setTimeout(() => setWorkspaceSaved(false), 2000);
+      } else {
+        setWorkspaceSaveError(true);
+        setTimeout(() => setWorkspaceSaveError(false), 2000);
       }
     } catch {
-      // silent
+      setWorkspaceSaveError(true);
+      setTimeout(() => setWorkspaceSaveError(false), 2000);
     } finally {
       setWorkspaceSaving(false);
     }
@@ -178,12 +183,12 @@ export function Header({ onSearchOpen }: HeaderProps) {
                 <button
                   onClick={handleSaveWorkspace}
                   disabled={workspaceSaving}
-                  title={workspaceSaved ? "Saved!" : "Save canvas to account"}
+                  title={workspaceSaved ? "Saved!" : workspaceSaveError ? "Save failed — try again" : "Save canvas to account"}
                   aria-label="Save canvas to account"
                   className="w-7 h-7 rounded border flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait"
                   style={{
-                    borderColor: workspaceSaved ? "var(--color-teal)" : "var(--color-border)",
-                    color: workspaceSaved ? "var(--color-teal)" : "var(--color-text-muted)",
+                    borderColor: workspaceSaved ? "var(--color-teal)" : workspaceSaveError ? "#ef4444" : "var(--color-border)",
+                    color: workspaceSaved ? "var(--color-teal)" : workspaceSaveError ? "#ef4444" : "var(--color-text-muted)",
                   }}
                 >
                   <Save className="w-3.5 h-3.5" />
