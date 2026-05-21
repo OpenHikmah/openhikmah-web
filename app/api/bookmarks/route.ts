@@ -8,12 +8,17 @@ export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 
-  const rows = await db
-    .select({ verseRef: bookmarks.verseRef })
-    .from(bookmarks)
-    .where(eq(bookmarks.userId, authed.userId));
+  try {
+    const rows = await db
+      .select({ verseRef: bookmarks.verseRef })
+      .from(bookmarks)
+      .where(eq(bookmarks.userId, authed.userId));
 
-  return NextResponse.json({ refs: rows.map((r) => r.verseRef) });
+    return NextResponse.json({ refs: rows.map((r) => r.verseRef) });
+  } catch (err) {
+    console.error("bookmarks GET db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -32,10 +37,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid verse ref" }, { status: 400 });
   }
 
-  await db
-    .insert(bookmarks)
-    .values({ userId: authed.userId, verseRef: ref })
-    .onConflictDoNothing();
+  try {
+    await db
+      .insert(bookmarks)
+      .values({ userId: authed.userId, verseRef: ref })
+      .onConflictDoNothing();
 
-  return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("bookmarks POST db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

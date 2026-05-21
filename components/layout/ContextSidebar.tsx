@@ -64,6 +64,7 @@ function NotesSection({ verseRef }: { verseRef: string }) {
   const [notes, setNotes] = useState<{ id: number; note: string; createdAt: string }[]>([]);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -79,6 +80,7 @@ function NotesSection({ verseRef }: { verseRef: string }) {
   const save = async () => {
     if (!draft.trim() || !accessToken) return;
     setSaving(true);
+    setSaveError(false);
     try {
       const res = await fetch("/api/notes", {
         method: "POST",
@@ -89,8 +91,14 @@ function NotesSection({ verseRef }: { verseRef: string }) {
         const created = await res.json();
         setNotes((prev) => [...prev, created]);
         setDraft("");
+      } else {
+        setSaveError(true);
+        setTimeout(() => setSaveError(false), 3000);
       }
-    } catch { /* silent */ } finally {
+    } catch {
+      setSaveError(true);
+      setTimeout(() => setSaveError(false), 3000);
+    } finally {
       setSaving(false);
     }
   };
@@ -159,9 +167,12 @@ function NotesSection({ verseRef }: { verseRef: string }) {
                 onClick={save}
                 disabled={saving || !draft.trim()}
                 className="text-xs px-2.5 py-1 rounded border transition-colors cursor-pointer disabled:opacity-40"
-                style={{ borderColor: "var(--color-teal)", color: "var(--color-teal)" }}
+                style={{
+                  borderColor: saveError ? "#ef4444" : "var(--color-teal)",
+                  color: saveError ? "#ef4444" : "var(--color-teal)",
+                }}
               >
-                {saving ? "Saving…" : "Save"}
+                {saving ? "Saving…" : saveError ? "Save failed — try again" : "Save"}
               </button>
             </>
           )}

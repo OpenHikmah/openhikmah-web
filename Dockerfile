@@ -59,4 +59,6 @@ COPY --from=deps /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
 
 USER nextjs
 EXPOSE 3000
-CMD ["node", "server.js"]
+# Run pending migrations (idempotent) then start the server.
+# This ensures new tables are always created on deploy without a manual step.
+CMD ["sh", "-c", "node scripts/migrate.mjs && node server.js"]

@@ -14,9 +14,14 @@ export async function DELETE(
   const { ref } = await params;
   const verseRef = decodeURIComponent(ref);
 
-  await db
-    .delete(bookmarks)
-    .where(and(eq(bookmarks.userId, authed.userId), eq(bookmarks.verseRef, verseRef)));
+  try {
+    await db
+      .delete(bookmarks)
+      .where(and(eq(bookmarks.userId, authed.userId), eq(bookmarks.verseRef, verseRef)));
 
-  return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("bookmarks DELETE db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
