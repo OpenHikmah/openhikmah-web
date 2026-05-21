@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/social-auth";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
-  if (authed instanceof NextResponse) return NextResponse.json({ refs: [] });
+  if (authed instanceof NextResponse) return authed;
 
   const rows = await db
     .select({ verseRef: bookmarks.verseRef })
