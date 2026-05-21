@@ -50,6 +50,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # Migration runner — node scripts/migrate.mjs (uses drizzle-orm, no drizzle-kit needed)
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.mjs ./scripts/migrate.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/ensure-tables.mjs ./scripts/ensure-tables.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/lib/db/migrations ./lib/db/migrations
 
 # postgres and drizzle-orm are bundled into Next.js chunks and not left in
@@ -61,4 +62,4 @@ USER nextjs
 EXPOSE 3000
 # Run pending migrations (idempotent) then start the server.
 # This ensures new tables are always created on deploy without a manual step.
-CMD ["sh", "-c", "node scripts/migrate.mjs && node server.js"]
+CMD ["sh", "-c", "node scripts/migrate.mjs && node scripts/ensure-tables.mjs && node server.js"]
