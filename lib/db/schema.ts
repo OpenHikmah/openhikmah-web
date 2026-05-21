@@ -9,6 +9,7 @@ import {
   timestamp,
   uniqueIndex,
   index,
+  unique,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -117,6 +118,24 @@ export const sharedCanvases = pgTable("shared_canvases", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ─── Bookmarks ────────────────────────────────────────────────────────────────
+
+export const bookmarks = pgTable(
+  "bookmarks",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    verseRef: text("verse_ref").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("bookmarks_user_ref_uniq").on(t.userId, t.verseRef),
+    index("bookmarks_user_idx").on(t.userId),
+  ]
+);
+
 // ─── Verse Notes ──────────────────────────────────────────────────────────────
 
 export const verseNotes = pgTable(
@@ -146,3 +165,5 @@ export type Challenge = typeof challenges.$inferSelect;
 export type SharedCanvas = typeof sharedCanvases.$inferSelect;
 export type VerseNote = typeof verseNotes.$inferSelect;
 export type NewVerseNote = typeof verseNotes.$inferInsert;
+export type Bookmark = typeof bookmarks.$inferSelect;
+export type NewBookmark = typeof bookmarks.$inferInsert;
