@@ -8,6 +8,7 @@ import { useSocialStore } from "@/store/social";
 
 function SessionRestorer() {
   const setTokens = useAuthStore((s) => s.setTokens);
+  const setSessionLoaded = useAuthStore((s) => s.setSessionLoaded);
   const loadRemoteBookmarks = useAuthStore((s) => s.loadRemoteBookmarks);
   const setProfile = useSocialStore((s) => s.setProfile);
   const bumpStreak = useSocialStore((s) => s.bumpStreak);
@@ -37,7 +38,8 @@ function SessionRestorer() {
           }
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setSessionLoaded());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

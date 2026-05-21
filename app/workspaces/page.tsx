@@ -18,6 +18,7 @@ interface WorkspaceMeta {
 export default function WorkspacesPage() {
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
+  const isSessionLoading = useAuthStore((s) => s.isSessionLoading);
   const restoreCanvas = useCanvasStore((s) => s.restoreCanvas);
 
   const [workspaces, setWorkspaces] = useState<WorkspaceMeta[]>([]);
@@ -39,6 +40,7 @@ export default function WorkspacesPage() {
   }, [accessToken]);
 
   useEffect(() => {
+    if (isSessionLoading) return;
     if (!accessToken) {
       router.replace("/");
       return;
@@ -46,7 +48,7 @@ export default function WorkspacesPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchWorkspaces();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken]);
+  }, [accessToken, isSessionLoading]);
 
   const handleLoad = async (id: number) => {
     if (!accessToken || loadingId) return;
@@ -82,6 +84,13 @@ export default function WorkspacesPage() {
     }
   };
 
+  if (isSessionLoading && !accessToken) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--color-bg)" }}>
+        <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--color-teal)" }} />
+      </div>
+    );
+  }
   if (!accessToken) return null;
 
   return (

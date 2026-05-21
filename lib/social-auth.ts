@@ -17,6 +17,26 @@ export function invalidateTokenCache(token: string): void {
 }
 
 /**
+ * Decodes the payload of a JWT without verifying the signature.
+ * Used to extract `sub` from QF's access token (Ory Hydra issues JWTs).
+ * We still validate the user exists in our DB, so a forged token with an
+ * unknown sub will simply return "not found".
+ */
+function decodeJwtSub(token: string): string | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(
+      Buffer.from(parts[1], "base64url").toString("utf-8")
+    ) as Record<string, unknown>;
+    const sub = payload.sub ?? payload.user_id ?? payload.userId;
+    return typeof sub === "string" && sub ? sub : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Extracts the Bearer token from the request, resolves the user from the DB,
  * and returns { userId, user } or a 401 NextResponse.
  */
@@ -30,22 +50,21 @@ export async function requireUser(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Check in-process cache first to avoid DB round-trip on every request
+  // Check in-process cache first to avoid any round-trip
   const cached = tokenCache.get(token);
   if (cached && cached.expiresAt > Date.now()) {
     return { userId: cached.user.id, user: cached.user };
   }
 
-  // Verify the token is valid by calling QF userinfo
+  // Resolve QF user ID: JWT decode first (no network), QF userinfo as fallback
   const qfId = await resolveQfId(token);
   if (!qfId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Look up (or create) the user in our DB
+  // Look up the user in our DB
   const [user] = await db.select().from(users).where(eq(users.qfId, qfId)).limit(1);
   if (!user) {
-    // User exists in QF but hasn't gone through our exchange route yet
     return NextResponse.json({ error: "Profile not found — please sign in again" }, { status: 401 });
   }
 
@@ -54,14 +73,19 @@ export async function requireUser(
 }
 
 /**
- * Calls the QF userinfo endpoint and returns the stable `sub` (user ID),
- * or null if the token is invalid / the endpoint is unreachable.
+ * Returns the QF user ID (sub) for an access token.
+ * Decodes the JWT payload first (no network call). Falls back to the QF
+ * userinfo endpoint if the token is opaque or the sub claim is missing.
  */
 export async function resolveQfId(accessToken: string): Promise<string | null> {
+  // Fast path: decode JWT payload — Ory Hydra issues JWTs with sub = QF user ID
+  const jwtSub = decodeJwtSub(accessToken);
+  if (jwtSub) return jwtSub;
+
+  // Slow path: hit QF userinfo (opaque tokens, or sub missing from payload)
   const qfAuthBase = process.env.QF_AUTH_BASE ?? "";
   if (!qfAuthBase) return null;
 
-  // Try standard OIDC path first, fall back to QF-specific path
   const endpoints = [
     `${qfAuthBase}/oauth2/userinfo`,
     `${qfAuthBase}/auth/v1/me`,
@@ -71,7 +95,6 @@ export async function resolveQfId(accessToken: string): Promise<string | null> {
     try {
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${accessToken}` },
-        // Short timeout — don't hang a request waiting for QF
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) continue;

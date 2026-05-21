@@ -18,6 +18,7 @@ type Tab = "friends" | "leaderboard" | "challenges";
 export default function SocialPage() {
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
+  const isSessionLoading = useAuthStore((s) => s.isSessionLoading);
   const userId = useSocialStore((s) => s.userId);
   const username = useSocialStore((s) => s.username);
 
@@ -83,6 +84,7 @@ export default function SocialPage() {
   }, [userId, accessToken]);
 
   useEffect(() => {
+    if (isSessionLoading) return;
     if (!accessToken) {
       router.replace("/");
       return;
@@ -124,8 +126,15 @@ export default function SocialPage() {
 
     return () => ctrl.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken, userId]);
+  }, [accessToken, userId, isSessionLoading]);
 
+  if (isSessionLoading && !accessToken) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--color-bg)" }}>
+        <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--color-teal)" }} />
+      </div>
+    );
+  }
   if (!accessToken) return null;
 
   if (!userId) {

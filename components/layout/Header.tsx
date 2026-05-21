@@ -88,13 +88,15 @@ export function Header({ onSearchOpen }: HeaderProps) {
     try {
       const date = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
       const name = `${nodeCount} verse${nodeCount === 1 ? "" : "s"} — ${date}`;
-      await fetch("/api/workspace", {
+      const res = await fetch("/api/workspace", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ name, data: serializeCanvas(nodes, edges), nodeCount }),
       });
-      setWorkspaceSaved(true);
-      setTimeout(() => setWorkspaceSaved(false), 2000);
+      if (res.ok) {
+        setWorkspaceSaved(true);
+        setTimeout(() => setWorkspaceSaved(false), 2000);
+      }
     } catch {
       // silent
     } finally {

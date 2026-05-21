@@ -7,10 +7,13 @@ import { useSocialStore } from "@/store/social";
 interface AuthStore {
   // Access token kept in memory — restored on page load via /api/auth/refresh (HttpOnly cookie)
   accessToken: string | null;
+  // True until SessionRestorer finishes its first attempt (success or failure)
+  isSessionLoading: boolean;
   // Bookmarks are non-sensitive and are persisted for offline use
   bookmarks: string[];
 
   setTokens: (accessToken: string) => void;
+  setSessionLoaded: () => void;
   clearAuth: () => void;
   toggleBookmark: (ref: string) => void;
   isBookmarked: (ref: string) => boolean;
@@ -21,9 +24,11 @@ export const useAuthStore = create<AuthStore>()(
   persist(
     (set, get) => ({
       accessToken: null,
+      isSessionLoading: true,
       bookmarks: [],
 
       setTokens: (accessToken) => set({ accessToken }),
+      setSessionLoaded: () => set({ isSessionLoading: false }),
 
       clearAuth: () => {
         set({ accessToken: null, bookmarks: [] });

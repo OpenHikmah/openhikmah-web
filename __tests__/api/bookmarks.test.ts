@@ -91,12 +91,10 @@ describe("GET /api/bookmarks", () => {
     mockSelect.mockReturnValue(makeDbChain([]));
   });
 
-  it("returns empty refs when not authenticated", async () => {
+  it("returns 401 when not authenticated", async () => {
     unauthedUser();
     const res = await GET(req());
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.refs).toEqual([]);
+    expect(res.status).toBe(401);
   });
 
   it("returns refs for authenticated user", async () => {
