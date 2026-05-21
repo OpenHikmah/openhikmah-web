@@ -217,20 +217,27 @@ export function Header({ onSearchOpen }: HeaderProps) {
             <>
               {/* Username pill with streak inlined */}
               <div
-                className="flex items-center gap-1.5 px-2 py-1 rounded border text-xs font-mono"
-                style={{ borderColor: "var(--color-teal)", color: "var(--color-teal)" }}
+                className="flex items-center gap-1.5 px-2 py-1 rounded border text-xs"
+                style={{
+                  borderColor: "var(--color-border)",
+                  background: "var(--color-surface-raised)",
+                  color: "var(--color-text-secondary)",
+                }}
               >
                 <span
-                  className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0"
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
                   style={{ background: "var(--color-teal)", color: "var(--color-bg)" }}
                 >
                   {(username ?? "?")[0].toUpperCase()}
                 </span>
-                <span>{username ?? "signed in"}</span>
+                {username && (
+                  <span className="max-w-[96px] truncate" style={{ color: "var(--color-text-primary)" }}>
+                    {username}
+                  </span>
+                )}
                 {streak > 0 && (
                   <>
-                    <span style={{ color: "var(--color-border)" }}>·</span>
-                    <Flame className="w-3 h-3" fill="currentColor" style={{ color: "var(--color-gold)" }} />
+                    <Flame className="w-3 h-3 shrink-0" fill="currentColor" style={{ color: "var(--color-gold)" }} />
                     <span style={{ color: "var(--color-gold)" }}>{streak}</span>
                   </>
                 )}
