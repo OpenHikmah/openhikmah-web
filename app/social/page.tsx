@@ -69,10 +69,11 @@ export default function SocialPage() {
   }, [accessToken]);
 
   useEffect(() => {
-    if (!accessToken || !userId) {
+    if (!accessToken) {
       router.replace("/");
       return;
     }
+    if (!userId) return;
     const ctrl = new AbortController();
     const { signal } = ctrl;
 
@@ -111,7 +112,25 @@ export default function SocialPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, userId]);
 
-  if (!accessToken || !userId) return null;
+  if (!accessToken) return null;
+
+  if (!userId) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "var(--color-bg)" }}
+      >
+        <div className="text-center space-y-3 px-4">
+          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+            Your profile couldn&apos;t load. Please sign out and try again.
+          </p>
+          <Link href="/" className="text-xs underline" style={{ color: "var(--color-teal)" }}>
+            Back to canvas
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
