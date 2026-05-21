@@ -9,5 +9,6 @@ __tests__
 .agents
 scripts
 !scripts/migrate.mjs
+!scripts/ensure-tables.mjs
 hosting.md
 plan.md
