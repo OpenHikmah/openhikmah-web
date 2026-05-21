@@ -52,22 +52,6 @@ export function EmptyState({ onSearchOpen }: EmptyStateProps) {
           </kbd>
         </button>
 
-        {/* Edge type legend */}
-        <div
-          className="mt-6 flex items-center justify-center gap-4 text-xs"
-          style={{ color: "var(--color-text-muted)" }}
-        >
-          {[
-            { color: "var(--color-theme-edge)", label: "Thematic" },
-            { color: "var(--color-root-edge)", label: "Root word" },
-            { color: "var(--color-contrast-edge)", label: "Contrast" },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center gap-1.5">
-              <div className="w-3 h-0.5 rounded-full" style={{ background: item.color }} />
-              <span>{item.label}</span>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
