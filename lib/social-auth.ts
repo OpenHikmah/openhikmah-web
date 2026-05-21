@@ -41,6 +41,10 @@ function decodeJwtSub(token: string): string | null {
 /**
  * Extracts the Bearer token from the request, resolves the user from the DB,
  * and returns { userId, user } or a 401 NextResponse.
+ *
+ * Two-stage lookup so legacy users (whose qfId was stored via the QF userinfo
+ * endpoint before the JWT fast-path was reliable) are still found even when the
+ * JWT sub claim is present but has a different string representation.
  */
 export async function requireUser(
   req: NextRequest
@@ -58,16 +62,23 @@ export async function requireUser(
     return { userId: cached.user.id, user: cached.user };
   }
 
-  // Resolve QF user ID: JWT decode first (no network), QF userinfo as fallback
-  const qfId = await resolveQfId(token);
-  if (!qfId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Stage 1 — JWT fast path (no network)
+  let user: User | undefined;
+  const jwtSub = decodeJwtSub(token);
+  if (jwtSub) {
+    [user] = await db.select().from(users).where(eq(users.qfId, jwtSub)).limit(1);
   }
 
-  // Look up the user in our DB
-  const [user] = await db.select().from(users).where(eq(users.qfId, qfId)).limit(1);
+  // Stage 2 — QF userinfo slow path (handles opaque tokens and qfId format mismatches)
   if (!user) {
-    return NextResponse.json({ error: "Profile not found — please sign in again" }, { status: 401 });
+    const qfId = await resolveQfIdFromUserinfo(token);
+    if (qfId) {
+      [user] = await db.select().from(users).where(eq(users.qfId, qfId)).limit(1);
+    }
+  }
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   tokenCache.set(token, { user, expiresAt: Date.now() + CACHE_TTL_MS });
@@ -80,11 +91,17 @@ export async function requireUser(
  * userinfo endpoint if the token is opaque or the sub claim is missing.
  */
 export async function resolveQfId(accessToken: string): Promise<string | null> {
-  // Fast path: decode JWT payload — Ory Hydra issues JWTs with sub = QF user ID
   const jwtSub = decodeJwtSub(accessToken);
   if (jwtSub) return jwtSub;
+  return resolveQfIdFromUserinfo(accessToken);
+}
 
-  // Slow path: hit QF userinfo (opaque tokens, or sub missing from payload)
+/**
+ * Resolves the QF user ID by hitting the QF userinfo endpoint directly,
+ * skipping the JWT fast path. Used as a fallback in requireUser when the
+ * JWT sub doesn't match any stored qfId.
+ */
+async function resolveQfIdFromUserinfo(accessToken: string): Promise<string | null> {
   const qfAuthBase = process.env.QF_AUTH_BASE ?? "";
   if (!qfAuthBase) return null;
 

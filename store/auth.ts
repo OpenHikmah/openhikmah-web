@@ -86,8 +86,18 @@ export const useAuthStore = create<AuthStore>()(
             headers: { Authorization: `Bearer ${accessToken}` },
           });
           if (!res.ok) return;
-          const { refs } = await res.json();
-          set({ bookmarks: refs });
+          const { refs } = await res.json() as { refs: string[] };
+          // Merge: DB is authoritative, but sync any local-only bookmarks up to DB
+          const local = get().bookmarks;
+          const localOnly = local.filter((r) => !refs.includes(r));
+          set({ bookmarks: [...new Set([...refs, ...localOnly])] });
+          localOnly.forEach((ref) => {
+            fetch("/api/bookmarks", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+              body: JSON.stringify({ ref }),
+            }).catch(() => {});
+          });
         } catch {}
       },
     }),

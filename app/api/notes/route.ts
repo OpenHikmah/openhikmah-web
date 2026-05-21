@@ -13,12 +13,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing ref" }, { status: 400 });
   }
 
-  const notes = await db
-    .select()
-    .from(verseNotes)
-    .where(and(eq(verseNotes.userId, authed.userId), eq(verseNotes.verseRef, ref)));
+  try {
+    const notes = await db
+      .select()
+      .from(verseNotes)
+      .where(and(eq(verseNotes.userId, authed.userId), eq(verseNotes.verseRef, ref)));
 
-  return NextResponse.json(notes);
+    return NextResponse.json(notes);
+  } catch (err) {
+    console.error("notes GET db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -38,10 +43,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing ref or note" }, { status: 400 });
   }
 
-  const [inserted] = await db
-    .insert(verseNotes)
-    .values({ userId: authed.userId, verseRef: ref, note })
-    .returning();
+  try {
+    const [inserted] = await db
+      .insert(verseNotes)
+      .values({ userId: authed.userId, verseRef: ref, note })
+      .returning();
 
-  return NextResponse.json(inserted, { status: 201 });
+    return NextResponse.json(inserted, { status: 201 });
+  } catch (err) {
+    console.error("notes POST db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

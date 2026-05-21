@@ -8,19 +8,24 @@ export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 
-  const rows = await db
-    .select({
-      id: savedWorkspaces.id,
-      name: savedWorkspaces.name,
-      nodeCount: savedWorkspaces.nodeCount,
-      createdAt: savedWorkspaces.createdAt,
-      updatedAt: savedWorkspaces.updatedAt,
-    })
-    .from(savedWorkspaces)
-    .where(eq(savedWorkspaces.userId, authed.userId))
-    .orderBy(desc(savedWorkspaces.updatedAt));
+  try {
+    const rows = await db
+      .select({
+        id: savedWorkspaces.id,
+        name: savedWorkspaces.name,
+        nodeCount: savedWorkspaces.nodeCount,
+        createdAt: savedWorkspaces.createdAt,
+        updatedAt: savedWorkspaces.updatedAt,
+      })
+      .from(savedWorkspaces)
+      .where(eq(savedWorkspaces.userId, authed.userId))
+      .orderBy(desc(savedWorkspaces.updatedAt));
 
-  return NextResponse.json(rows);
+    return NextResponse.json(rows);
+  } catch (err) {
+    console.error("workspace GET db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -41,15 +46,20 @@ export async function POST(req: NextRequest) {
   const name = (body.name?.trim()) || "Untitled canvas";
   const nodeCount = typeof body.nodeCount === "number" ? body.nodeCount : 0;
 
-  const [inserted] = await db
-    .insert(savedWorkspaces)
-    .values({
-      userId: authed.userId,
-      name,
-      data: JSON.stringify(body.data),
-      nodeCount,
-    })
-    .returning({ id: savedWorkspaces.id, name: savedWorkspaces.name, createdAt: savedWorkspaces.createdAt });
+  try {
+    const [inserted] = await db
+      .insert(savedWorkspaces)
+      .values({
+        userId: authed.userId,
+        name,
+        data: JSON.stringify(body.data),
+        nodeCount,
+      })
+      .returning({ id: savedWorkspaces.id, name: savedWorkspaces.name, createdAt: savedWorkspaces.createdAt });
 
-  return NextResponse.json(inserted, { status: 201 });
+    return NextResponse.json(inserted, { status: 201 });
+  } catch (err) {
+    console.error("workspace POST db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
