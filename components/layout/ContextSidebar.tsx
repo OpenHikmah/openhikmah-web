@@ -3,7 +3,8 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronDown, ChevronRight } from "lucide-react";
 import { useCanvasStore } from "@/store/canvas";
-import { useState } from "react";
+import { useAuthStore } from "@/store/auth";
+import { useState, useEffect } from "react";
 import type { EdgeKind } from "@/types/quran";
 
 function TafsirSection({ surah, ayah }: { surah: number; ayah: number }) {
@@ -50,6 +51,119 @@ function TafsirSection({ surah, ayah }: { surah: number; ayah: number }) {
             <p className="text-xs leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
               {text}
             </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NotesSection({ verseRef }: { verseRef: string }) {
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const [open, setOpen] = useState(false);
+  const [notes, setNotes] = useState<{ id: number; note: string; createdAt: string }[]>([]);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!open || !accessToken || loaded) return;
+    fetch(`/api/notes?ref=${encodeURIComponent(verseRef)}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => { setNotes(data); setLoaded(true); })
+      .catch(() => {});
+  }, [open, verseRef, accessToken, loaded]);
+
+  const save = async () => {
+    if (!draft.trim() || !accessToken) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ ref: verseRef, note: draft.trim() }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setNotes((prev) => [...prev, created]);
+        setDraft("");
+      }
+    } catch { /* silent */ } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (id: number) => {
+    if (!accessToken) return;
+    await fetch(`/api/notes/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }).catch(() => {});
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  return (
+    <div
+      className="rounded-md border"
+      style={{ borderColor: "var(--color-border)", background: "var(--color-surface-raised)" }}
+    >
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-3 py-2 cursor-pointer"
+        style={{ color: "var(--color-text-secondary)" }}
+      >
+        <span className="text-xs font-medium">My Notes</span>
+        {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+      </button>
+
+      {open && (
+        <div className="px-3 pb-3 space-y-2">
+          {!accessToken ? (
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              Sign in to add private notes.
+            </p>
+          ) : (
+            <>
+              {notes.map((n) => (
+                <div
+                  key={n.id}
+                  className="flex gap-2 items-start rounded border p-2"
+                  style={{ borderColor: "var(--color-border)" }}
+                >
+                  <p className="flex-1 text-xs leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
+                    {n.note}
+                  </p>
+                  <button
+                    onClick={() => remove(n.id)}
+                    className="shrink-0 cursor-pointer hover:opacity-70"
+                  >
+                    <X className="w-3 h-3" style={{ color: "var(--color-text-muted)" }} />
+                  </button>
+                </div>
+              ))}
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="Add a private note…"
+                rows={2}
+                className="w-full text-xs rounded border px-2.5 py-2 resize-none outline-none"
+                style={{
+                  background: "transparent",
+                  borderColor: "var(--color-border)",
+                  color: "var(--color-text-primary)",
+                }}
+              />
+              <button
+                onClick={save}
+                disabled={saving || !draft.trim()}
+                className="text-xs px-2.5 py-1 rounded border transition-colors cursor-pointer disabled:opacity-40"
+                style={{ borderColor: "var(--color-teal)", color: "var(--color-teal)" }}
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </>
           )}
         </div>
       )}
@@ -145,6 +259,8 @@ export function ContextSidebar() {
                 </p>
 
                 <TafsirSection key={sidebarContent.verse.ref} surah={sidebarContent.verse.surah} ayah={sidebarContent.verse.ayah} />
+
+                <NotesSection key={`notes-${sidebarContent.verse.ref}`} verseRef={sidebarContent.verse.ref} />
               </>
             )}
 
