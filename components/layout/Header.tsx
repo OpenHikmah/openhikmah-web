@@ -35,7 +35,8 @@ export function Header({ onSearchOpen }: HeaderProps) {
   const username = useSocialStore((s) => s.username);
   const userId = useSocialStore((s) => s.userId);
   const streak = useSocialStore((s) => s.streak);
-  const { bumpStreak } = useSocialStore();
+  const pendingFriendCount = useSocialStore((s) => s.pendingFriendCount);
+  const { bumpStreak, setPendingFriendCount } = useSocialStore();
 
   const playGraph = useAudioStore((s) => s.playGraph);
   const audioCurrentRef = useAudioStore((s) => s.currentRef);
@@ -52,6 +53,27 @@ export function Header({ onSearchOpen }: HeaderProps) {
         if (data?.streak !== undefined) bumpStreak(data.streak, data.longestStreak);
       })
       .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken, userId]);
+
+  // Poll for incoming friend requests every 60 s while signed in
+  useEffect(() => {
+    if (!accessToken || !userId) return;
+    const load = () =>
+      fetch("/api/social/friends", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+        .then((r) => (r.ok ? r.json() : []))
+        .then((data: { status: string; direction: string }[]) => {
+          const count = data.filter(
+            (f) => f.status === "pending" && f.direction === "received"
+          ).length;
+          setPendingFriendCount(count);
+        })
+        .catch(() => {});
+    load();
+    const interval = setInterval(load, 60_000);
+    return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, userId]);
 
@@ -241,9 +263,17 @@ export function Header({ onSearchOpen }: HeaderProps) {
             <Link
               href="/social"
               title="Friends & Leaderboard"
-              className="w-7 h-7 rounded border flex items-center justify-center transition-colors border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-teal)] hover:text-[var(--color-teal)]"
+              className="relative w-7 h-7 rounded border flex items-center justify-center transition-colors border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-teal)] hover:text-[var(--color-teal)]"
             >
               <Trophy className="w-3.5 h-3.5" />
+              {pendingFriendCount > 0 && (
+                <span
+                  className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] rounded-full flex items-center justify-center text-[9px] font-bold px-0.5"
+                  style={{ background: "var(--color-gold)", color: "var(--color-bg)" }}
+                >
+                  {pendingFriendCount > 9 ? "9+" : pendingFriendCount}
+                </span>
+              )}
             </Link>
           )}
 

@@ -13,10 +13,12 @@ interface SocialStore {
   username: string | null;
   streak: number;
   longestStreak: number;
+  pendingFriendCount: number;
 
   setProfile: (profile: SocialProfile) => void;
   clearSocial: () => void;
   bumpStreak: (newStreak: number, newLongest?: number) => void;
+  setPendingFriendCount: (count: number) => void;
 }
 
 export const useSocialStore = create<SocialStore>()(
@@ -26,17 +28,20 @@ export const useSocialStore = create<SocialStore>()(
       username: null,
       streak: 0,
       longestStreak: 0,
+      pendingFriendCount: 0,
 
       setProfile: ({ userId, username }) => set({ userId, username }),
 
       clearSocial: () =>
-        set({ userId: null, username: null, streak: 0, longestStreak: 0 }),
+        set({ userId: null, username: null, streak: 0, longestStreak: 0, pendingFriendCount: 0 }),
 
       bumpStreak: (newStreak, newLongest) =>
         set((s) => ({
           streak: newStreak,
           longestStreak: newLongest ?? Math.max(s.longestStreak, newStreak),
         })),
+
+      setPendingFriendCount: (count) => set({ pendingFriendCount: count }),
     }),
     {
       name: "open-hikmah-social",
