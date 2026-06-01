@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+
+const { mockGetVerse } = vi.hoisted(() => ({ mockGetVerse: vi.fn() }));
+vi.mock("@/lib/quran-corpus", () => ({ getVerse: mockGetVerse }));
+
 import { GET } from "@/app/api/verse/[surah]/[ayah]/route";
 
 const mockFetch = vi.fn();
@@ -20,6 +24,28 @@ function params(surah: string, ayah: string) {
 describe("GET /api/verse/[surah]/[ayah]", () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    // Default: corpus miss → exercises the live-fetch fallback path.
+    mockGetVerse.mockReset();
+    mockGetVerse.mockResolvedValue(null);
+  });
+
+  it("serves from the local corpus without fetching when present", async () => {
+    mockGetVerse.mockResolvedValue({
+      surah: 2,
+      ayah: 255,
+      ref: "2:255",
+      arabicText: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ",
+      translation: "Allah - there is no deity except Him.",
+      surahName: "Al-Baqarah",
+      surahNameArabic: "البقرة",
+    });
+
+    const req = new NextRequest("http://localhost/api/verse/2/255");
+    const res = await GET(req, params("2", "255"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ref).toBe("2:255");
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it("returns 400 when surah is 0", async () => {
@@ -85,10 +111,10 @@ describe("GET /api/verse/[surah]/[ayah]", () => {
     expect(body.surahName).toBe("Al-Baqarah");
   });
 
-  it("returns 500 when fetch throws", async () => {
+  it("returns 404 when the verse resolves nowhere (fetch throws)", async () => {
     mockFetch.mockRejectedValue(new Error("network error"));
     const req = new NextRequest("http://localhost/api/verse/1/1");
     const res = await GET(req, params("1", "1"));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(404);
   });
 });
