@@ -17,7 +17,8 @@ function makeSelectChain(resolveWith: unknown[]) {
 }
 
 const {
-  mockSelect, mockInsert, mockValues, mockOnConflict, mockGenerate, mockResolveVerse, mockConsume,
+  mockSelect, mockInsert, mockValues, mockOnConflict, mockGenerate, mockGenerateGrounded,
+  mockDiscover, mockResolveVerse, mockConsume,
 } = vi.hoisted(() => {
   const mockOnConflict = vi.fn().mockResolvedValue(undefined);
   const mockValues = vi.fn((..._args: unknown[]) => ({ onConflictDoNothing: mockOnConflict }));
@@ -27,13 +28,19 @@ const {
     mockValues,
     mockOnConflict,
     mockGenerate: vi.fn(),
+    mockGenerateGrounded: vi.fn(),
+    mockDiscover: vi.fn(),
     mockResolveVerse: vi.fn(),
     mockConsume: vi.fn(),
   };
 });
 
 vi.mock("@/lib/db", () => ({ db: { select: mockSelect, insert: mockInsert } }));
-vi.mock("@/lib/connection-generator", () => ({ generateConnections: mockGenerate }));
+vi.mock("@/lib/connection-generator", () => ({
+  generateConnections: mockGenerate,
+  generateGroundedConnections: mockGenerateGrounded,
+}));
+vi.mock("@/lib/connection-discovery", () => ({ discoverCandidates: mockDiscover }));
 vi.mock("@/lib/verse-resolver", () => ({ resolveVerse: mockResolveVerse }));
 vi.mock("@/lib/rate-limit", () => ({
   consume: mockConsume,
@@ -69,9 +76,13 @@ describe("getConnections", () => {
     mockValues.mockClear();
     mockOnConflict.mockClear();
     mockGenerate.mockReset();
+    mockGenerateGrounded.mockReset();
+    mockDiscover.mockReset();
     mockResolveVerse.mockReset();
     mockConsume.mockReset();
     mockConsume.mockResolvedValue(true);
+    // Default: no grounding data → legacy generation path.
+    mockDiscover.mockResolvedValue([]);
     mockResolveVerse.mockImplementation(async (ref: string) => verse(ref));
   });
 
@@ -150,6 +161,33 @@ describe("getConnections", () => {
     const out = await getConnections("1:1", "thematic", source, { clientKey: "1.2.3.4" });
     expect(mockConsume).toHaveBeenCalledTimes(1);
     expect(mockGenerate).toHaveBeenCalledTimes(1);
+    expect(out).toHaveLength(1);
+  });
+
+  it("on a miss WITH grounding data, uses grounded generation, not legacy", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    mockDiscover.mockResolvedValue(["2:255", "3:18"]);
+    mockGenerateGrounded.mockResolvedValue([result("2:255")]);
+
+    const out = await getConnections("1:1", "thematic", source);
+
+    expect(mockDiscover).toHaveBeenCalledWith("1:1", "thematic");
+    expect(mockGenerateGrounded).toHaveBeenCalledTimes(1);
+    expect(mockGenerateGrounded).toHaveBeenCalledWith("1:1", "ar", "tr", "thematic", ["2:255", "3:18"]);
+    expect(mockGenerate).not.toHaveBeenCalled(); // legacy path skipped
+    expect(out).toHaveLength(1);
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to legacy generation when discovery returns no candidates", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    mockDiscover.mockResolvedValue([]);
+    mockGenerate.mockResolvedValue([result("2:255")]);
+
+    const out = await getConnections("1:1", "root", source);
+
+    expect(mockGenerateGrounded).not.toHaveBeenCalled();
+    expect(mockGenerate).toHaveBeenCalledWith("1:1", "ar", "tr", "root");
     expect(out).toHaveLength(1);
   });
 
