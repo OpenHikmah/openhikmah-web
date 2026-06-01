@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getConnections } from "@/lib/graph-service";
+import { isValidRef } from "@/lib/quran-corpus";
 import { RateLimitError } from "@/lib/rate-limit";
 import type { EdgeKind } from "@/types/quran";
 
+// IPv4/IPv6 characters only, capped at IPv6's max length. Guards against
+// arbitrarily long / malformed x-forwarded-for values being persisted as
+// rate-limit keys.
+const IP_PATTERN = /^[0-9a-fA-F:.]{1,45}$/;
+
 function clientKey(req: NextRequest): string {
   const fwd = req.headers.get("x-forwarded-for");
-  return fwd?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+  const candidate =
+    fwd?.split(",")[0]?.trim() || req.headers.get("x-real-ip")?.trim() || "";
+  // Fall back to a single shared "unknown" bucket rather than omitting the key:
+  // the AI path must always be rate-limited, even when no usable IP is present.
+  return IP_PATTERN.test(candidate) ? candidate : "unknown";
 }
 
 export async function POST(req: NextRequest) {
@@ -24,6 +34,10 @@ export async function POST(req: NextRequest) {
 
   if (!["thematic", "root", "contrast"].includes(kind)) {
     return NextResponse.json({ error: "Invalid kind" }, { status: 400 });
+  }
+
+  if (!isValidRef(fromRef)) {
+    return NextResponse.json({ error: "Invalid fromRef" }, { status: 400 });
   }
 
   try {

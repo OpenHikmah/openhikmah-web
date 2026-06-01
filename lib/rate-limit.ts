@@ -17,9 +17,22 @@ export class RateLimitError extends Error {
   }
 }
 
+/**
+ * Parses a positive-integer env var, falling back to `fallback` for missing or
+ * invalid values (non-numeric, 0, negative, fractional, Infinity). Guards the
+ * bucketing math below from NaN/Infinity, which would collapse all requests
+ * into one bucket or block everyone.
+ */
+export function positiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
 /** Default generation budget per client, per window (overridable via env). */
-export const AI_GEN_LIMIT = Number(process.env.AI_GEN_RATE_LIMIT ?? 20);
-export const AI_GEN_WINDOW_SECONDS = Number(process.env.AI_GEN_RATE_WINDOW ?? 60);
+export const AI_GEN_LIMIT = positiveIntEnv("AI_GEN_RATE_LIMIT", 20);
+export const AI_GEN_WINDOW_SECONDS = positiveIntEnv("AI_GEN_RATE_WINDOW", 60);
 
 /**
  * Records a hit for `key` and returns true if still within `limit` for the

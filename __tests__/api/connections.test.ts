@@ -63,11 +63,11 @@ function transResp(text = "A noble verse.") {
   return { ok: true, json: async () => ({ data: { text } }) };
 }
 
-function makeRequest(body: Record<string, string>) {
+function makeRequest(body: Record<string, string>, headers: Record<string, string> = {}) {
   return new NextRequest("http://localhost/api/connections", {
     method: "POST",
     body: JSON.stringify(body),
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
   });
 }
 
@@ -95,6 +95,19 @@ describe("POST /api/connections", () => {
 
   it("returns 400 for invalid kind", async () => {
     const req = makeRequest({ fromRef: "1:1", kind: "bogus", arabicText: "text", translation: "trans" });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for an out-of-bounds fromRef without calling the AI path", async () => {
+    const req = makeRequest({ fromRef: "999:1", kind: "thematic", arabicText: "t", translation: "t" });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(mockConsume).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for a malformed fromRef", async () => {
+    const req = makeRequest({ fromRef: "garbage", kind: "thematic", arabicText: "t", translation: "t" });
     const res = await POST(req);
     expect(res.status).toBe(400);
   });
@@ -146,6 +159,36 @@ describe("POST /api/connections", () => {
       expect(item).toHaveProperty("reason");
       expect(item).toHaveProperty("kind", "contrast");
     }
+  });
+
+  it("rate-limits under the client IP from x-forwarded-for", async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (typeof url !== "string") return { ok: false };
+      if (url.includes("ar.alafasy")) return arabicResp();
+      if (url.includes("en.sahih")) return transResp();
+      return { ok: false };
+    });
+    const req = makeRequest(
+      { fromRef: "1:1", kind: "thematic", arabicText: "x", translation: "y" },
+      { "x-forwarded-for": "203.0.113.7, 70.41.3.18" }
+    );
+    await POST(req);
+    expect(mockConsume).toHaveBeenCalledWith("gen:203.0.113.7");
+  });
+
+  it("buckets requests with a malformed/oversized x-forwarded-for under 'unknown'", async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (typeof url !== "string") return { ok: false };
+      if (url.includes("ar.alafasy")) return arabicResp();
+      if (url.includes("en.sahih")) return transResp();
+      return { ok: false };
+    });
+    const req = makeRequest(
+      { fromRef: "1:1", kind: "thematic", arabicText: "x", translation: "y" },
+      { "x-forwarded-for": "x".repeat(500) }
+    );
+    await POST(req);
+    expect(mockConsume).toHaveBeenCalledWith("gen:unknown");
   });
 
   it("returns 429 when the generation rate limit is exceeded", async () => {

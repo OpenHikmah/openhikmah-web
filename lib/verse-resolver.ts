@@ -51,7 +51,10 @@ async function fetchVerseLive(ref: string): Promise<Verse | null> {
       surahName,
       surahNameArabic,
     };
-  } catch {
+  } catch (err) {
+    // Log so an upstream outage is distinguishable from a genuinely missing
+    // verse (both surface as null → 404 at the API layer).
+    console.error(`Live verse fetch failed for ${ref}:`, err);
     return null;
   }
 }

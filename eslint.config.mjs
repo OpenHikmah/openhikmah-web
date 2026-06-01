@@ -15,6 +15,20 @@ const eslintConfig = defineConfig([
     // Agent skill examples — not project code
     ".agents/**",
   ]),
+  {
+    // Recognize the underscore convention for intentionally-unused bindings
+    // (common in mock factories / proxy traps), so --max-warnings=0 stays clean.
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

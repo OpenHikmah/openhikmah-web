@@ -1,16 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const { mockReturning, mockOnConflict, mockValues, mockInsert } = vi.hoisted(() => {
+const { mockReturning, mockValues, mockInsert } = vi.hoisted(() => {
   const mockReturning = vi.fn();
   const mockOnConflict = vi.fn(() => ({ returning: mockReturning }));
   const mockValues = vi.fn((..._args: unknown[]) => ({ onConflictDoUpdate: mockOnConflict }));
   const mockInsert = vi.fn(() => ({ values: mockValues }));
-  return { mockReturning, mockOnConflict, mockValues, mockInsert };
+  return { mockReturning, mockValues, mockInsert };
 });
 
 vi.mock("@/lib/db", () => ({ db: { insert: mockInsert } }));
 
-import { consume, RateLimitError } from "@/lib/rate-limit";
+import { consume, RateLimitError, positiveIntEnv } from "@/lib/rate-limit";
 
 describe("rate-limit consume", () => {
   beforeEach(() => {
@@ -48,5 +48,30 @@ describe("rate-limit consume", () => {
 
   it("RateLimitError carries a name", () => {
     expect(new RateLimitError().name).toBe("RateLimitError");
+  });
+});
+
+describe("positiveIntEnv", () => {
+  const KEY = "TEST_RL_ENV";
+  afterEach(() => {
+    delete process.env[KEY];
+  });
+
+  it("uses the fallback when unset or empty", () => {
+    expect(positiveIntEnv(KEY, 60)).toBe(60);
+    process.env[KEY] = "   ";
+    expect(positiveIntEnv(KEY, 60)).toBe(60);
+  });
+
+  it("parses a valid positive integer", () => {
+    process.env[KEY] = "30";
+    expect(positiveIntEnv(KEY, 60)).toBe(30);
+  });
+
+  it("falls back for non-numeric, zero, negative, fractional, and Infinity", () => {
+    for (const bad of ["abc", "0", "-5", "2.5", "Infinity", "NaN"]) {
+      process.env[KEY] = bad;
+      expect(positiveIntEnv(KEY, 60)).toBe(60);
+    }
   });
 });
