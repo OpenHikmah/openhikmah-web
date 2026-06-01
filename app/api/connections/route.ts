@@ -1,134 +1,22 @@
-import { unstable_cache } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
-import { callAI } from "@/lib/ai";
-import type { ConnectionResult, EdgeKind, VerseRef } from "@/types/quran";
-import { getSurahName } from "@/lib/surah-names";
+import { getConnections } from "@/lib/graph-service";
+import { isValidRef } from "@/lib/quran-corpus";
+import { RateLimitError } from "@/lib/rate-limit";
+import type { EdgeKind } from "@/types/quran";
 
-const KIND_INSTRUCTIONS: Record<EdgeKind, string> = {
-  thematic:
-    "Find 3 other Quran verses that share the same theological theme as the given verse. Focus on verses that reinforce or expand the same divine message.",
-  root:
-    "Find 3 other Quran verses that share a significant Arabic root word with the given verse. The shared root should carry meaning relevant to the verse's central message.",
-  contrast:
-    "Find 3 other Quran verses that present a contrasting theological concept to the given verse — opposing states such as ease/hardship, gratitude/ingratitude, mercy/punishment.",
-};
+// IPv4/IPv6 characters only, capped at IPv6's max length. Guards against
+// arbitrarily long / malformed x-forwarded-for values being persisted as
+// rate-limit keys.
+const IP_PATTERN = /^[0-9a-fA-F:.]{1,45}$/;
 
-function buildPrompt(
-  fromRef: string,
-  arabicText: string,
-  translation: string,
-  kind: EdgeKind
-): string {
-  return `You are a classical Islamic scholar grounded in the Maturidi/Hanafi tradition (Ahl al-Sunnah wal-Jama'ah).
-
-Given this Quran verse:
-Reference: ${fromRef}
-Arabic: ${arabicText}
-Translation: ${translation}
-
-Task: ${KIND_INSTRUCTIONS[kind]}
-
-Rules:
-- Return EXACTLY 3 different verses (not the source verse).
-- Verse references must be real and accurate (format: surah:ayah, e.g. 2:255).
-- Each reason must be one concise sentence explaining the ${kind} connection in classical Islamic terms.
-- Maintain strict Tanzih (divine transcendence). Avoid Tashbih (anthropomorphism).
-- Return ONLY a valid JSON array. No prose, no markdown, no explanation outside the JSON.
-
-Output format:
-[
-  { "ref": "surah:ayah", "reason": "one-sentence theological justification" },
-  { "ref": "surah:ayah", "reason": "one-sentence theological justification" },
-  { "ref": "surah:ayah", "reason": "one-sentence theological justification" }
-]`;
+function clientKey(req: NextRequest): string {
+  const fwd = req.headers.get("x-forwarded-for");
+  const candidate =
+    fwd?.split(",")[0]?.trim() || req.headers.get("x-real-ip")?.trim() || "";
+  // Fall back to a single shared "unknown" bucket rather than omitting the key:
+  // the AI path must always be rate-limited, even when no usable IP is present.
+  return IP_PATTERN.test(candidate) ? candidate : "unknown";
 }
-
-async function fetchVerseData(ref: string): Promise<{
-  arabicText: string;
-  translation: string;
-  surahName: string;
-  surahNameArabic: string;
-} | null> {
-  const [surahStr, ayahStr] = ref.split(":");
-  const surahNum = parseInt(surahStr, 10);
-  const ayahNum = parseInt(ayahStr, 10);
-
-  if (!surahNum || !ayahNum || surahNum < 1 || surahNum > 114 || ayahNum < 1) {
-    return null;
-  }
-
-  try {
-    const [arabicRes, translationRes] = await Promise.all([
-      fetch(`https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/ar.alafasy`),
-      fetch(`https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/en.sahih`),
-    ]);
-
-    if (!arabicRes.ok || !translationRes.ok) return null;
-
-    const [arabicData, translationData] = await Promise.all([
-      arabicRes.json(),
-      translationRes.json(),
-    ]);
-
-    const [surahName, surahNameArabic] = getSurahName(surahNum);
-
-    return {
-      arabicText: arabicData.data.text,
-      translation: translationData.data.text,
-      surahName,
-      surahNameArabic,
-    };
-  } catch {
-    return null;
-  }
-}
-
-const getCachedConnections = unstable_cache(
-  async (
-    fromRef: string,
-    arabicText: string,
-    translation: string,
-    kind: EdgeKind
-  ): Promise<ConnectionResult[]> => {
-    const text = await callAI(buildPrompt(fromRef, arabicText, translation, kind));
-
-    let rawConnections: Array<{ ref: string; reason: string }>;
-    try {
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) throw new Error("No JSON array found");
-      rawConnections = JSON.parse(jsonMatch[0]);
-    } catch {
-      return [];
-    }
-
-    const verseDataResults = await Promise.all(
-      rawConnections.slice(0, 3).map((c) => fetchVerseData(c.ref))
-    );
-
-    return rawConnections
-      .slice(0, 3)
-      .map((c, i) => {
-        const verseData = verseDataResults[i];
-        if (!verseData) return null;
-        const [surahStr, ayahStr] = c.ref.split(":");
-        const result: ConnectionResult = {
-          surah: parseInt(surahStr, 10),
-          ayah: parseInt(ayahStr, 10),
-          ref: c.ref as VerseRef,
-          arabicText: verseData.arabicText,
-          translation: verseData.translation,
-          surahName: verseData.surahName,
-          surahNameArabic: verseData.surahNameArabic,
-          reason: c.reason,
-          kind,
-        };
-        return result;
-      })
-      .filter((c): c is ConnectionResult => c !== null);
-  },
-  ["connections-v1"],
-  { revalidate: 86400 * 30 }
-);
 
 export async function POST(req: NextRequest) {
   let body: { fromRef?: string; kind?: string; arabicText?: string; translation?: string };
@@ -148,17 +36,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid kind" }, { status: 400 });
   }
 
-  const edgeKind = kind as EdgeKind;
+  if (!isValidRef(fromRef)) {
+    return NextResponse.json({ error: "Invalid fromRef" }, { status: 400 });
+  }
 
   try {
-    const connections = await getCachedConnections(fromRef, arabicText, translation, edgeKind);
+    const results = await getConnections(
+      fromRef,
+      kind as EdgeKind,
+      { arabicText, translation },
+      { clientKey: clientKey(req) }
+    );
 
-    if (connections.length === 0) {
+    if (results.length === 0) {
       return NextResponse.json({ error: "Could not resolve any verses" }, { status: 500 });
     }
 
-    return NextResponse.json(connections);
+    return NextResponse.json(results);
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return NextResponse.json(
+        { error: "Too many requests — please slow down." },
+        { status: 429 }
+      );
+    }
     console.error("Connections route error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

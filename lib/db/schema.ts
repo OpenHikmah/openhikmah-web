@@ -175,6 +175,83 @@ export const verseNotes = pgTable(
   ]
 );
 
+// ─── Quran Corpus (local) ─────────────────────────────────────────────────────
+// The full Quran, seeded once. Replaces per-request fetches to alquran.cloud /
+// quran.com — see lib/quran-corpus.ts. Keyed by "surah:ayah".
+
+// Surah names are derived at read time from lib/surah-names.ts (single source of
+// truth) rather than duplicated per row — see lib/quran-corpus.ts.
+export const verses = pgTable(
+  "verses",
+  {
+    ref: text("ref").primaryKey(),
+    surah: integer("surah").notNull(),
+    ayah: integer("ayah").notNull(),
+    arabicText: text("arabic_text").notNull(),
+    translation: text("translation").notNull(),
+    transliteration: text("transliteration"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("verses_surah_ayah_idx").on(t.surah, t.ayah),
+  ]
+);
+
+// ─── Connection Graph (the persistent knowledge graph) ────────────────────────
+// Each row is an AI-generated edge between two verses. Written once on a cache
+// miss (see lib/graph-service.ts) and shared by every subsequent reader, so AI
+// cost trends toward zero as the graph fills.
+
+export const connections = pgTable(
+  "connections",
+  {
+    id: serial("id").primaryKey(),
+    fromRef: text("from_ref").notNull(),
+    toRef: text("to_ref").notNull(),
+    // 'thematic' | 'root' | 'contrast'
+    kind: text("kind").notNull(),
+    reason: text("reason").notNull(),
+    model: text("model"),
+    confidence: integer("confidence"),
+    // 'active' | 'flagged' | 'retired' — lets edges be soft-deactivated without schema change
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("connections_from_to_kind_idx").on(t.fromRef, t.toRef, t.kind),
+    index("connections_from_kind_idx").on(t.fromRef, t.kind),
+  ]
+);
+
+// ─── AI Generation Log ────────────────────────────────────────────────────────
+// Lightweight cost/audit trail: one row per actual AI generation (cache miss).
+// How we measure the bill flattening over time.
+
+export const aiGenerations = pgTable(
+  "ai_generations",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    fromRef: text("from_ref").notNull(),
+    kind: text("kind").notNull(),
+    model: text("model"),
+    tokens: integer("tokens"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("ai_generations_created_idx").on(t.createdAt),
+  ]
+);
+
+// ─── Rate Limits ──────────────────────────────────────────────────────────────
+// Fixed-window counter (no Redis). One row per (key, time-bucket); guards the
+// expensive AI generation path. See lib/rate-limit.ts.
+
+export const rateLimits = pgTable("rate_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─── Exported types ───────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
@@ -189,3 +266,11 @@ export type Bookmark = typeof bookmarks.$inferSelect;
 export type NewBookmark = typeof bookmarks.$inferInsert;
 export type SavedWorkspace = typeof savedWorkspaces.$inferSelect;
 export type NewSavedWorkspace = typeof savedWorkspaces.$inferInsert;
+export type VerseRow = typeof verses.$inferSelect;
+export type NewVerseRow = typeof verses.$inferInsert;
+export type Connection = typeof connections.$inferSelect;
+export type NewConnection = typeof connections.$inferInsert;
+export type AiGeneration = typeof aiGenerations.$inferSelect;
+export type NewAiGeneration = typeof aiGenerations.$inferInsert;
+export type RateLimit = typeof rateLimits.$inferSelect;
+export type NewRateLimit = typeof rateLimits.$inferInsert;

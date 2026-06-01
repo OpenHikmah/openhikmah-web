@@ -7,8 +7,13 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    // Threads start far faster than forked processes on Windows and avoid the
+    // worker-startup timeouts seen when many jsdom workers spawn under git hooks.
+    pool: "threads",
     setupFiles: ["./vitest.setup.ts"],
-    exclude: ["node_modules", ".next"],
+    // Integration tests need Docker (Testcontainers) and run via
+    // vitest.integration.config.ts — keep them out of the fast unit suite.
+    exclude: ["node_modules", ".next", "__tests__/integration/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
