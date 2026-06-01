@@ -1,12 +1,20 @@
-set -e
-
 # Integration tests (Testcontainers) require a running Docker daemon and MUST
-# pass before any push. No Docker = no push (fail closed).
+# pass before any push. No Docker = no push (fail closed). Output is kept quiet
+# on success and shown in full only on failure.
+
 if ! docker info >/dev/null 2>&1; then
-  echo "✗ Docker daemon is not running."
-  echo "  Integration tests are required before push. Start Docker and retry."
+  echo "pre-push: Docker daemon not running — integration tests are required. Start Docker and retry." >&2
   exit 1
 fi
 
-echo "Running integration tests (Testcontainers)…"
-npm run test:integration
+echo "pre-push: running integration tests (Testcontainers)…"
+output=$(npm run test:integration 2>&1)
+status=$?
+
+if [ "$status" -ne 0 ]; then
+  echo "$output" >&2
+  echo "pre-push: integration tests FAILED — push aborted." >&2
+  exit 1
+fi
+
+echo "pre-push: integration tests passed."
