@@ -3,14 +3,16 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { verseNotes } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
+import { isValidRef } from "@/lib/quran-corpus";
+import { jsonError, parseJson } from "@/lib/http";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 
   const ref = req.nextUrl.searchParams.get("ref");
-  if (!ref) {
-    return NextResponse.json({ error: "Missing ref" }, { status: 400 });
+  if (!ref || !isValidRef(ref)) {
+    return jsonError("Invalid or missing ref", 400);
   }
 
   try {
@@ -22,7 +24,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(notes);
   } catch (err) {
     console.error("notes GET db error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return jsonError("Internal server error", 500);
   }
 }
 
@@ -30,17 +32,16 @@ export async function POST(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 
-  let body: { ref?: string; note?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
-  }
+  const body = await parseJson<{ ref?: string; note?: string }>(req);
+  if (!body) return jsonError("Invalid request body", 400);
 
   const ref = body.ref?.trim();
   const note = body.note?.trim();
-  if (!ref || !note) {
-    return NextResponse.json({ error: "Missing ref or note" }, { status: 400 });
+  if (!ref || !isValidRef(ref)) {
+    return jsonError("Invalid verse ref", 400);
+  }
+  if (!note) {
+    return jsonError("Missing note", 400);
   }
 
   try {
@@ -52,6 +53,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(inserted, { status: 201 });
   } catch (err) {
     console.error("notes POST db error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return jsonError("Internal server error", 500);
   }
 }

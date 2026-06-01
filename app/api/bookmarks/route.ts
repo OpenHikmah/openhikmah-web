@@ -3,6 +3,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { bookmarks } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
+import { isValidRef } from "@/lib/quran-corpus";
+import { jsonError, parseJson } from "@/lib/http";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
@@ -17,7 +19,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ refs: rows.map((r) => r.verseRef) });
   } catch (err) {
     console.error("bookmarks GET db error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return jsonError("Internal server error", 500);
   }
 }
 
@@ -25,16 +27,12 @@ export async function POST(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 
-  let body: { ref?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
-  }
+  const body = await parseJson<{ ref?: string }>(req);
+  if (!body) return jsonError("Invalid request body", 400);
 
   const ref = body.ref?.trim();
-  if (!ref || !/^\d+:\d+$/.test(ref)) {
-    return NextResponse.json({ error: "Invalid verse ref" }, { status: 400 });
+  if (!ref || !isValidRef(ref)) {
+    return jsonError("Invalid verse ref", 400);
   }
 
   try {
@@ -46,6 +44,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("bookmarks POST db error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return jsonError("Internal server error", 500);
   }
 }
