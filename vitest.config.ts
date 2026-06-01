@@ -7,6 +7,9 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    // Threads start far faster than forked processes on Windows and avoid the
+    // worker-startup timeouts seen when many jsdom workers spawn under git hooks.
+    pool: "threads",
     setupFiles: ["./vitest.setup.ts"],
     exclude: ["node_modules", ".next"],
     coverage: {
