@@ -10,7 +10,7 @@
  *
  * Exits non-zero on any violation, aborting the commit.
  */
-import { execSync, spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 
 const RED = "\x1b[31m";
 const YELLOW = "\x1b[33m";
@@ -20,25 +20,28 @@ const warn = (msg) => console.warn(`${YELLOW}! ${msg}${RESET}`);
 
 let violations = 0;
 
-function sh(cmd) {
-  return execSync(cmd, { encoding: "utf8" }).trim();
+// Run git with an argv array (no shell) — avoids quoting/escaping issues and
+// stays robust for paths with spaces or special characters, cross-platform.
+function git(args) {
+  return execFileSync("git", args, { encoding: "utf8" });
 }
 
 // Staged blob content (handles partially-staged files correctly).
 function stagedContent(file) {
   try {
-    return execSync(`git show :${JSON.stringify(file)}`, { encoding: "utf8" });
+    return git(["show", `:${file}`]);
   } catch {
     return "";
   }
 }
 
-const stagedFiles = sh("git diff --cached --name-only --diff-filter=ACM")
+const stagedFiles = git(["diff", "--cached", "--name-only", "--diff-filter=ACM"])
+  .trim()
   .split("\n")
   .filter(Boolean);
 
 // ── 1. Block direct commits to main ─────────────────────────────────────────
-const branch = sh("git rev-parse --abbrev-ref HEAD");
+const branch = git(["rev-parse", "--abbrev-ref", "HEAD"]).trim();
 if (branch === "main" || branch === "master") {
   fail(`Direct commits to "${branch}" are blocked — work on a feature branch.`);
   violations++;
