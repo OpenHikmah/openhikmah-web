@@ -11,8 +11,9 @@ An AI-powered Quran knowledge graph. Search any verse, drop it on an infinite ca
 
 ## Features
 
-- **Canvas** — Infinite graph of verse nodes connected by AI-generated edges. Expand any verse by Theme, Root Word, or Contrast. Click an edge to read the reasoning behind the connection.
-- **Search** — Direct reference lookup (`2:255`) or full-text keyword search. One click adds any verse to the canvas.
+- **Canvas** — Infinite graph of verse nodes connected by AI-generated edges. Expand any verse by Theme, Root Word, or Contrast. Click an edge to read the reasoning behind the connection. Connections are **grounded**: canonical data (Arabic roots + meaning-based similarity) discovers the real target verses; the AI only explains *why* — it never invents references.
+- **Search** — Direct reference lookup (`2:255`), full-text keyword search, or **search by meaning** (semantic): find verses about a concept even when they don't contain the literal word. One click adds any verse to the canvas.
+- **Find similar verses** — From any verse, surface the closest verses by meaning (embedding similarity).
 - **Shareable canvases** — Every canvas state serialises to a single URL you can copy and share.
 - **Audio** — Play all canvas verses in Quran order with a single button.
 - **99 Divine Names** — Full Asmaul Husna with Arabic script, root morphology, Maturidi taxonomy, verse feed, and contemplative reflections.
@@ -29,10 +30,10 @@ An AI-powered Quran knowledge graph. Search any verse, drop it on an infinite ca
 | Canvas | @xyflow/react |
 | State | Zustand |
 | Styling | Tailwind CSS v4 |
-| AI | Anthropic Claude (adaptive thinking) with Gemini fallback |
-| Quran data | alquran.cloud + Quran Foundation API |
+| AI | Anthropic Claude (adaptive thinking) with Gemini fallback; Gemini embeddings for semantic search |
+| Quran data | alquran.cloud + Quran Foundation API; canonical morphology for root grounding |
 | Auth | Quran Foundation OAuth2 PKCE |
-| Database | PostgreSQL + Drizzle ORM |
+| Database | PostgreSQL + pgvector + Drizzle ORM |
 | Testing | Vitest |
 | CI | GitHub Actions |
 
@@ -40,7 +41,7 @@ An AI-powered Quran knowledge graph. Search any verse, drop it on an infinite ca
 
 ## Local Development
 
-**Prerequisites:** Node 20+, PostgreSQL 16.
+**Prerequisites:** Node 20+, PostgreSQL 16 with the **pgvector** extension.
 
 ```bash
 git clone https://github.com/Nazm-AI/open-hikmah
@@ -48,11 +49,17 @@ cd open-hikmah
 npm install
 cp .env.example .env.local
 # Fill in the values
-npx drizzle-kit migrate
+npx drizzle-kit migrate          # creates tables; enables the pgvector extension
+
+# One-time data seeds (idempotent, resumable):
+node scripts/seed-quran.mjs       # full Quran corpus → verses
+node scripts/embed-corpus.mjs     # verse embeddings → semantic search (needs GEMINI_API_KEY)
+node scripts/seed-morphology.mjs  # Arabic roots → grounded "By Root" connections
+
 npm run dev
 ```
 
-Start a local Postgres instance if you don't have one:
+Start a local Postgres instance if you don't have one (the image must include pgvector):
 
 ```bash
 docker run -d --name openh-db \
@@ -60,10 +67,14 @@ docker run -d --name openh-db \
   -e POSTGRES_USER=openh \
   -e POSTGRES_PASSWORD=devpassword \
   -p 5432:5432 \
-  postgres:16-alpine
+  pgvector/pgvector:pg16
 ```
 
 Then set `DATABASE_URL=postgresql://openh:devpassword@localhost:5432/open_hikmah` in `.env.local`.
+
+> **Note:** the app runs without the seeds — search falls back to keyword mode and connections
+> to AI-from-memory generation. Run the seeds to enable semantic search and grounded connections.
+> `seed-morphology.mjs` ships with Al-Fatihah (surah 1); the rest of the corpus is a one-time backfill.
 
 ---
 
