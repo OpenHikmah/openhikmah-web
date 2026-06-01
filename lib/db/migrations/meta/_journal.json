@@ -43,6 +43,20 @@
       "when": 1748000003000,
       "tag": "0005_ensure_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1748000004000,
+      "tag": "0006_connection_graph",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1748000005000,
+      "tag": "0007_rate_limits",
+      "breakpoints": true
     }
   ]
 }

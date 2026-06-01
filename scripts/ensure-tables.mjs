@@ -49,6 +49,57 @@ try {
   `;
   await sql`CREATE INDEX IF NOT EXISTS saved_workspaces_user_idx ON saved_workspaces (user_id)`;
 
+  // ─── Connection graph (foundation phase) ────────────────────────────────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS verses (
+      ref               text PRIMARY KEY,
+      surah             integer NOT NULL,
+      ayah              integer NOT NULL,
+      arabic_text       text NOT NULL,
+      translation       text NOT NULL,
+      transliteration   text,
+      created_at        timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS verses_surah_ayah_idx ON verses (surah, ayah)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS connections (
+      id         serial PRIMARY KEY,
+      from_ref   text NOT NULL,
+      to_ref     text NOT NULL,
+      kind       text NOT NULL,
+      reason     text NOT NULL,
+      model      text,
+      confidence integer,
+      status     text NOT NULL DEFAULT 'active',
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS connections_from_to_kind_idx ON connections (from_ref, to_ref, kind)`;
+  await sql`CREATE INDEX IF NOT EXISTS connections_from_kind_idx ON connections (from_ref, kind)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS ai_generations (
+      id         bigserial PRIMARY KEY,
+      from_ref   text NOT NULL,
+      kind       text NOT NULL,
+      model      text,
+      tokens     integer,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS ai_generations_created_idx ON ai_generations (created_at)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS rate_limits (
+      key        text PRIMARY KEY,
+      count      integer NOT NULL DEFAULT 0,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS rate_limits_created_idx ON rate_limits (created_at)`;
+
   console.log("Tables ensured successfully");
 } finally {
   await sql.end();
