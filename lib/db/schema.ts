@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   index,
   unique,
+  vector,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -252,6 +253,50 @@ export const rateLimits = pgTable("rate_limits", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ─── Verse Embeddings (semantic search) ───────────────────────────────────────
+// One vector per verse, produced once by scripts/embed-corpus.mjs via Gemini.
+// Powers "search by meaning" and "find similar verses", and supplies the real
+// thematic/contrast candidates for grounded connection discovery (data discovers,
+// AI articulates). Requires the pgvector extension — see migration 0008.
+
+export const verseEmbeddings = pgTable(
+  "verse_embeddings",
+  {
+    ref: text("ref").primaryKey(),
+    embedding: vector("embedding", { dimensions: 768 }).notNull(),
+    model: text("model").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("verse_embeddings_hnsw_idx").using(
+      "hnsw",
+      t.embedding.op("vector_cosine_ops")
+    ),
+  ]
+);
+
+// ─── Word Morphology (grounded root discovery) ────────────────────────────────
+// One row per word per verse: its Arabic root + lemma. Seeded once by
+// scripts/seed-morphology.mjs. Makes "verses sharing a root" a local SQL query,
+// so root connections are discovered from real data instead of the model's memory.
+
+export const wordMorphology = pgTable(
+  "word_morphology",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    ref: text("ref").notNull(),
+    position: integer("position").notNull(),
+    surface: text("surface").notNull(),
+    root: text("root"),
+    lemma: text("lemma"),
+  },
+  (t) => [
+    uniqueIndex("word_morphology_ref_pos_idx").on(t.ref, t.position),
+    index("word_morphology_ref_idx").on(t.ref),
+    index("word_morphology_root_idx").on(t.root),
+  ]
+);
+
 // ─── Exported types ───────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
@@ -274,3 +319,7 @@ export type AiGeneration = typeof aiGenerations.$inferSelect;
 export type NewAiGeneration = typeof aiGenerations.$inferInsert;
 export type RateLimit = typeof rateLimits.$inferSelect;
 export type NewRateLimit = typeof rateLimits.$inferInsert;
+export type VerseEmbedding = typeof verseEmbeddings.$inferSelect;
+export type NewVerseEmbedding = typeof verseEmbeddings.$inferInsert;
+export type WordMorphology = typeof wordMorphology.$inferSelect;
+export type NewWordMorphology = typeof wordMorphology.$inferInsert;

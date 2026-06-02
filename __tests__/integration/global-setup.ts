@@ -21,7 +21,9 @@ interface SetupContext {
 }
 
 export async function setup({ provide }: SetupContext) {
-  container = await new PostgreSqlContainer("postgres:16-alpine").start();
+  // pgvector-enabled image (matches docker-compose) so migration 0008's
+  // `CREATE EXTENSION vector` and the verse_embeddings vector column apply.
+  container = await new PostgreSqlContainer("pgvector/pgvector:pg16").start();
   const url = container.getConnectionUri();
 
   // Apply all Drizzle migrations to the fresh database.

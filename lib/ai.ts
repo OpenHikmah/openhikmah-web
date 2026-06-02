@@ -37,3 +37,42 @@ async function callGemini(prompt: string): Promise<string> {
   const result = await genModel.generateContent(prompt);
   return result.response.text();
 }
+
+// ─── Embeddings ───────────────────────────────────────────────────────────────
+// Anthropic has no embeddings API, so embeddings are always Gemini regardless of
+// AI_PROVIDER. Used to populate verse_embeddings (semantic search + grounded
+// thematic/contrast discovery). The dimension must match the verse_embeddings
+// vector(N) column in the schema.
+
+export const EMBEDDING_DIMENSIONS = 768;
+
+function embeddingModelName(): string {
+  return process.env.GEMINI_EMBEDDING_MODEL ?? "text-embedding-004";
+}
+
+function embeddingClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
+  return new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: embeddingModelName() });
+}
+
+/** Embeds a single piece of text into a fixed-length semantic vector. */
+export async function embed(text: string): Promise<number[]> {
+  const { embedding } = await embeddingClient().embedContent(text);
+  return embedding.values;
+}
+
+/** Embeds many texts in one request, preserving input order. */
+export async function embedBatch(texts: string[]): Promise<number[][]> {
+  if (texts.length === 0) return [];
+  const model = embeddingClient();
+  const { embeddings } = await model.batchEmbedContents({
+    requests: texts.map((text) => ({ content: { role: "user", parts: [{ text }] } })),
+  });
+  return embeddings.map((e) => e.values);
+}
+
+/** The model identifier persisted alongside each stored embedding. */
+export function embeddingModel(): string {
+  return embeddingModelName();
+}

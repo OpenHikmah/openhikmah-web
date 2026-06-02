@@ -37,7 +37,10 @@ services:
       start_period: 30s
 
   db:
-    image: postgres:16-alpine
+    # pgvector-enabled Postgres 16 (drop-in for postgres:16) — required for the
+    # verse_embeddings vector column / semantic search. The vector extension is
+    # enabled by migration 0008 / ensure-tables.mjs.
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     volumes:
       - postgres_data:/var/lib/postgresql/data

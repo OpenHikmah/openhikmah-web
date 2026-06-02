@@ -1,17 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Verse, VerseRef } from "@/types/quran";
 
-const { mockCallAI, mockResolveVerse, mockInsert } = vi.hoisted(() => ({
+const { mockCallAI, mockResolveVerse, mockInsert, mockGetVerses } = vi.hoisted(() => ({
   mockCallAI: vi.fn(),
   mockResolveVerse: vi.fn(),
   mockInsert: vi.fn(() => ({ values: vi.fn().mockResolvedValue(undefined) })),
+  mockGetVerses: vi.fn(),
 }));
 
 vi.mock("@/lib/ai", () => ({ callAI: mockCallAI }));
 vi.mock("@/lib/verse-resolver", () => ({ resolveVerse: mockResolveVerse }));
 vi.mock("@/lib/db", () => ({ db: { insert: mockInsert } }));
+vi.mock("@/lib/quran-corpus", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/quran-corpus")>();
+  return { ...actual, getVerses: mockGetVerses };
+});
 
-import { generateConnections } from "@/lib/connection-generator";
+import { generateConnections, generateGroundedConnections } from "@/lib/connection-generator";
 
 function verse(ref: string): Verse {
   const [s, a] = ref.split(":");
@@ -99,5 +104,75 @@ describe("generateConnections", () => {
     );
     const out = await generateConnections("1:1", "ar", "tr", "thematic");
     expect(out).toHaveLength(3);
+  });
+});
+
+describe("generateGroundedConnections", () => {
+  beforeEach(() => {
+    mockCallAI.mockReset();
+    mockInsert.mockClear();
+    mockGetVerses.mockReset();
+    // Default: every requested candidate ref resolves to a verse.
+    mockGetVerses.mockImplementation(async (refs: string[]) =>
+      new Map(refs.map((r) => [r, verse(r)]))
+    );
+  });
+
+  it("selects and articulates from the provided candidates", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        { ref: "2:255", reason: "throne verse" },
+        { ref: "3:18", reason: "witness of oneness" },
+      ])
+    );
+    const out = await generateGroundedConnections("1:1", "ar", "tr", "thematic", [
+      "2:255",
+      "3:18",
+      "112:1",
+    ]);
+    expect(out.map((c) => c.ref)).toEqual(["2:255", "3:18"]);
+    expect(out[0]).toMatchObject({ reason: "throne verse", kind: "thematic" });
+  });
+
+  it("rejects any ref the model returns that was not in the candidate set", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        { ref: "2:255", reason: "in set" },
+        { ref: "9:99", reason: "NOT a candidate — must be dropped" },
+      ])
+    );
+    const out = await generateGroundedConnections("1:1", "ar", "tr", "root", [
+      "2:255",
+      "3:18",
+    ]);
+    expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+  });
+
+  it("never returns the source verse even if the model picks it", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        { ref: "1:1", reason: "self" },
+        { ref: "2:255", reason: "valid" },
+      ])
+    );
+    const out = await generateGroundedConnections("1:1", "ar", "tr", "contrast", [
+      "2:255",
+    ]);
+    expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+  });
+
+  it("returns [] without calling the AI when no candidate verse resolves", async () => {
+    mockGetVerses.mockResolvedValue(new Map());
+    const out = await generateGroundedConnections("1:1", "ar", "tr", "thematic", [
+      "2:255",
+    ]);
+    expect(out).toEqual([]);
+    expect(mockCallAI).not.toHaveBeenCalled();
+  });
+
+  it("logs exactly one ai_generations row per grounded generation", async () => {
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
+    await generateGroundedConnections("1:1", "ar", "tr", "root", ["2:255"]);
+    expect(mockInsert).toHaveBeenCalledTimes(1);
   });
 });

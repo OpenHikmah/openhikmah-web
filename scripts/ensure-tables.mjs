@@ -100,6 +100,33 @@ try {
   `;
   await sql`CREATE INDEX IF NOT EXISTS rate_limits_created_idx ON rate_limits (created_at)`;
 
+  // ─── Semantic search + grounded discovery (this phase) ──────────────────────
+  // pgvector must be available in the Postgres image (pgvector/pgvector:pg16).
+  await sql`CREATE EXTENSION IF NOT EXISTS vector`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS verse_embeddings (
+      ref        text PRIMARY KEY,
+      embedding  vector(768) NOT NULL,
+      model      text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS verse_embeddings_hnsw_idx ON verse_embeddings USING hnsw (embedding vector_cosine_ops)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS word_morphology (
+      id        bigserial PRIMARY KEY,
+      ref       text NOT NULL,
+      position  integer NOT NULL,
+      surface   text NOT NULL,
+      root      text,
+      lemma     text
+    )
+  `;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS word_morphology_ref_pos_idx ON word_morphology (ref, position)`;
+  await sql`CREATE INDEX IF NOT EXISTS word_morphology_ref_idx ON word_morphology (ref)`;
+  await sql`CREATE INDEX IF NOT EXISTS word_morphology_root_idx ON word_morphology (root)`;
+
   console.log("Tables ensured successfully");
 } finally {
   await sql.end();

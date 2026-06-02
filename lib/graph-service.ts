@@ -1,7 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { connections, type Connection } from "@/lib/db/schema";
-import { generateConnections } from "@/lib/connection-generator";
+import {
+  generateConnections,
+  generateGroundedConnections,
+} from "@/lib/connection-generator";
+import { discoverCandidates } from "@/lib/connection-discovery";
 import { resolveVerse } from "@/lib/verse-resolver";
 import { consume, RateLimitError } from "@/lib/rate-limit";
 import type { ConnectionResult, EdgeKind } from "@/types/quran";
@@ -79,13 +83,25 @@ export async function getConnections(
     if (!allowed) throw new RateLimitError();
   }
 
-  // Generate, persist, return.
-  const generated = await generateConnections(
-    fromRef,
-    source.arabicText,
-    source.translation,
-    kind
-  );
+  // Generate, persist, return. Prefer grounded discovery (data discovers, AI
+  // articulates); fall back to legacy memory-based generation only when no
+  // grounding data is available for this verse (e.g. corpus not yet seeded).
+  const candidates = await discoverCandidates(fromRef, kind);
+  const generated =
+    candidates.length > 0
+      ? await generateGroundedConnections(
+          fromRef,
+          source.arabicText,
+          source.translation,
+          kind,
+          candidates
+        )
+      : await generateConnections(
+          fromRef,
+          source.arabicText,
+          source.translation,
+          kind
+        );
 
   if (generated.length > 0) {
     const model = process.env.ANTHROPIC_MODEL ?? null;

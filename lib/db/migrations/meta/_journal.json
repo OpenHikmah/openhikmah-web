@@ -57,6 +57,13 @@
       "when": 1748000005000,
       "tag": "0007_rate_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1748000006000,
+      "tag": "0008_semantic_and_morphology",
+      "breakpoints": true
     }
   ]
 }
