@@ -44,8 +44,5 @@ docs/
 hosting.md
 .env.local
 
-# research / mockup / screenshot artifacts (local design references, not committed)
+# Playwright scratch dir (console logs, page snapshots, review screenshots) — local only
 /.playwright-mcp/
-/ref-*.jpeg
-/mock-*.jpeg
-/surface*.jpeg
