@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const { mockSearchByMeaning } = vi.hoisted(() => ({ mockSearchByMeaning: vi.fn() }));
+const { mockSearchByMeaning, mockConsume } = vi.hoisted(() => ({
+  mockSearchByMeaning: vi.fn(),
+  mockConsume: vi.fn(async () => true),
+}));
 vi.mock("@/lib/semantic-search", () => ({ searchByMeaning: mockSearchByMeaning }));
+vi.mock("@/lib/rate-limit", () => ({ consume: mockConsume }));
 
 import { GET } from "@/app/api/search/route";
 
@@ -13,9 +17,10 @@ function makeSearchReq(q: string) {
   return new NextRequest(`http://localhost/api/search?q=${encodeURIComponent(q)}`);
 }
 
-function makeMeaningReq(q: string) {
+function makeMeaningReq(q: string, headers: Record<string, string> = {}) {
   return new NextRequest(
-    `http://localhost/api/search?q=${encodeURIComponent(q)}&mode=meaning`
+    `http://localhost/api/search?q=${encodeURIComponent(q)}&mode=meaning`,
+    { headers }
   );
 }
 
@@ -46,6 +51,8 @@ describe("GET /api/search", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     mockSearchByMeaning.mockReset();
+    mockConsume.mockReset();
+    mockConsume.mockResolvedValue(true);
   });
 
   it("returns 400 when query is missing", async () => {
@@ -174,5 +181,30 @@ describe("GET /api/search", () => {
     const res = await GET(makeMeaningReq("mercy"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([]);
+  });
+
+  it("mode=meaning rate-limits under the client IP from x-forwarded-for", async () => {
+    mockSearchByMeaning.mockResolvedValueOnce([]);
+    await GET(makeMeaningReq("mercy", { "x-forwarded-for": "203.0.113.7, 70.41.3.18" }));
+    expect(mockConsume).toHaveBeenCalledWith("search:203.0.113.7");
+  });
+
+  it("mode=meaning buckets a malformed x-forwarded-for under 'unknown'", async () => {
+    mockSearchByMeaning.mockResolvedValueOnce([]);
+    await GET(makeMeaningReq("mercy", { "x-forwarded-for": "x".repeat(500) }));
+    expect(mockConsume).toHaveBeenCalledWith("search:unknown");
+  });
+
+  it("mode=meaning returns 429 when the rate limit is exceeded, without embedding", async () => {
+    mockConsume.mockResolvedValue(false);
+    const res = await GET(makeMeaningReq("mercy"));
+    expect(res.status).toBe(429);
+    expect(mockSearchByMeaning).not.toHaveBeenCalled();
+  });
+
+  it("does not rate-limit the keyword path", async () => {
+    mockFetch.mockResolvedValueOnce(quranComResponse([]));
+    await GET(makeSearchReq("mercy"));
+    expect(mockConsume).not.toHaveBeenCalled();
   });
 });

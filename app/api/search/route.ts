@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import type { SearchResult, VerseRef } from "@/types/quran";
 import { getSurahName } from "@/lib/surah-names";
 import { searchByMeaning } from "@/lib/semantic-search";
+import { consume } from "@/lib/rate-limit";
+import { clientKey } from "@/lib/http";
 import sanitizeHtml from "sanitize-html";
 
 export async function GET(req: NextRequest) {
@@ -30,6 +32,17 @@ export async function GET(req: NextRequest) {
   // similarity. Degrades gracefully to [] if embeddings aren't seeded or the
   // embedding provider is unavailable, mirroring the keyword path's resilience.
   if (req.nextUrl.searchParams.get("mode") === "meaning") {
+    // This path calls a paid embedding provider on every request, so rate-limit
+    // it per client IP — otherwise a single caller can drive unbounded spend.
+    // The keyword and ref-format paths above are free and stay unlimited.
+    const allowed = await consume(`search:${clientKey(req)}`);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Too many requests — please slow down." },
+        { status: 429 }
+      );
+    }
+
     try {
       const matches = await searchByMeaning(q, 10);
       const results: SearchResult[] = matches.map((m) => ({
