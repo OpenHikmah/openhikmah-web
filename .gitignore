@@ -43,3 +43,8 @@ next-env.d.ts
 docs/
 hosting.md
 .env.local
+
+# research / mockup artifacts (local design references, not committed)
+/.playwright-mcp/
+/ref-*.jpeg
+/mock-*.jpeg
