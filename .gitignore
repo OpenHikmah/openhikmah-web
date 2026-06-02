@@ -46,3 +46,7 @@ hosting.md
 
 # Playwright scratch dir (console logs, page snapshots, review screenshots) — local only
 /.playwright-mcp/
+.mcp.json
+
+# Claude Code managed skills (tooling-synced duplicate; tracked under .agents/skills)
+/.claude/skills/
