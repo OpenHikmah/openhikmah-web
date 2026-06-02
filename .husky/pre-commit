@@ -1,13 +1,28 @@
-set -e
+# pre-commit — quiet on success, full output only on failure (mirrors pre-push).
+# Each step's output is captured and printed only if that step fails.
+
+step() {
+  label=$1
+  shift
+  output=$("$@" 2>&1)
+  status=$?
+  if [ "$status" -ne 0 ]; then
+    printf '%s\n' "$output" >&2
+    echo "pre-commit: $label FAILED — commit aborted." >&2
+    exit 1
+  fi
+}
 
 # 1. Strict guards: branch, focused tests, leftover debug, secret scan (fast)
-node scripts/precommit-checks.mjs
+step "guards" node scripts/precommit-checks.mjs
 
 # 2. ESLint on staged files, zero warnings tolerated
-npx lint-staged
+step "lint" npx lint-staged
 
 # 3. Project-wide typecheck
-npm run typecheck
+step "typecheck" npm run typecheck
 
 # 4. Full unit test suite
-npm run test:ci
+step "tests" npm run test:ci
+
+echo "pre-commit: checks passed."

@@ -1,107 +1,76 @@
-"use client";
+import Link from "next/link";
+import type { Metadata } from "next";
+import { LandingHeader } from "@/components/layout/LandingHeader";
+import { VerseOfDayStrip } from "@/components/today/VerseOfDayStrip";
+import { buttonVariants } from "@/components/ui/Button";
+import { getVerseOfDay } from "@/lib/verse-of-day";
 
-import { useState, useEffect, useRef, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import dynamic from "next/dynamic";
-import { Header } from "@/components/layout/Header";
-import { SearchDialog } from "@/components/search/SearchDialog";
-import { EmptyState } from "@/components/canvas/EmptyState";
-import { ContextSidebar } from "@/components/layout/ContextSidebar";
-import { useCanvasStore } from "@/store/canvas";
-import type { Verse } from "@/types/quran";
+export const metadata: Metadata = {
+  title: "Open Hikmah — the Qur'an as a connected graph",
+  description:
+    "Search any verse and map its connections — shared roots, themes, and contrasts — grounded in canonical Qur'an data.",
+};
 
-const HikmahCanvas = dynamic(
-  () => import("@/components/canvas/HikmahCanvas").then((m) => m.HikmahCanvas),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="w-full h-full flex items-center justify-center">
-        <div
-          className="text-xs font-mono tracking-wider uppercase"
-          style={{ color: "var(--color-text-muted)" }}
-        >
-          Loading canvas…
-        </div>
-      </div>
-    ),
-  }
-);
+// Themes → a representative verse, opened directly on the canvas.
+const STARTERS: Array<{ label: string; ref: string }> = [
+  { label: "Patience", ref: "2:153" },
+  { label: "Mercy", ref: "1:3" },
+  { label: "Light", ref: "24:35" },
+  { label: "Gratitude", ref: "14:7" },
+];
 
-function VerseLoader() {
-  const searchParams = useSearchParams();
-  const addVerseNode = useCanvasStore((s) => s.addVerseNode);
-  const setPendingAutoExpand = useCanvasStore((s) => s.setPendingAutoExpand);
-  const handledRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    const verseRef = searchParams.get("verse");
-    if (!verseRef || handledRef.current === verseRef) return;
-    if (!/^\d+:\d+$/.test(verseRef)) return;
-
-    handledRef.current = verseRef;
-    const [surah, ayah] = verseRef.split(":");
-
-    fetch(`/api/verse/${surah}/${ayah}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((verse: Verse | null) => {
-        if (!verse) return;
-        const nodeId = addVerseNode({ ...verse, isRoot: true }, { x: 0, y: 0 });
-        setPendingAutoExpand(nodeId);
-        const url = new URL(window.location.href);
-        url.searchParams.delete("verse");
-        window.history.replaceState(null, "", url.toString());
-      })
-      .catch(() => {});
-  }, [searchParams, addVerseNode, setPendingAutoExpand]);
-
-  return null;
-}
-
-export default function Home() {
-  const [searchOpen, setSearchOpen] = useState(false);
-  const nodes = useCanvasStore((s) => s.nodes);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const isInput =
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target.isContentEditable;
-
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        if (isInput) return;
-        e.preventDefault();
-        setSearchOpen(true);
-      }
-      if (e.key === "Escape" && !isInput) {
-        setSearchOpen(false);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
+export default async function Home() {
+  const verse = await getVerseOfDay().catch(() => null);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden" style={{ background: "var(--color-bg)" }}>
-      <Suspense>
-        <VerseLoader />
-      </Suspense>
+    <div className="flex h-dvh flex-col overflow-hidden bg-bg">
+      <LandingHeader />
 
-      <Header onSearchOpen={() => setSearchOpen(true)} />
+      <main className="mx-auto flex w-full min-h-0 max-w-[1180px] flex-1 flex-col px-6 md:px-12">
+        <div className="flex flex-1 flex-col justify-center">
+          <h1 className="max-w-[16ch] text-[clamp(2.25rem,5vw,3.25rem)] font-semibold leading-[1.05] tracking-[-0.02em] text-text-primary">
+            Explore the Qur&apos;an as a <span className="text-gold">connected graph</span>.
+          </h1>
+          <p className="mt-4 max-w-[52ch] text-[18px] leading-relaxed text-text-secondary">
+            Search any verse and map its connections — shared roots, themes, and contrasts —
+            grounded in canonical data, not guessed by AI.
+          </p>
 
-      <main className="flex-1 relative overflow-hidden">
-        {nodes.length === 0 && (
-          <EmptyState onSearchOpen={() => setSearchOpen(true)} />
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link href="/canvas" className={buttonVariants({ variant: "primary", size: "lg" })}>
+              Open the canvas
+            </Link>
+            <Link href="/names" className={buttonVariants({ variant: "secondary", size: "lg" })}>
+              Browse the Asma&apos;ul Husna
+            </Link>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-2.5">
+            <span className="mr-1 text-[13px] text-text-muted">Begin with</span>
+            {STARTERS.map((s) => (
+              <Link
+                key={s.ref}
+                href={`/canvas?verse=${s.ref}`}
+                className="rounded-md border border-border bg-surface px-4 py-2 text-sm text-text-primary transition-[color,border-color] duration-[120ms] hover:border-gold-muted hover:text-gold"
+              >
+                {s.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {verse && (
+          <div className="shrink-0 pb-6">
+            <VerseOfDayStrip verse={verse} />
+          </div>
         )}
-        <HikmahCanvas />
-        <ContextSidebar />
       </main>
 
-      <SearchDialog
-        open={searchOpen}
-        onClose={() => setSearchOpen(false)}
-      />
+      <footer className="shrink-0 border-t border-border px-6 py-4 md:px-12">
+        <p className="text-[13px] text-text-muted">
+          Open Hikmah · Qur&apos;an text &amp; translation from canonical sources.
+        </p>
+      </footer>
     </div>
   );
 }
