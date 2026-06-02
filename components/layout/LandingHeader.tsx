@@ -35,7 +35,7 @@ export function LandingHeader() {
           Canvas
         </Link>
         <Link href="/names" className="text-[13.5px] text-text-secondary transition-colors hover:text-text-primary">
-          99 Names
+          Asma&apos;ul Husna
         </Link>
         {accessToken ? (
           <span className="flex items-center gap-1.5 rounded-md border border-border bg-surface-raised px-2.5 py-1 text-[13px] text-text-primary">
