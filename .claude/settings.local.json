@@ -1,5 +1,8 @@
 {
   "enabledPlugins": {
     "andrej-karpathy-skills@karpathy-skills": true
-  }
+  },
+  "enabledMcpjsonServers": [
+    "sequential-thinking"
+  ]
 }
