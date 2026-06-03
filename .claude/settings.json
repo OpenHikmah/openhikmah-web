@@ -1,0 +1,9 @@
+{
+  "enabledMcpjsonServers": [
+    "sequential-thinking"
+  ],
+  "enabledPlugins": {
+    "andrej-karpathy-skills@karpathy-skills": true,
+    "security-guidance@claude-plugins-official": true
+  }
+}
