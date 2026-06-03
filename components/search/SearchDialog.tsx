@@ -6,6 +6,7 @@ import { Search, X, Loader2, BookOpen, Network } from "lucide-react";
 import { useCanvasStore } from "@/store/canvas";
 import type { Verse, SearchResult } from "@/types/quran";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui";
 
 interface SearchDialogProps {
   open: boolean;
@@ -164,29 +165,13 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
           aria-describedby={undefined}
         >
           <Dialog.Title className="sr-only">Search Quran Verses</Dialog.Title>
-          <div
-            className="rounded-md border overflow-hidden"
-            style={{
-              background: "var(--color-surface)",
-              borderColor: "var(--color-border)",
-              boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
-            }}
-          >
+          <div className="rounded-md border border-border overflow-hidden bg-surface shadow-[0_4px_16px_rgba(0,0,0,0.4)]">
             {/* Input bar */}
-            <div
-              className="flex items-center gap-3 px-4 py-3 border-b"
-              style={{ borderColor: "var(--color-border)" }}
-            >
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
               {busy ? (
-                <Loader2
-                  className="w-4 h-4 animate-spin shrink-0"
-                  style={{ color: "var(--color-gold)" }}
-                />
+                <Loader2 className="w-4 h-4 animate-spin shrink-0 text-gold" />
               ) : (
-                <Search
-                  className="w-4 h-4 shrink-0"
-                  style={{ color: "var(--color-text-muted)" }}
-                />
+                <Search className="w-4 h-4 shrink-0 text-text-muted" />
               )}
               <input
                 ref={inputRef}
@@ -205,14 +190,13 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                   }
                 }}
                 placeholder="Search topics, or enter a ref like 2:255…"
-                className="flex-1 bg-transparent text-sm outline-none"
-                style={{ color: "var(--color-text-primary)" }}
+                className="flex-1 bg-transparent text-sm outline-none text-text-primary placeholder:text-text-muted"
               />
               <button
                 type="button"
                 onClick={query ? () => setQuery("") : onClose}
-                className="transition-colors hover:text-[var(--color-text-secondary)]"
-                style={{ color: "var(--color-text-muted)" }}
+                aria-label={query ? "Clear search" : "Close search"}
+                className="text-text-muted transition-colors hover:text-text-secondary"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -230,9 +214,9 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
               {previewError && !loading && (
                 <div className="px-4 py-6 text-center">
-                  <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+                  <p className="text-sm text-text-muted">
                     Verse not found. Try a format like{" "}
-                    <code className="font-mono" style={{ color: "var(--color-gold)" }}>2:255</code>
+                    <code className="font-mono text-gold">2:255</code>
                   </p>
                 </div>
               )}
@@ -264,18 +248,13 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
               {!showSeedVerses && !showPreview && !showResults && !busy && !previewError && (
                 <div className="px-4 py-8 text-center">
-                  <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-                    No results found
-                  </p>
+                  <p className="text-sm text-text-muted">No results found</p>
                 </div>
               )}
 
               {showSeedVerses && (
                 <div className="p-3">
-                  <p
-                    className="text-xs px-2 mb-2 font-mono"
-                    style={{ color: "var(--color-text-muted)" }}
-                  >
+                  <p className="text-xs px-2 mb-2 font-mono text-text-muted">
                     Popular starting points
                   </p>
                   <div className="space-y-0.5">
@@ -286,21 +265,14 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                         disabled={busy}
                         className={cn(
                           "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors",
-                          "hover:bg-[var(--color-surface-raised)] disabled:opacity-50 disabled:cursor-not-allowed"
+                          "hover:bg-surface-raised disabled:opacity-50 disabled:cursor-not-allowed"
                         )}
                       >
-                        <div
-                          className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
-                          style={{ background: "var(--color-surface-overlay)" }}
-                        >
-                          <BookOpen className="w-3.5 h-3.5" style={{ color: "var(--color-text-muted)" }} />
+                        <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 bg-surface-overlay">
+                          <BookOpen className="w-3.5 h-3.5 text-text-muted" />
                         </div>
-                        <span className="flex-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
-                          {sv.label}
-                        </span>
-                        <span className="text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>
-                          {sv.ref}
-                        </span>
+                        <span className="flex-1 text-sm text-text-secondary">{sv.label}</span>
+                        <span className="text-xs font-mono text-text-muted">{sv.ref}</span>
                       </button>
                     ))}
                   </div>
@@ -336,69 +308,43 @@ function VerseCard({
   };
 
   return (
-    <div
-      className="m-3 rounded-md border p-3 space-y-3"
-      style={{
-        background: "var(--color-surface-raised)",
-        borderColor: "var(--color-border)",
-      }}
-    >
+    <div className="m-3 rounded-md border border-border p-3 space-y-3 bg-surface-raised">
       <div className="flex items-center justify-between gap-2">
-        <span
-          className="text-xs font-mono"
-          style={{ color: "var(--color-text-secondary)" }}
-        >
-          {verse.surahName}
-        </span>
-        <span
-          className="text-xs font-mono px-1.5 py-0.5 rounded border shrink-0"
-          style={{
-            color: "var(--color-gold)",
-            borderColor: "var(--color-gold)",
-            background: "rgba(201,168,76,0.08)",
-          }}
-        >
+        <span className="text-xs font-mono text-text-secondary">{verse.surahName}</span>
+        <span className="text-xs font-mono px-1.5 py-0.5 rounded border shrink-0 text-gold border-gold bg-gold/10">
           {verse.ref}
         </span>
       </div>
 
-      <p
-        className="font-arabic text-right text-base leading-loose line-clamp-2"
-        style={{ color: "var(--color-text-primary)" }}
-      >
+      <p className="font-arabic text-right text-base leading-loose line-clamp-2 text-text-primary">
         {verse.arabicText}
       </p>
 
-      <p
-        className="text-xs leading-relaxed line-clamp-2"
-        style={{ color: "var(--color-text-secondary)" }}
-      >
+      <p className="text-xs leading-relaxed line-clamp-2 text-text-secondary">
         {verse.translation}
       </p>
 
-      <button
-        onClick={handleClick}
-        disabled={alreadyAdded || submitting}
-        className={cn(
-          "w-full flex items-center justify-center gap-2 py-2 rounded text-xs font-medium transition-colors cursor-pointer",
-          alreadyAdded || submitting
-            ? "cursor-not-allowed opacity-60"
-            : "hover:brightness-110 active:scale-[0.98]"
-        )}
-        style={{
-          background: alreadyAdded
-            ? "var(--color-surface-overlay)"
-            : "var(--color-teal)",
-          color: alreadyAdded ? "var(--color-text-muted)" : "#ffffff",
-        }}
-      >
-        {submitting ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        ) : (
+      {alreadyAdded ? (
+        <Button variant="secondary" size="sm" disabled className="w-full">
           <Network className="w-3.5 h-3.5" />
-        )}
-        {alreadyAdded ? "Already on canvas" : "Map Connections"}
-      </button>
+          Already on canvas
+        </Button>
+      ) : (
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={handleClick}
+          disabled={submitting}
+          className="w-full"
+        >
+          {submitting ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Network className="w-3.5 h-3.5" />
+          )}
+          Map Connections
+        </Button>
+      )}
     </div>
   );
 }
@@ -418,38 +364,25 @@ function SearchResultRow({
       disabled={alreadyAdded}
       className={cn(
         "w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left transition-colors",
-        "hover:bg-[var(--color-surface-raised)] disabled:opacity-50 disabled:cursor-not-allowed"
+        "hover:bg-surface-raised disabled:opacity-50 disabled:cursor-not-allowed"
       )}
     >
-      <div
-        className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 mt-0.5"
-        style={{ background: "var(--color-surface-overlay)" }}
-      >
-        <BookOpen className="w-4 h-4" style={{ color: "var(--color-text-muted)" }} />
+      <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 mt-0.5 bg-surface-overlay">
+        <BookOpen className="w-4 h-4 text-text-muted" />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <span className="text-xs font-mono" style={{ color: "var(--color-gold)" }}>
-            {result.ref}
-          </span>
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {result.surahName}
-          </span>
+          <span className="text-xs font-mono text-gold">{result.ref}</span>
+          <span className="text-xs text-text-muted">{result.surahName}</span>
         </div>
         {result.snippet && (
-          <p
-            className="text-xs leading-relaxed line-clamp-2"
-            style={{ color: "var(--color-text-secondary)" }}
-          >
+          <p className="text-xs leading-relaxed line-clamp-2 text-text-secondary">
             {result.snippet}
           </p>
         )}
       </div>
       <Network
-        className="w-3.5 h-3.5 shrink-0 mt-1"
-        style={{
-          color: alreadyAdded ? "var(--color-teal)" : "var(--color-text-muted)",
-        }}
+        className={cn("w-3.5 h-3.5 shrink-0 mt-1", alreadyAdded ? "text-teal" : "text-text-muted")}
       />
     </button>
   );
