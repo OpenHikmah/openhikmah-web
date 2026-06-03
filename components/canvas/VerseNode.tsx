@@ -7,6 +7,7 @@ import { useCanvasStore } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import { cn } from "@/lib/utils";
 import { Loader2, Plus, Heart, Volume2 } from "lucide-react";
+import { IconButton, Tooltip } from "@/components/ui";
 import { ExpandMenu } from "./ExpandMenu";
 import { useAudioStore } from "@/store/audio";
 
@@ -51,95 +52,78 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
       onClick={() => setSelectedNode(selected ? null : id)}
       className={cn(
         "relative w-72 rounded-lg border transition-colors duration-150 cursor-pointer select-none",
-        "bg-[var(--color-surface-raised)] border-[var(--color-border)]",
+        "bg-surface-raised border-border",
         selected && "node-selected",
         isExpanding && "node-expanding",
-        !selected && !isExpanding && "hover:border-[var(--color-text-muted)]"
+        !selected && !isExpanding && "hover:border-text-muted"
       )}
     >
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-2 !h-2 !bg-[var(--color-border)] !border-[var(--color-border-subtle)]"
+        className="!w-2 !h-2 !bg-border !border-border-subtle"
       />
 
       <div className="p-3 space-y-2.5">
         <div className="flex items-center justify-between gap-2">
-          <span
-            className="text-xs font-mono truncate"
-            style={{ color: "var(--color-text-muted)" }}
-          >
+          <span className="text-xs font-mono truncate text-text-muted">
             {verse.surahName}
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
             <span
-              className="text-xs font-mono px-1.5 py-0.5 rounded border"
-              style={
+              className={cn(
+                "text-xs font-mono px-1.5 py-0.5 rounded border",
                 verse.isRoot
-                  ? {
-                      color: "var(--color-gold)",
-                      borderColor: "var(--color-gold)",
-                      background: "rgba(201,168,76,0.08)",
-                    }
-                  : {
-                      color: "var(--color-text-muted)",
-                      borderColor: "var(--color-border)",
-                    }
-              }
+                  ? "text-gold border-gold bg-gold/10"
+                  : "text-text-muted border-border"
+              )}
             >
               {verse.ref}
             </span>
-            <button
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (isThisPlaying) {
-                  pauseAudio();
-                } else if (currentRef === verse.ref) {
-                  resumeAudio();
-                } else {
-                  playVerse({ ref: verse.ref, surah: verse.surah, ayah: verse.ayah, surahName: verse.surahName });
-                }
-              }}
-              aria-label={isThisPlaying ? "Pause recitation" : "Play recitation"}
-              className="w-5 h-5 flex items-center justify-center rounded transition-colors cursor-pointer"
-              style={{
-                color: currentRef === verse.ref ? "var(--color-teal)" : "var(--color-text-muted)",
-              }}
-            >
-              <Volume2 className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleBookmark(verse.ref);
-              }}
-              aria-label={isBookmarked ? "Remove bookmark" : "Bookmark verse"}
-              className="w-5 h-5 flex items-center justify-center rounded transition-colors cursor-pointer hover:text-[var(--color-gold)]"
-              style={{
-                color: isBookmarked ? "var(--color-gold)" : "var(--color-text-muted)",
-              }}
-            >
-              <Heart
-                className="w-3.5 h-3.5"
-                fill={isBookmarked ? "currentColor" : "none"}
-              />
-            </button>
+            <Tooltip label={isThisPlaying ? "Pause recitation" : "Play recitation"}>
+              <IconButton
+                size="xs"
+                tone="teal"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isThisPlaying) {
+                    pauseAudio();
+                  } else if (currentRef === verse.ref) {
+                    resumeAudio();
+                  } else {
+                    playVerse({ ref: verse.ref, surah: verse.surah, ayah: verse.ayah, surahName: verse.surahName });
+                  }
+                }}
+                aria-label={isThisPlaying ? "Pause recitation" : "Play recitation"}
+                className={cn(currentRef === verse.ref && "border-teal text-teal")}
+              >
+                <Volume2 />
+              </IconButton>
+            </Tooltip>
+            <Tooltip label={isBookmarked ? "Remove bookmark" : "Bookmark verse"}>
+              <IconButton
+                size="xs"
+                tone="gold"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleBookmark(verse.ref);
+                }}
+                aria-label={isBookmarked ? "Remove bookmark" : "Bookmark verse"}
+                className={cn(isBookmarked && "border-gold-muted text-gold")}
+              >
+                <Heart fill={isBookmarked ? "currentColor" : "none"} />
+              </IconButton>
+            </Tooltip>
           </div>
         </div>
 
-        <p
-          className="font-arabic text-right text-sm leading-loose"
-          style={{ color: "var(--color-text-primary)" }}
-        >
+        <p className="font-arabic text-right text-sm leading-loose text-text-primary">
           {verse.arabicText}
         </p>
 
-        <p
-          className="text-xs leading-relaxed line-clamp-3"
-          style={{ color: "var(--color-text-secondary)" }}
-        >
+        <p className="text-xs leading-relaxed line-clamp-3 text-text-secondary">
           {verse.translation}
         </p>
       </div>
@@ -150,24 +134,22 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            setOpenExpandNodeId(expandMenuOpen ? null : id);
-          }}
-          disabled={isExpanding}
-          className={cn(
-            "w-6 h-6 rounded border flex items-center justify-center transition-colors cursor-pointer",
-            expandMenuOpen
-              ? "border-[var(--color-teal)] text-[var(--color-teal)]"
-              : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-teal)] hover:text-[var(--color-teal)]",
-            "disabled:opacity-40 disabled:cursor-not-allowed"
-          )}
-          title="Expand connections"
-        >
-          <Plus className="w-3 h-3" />
-        </button>
+        <Tooltip label="Expand connections">
+          <IconButton
+            size="xs"
+            tone="teal"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpenExpandNodeId(expandMenuOpen ? null : id);
+            }}
+            disabled={isExpanding}
+            aria-label="Expand connections"
+            className={cn(expandMenuOpen && "border-teal text-teal")}
+          >
+            <Plus />
+          </IconButton>
+        </Tooltip>
       </div>
 
       {expandMenuOpen && (
@@ -178,15 +160,15 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
       )}
 
       {isExpanding && (
-        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[var(--color-surface-raised)]/70">
-          <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--color-teal)" }} />
+        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-surface-raised/70">
+          <Loader2 className="w-4 h-4 animate-spin text-teal" />
         </div>
       )}
 
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-2 !h-2 !bg-[var(--color-border)] !border-[var(--color-border-subtle)]"
+        className="!w-2 !h-2 !bg-border !border-border-subtle"
       />
     </div>
   );

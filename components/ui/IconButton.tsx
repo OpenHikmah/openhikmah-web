@@ -21,6 +21,7 @@ const iconButton = cva(
           "border-border text-text-secondary hover:border-error/40 hover:bg-error/10 hover:text-error",
       },
       size: {
+        xs: "h-7 w-7 [&_svg]:size-3.5",
         sm: "h-8 w-8 [&_svg]:size-4",
         md: "h-9 w-9 [&_svg]:size-[17px]",
       },

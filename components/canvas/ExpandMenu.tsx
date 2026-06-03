@@ -58,14 +58,7 @@ export function ExpandMenu({ onSelect, onClose }: ExpandMenuProps) {
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      <div
-        className="rounded-md border overflow-hidden"
-        style={{
-          background: "var(--color-surface-overlay)",
-          borderColor: "var(--color-border)",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-        }}
-      >
+      <div className="rounded-md border border-border overflow-hidden bg-surface-overlay shadow-[0_2px_8px_rgba(0,0,0,0.25)]">
         {OPTIONS.map((opt) => (
           <button
             key={opt.kind}
@@ -77,23 +70,13 @@ export function ExpandMenu({ onSelect, onClose }: ExpandMenuProps) {
           >
             <span
               className="w-5 h-5 rounded flex items-center justify-center text-xs font-mono shrink-0"
-              style={{ background: `${opt.color}1a`, color: opt.color }}
+              style={{ background: `color-mix(in srgb, ${opt.color} 12%, transparent)`, color: opt.color }}
             >
               {opt.icon}
             </span>
             <div className="min-w-0">
-              <p
-                className="text-xs font-medium"
-                style={{ color: "var(--color-text-primary)" }}
-              >
-                {opt.label}
-              </p>
-              <p
-                className="text-xs"
-                style={{ color: "var(--color-text-muted)" }}
-              >
-                {opt.description}
-              </p>
+              <p className="text-xs font-medium text-text-primary">{opt.label}</p>
+              <p className="text-xs text-text-muted">{opt.description}</p>
             </div>
           </button>
         ))}
