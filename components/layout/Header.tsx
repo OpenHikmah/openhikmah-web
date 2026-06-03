@@ -14,6 +14,7 @@ import { useState, useEffect, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Button, IconButton, Tooltip, buttonVariants, iconButtonVariants } from "@/components/ui";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
+import { AccountMenu } from "./AccountMenu";
 
 interface HeaderProps {
   onSearchOpen: () => void;
@@ -272,7 +273,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
           <div className="flex items-center gap-1.5">
             <Link href="/names" className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>
               <Sparkles className="w-3.5 h-3.5" />
-              <span>99 Names</span>
+              <span>Asma&apos;ul Husna</span>
             </Link>
 
             <Tooltip label="Search ⌘K">
@@ -329,36 +330,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
               </Tooltip>
             )}
 
-            {accessToken ? (
-              <>
-                {/* Username pill with streak inlined */}
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border bg-surface-raised text-xs text-text-secondary">
-                  <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 bg-teal text-bg">
-                    {(username ?? "?")[0].toUpperCase()}
-                  </span>
-                  {username && (
-                    <span className="max-w-[96px] truncate text-text-primary">{username}</span>
-                  )}
-                  {streak > 0 && (
-                    <>
-                      <Flame className="w-3 h-3 shrink-0 text-gold" fill="currentColor" />
-                      <span className="text-gold">{streak}</span>
-                    </>
-                  )}
-                </div>
-
-                <Tooltip label="Sign out">
-                  <IconButton onClick={handleSignOut} aria-label="Sign out">
-                    <LogOut />
-                  </IconButton>
-                </Tooltip>
-              </>
-            ) : (
-              <Button variant="secondary" size="sm" onClick={handleSignIn}>
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Sign in</span>
-              </Button>
-            )}
+            <AccountMenu />
           </div>
         </div>
 
