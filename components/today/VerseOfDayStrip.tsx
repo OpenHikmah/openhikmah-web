@@ -8,7 +8,7 @@ import type { Verse } from "@/types/quran";
  */
 export function VerseOfDayStrip({ verse }: { verse: Verse }) {
   return (
-    <div className="flex flex-col gap-5 border-t border-border pt-7 md:flex-row md:items-center md:gap-7">
+    <div className="flex flex-col gap-3 border-t border-border pt-5 md:flex-row md:items-center md:gap-7 md:pt-7">
       <div className="min-w-[150px] shrink-0">
         <Link
           href="/today"
@@ -21,14 +21,18 @@ export function VerseOfDayStrip({ verse }: { verse: Verse }) {
         </div>
       </div>
 
+      {/* One-line teaser: clamp the Arabic and fade the (left/RTL) cut edge
+          rather than appending a "…" glyph to the Qur'an text. min-w-0 lets the
+          flex item shrink below its content width instead of blowing out the row;
+          the full verse is one tap away at /today. */}
       <p
         dir="rtl"
-        className="font-arabic shrink-0 text-[28px] leading-[1.9] text-text-primary"
+        className="min-w-0 flex-1 overflow-hidden whitespace-nowrap font-arabic text-[22px] leading-[1.9] text-text-primary [mask-image:linear-gradient(to_left,#000_72%,transparent)] md:text-[28px]"
       >
         {verse.arabicText}
       </p>
 
-      <p className="flex-1 text-[15px] leading-relaxed text-text-secondary">
+      <p className="min-w-0 flex-1 text-[15px] leading-relaxed text-text-secondary line-clamp-1 md:line-clamp-2">
         {verse.translation}
       </p>
 
