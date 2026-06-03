@@ -11,6 +11,12 @@ export const metadata: Metadata = {
     "Search any verse and map its connections — shared roots, themes, and contrasts — grounded in canonical Qur'an data.",
 };
 
+// Render per request so the strip's Verse of the Day matches the current UTC day
+// — and the same verse the strip links through to at /today (which is also
+// force-dynamic). getVerse is a plain DB read (no dynamic API), so otherwise this
+// page would prerender at build and freeze the verse, diverging from /today.
+export const dynamic = "force-dynamic";
+
 // Themes → a representative verse, opened directly on the canvas.
 const STARTERS: Array<{ label: string; ref: string }> = [
   { label: "Patience", ref: "2:153" },
