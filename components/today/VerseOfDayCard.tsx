@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Network, Volume2, Pause, Heart, Share2, Check } from "lucide-react";
 import type { Verse } from "@/types/quran";
@@ -32,10 +32,19 @@ export function VerseOfDayCard({
   const isThisCurrent = currentRef === verse.ref;
   const isThisPlaying = isThisCurrent && isPlaying;
 
-  const isBookmarked = useAuthStore((s) => s.isBookmarked(verse.ref));
   const toggleBookmark = useAuthStore((s) => s.toggleBookmark);
+  const bookmarkedInStore = useAuthStore((s) => s.isBookmarked(verse.ref));
 
   const [copied, setCopied] = useState(false);
+  // The auth store rehydrates bookmarks from localStorage on the client, which
+  // the server can't know. Gate the bookmark visual on mount so the first client
+  // render matches the server HTML (unbookmarked), avoiding a hydration mismatch.
+  // The one-time mount flag is React's documented pattern for this; the lint
+  // rule's cascading-render concern doesn't apply to a single post-mount flip.
+  const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setMounted(true), []);
+  const isBookmarked = mounted && bookmarkedInStore;
 
   const handleListen = () => {
     if (isThisPlaying) pauseAudio();
