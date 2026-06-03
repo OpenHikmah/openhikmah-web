@@ -48,5 +48,8 @@ hosting.md
 /.playwright-mcp/
 .mcp.json
 
+# Claude Code personal/local settings (machine-specific; shared config lives in .claude/settings.json)
+.claude/settings.local.json
+
 # Claude Code managed skills (tooling-synced duplicate; tracked under .agents/skills)
 /.claude/skills/
