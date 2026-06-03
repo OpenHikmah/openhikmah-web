@@ -34,26 +34,16 @@ export default function NamesPage() {
   }));
 
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: "var(--color-bg)", color: "var(--color-text-primary)" }}
-    >
+    <div className="min-h-screen bg-bg text-text-primary">
       {/* Top nav */}
-      <header
-        className="sticky top-0 z-20 flex items-center justify-between px-6 h-12"
-        style={{
-          background: "var(--color-surface)",
-          borderBottom: "1px solid var(--color-border)",
-        }}
-      >
+      <header className="sticky top-0 z-20 flex items-center justify-between px-6 h-14 bg-surface border-b border-border">
         <div className="flex items-center gap-3">
-          <BookOpen className="w-4 h-4" style={{ color: "var(--color-gold)" }} />
+          <BookOpen className="w-4 h-4 text-gold" />
           <span className="text-sm font-medium">Open Hikmah</span>
         </div>
         <Link
           href="/"
-          className="flex items-center gap-1.5 text-xs transition-colors"
-          style={{ color: "var(--color-text-secondary)" }}
+          className="flex items-center gap-1.5 text-xs text-text-secondary transition-colors hover:text-text-primary"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Canvas</span>
@@ -61,26 +51,17 @@ export default function NamesPage() {
       </header>
 
       {/* Hero */}
-      <div
-        className="px-6 pt-12 pb-10 text-center"
-        style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-      >
-        <p
-          className="text-xs uppercase tracking-[0.2em] font-mono mb-3"
-          style={{ color: "var(--color-text-muted)" }}
-        >
+      <div className="px-6 pt-12 pb-10 text-center border-b border-border-subtle">
+        <p className="text-xs uppercase tracking-[0.2em] font-mono mb-3 text-text-muted">
           Asmaul Husna
         </p>
-        <h1
-          className="font-arabic text-5xl mb-2"
-          style={{ color: "var(--color-gold)" }}
-        >
+        <h1 className="font-arabic text-5xl mb-2 text-gold">
           أَسْمَاءُ اللَّه الْحُسْنَى
         </h1>
-        <p className="text-2xl font-light mb-4" style={{ color: "var(--color-text-primary)" }}>
+        <p className="text-2xl font-light mb-4 text-text-primary">
           The 99 Beautiful Names of Allah
         </p>
-        <p className="text-sm max-w-xl mx-auto" style={{ color: "var(--color-text-secondary)" }}>
+        <p className="text-sm max-w-xl mx-auto text-text-secondary">
           Organised by Maturidi/Hanafi taxonomy — Sifat al-Dhat, Sifat al-Ma&apos;ani, and Sifat al-Af&apos;al.
           Click any name to explore its verses.
         </p>
@@ -93,13 +74,8 @@ export default function NamesPage() {
             return (
               <div key={cat} className="flex items-center gap-2 text-xs">
                 <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
-                <span style={{ color: "var(--color-text-secondary)" }}>{label.en}</span>
-                <span
-                  className="font-arabic text-sm"
-                  style={{ color: "var(--color-text-muted)" }}
-                >
-                  {label.ar}
-                </span>
+                <span className="text-text-secondary">{label.en}</span>
+                <span className="font-arabic text-sm text-text-muted">{label.ar}</span>
               </div>
             );
           })}
@@ -117,19 +93,10 @@ export default function NamesPage() {
               <div className="mb-6">
                 <div className="flex items-center gap-3 mb-2">
                   <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${colors.dot}`} />
-                  <h2 className="text-lg font-medium" style={{ color: "var(--color-text-primary)" }}>
-                    {label.en}
-                  </h2>
-                  <span
-                    className="font-arabic text-xl"
-                    style={{ color: "var(--color-text-secondary)" }}
-                  >
-                    {label.ar}
-                  </span>
+                  <h2 className="text-lg font-medium text-text-primary">{label.en}</h2>
+                  <span className="font-arabic text-xl text-text-secondary">{label.ar}</span>
                 </div>
-                <p className="text-xs pl-5" style={{ color: "var(--color-text-muted)" }}>
-                  {label.description}
-                </p>
+                <p className="text-xs pl-5 text-text-muted">{label.description}</p>
               </div>
 
               {/* Grid */}
@@ -138,34 +105,19 @@ export default function NamesPage() {
                   <Link
                     key={name.id}
                     href={`/names/${name.slug}`}
-                    className="group rounded-lg border p-3 transition-all duration-200 hover:scale-[1.02] hover:border-[var(--color-gold)]"
-                    style={{
-                      background: "var(--color-surface)",
-                      borderColor: "var(--color-border)",
-                    }}
+                    className="group rounded-lg border border-border bg-surface p-3 transition-all duration-200 hover:scale-[1.02] hover:border-gold"
                   >
-                    <div
-                      className="font-arabic text-xl text-center mb-2 leading-relaxed"
-                      style={{ color: "var(--color-text-primary)" }}
-                    >
+                    <div className="font-arabic text-xl text-center mb-2 leading-relaxed text-text-primary">
                       {name.arabic}
                     </div>
-                    <div
-                      className="text-xs text-center font-mono mb-1"
-                      style={{ color: "var(--color-text-secondary)" }}
-                    >
+                    <div className="text-xs text-center font-mono mb-1 text-text-secondary">
                       {name.transliteration}
                     </div>
-                    <div
-                      className="text-xs text-center"
-                      style={{ color: "var(--color-text-muted)" }}
-                    >
+                    <div className="text-xs text-center text-text-muted">
                       {name.meaning}
                     </div>
                     <div className="mt-2 flex justify-center">
-                      <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${colors.badge}`}
-                      >
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${colors.badge}`}>
                         {name.root}
                       </span>
                     </div>
@@ -178,13 +130,7 @@ export default function NamesPage() {
       </div>
 
       {/* Footer */}
-      <footer
-        className="text-center py-6 text-xs"
-        style={{
-          borderTop: "1px solid var(--color-border-subtle)",
-          color: "var(--color-text-muted)",
-        }}
-      >
+      <footer className="text-center py-6 text-xs border-t border-border-subtle text-text-muted">
         Names grounded in Maturidi/Hanafi tradition · verses powered by Claude
       </footer>
     </div>
