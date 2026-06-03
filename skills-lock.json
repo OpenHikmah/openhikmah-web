@@ -37,6 +37,12 @@
       "skillPath": "skills/security-review/SKILL.md",
       "computedHash": "ec9792f5fd065e020c48ab5a57707c83435c286c449ba98dfa726d7b1842c868"
     },
+    "stitch-design-taste": {
+      "source": "leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/stitch-skill/SKILL.md",
+      "computedHash": "3aa58992f0fd9673b975cd48cd4f8ae4b4976fd5cdd9f20e26d3d447aee317fb"
+    },
     "systematic-debugging": {
       "source": "obra/superpowers",
       "sourceType": "github",
