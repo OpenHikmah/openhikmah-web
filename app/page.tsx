@@ -34,7 +34,7 @@ export default async function Home() {
 
       <main className="mx-auto flex w-full min-h-0 max-w-[1180px] flex-1 flex-col px-6 md:px-12">
         <div className="flex flex-1 flex-col justify-center">
-          <h1 className="max-w-[16ch] text-[clamp(2.25rem,5vw,3.25rem)] font-semibold leading-[1.05] tracking-[-0.02em] text-text-primary">
+          <h1 className="max-w-[16ch] text-[clamp(1.85rem,5vw,3.25rem)] font-semibold leading-[1.08] tracking-[-0.02em] text-text-primary">
             Explore the Qur&apos;an as a <span className="text-gold">connected graph</span>.
           </h1>
           <p className="mt-4 max-w-[52ch] text-[18px] leading-relaxed text-text-secondary">
@@ -42,11 +42,11 @@ export default async function Home() {
             grounded in canonical data, not guessed by AI.
           </p>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/canvas" className={buttonVariants({ variant: "primary", size: "lg" })}>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <Link href="/canvas" className={`${buttonVariants({ variant: "primary", size: "lg" })} w-full sm:w-auto`}>
               Open the canvas
             </Link>
-            <Link href="/names" className={buttonVariants({ variant: "secondary", size: "lg" })}>
+            <Link href="/names" className={`${buttonVariants({ variant: "secondary", size: "lg" })} w-full sm:w-auto`}>
               Browse the Asma&apos;ul Husna
             </Link>
           </div>

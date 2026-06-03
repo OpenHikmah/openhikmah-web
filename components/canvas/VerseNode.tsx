@@ -96,7 +96,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
                   }
                 }}
                 aria-label={isThisPlaying ? "Pause recitation" : "Play recitation"}
-                className={cn(currentRef === verse.ref && "border-teal text-teal")}
+                className={cn("max-md:size-11 max-md:[&_svg]:size-5", currentRef === verse.ref && "border-teal text-teal")}
               >
                 <Volume2 />
               </IconButton>
@@ -111,7 +111,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
                   toggleBookmark(verse.ref);
                 }}
                 aria-label={isBookmarked ? "Remove bookmark" : "Bookmark verse"}
-                className={cn(isBookmarked && "border-gold-muted text-gold")}
+                className={cn("max-md:size-11 max-md:[&_svg]:size-5", isBookmarked && "border-gold-muted text-gold")}
               >
                 <Heart fill={isBookmarked ? "currentColor" : "none"} />
               </IconButton>
@@ -145,7 +145,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
             }}
             disabled={isExpanding}
             aria-label="Expand connections"
-            className={cn(expandMenuOpen && "border-teal text-teal")}
+            className={cn("max-md:size-11 max-md:[&_svg]:size-5", expandMenuOpen && "border-teal text-teal")}
           >
             <Plus />
           </IconButton>

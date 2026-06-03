@@ -30,11 +30,11 @@ export function LandingHeader() {
         <span className="text-[15px] font-semibold text-text-primary">Open Hikmah</span>
       </Link>
 
-      <nav className="flex items-center gap-6">
-        <Link href="/canvas" className="text-[13.5px] text-text-secondary transition-colors hover:text-text-primary">
+      <nav className="flex items-center gap-4 md:gap-6">
+        <Link href="/canvas" className="hidden whitespace-nowrap text-[13.5px] text-text-secondary transition-colors hover:text-text-primary sm:inline-block">
           Canvas
         </Link>
-        <Link href="/names" className="text-[13.5px] text-text-secondary transition-colors hover:text-text-primary">
+        <Link href="/names" className="whitespace-nowrap text-[13.5px] text-text-secondary transition-colors hover:text-text-primary">
           Asma&apos;ul Husna
         </Link>
         {accessToken ? (

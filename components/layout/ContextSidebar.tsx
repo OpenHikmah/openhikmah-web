@@ -203,11 +203,11 @@ export function ContextSidebar() {
       {sidebarContent && (
         <motion.aside
           key="sidebar"
-          initial={{ x: 320, opacity: 0 }}
+          initial={{ x: "100%", opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
-          exit={{ x: 320, opacity: 0 }}
+          exit={{ x: "100%", opacity: 0 }}
           transition={{ duration: 0.15, ease: "easeOut" }}
-          className="absolute top-0 right-0 h-full w-72 z-40 flex flex-col pointer-events-auto"
+          className="absolute top-0 right-0 h-full w-full sm:w-72 z-40 flex flex-col pointer-events-auto"
           style={{
             background: "var(--color-surface)",
             borderLeft: "1px solid var(--color-border)",
@@ -226,10 +226,11 @@ export function ContextSidebar() {
             </span>
             <button
               onClick={() => setSidebarContent(null)}
-              className="w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer hover:bg-white/5"
+              aria-label="Close panel"
+              className="grid place-items-center h-9 w-9 -mr-1.5 sm:h-6 sm:w-6 sm:mr-0 rounded transition-colors cursor-pointer hover:bg-white/5"
               style={{ color: "var(--color-text-muted)" }}
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             </button>
           </div>
 

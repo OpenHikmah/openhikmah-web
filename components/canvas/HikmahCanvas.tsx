@@ -184,7 +184,7 @@ function CanvasInner() {
     <div className="w-full h-full">
       {expansionError && (
         <div
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-md text-xs font-mono pointer-events-none"
+          className="absolute bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-md text-xs font-mono pointer-events-none"
           style={{
             background: "var(--color-surface-raised)",
             border: "1px solid var(--color-border)",
