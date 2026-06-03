@@ -13,13 +13,14 @@ import { buildShareUrl } from "@/hooks/useCanvasPersistence";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button, IconButton, Tooltip, buttonVariants, iconButtonVariants } from "@/components/ui";
+import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 
 interface HeaderProps {
   onSearchOpen: () => void;
 }
 
 export function Header({ onSearchOpen }: HeaderProps) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyFeedback();
   const [sharing, setSharing] = useState(false);
   const [workspaceSaved, setWorkspaceSaved] = useState(false);
   const [workspaceSaving, setWorkspaceSaving] = useState(false);
@@ -97,9 +98,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
     setSharing(true);
     try {
       const url = await buildShareUrl(serializeCanvas(nodes, edges));
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      await copy(url);
     } catch {
       // Share API or clipboard failed — silent
     } finally {

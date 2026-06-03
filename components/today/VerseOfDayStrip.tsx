@@ -10,9 +10,12 @@ export function VerseOfDayStrip({ verse }: { verse: Verse }) {
   return (
     <div className="flex flex-col gap-5 border-t border-border pt-7 md:flex-row md:items-center md:gap-7">
       <div className="min-w-[150px] shrink-0">
-        <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-text-muted">
+        <Link
+          href="/today"
+          className="font-mono text-[11px] uppercase tracking-[0.14em] text-text-muted transition-colors hover:text-gold"
+        >
           Verse of the day
-        </div>
+        </Link>
         <div className="mt-1.5 font-mono text-[13px] tracking-wide text-gold">
           {verse.ref} · {verse.surahName}
         </div>
