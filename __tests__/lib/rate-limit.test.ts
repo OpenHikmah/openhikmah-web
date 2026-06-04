@@ -1,16 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const { mockReturning, mockValues, mockInsert } = vi.hoisted(() => {
+const { mockReturning, mockValues, mockInsert, mockDeleteWhere, mockDelete } = vi.hoisted(() => {
   const mockReturning = vi.fn();
   const mockOnConflict = vi.fn(() => ({ returning: mockReturning }));
   const mockValues = vi.fn((..._args: unknown[]) => ({ onConflictDoUpdate: mockOnConflict }));
   const mockInsert = vi.fn(() => ({ values: mockValues }));
-  return { mockReturning, mockValues, mockInsert };
+  const mockDeleteWhere = vi.fn().mockResolvedValue(undefined);
+  const mockDelete = vi.fn(() => ({ where: mockDeleteWhere }));
+  return { mockReturning, mockValues, mockInsert, mockDeleteWhere, mockDelete };
 });
 
-vi.mock("@/lib/db", () => ({ db: { insert: mockInsert } }));
+vi.mock("@/lib/db", () => ({ db: { insert: mockInsert, delete: mockDelete } }));
 
-import { consume, RateLimitError, positiveIntEnv } from "@/lib/rate-limit";
+import { consume, sweepRateLimits, RateLimitError, positiveIntEnv } from "@/lib/rate-limit";
 
 describe("rate-limit consume", () => {
   beforeEach(() => {
@@ -48,6 +50,19 @@ describe("rate-limit consume", () => {
 
   it("RateLimitError carries a name", () => {
     expect(new RateLimitError().name).toBe("RateLimitError");
+  });
+});
+
+describe("sweepRateLimits", () => {
+  beforeEach(() => {
+    mockDelete.mockClear();
+    mockDeleteWhere.mockClear();
+  });
+
+  it("issues a delete of expired buckets", async () => {
+    await sweepRateLimits(600);
+    expect(mockDelete).toHaveBeenCalledOnce();
+    expect(mockDeleteWhere).toHaveBeenCalledOnce();
   });
 });
 

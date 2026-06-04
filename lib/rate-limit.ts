@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { rateLimits } from "@/lib/db/schema";
 
@@ -34,6 +34,35 @@ export function positiveIntEnv(name: string, fallback: number): number {
 export const AI_GEN_LIMIT = positiveIntEnv("AI_GEN_RATE_LIMIT", 20);
 export const AI_GEN_WINDOW_SECONDS = positiveIntEnv("AI_GEN_RATE_WINDOW", 60);
 
+/** Probability that a given `consume` call also prunes expired buckets. */
+const SWEEP_PROBABILITY = 0.01;
+/** Keep this many windows of history before a bucket is eligible for pruning. */
+const SWEEP_RETENTION_WINDOWS = 10;
+
+/**
+ * Deletes rate-limit buckets older than `olderThanSeconds`. Only buckets for the
+ * current (and the immediately preceding) window matter; everything older is dead
+ * weight. Exported so a cron job can call it directly if preferred over the
+ * opportunistic sweep below.
+ */
+export async function sweepRateLimits(olderThanSeconds: number): Promise<void> {
+  const cutoff = new Date(Date.now() - olderThanSeconds * 1000);
+  await db.delete(rateLimits).where(lt(rateLimits.createdAt, cutoff));
+}
+
+/**
+ * Fire-and-forget, low-probability pruning of expired buckets. Wrapped so it can
+ * never throw into — or otherwise affect — the limit decision in `consume`.
+ */
+function maybeSweep(windowSeconds: number): void {
+  try {
+    if (Math.random() >= SWEEP_PROBABILITY) return;
+    void sweepRateLimits(windowSeconds * SWEEP_RETENTION_WINDOWS).catch(() => {});
+  } catch {
+    // Never let cleanup affect rate limiting.
+  }
+}
+
 /**
  * Records a hit for `key` and returns true if still within `limit` for the
  * current window. Fails open (returns true) if the limiter itself errors — we
@@ -58,6 +87,7 @@ export async function consume(
       .returning({ count: rateLimits.count });
 
     const count = rows[0]?.count ?? 1;
+    maybeSweep(windowSeconds);
     return count <= limit;
   } catch (err) {
     console.error("Rate limiter error (failing open):", err);

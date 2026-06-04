@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createPublicKey, verify as verifySignature } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { users, type User } from "./db/schema";
@@ -16,26 +17,109 @@ export function invalidateTokenCache(token: string): void {
   tokenCache.delete(token);
 }
 
+// ─── JWT signature verification ───────────────────────────────────────────────
+// QF runs Ory Hydra, which issues RS256-signed JWT access tokens. We verify the
+// signature against QF's published JWKS before trusting any claim — an attacker
+// must NEVER be able to authenticate by hand-crafting a token with a known `sub`.
+// If verification can't be performed (JWKS unreachable, opaque token, unknown
+// alg), we return null and the caller falls back to the QF userinfo endpoint,
+// which is authoritative — so a tampered token is rejected there too.
+
+interface Jwk {
+  kty: string;
+  kid?: string;
+  alg?: string;
+  use?: string;
+  n?: string;
+  e?: string;
+}
+
+let jwksCache: { keys: Jwk[]; expiresAt: number } | null = null;
+const JWKS_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+/** Candidate JWKS URLs. `QF_JWKS_URL` overrides; otherwise derive from the auth base. */
+function jwksUrls(): string[] {
+  const explicit = process.env.QF_JWKS_URL;
+  if (explicit) return [explicit];
+  const base = process.env.QF_AUTH_BASE ?? "";
+  if (!base) return [];
+  return [`${base}/.well-known/jwks.json`, `${base}/oauth2/.well-known/jwks.json`];
+}
+
+async function fetchJwks(): Promise<Jwk[]> {
+  if (jwksCache && jwksCache.expiresAt > Date.now()) return jwksCache.keys;
+  for (const url of jwksUrls()) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) continue;
+      const data = (await res.json()) as { keys?: Jwk[] };
+      if (Array.isArray(data.keys) && data.keys.length > 0) {
+        jwksCache = { keys: data.keys, expiresAt: Date.now() + JWKS_TTL_MS };
+        return data.keys;
+      }
+    } catch {
+      // Try the next candidate URL.
+    }
+  }
+  return [];
+}
+
+function b64urlToBuffer(s: string): Buffer {
+  return Buffer.from(s, "base64url");
+}
+
 /**
- * Decodes the payload of a JWT without verifying the signature.
- * Used to extract `sub` from QF's access token (Ory Hydra issues JWTs).
- * We still validate the user exists in our DB, so a forged token with an
- * unknown sub will simply return "not found".
+ * Returns the `sub` of a QF access token ONLY if it is a JWT whose RS256
+ * signature verifies against QF's JWKS and which has not expired. Returns null
+ * for opaque tokens, unknown algorithms, bad signatures, expired tokens, or when
+ * the JWKS can't be fetched — every one of those falls back to the authoritative
+ * userinfo path, so this never weakens auth, it only adds a verified fast path.
  */
-function decodeJwtSub(token: string): string | null {
+async function verifiedJwtSub(token: string): Promise<string | null> {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null; // not a JWT — opaque token path
+
+  let header: { alg?: string; kid?: string };
+  let payload: Record<string, unknown>;
   try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(
-      Buffer.from(parts[1], "base64url").toString("utf-8")
-    ) as Record<string, unknown>;
-    const sub = payload.sub ?? payload.user_id ?? payload.userId;
-    if (sub === null || sub === undefined) return null;
-    const subStr = String(sub);
-    return subStr || null;
+    header = JSON.parse(b64urlToBuffer(parts[0]).toString("utf-8"));
+    payload = JSON.parse(b64urlToBuffer(parts[1]).toString("utf-8"));
   } catch {
     return null;
   }
+
+  // Only RS256 is accepted. This explicitly rejects "none" and HMAC algs, which
+  // are the classic JWT signature-bypass vectors.
+  if (header.alg !== "RS256") return null;
+
+  // Reject expired tokens.
+  if (typeof payload.exp === "number" && payload.exp * 1000 <= Date.now()) return null;
+
+  const keys = await fetchJwks();
+  if (keys.length === 0) return null; // can't verify → caller uses userinfo
+
+  const candidates = header.kid ? keys.filter((k) => k.kid === header.kid) : keys;
+  const signingInput = Buffer.from(`${parts[0]}.${parts[1]}`);
+  const signature = b64urlToBuffer(parts[2]);
+
+  for (const jwk of candidates.length > 0 ? candidates : keys) {
+    if (jwk.kty !== "RSA") continue;
+    try {
+      const key = createPublicKey({
+        key: jwk as unknown as import("node:crypto").JsonWebKey,
+        format: "jwk",
+      });
+      if (verifySignature("RSA-SHA256", signingInput, key, signature)) {
+        const sub = payload.sub ?? payload.user_id ?? payload.userId;
+        if (sub === null || sub === undefined) return null;
+        return String(sub) || null;
+      }
+    } catch {
+      // Bad key material — try the next candidate.
+    }
+  }
+
+  return null; // signature did not verify against any key
 }
 
 /**
@@ -62,9 +146,9 @@ export async function requireUser(
     return { userId: cached.user.id, user: cached.user };
   }
 
-  // Stage 1 — JWT fast path (no network)
+  // Stage 1 — verified-JWT fast path (no userinfo round-trip)
   let user: User | undefined;
-  const jwtSub = decodeJwtSub(token);
+  const jwtSub = await verifiedJwtSub(token);
   if (jwtSub) {
     [user] = await db.select().from(users).where(eq(users.qfId, jwtSub)).limit(1);
   }
@@ -86,12 +170,12 @@ export async function requireUser(
 }
 
 /**
- * Returns the QF user ID (sub) for an access token.
- * Decodes the JWT payload first (no network call). Falls back to the QF
- * userinfo endpoint if the token is opaque or the sub claim is missing.
+ * Returns the QF user ID (sub) for an access token. Tries the verified-JWT fast
+ * path first (no network call), then falls back to the QF userinfo endpoint for
+ * opaque tokens or when the signature can't be verified locally.
  */
 export async function resolveQfId(accessToken: string): Promise<string | null> {
-  const jwtSub = decodeJwtSub(accessToken);
+  const jwtSub = await verifiedJwtSub(accessToken);
   if (jwtSub) return jwtSub;
   return resolveQfIdFromUserinfo(accessToken);
 }
