@@ -26,8 +26,19 @@ export function verseOfDayRef(date: Date = new Date()): string {
   return POOL[daySeed(date) % POOL.length];
 }
 
+/**
+ * Admin-curated override for a given day. Returns null until the admin
+ * Verse-of-the-Day calendar (roadmap Epic 2 / design.md §6.A) is built — the
+ * algorithmic pick below is the always-on fallback. This is the single seam a
+ * curated entry will plug into; the card UI is identical either way.
+ */
+export async function getCuratedVerseOfDay(_date: Date): Promise<Verse | null> {
+  return null;
+}
+
 /** Resolves today's verse (full text). Null only if it can't be resolved at all. */
 export async function getVerseOfDay(date: Date = new Date()): Promise<Verse | null> {
-  // TODO: check an admin-curated `verse_of_day` entry for this date first.
+  const curated = await getCuratedVerseOfDay(date);
+  if (curated) return curated;
   return resolveVerse(verseOfDayRef(date));
 }

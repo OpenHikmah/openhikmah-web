@@ -1,10 +1,11 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // verseOfDayRef is pure, but importing the module pulls in resolveVerse →
 // the DB chain. Mock it so the unit test stays isolated to the picker logic.
 vi.mock("@/lib/verse-resolver", () => ({ resolveVerse: vi.fn() }));
 
-import { verseOfDayRef } from "@/lib/verse-of-day";
+import { resolveVerse } from "@/lib/verse-resolver";
+import { verseOfDayRef, getVerseOfDay, getCuratedVerseOfDay } from "@/lib/verse-of-day";
 
 describe("verseOfDayRef", () => {
   it("returns a valid verse ref (surah:ayah)", () => {
@@ -30,5 +31,22 @@ describe("verseOfDayRef", () => {
 
   it("defaults to the current date without throwing", () => {
     expect(verseOfDayRef()).toMatch(/^\d+:\d+$/);
+  });
+});
+
+describe("getVerseOfDay override seam", () => {
+  beforeEach(() => vi.mocked(resolveVerse).mockReset());
+
+  it("getCuratedVerseOfDay returns null until the admin calendar is built", async () => {
+    expect(await getCuratedVerseOfDay(new Date("2026-06-04T00:00:00Z"))).toBeNull();
+  });
+
+  it("falls back to the algorithmic pick when no curated entry exists", async () => {
+    const verse = { ref: "2:255" } as never;
+    vi.mocked(resolveVerse).mockResolvedValue(verse);
+    const date = new Date("2026-06-04T00:00:00Z");
+    const result = await getVerseOfDay(date);
+    expect(vi.mocked(resolveVerse)).toHaveBeenCalledWith(verseOfDayRef(date));
+    expect(result).toBe(verse);
   });
 });
