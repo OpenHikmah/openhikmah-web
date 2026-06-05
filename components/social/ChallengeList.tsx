@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { Loader2, Trophy, Clock } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface EnrichedChallenge {
   id: number;
@@ -87,37 +88,32 @@ function ChallengeCard({
     }
   };
 
-  const borderColor =
+  const borderClass =
     c.status === "completed" && iWon
-      ? "var(--color-gold)"
+      ? "border-gold"
       : c.status === "active"
-      ? "var(--color-teal)"
-      : "var(--color-border)";
+      ? "border-teal"
+      : "border-border";
+
+  const statusClass =
+    c.status === "active"
+      ? "text-teal"
+      : c.status === "completed" && iWon
+      ? "text-gold"
+      : "text-text-muted";
 
   return (
     <div
-      className="rounded border p-3 space-y-2 text-sm"
-      style={{
-        borderColor,
-        background: "var(--color-surface)",
-        opacity: c.status === "declined" ? 0.5 : 1,
-      }}
+      className={cn(
+        "space-y-2 rounded border bg-surface p-3 text-sm",
+        borderClass,
+        c.status === "declined" && "opacity-50"
+      )}
     >
       {/* Header row */}
       <div className="flex items-center justify-between gap-2">
-        <span className="font-medium" style={{ color: "var(--color-text-primary)" }}>
-          vs @{opponentName}
-        </span>
-        <span
-          className="text-xs font-mono px-1.5 py-0.5 rounded"
-          style={{
-            background: "var(--color-surface-overlay)",
-            color:
-              c.status === "active" ? "var(--color-teal)" :
-              c.status === "completed" && iWon ? "var(--color-gold)" :
-              "var(--color-text-muted)",
-          }}
-        >
+        <span className="font-medium text-text-primary">vs @{opponentName}</span>
+        <span className={cn("rounded bg-surface-overlay px-1.5 py-0.5 font-mono text-xs", statusClass)}>
           {c.status === "active" ? "Active" :
            c.status === "pending" && !isChallenger ? "Incoming" :
            c.status === "pending" ? "Pending" :
@@ -129,35 +125,27 @@ function ChallengeCard({
       </div>
 
       {/* Verse context */}
-      {c.verseRef && (
-        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Verse: {c.verseRef}
-        </p>
-      )}
+      {c.verseRef && <p className="text-xs text-text-muted">Verse: {c.verseRef}</p>}
 
       {/* Scores (active / completed) */}
       {(c.status === "active" || c.status === "completed") && (
         <div className="flex items-center gap-3">
-          <span className="text-xs font-mono" style={{ color: "var(--color-text-secondary)" }}>
+          <span className="font-mono text-xs text-text-secondary">
             You {myScore} — {theirScore} @{opponentName}
           </span>
           {c.status === "active" && (
-            <span className="flex items-center gap-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
-              <Clock className="w-3 h-3" />
+            <span className="flex items-center gap-1 text-xs text-text-muted">
+              <Clock className="h-3 w-3" />
               {countdown}
             </span>
           )}
-          {c.status === "completed" && iWon && (
-            <Trophy className="w-3.5 h-3.5" style={{ color: "var(--color-gold)" }} />
-          )}
+          {c.status === "completed" && iWon && <Trophy className="h-3.5 w-3.5 text-gold" />}
         </div>
       )}
 
       {/* Pending sent */}
       {c.status === "pending" && isChallenger && (
-        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Waiting for @{opponentName} to respond…
-        </p>
+        <p className="text-xs text-text-muted">Waiting for @{opponentName} to respond…</p>
       )}
 
       {/* Pending received — accept / decline */}
@@ -166,19 +154,17 @@ function ChallengeCard({
           <button
             onClick={() => handleAction("accept")}
             disabled={acting !== null}
-            className="flex items-center gap-1 px-2.5 py-1 rounded border text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer"
-            style={{ borderColor: "var(--color-teal)", color: "var(--color-teal)" }}
+            className="flex cursor-pointer items-center gap-1 rounded border border-teal px-2.5 py-1 text-xs font-medium text-teal transition-colors hover:bg-teal/10 disabled:opacity-50"
           >
-            {acting === "accept" ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+            {acting === "accept" ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
             Accept
           </button>
           <button
             onClick={() => handleAction("decline")}
             disabled={acting !== null}
-            className="flex items-center gap-1 px-2.5 py-1 rounded border text-xs transition-colors disabled:opacity-50 cursor-pointer"
-            style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
+            className="flex cursor-pointer items-center gap-1 rounded border border-border px-2.5 py-1 text-xs text-text-muted transition-colors hover:bg-white/5 disabled:opacity-50"
           >
-            {acting === "decline" ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+            {acting === "decline" ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
             Decline
           </button>
         </div>
@@ -193,11 +179,7 @@ export function ChallengeList({ challenges, onUpdate }: Props) {
   if (!myId) return null;
 
   if (challenges.length === 0) {
-    return (
-      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        No challenges yet. Send one to a friend!
-      </p>
-    );
+    return <p className="text-xs text-text-muted">No challenges yet. Send one to a friend!</p>;
   }
 
   const order = ["active", "pending", "completed", "declined"];

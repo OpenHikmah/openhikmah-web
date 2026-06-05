@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useAuthStore } from "@/store/auth";
 import { Loader2, Swords } from "lucide-react";
+import { Input } from "@/components/ui";
+import { cn } from "@/lib/utils";
 
 interface AcceptedFriend {
   id: number;
@@ -69,17 +71,13 @@ export function CreateChallengeForm({ friends, loadingFriends, onCreated }: Prop
   if (loadingFriends) {
     return (
       <div className="flex justify-center py-4">
-        <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--color-teal)" }} />
+        <Loader2 className="h-4 w-4 animate-spin text-teal" />
       </div>
     );
   }
 
   if (friends.length === 0) {
-    return (
-      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        Add friends first to challenge them.
-      </p>
-    );
+    return <p className="text-xs text-text-muted">Add friends first to challenge them.</p>;
   }
 
   return (
@@ -88,18 +86,16 @@ export function CreateChallengeForm({ friends, loadingFriends, onCreated }: Prop
       <select
         value={selectedFriend}
         onChange={(e) => { setSelectedFriend(e.target.value); setError(null); setSuccess(null); }}
-        className="w-full px-3 py-1.5 rounded border text-sm bg-transparent outline-none transition-colors appearance-none cursor-pointer"
-        style={{
-          borderColor: "var(--color-border)",
-          color: selectedFriend ? "var(--color-text-primary)" : "var(--color-text-muted)",
-          background: "var(--color-surface)",
-        }}
+        className={cn(
+          "w-full cursor-pointer appearance-none rounded border border-border bg-surface px-3 py-1.5 text-sm transition-colors focus:border-gold-muted",
+          selectedFriend ? "text-text-primary" : "text-text-muted"
+        )}
       >
-        <option value="" disabled style={{ background: "var(--color-surface)" }}>
+        <option value="" disabled className="bg-surface">
           Choose a friend to challenge…
         </option>
         {friends.map((f) => (
-          <option key={f.id} value={f.username} style={{ background: "var(--color-surface)" }}>
+          <option key={f.id} value={f.username} className="bg-surface">
             @{f.username}
           </option>
         ))}
@@ -112,12 +108,12 @@ export function CreateChallengeForm({ friends, loadingFriends, onCreated }: Prop
             key={d}
             type="button"
             onClick={() => setDuration(d)}
-            className="flex-1 py-1.5 rounded border text-xs font-medium transition-colors cursor-pointer"
-            style={{
-              borderColor: duration === d ? "var(--color-teal)" : "var(--color-border)",
-              color: duration === d ? "var(--color-teal)" : "var(--color-text-muted)",
-              background: duration === d ? "var(--color-surface-raised)" : "transparent",
-            }}
+            className={cn(
+              "flex-1 cursor-pointer rounded border py-1.5 text-xs font-medium transition-colors",
+              duration === d
+                ? "border-teal bg-surface-raised text-teal"
+                : "border-border text-text-muted hover:text-text-secondary"
+            )}
           >
             {d}
           </button>
@@ -125,7 +121,7 @@ export function CreateChallengeForm({ friends, loadingFriends, onCreated }: Prop
       </div>
 
       {/* Optional verse */}
-      <input
+      <Input
         type="text"
         value={verseRef}
         onChange={(e) => setVerseRef(e.target.value)}
@@ -133,40 +129,25 @@ export function CreateChallengeForm({ friends, loadingFriends, onCreated }: Prop
         maxLength={20}
         autoComplete="off"
         spellCheck={false}
-        className="w-full px-3 py-1.5 rounded border text-sm bg-transparent outline-none transition-colors"
-        style={{
-          borderColor: "var(--color-border)",
-          color: "var(--color-text-primary)",
-        }}
-        onFocus={(e) => (e.currentTarget.style.borderColor = "var(--color-teal)")}
-        onBlur={(e) => (e.currentTarget.style.borderColor = "var(--color-border)")}
+        className="h-auto rounded px-3 py-1.5"
       />
 
       <div className="flex items-center gap-3">
         <button
           type="submit"
           disabled={sending || !selectedFriend}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-          style={{ borderColor: "var(--color-teal)", color: "var(--color-teal)" }}
+          className="flex cursor-pointer items-center gap-1.5 rounded border border-teal px-3 py-1.5 text-xs font-medium text-teal transition-colors hover:bg-teal/10 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {sending ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
-            <Swords className="w-3.5 h-3.5" />
+            <Swords className="h-3.5 w-3.5" />
           )}
           Challenge
         </button>
 
-        {error && (
-          <p className="text-xs" style={{ color: "var(--color-error, #ef4444)" }}>
-            {error}
-          </p>
-        )}
-        {success && (
-          <p className="text-xs" style={{ color: "var(--color-teal)" }}>
-            {success}
-          </p>
-        )}
+        {error && <p className="text-xs text-error">{error}</p>}
+        {success && <p className="text-xs text-teal">{success}</p>}
       </div>
     </form>
   );

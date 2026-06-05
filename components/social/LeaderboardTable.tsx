@@ -19,11 +19,7 @@ interface Props {
 
 export function LeaderboardTable({ entries }: Props) {
   if (entries.length === 0) {
-    return (
-      <p className="text-sm py-4" style={{ color: "var(--color-text-muted)" }}>
-        Add friends to see the leaderboard.
-      </p>
-    );
+    return <p className="py-4 text-sm text-text-muted">Add friends to see the leaderboard.</p>;
   }
 
   return (
@@ -32,62 +28,46 @@ export function LeaderboardTable({ entries }: Props) {
         <div
           key={entry.id}
           className={cn(
-            "flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors",
-            entry.isYou ? "border-[var(--color-teal)]" : "border-[var(--color-border)]"
+            "flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
+            entry.isYou ? "border-teal bg-teal/[0.06]" : "border-border bg-surface-raised"
           )}
-          style={{
-            background: entry.isYou
-              ? "rgba(0,128,128,0.06)"
-              : "var(--color-surface-raised)",
-          }}
         >
           {/* Rank */}
           <div className="w-6 text-center">
             {entry.rank === 1 ? (
-              <Crown className="w-4 h-4 mx-auto" style={{ color: "var(--color-gold)" }} />
+              <Crown className="mx-auto h-4 w-4 text-gold" />
             ) : (
-              <span className="text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>
-                {entry.rank}
-              </span>
+              <span className="font-mono text-xs text-text-muted">{entry.rank}</span>
             )}
           </div>
 
           {/* Name */}
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
             <span
-              className={cn("text-sm truncate", entry.isYou ? "font-medium" : "")}
-              style={{
-                color: entry.isYou
-                  ? "var(--color-teal)"
-                  : "var(--color-text-primary)",
-              }}
+              className={cn(
+                "truncate text-sm",
+                entry.isYou ? "font-medium text-teal" : "text-text-primary"
+              )}
             >
               {entry.displayName ?? entry.username}
             </span>
             {entry.displayName && (
-              <span className="ml-1.5 text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>
-                @{entry.username}
-              </span>
+              <span className="ml-1.5 font-mono text-xs text-text-muted">@{entry.username}</span>
             )}
-            {entry.isYou && (
-              <span className="ml-1.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
-                (you)
-              </span>
-            )}
+            {entry.isYou && <span className="ml-1.5 text-xs text-text-muted">(you)</span>}
           </div>
 
           {/* Streak */}
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex shrink-0 items-center gap-1">
             <Flame
-              className="w-3.5 h-3.5"
+              className={cn("h-3.5 w-3.5", entry.streak > 0 ? "text-gold" : "text-text-muted")}
               fill={entry.streak > 0 ? "currentColor" : "none"}
-              style={{ color: entry.streak > 0 ? "var(--color-gold)" : "var(--color-text-muted)" }}
             />
             <span
-              className="text-sm font-mono font-medium"
-              style={{
-                color: entry.streak > 0 ? "var(--color-gold)" : "var(--color-text-muted)",
-              }}
+              className={cn(
+                "font-mono text-sm font-medium",
+                entry.streak > 0 ? "text-gold" : "text-text-muted"
+              )}
             >
               {entry.streak}
             </span>

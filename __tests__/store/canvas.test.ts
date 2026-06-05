@@ -49,12 +49,21 @@ describe("canvas store", () => {
     expect(node!.data).toMatchObject({ ref: "2:255", surah: 2 });
   });
 
-  it("addVerseNode uses random position when none provided", () => {
+  it("addVerseNode picks a collision-free position when none provided", () => {
     const id = useCanvasStore.getState().addVerseNode(baseVerse);
     const node = useCanvasStore.getState().getNodeById(id);
     expect(node).toBeDefined();
     expect(typeof node!.position.x).toBe("number");
     expect(typeof node!.position.y).toBe("number");
+
+    // A second auto-placed node must not stack on the first.
+    const id2 = useCanvasStore
+      .getState()
+      .addVerseNode({ ...baseVerse, ref: "1:1", surah: 1, ayah: 1 });
+    const node2 = useCanvasStore.getState().getNodeById(id2);
+    const dx = Math.abs(node!.position.x - node2!.position.x);
+    const dy = Math.abs(node!.position.y - node2!.position.y);
+    expect(dx >= 288 || dy >= 240).toBe(true);
   });
 
   it("hasNode returns true after addVerseNode", () => {

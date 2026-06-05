@@ -61,7 +61,7 @@ export function AccountMenu() {
     return (
       <button
         onClick={signIn}
-        className="inline-flex items-center gap-1.5 rounded-md bg-gold px-3.5 py-1.5 text-[13px] font-semibold text-[#1a1305] transition-[filter] duration-[120ms] hover:brightness-110"
+        className="inline-flex items-center gap-1.5 rounded-md bg-gold px-3.5 py-1.5 text-[13px] font-semibold text-ink transition-[filter] duration-[120ms] hover:brightness-110"
       >
         <LogIn className="size-3.5" />
         Sign in
@@ -86,7 +86,7 @@ export function AccountMenu() {
           open ? "border-gold-muted" : "border-border hover:border-gold-muted/70"
         )}
       >
-        <span className="grid size-[30px] place-items-center rounded-full bg-teal text-[12px] font-bold text-bg shadow-[0_0_0_2px_rgba(13,148,136,0.25)]">
+        <span className="grid size-[30px] place-items-center rounded-full bg-teal text-[12px] font-bold text-bg shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-teal)_25%,transparent)]">
           {initial}
         </span>
         {username && (
@@ -110,15 +110,15 @@ export function AccountMenu() {
           role="menu"
           className="absolute right-0 top-[calc(100%+8px)] z-50 w-[268px] overflow-hidden rounded-2xl border border-border bg-surface-overlay shadow-[0_20px_50px_rgba(0,0,0,0.55)]"
         >
-          {/* Profile header */}
+          {/* Profile header — a soft gold→teal wash derived from palette tokens. */}
           <div
             className="flex items-center gap-3 p-4"
             style={{
               background:
-                "radial-gradient(120% 100% at 0% 0%, rgba(201,168,76,0.12), transparent 60%), linear-gradient(180deg, rgba(13,148,136,0.08), transparent)",
+                "radial-gradient(120% 100% at 0% 0%, color-mix(in srgb, var(--color-gold) 12%, transparent), transparent 60%), linear-gradient(180deg, color-mix(in srgb, var(--color-teal) 8%, transparent), transparent)",
             }}
           >
-            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-teal text-[17px] font-bold text-bg shadow-[0_0_0_2px_rgba(201,168,76,0.3)]">
+            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-teal text-[17px] font-bold text-bg shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-gold)_30%,transparent)]">
               {initial}
             </span>
             <div className="min-w-0">

@@ -21,12 +21,19 @@
   --color-text-primary: #f0f4f8;
   --color-text-secondary: #8899aa;
   --color-text-muted: #4a5a6a;
+  /* Ink — dark text that sits on bright fills (gold buttons, badges). */
+  --color-ink: #1a1305;
 
   /* Semantic */
   --color-theme-edge: #0d9488;
   --color-root-edge: #c9a84c;
   --color-contrast-edge: #e05252;
   --color-error: #e05252;
+
+  /* Accent — the Names "af'al" taxonomy color, promoted from an inline literal.
+     Not a new brand color: it is already on-screen; this only stops it being hardcoded. */
+  --color-accent: #7c6af7;
+  --color-accent-soft: #a89cf7;
 
   /* Interaction washes — soft, palette-derived (relaxed border-only rule) */
   --color-wash-neutral: color-mix(in srgb, #ffffff 6%, transparent);
@@ -43,6 +50,17 @@
   --duration-fast: 120ms;
   --duration-base: 200ms;
   --duration-slow: 360ms;
+
+  /* Radius scale (design.md §3.3) — controls / cards / floating surfaces */
+  --radius-control: 6px;
+  --radius-card: 10px;
+  --radius-floating: 14px;
+
+  /* Elevation — reserved for floating things only (dialogs, popovers, menus, cards).
+     The canvas stays flat; separation there comes from border + surface layer. */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-floating: 0 16px 40px rgba(0, 0, 0, 0.5);
 }
 
 @layer base {

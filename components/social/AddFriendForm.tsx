@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useAuthStore } from "@/store/auth";
 import { Loader2, UserPlus } from "lucide-react";
+import { Input } from "@/components/ui";
+import { cn } from "@/lib/utils";
 
 interface Props {
   onAdded: () => void;
@@ -52,7 +54,7 @@ export function AddFriendForm({ onAdded }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="flex gap-2">
-      <input
+      <Input
         type="text"
         value={username}
         onChange={(e) => {
@@ -64,41 +66,22 @@ export function AddFriendForm({ onAdded }: Props) {
         maxLength={20}
         autoComplete="off"
         spellCheck={false}
-        className="flex-1 px-3 py-1.5 rounded border text-sm bg-transparent outline-none transition-colors"
-        style={{
-          borderColor: error ? "var(--color-error, #ef4444)" : "var(--color-border)",
-          color: "var(--color-text-primary)",
-        }}
-        onFocus={(e) => (e.currentTarget.style.borderColor = "var(--color-teal)")}
-        onBlur={(e) =>
-          (e.currentTarget.style.borderColor = error
-            ? "var(--color-error, #ef4444)"
-            : "var(--color-border)")
-        }
+        className={cn("h-auto flex-1 rounded px-3 py-1.5", error && "border-error")}
       />
       <button
         type="submit"
         disabled={sending || !username.trim()}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-        style={{ borderColor: "var(--color-teal)", color: "var(--color-teal)" }}
+        className="flex cursor-pointer items-center gap-1.5 rounded border border-teal px-3 py-1.5 text-xs font-medium text-teal transition-colors hover:bg-teal/10 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {sending ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
         ) : (
-          <UserPlus className="w-3.5 h-3.5" />
+          <UserPlus className="h-3.5 w-3.5" />
         )}
         Add
       </button>
-      {error && (
-        <p className="text-xs self-center" style={{ color: "var(--color-error, #ef4444)" }}>
-          {error}
-        </p>
-      )}
-      {success && (
-        <p className="text-xs self-center" style={{ color: "var(--color-teal)" }}>
-          {success}
-        </p>
-      )}
+      {error && <p className="self-center text-xs text-error">{error}</p>}
+      {success && <p className="self-center text-xs text-teal">{success}</p>}
     </form>
   );
 }

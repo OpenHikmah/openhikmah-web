@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useSocialStore } from "@/store/social";
 import { useAuthStore } from "@/store/auth";
 import { Flame } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function StreakBadge() {
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -31,12 +32,10 @@ export function StreakBadge() {
 
   return (
     <div
-      className="flex items-center gap-1 px-2 py-1 rounded border text-xs"
-      style={{
-        borderColor: streak > 0 ? "var(--color-gold)" : "var(--color-border)",
-        color: streak > 0 ? "var(--color-gold)" : "var(--color-text-muted)",
-        background: streak > 0 ? "rgba(201,168,76,0.08)" : "transparent",
-      }}
+      className={cn(
+        "flex items-center gap-1 rounded border px-2 py-1 text-xs",
+        streak > 0 ? "border-gold bg-gold/[0.08] text-gold" : "border-border text-text-muted"
+      )}
       title={`${streak}-day streak`}
     >
       <Flame className="w-3 h-3" fill={streak > 0 ? "currentColor" : "none"} />

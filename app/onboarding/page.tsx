@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { BookOpen, Loader2 } from "lucide-react";
+import { Card, Input } from "@/components/ui";
+import { cn } from "@/lib/utils";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -56,32 +58,15 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center px-4"
-      style={{ background: "var(--color-bg)" }}
-    >
-      <div
-        className="w-full max-w-sm rounded-lg border p-8 space-y-6"
-        style={{
-          background: "var(--color-surface)",
-          borderColor: "var(--color-border)",
-        }}
-      >
+    <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4">
+      <Card className="w-full max-w-sm space-y-6 p-8">
         <div className="flex flex-col items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-md flex items-center justify-center"
-            style={{ background: "var(--color-surface-overlay)" }}
-          >
-            <BookOpen className="w-5 h-5" style={{ color: "var(--color-gold)" }} />
+          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-surface-overlay">
+            <BookOpen className="h-5 w-5 text-gold" />
           </div>
-          <div className="text-center space-y-1">
-            <h1
-              className="text-base font-medium"
-              style={{ color: "var(--color-text-primary)" }}
-            >
-              Choose a username
-            </h1>
-            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          <div className="space-y-1 text-center">
+            <h1 className="text-base font-medium text-text-primary">Choose a username</h1>
+            <p className="text-xs text-text-muted">
               This is how friends will find you on the leaderboard.
             </p>
           </div>
@@ -89,7 +74,7 @@ export default function OnboardingPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <input
+            <Input
               type="text"
               value={username}
               onChange={(e) => {
@@ -101,46 +86,24 @@ export default function OnboardingPage() {
               autoFocus
               autoComplete="off"
               spellCheck={false}
-              className="w-full px-3 py-2 rounded border text-sm bg-transparent outline-none transition-colors"
-              style={{
-                borderColor: error ? "var(--color-error, #ef4444)" : "var(--color-border)",
-                color: "var(--color-text-primary)",
-              }}
-              onFocus={(e) =>
-                (e.currentTarget.style.borderColor = "var(--color-teal)")
-              }
-              onBlur={(e) =>
-                (e.currentTarget.style.borderColor = error
-                  ? "var(--color-error, #ef4444)"
-                  : "var(--color-border)")
-              }
+              className={cn(error && "border-error")}
             />
-            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            <p className="text-xs text-text-muted">
               3–20 characters: letters, numbers, underscores only
             </p>
-            {error && (
-              <p className="text-xs" style={{ color: "var(--color-error, #ef4444)" }}>
-                {error}
-              </p>
-            )}
+            {error && <p className="text-xs text-error">{error}</p>}
           </div>
 
           <button
             type="submit"
             disabled={saving || username.trim().length < 3}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            style={{
-              background: "var(--color-teal)",
-              color: "#ffffff",
-            }}
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded bg-teal py-2 text-sm font-medium text-text-primary transition-[filter] duration-[120ms] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {saving ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : null}
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
             {saving ? "Saving…" : "Get started"}
           </button>
         </form>
-      </div>
+      </Card>
     </div>
   );
 }

@@ -15,7 +15,7 @@ const button = cva(
   {
     variants: {
       variant: {
-        primary: "bg-gold font-semibold text-[#1a1305] hover:brightness-110 active:brightness-95",
+        primary: "bg-gold font-semibold text-ink hover:brightness-110 active:brightness-95",
         secondary:
           "border border-border text-text-primary hover:border-gold-muted hover:bg-white/5",
         ghost: "text-text-secondary hover:bg-white/5 hover:text-text-primary",

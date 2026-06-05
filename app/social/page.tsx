@@ -130,8 +130,8 @@ export default function SocialPage() {
 
   if (isSessionLoading && !accessToken) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--color-bg)" }}>
-        <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--color-teal)" }} />
+      <div className="flex min-h-screen items-center justify-center bg-bg">
+        <Loader2 className="h-5 w-5 animate-spin text-teal" />
       </div>
     );
   }
@@ -140,24 +140,18 @@ export default function SocialPage() {
   if (!userId) {
     if (profileLoading) {
       return (
-        <div
-          className="min-h-screen flex items-center justify-center"
-          style={{ background: "var(--color-bg)" }}
-        >
-          <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--color-teal)" }} />
+        <div className="flex min-h-screen items-center justify-center bg-bg">
+          <Loader2 className="h-5 w-5 animate-spin text-teal" />
         </div>
       );
     }
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: "var(--color-bg)" }}
-      >
-        <div className="text-center space-y-3 px-4">
-          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+      <div className="flex min-h-screen items-center justify-center bg-bg">
+        <div className="space-y-3 px-4 text-center">
+          <p className="text-sm text-text-secondary">
             Your profile couldn&apos;t load. Please sign out and try again.
           </p>
-          <Link href="/" className="text-xs underline" style={{ color: "var(--color-teal)" }}>
+          <Link href="/" className="text-xs text-teal underline">
             Back to canvas
           </Link>
         </div>
@@ -166,65 +160,37 @@ export default function SocialPage() {
   }
 
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: "var(--color-bg)" }}
-    >
+    <div className="min-h-screen bg-bg">
       {/* Header */}
-      <header
-        className="flex items-center justify-between px-4 h-12 shrink-0 sticky top-0 z-10"
-        style={{
-          background: "var(--color-surface)",
-          borderBottom: "1px solid var(--color-border)",
-        }}
-      >
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-sm"
-          style={{ color: "var(--color-text-secondary)" }}
-        >
-          <BookOpen className="w-4 h-4" style={{ color: "var(--color-gold)" }} />
-          <span className="font-medium" style={{ color: "var(--color-text-primary)" }}>
-            Open Hikmah
-          </span>
+      <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
+        <Link href="/" className="flex items-center gap-2 text-sm text-text-secondary">
+          <BookOpen className="h-4 w-4 text-gold" />
+          <span className="font-medium text-text-primary">Open Hikmah</span>
         </Link>
-        {username && (
-          <span className="text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>
-            @{username}
-          </span>
-        )}
+        {username && <span className="font-mono text-xs text-text-muted">@{username}</span>}
       </header>
 
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
-        <h1
-          className="text-lg font-medium"
-          style={{ color: "var(--color-text-primary)" }}
-        >
-          Social
-        </h1>
+      <div className="mx-auto max-w-lg space-y-6 px-4 py-6">
+        <h1 className="text-lg font-medium text-text-primary">Social</h1>
 
         {/* Tab switcher */}
-        <div
-          className="flex rounded-lg border overflow-hidden"
-          style={{ borderColor: "var(--color-border)" }}
-        >
-          {(["leaderboard", "friends", "challenges"] as Tab[]).map((t, i, arr) => (
+        <div className="flex divide-x divide-border overflow-hidden rounded-lg border border-border">
+          {(["leaderboard", "friends", "challenges"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors cursor-pointer capitalize"
-              style={{
-                background: tab === t ? "var(--color-surface-raised)" : "transparent",
-                color: tab === t ? "var(--color-text-primary)" : "var(--color-text-muted)",
-                borderRight: i < arr.length - 1 ? "1px solid var(--color-border)" : "none",
-              }}
+              className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 py-2 text-xs font-medium capitalize transition-colors ${
+                tab === t
+                  ? "bg-surface-raised text-text-primary"
+                  : "text-text-muted hover:text-text-secondary"
+              }`}
             >
               {t === "leaderboard" ? (
-                <Trophy className="w-3.5 h-3.5" />
+                <Trophy className="h-3.5 w-3.5" />
               ) : t === "friends" ? (
-                <Users className="w-3.5 h-3.5" />
+                <Users className="h-3.5 w-3.5" />
               ) : (
-                <Swords className="w-3.5 h-3.5" />
+                <Swords className="h-3.5 w-3.5" />
               )}
               {t === "leaderboard" ? "Leaderboard" : t === "friends" ? "Friends" : "Challenges"}
             </button>
@@ -241,7 +207,7 @@ export default function SocialPage() {
             />
             {loadingFriends ? (
               <div className="flex justify-center py-4">
-                <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--color-teal)" }} />
+                <Loader2 className="h-4 w-4 animate-spin text-teal" />
               </div>
             ) : (
               <FriendList
@@ -266,7 +232,7 @@ export default function SocialPage() {
             />
             {loadingChallenges ? (
               <div className="flex justify-center py-4">
-                <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--color-teal)" }} />
+                <Loader2 className="h-4 w-4 animate-spin text-teal" />
               </div>
             ) : (
               <ChallengeList challenges={challengesList} onUpdate={fetchChallenges} />
@@ -278,7 +244,7 @@ export default function SocialPage() {
           <div className="space-y-2">
             {loadingLeaderboard ? (
               <div className="flex justify-center py-4">
-                <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--color-teal)" }} />
+                <Loader2 className="h-4 w-4 animate-spin text-teal" />
               </div>
             ) : (
               <LeaderboardTable
@@ -286,12 +252,11 @@ export default function SocialPage() {
               />
             )}
             {!loadingLeaderboard && leaderboard.length <= 1 && (
-              <p className="text-xs text-center" style={{ color: "var(--color-text-muted)" }}>
+              <p className="text-center text-xs text-text-muted">
                 Add friends to see them here.{" "}
                 <button
                   onClick={() => setTab("friends")}
-                  className="underline cursor-pointer"
-                  style={{ color: "var(--color-teal)" }}
+                  className="cursor-pointer text-teal underline"
                 >
                   Go to Friends
                 </button>

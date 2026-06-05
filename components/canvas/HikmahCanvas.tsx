@@ -5,16 +5,21 @@ import {
   ReactFlow,
   Background,
   BackgroundVariant,
+  MiniMap,
+  Panel,
   useReactFlow,
   ReactFlowProvider,
   type Edge,
+  type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { VerseNode } from "./VerseNode";
 import { HikmahEdge } from "./HikmahEdge";
+import { CanvasLegend } from "./CanvasLegend";
 import { useCanvasStore } from "@/store/canvas";
 import { useActivityTracker } from "@/hooks/useActivityTracker";
 import { useCanvasPersistence } from "@/hooks/useCanvasPersistence";
+import { findFreeSlot } from "@/lib/canvas-layout";
 import type { ConnectionResult, Verse } from "@/types/quran";
 
 const nodeTypes = { verse: VerseNode };
@@ -64,6 +69,7 @@ function CanvasInner() {
   const setPendingAutoExpand = useCanvasStore((s) => s.setPendingAutoExpand);
   const setOpenExpandNodeId = useCanvasStore((s) => s.setOpenExpandNodeId);
   const setSidebarContent = useCanvasStore((s) => s.setSidebarContent);
+  const setViewport = useCanvasStore((s) => s.setViewport);
   const getNodeById = useCanvasStore((s) => s.getNodeById);
   const hasNode = useCanvasStore((s) => s.hasNode);
 
@@ -98,7 +104,11 @@ function CanvasInner() {
           const conn = connections[i];
           if (hasNode(conn.ref)) continue;
 
-          const pos = radialPos(sourcePos, i, connections.length);
+          // Fan out radially, then nudge off any collision with the live graph
+          // (including siblings added moments ago in this same expansion).
+          const target = radialPos(sourcePos, i, connections.length);
+          const existing = useCanvasStore.getState().nodes.map((n) => n.position);
+          const pos = findFreeSlot(existing, target);
           const newId = addVerseNode(conn as unknown as Verse, pos);
 
           addConnectionEdge({
@@ -180,17 +190,17 @@ function CanvasInner() {
     setOpenExpandNodeId(null);
   }, [setOpenExpandNodeId]);
 
+  const handleMove = useCallback(
+    (_: unknown, vp: { x: number; y: number; zoom: number }) => {
+      setViewport(vp);
+    },
+    [setViewport]
+  );
+
   return (
     <div className="w-full h-full">
       {expansionError && (
-        <div
-          className="absolute bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-md text-xs font-mono pointer-events-none"
-          style={{
-            background: "var(--color-surface-raised)",
-            border: "1px solid var(--color-border)",
-            color: "var(--color-text-muted)",
-          }}
-        >
+        <div className="pointer-events-none absolute bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-md border border-border bg-surface-raised px-4 py-2 font-mono text-xs text-text-muted md:bottom-6">
           {expansionError}
         </div>
       )}
@@ -204,6 +214,7 @@ function CanvasInner() {
         onEdgesChange={onEdgesChange}
         onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}
+        onMove={handleMove}
         fitView
         fitViewOptions={{ padding: 0.4, maxZoom: 1 }}
         minZoom={0.1}
@@ -219,6 +230,27 @@ function CanvasInner() {
           color="var(--color-border)"
           style={{ opacity: 0.4 }}
         />
+        {nodes.length > 0 && (
+          <>
+            <Panel position="bottom-left">
+              <CanvasLegend />
+            </Panel>
+            <MiniMap
+              pannable
+              zoomable
+              ariaLabel="Canvas minimap"
+              nodeColor={(n: Node) =>
+                (n.data as { isRoot?: boolean })?.isRoot
+                  ? "var(--color-gold)"
+                  : "var(--color-text-secondary)"
+              }
+              nodeStrokeWidth={0}
+              maskColor="color-mix(in srgb, var(--color-bg) 72%, transparent)"
+              className="hidden rounded-md border border-border sm:block"
+              style={{ background: "var(--color-surface)" }}
+            />
+          </>
+        )}
       </ReactFlow>
     </div>
   );
