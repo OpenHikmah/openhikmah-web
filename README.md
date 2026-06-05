@@ -39,56 +39,6 @@ An AI-powered Quran knowledge graph. Search any verse, drop it on an infinite ca
 
 ---
 
-## Local Development
-
-**Prerequisites:** Node 20+, PostgreSQL 16 with the **pgvector** extension.
-
-```bash
-git clone https://github.com/Nazm-AI/open-hikmah
-cd open-hikmah
-npm install
-cp .env.example .env.local
-# Fill in the values
-npx drizzle-kit migrate          # creates tables; enables the pgvector extension
-
-# One-time data seeds (idempotent, resumable):
-node scripts/seed-quran.mjs       # full Quran corpus → verses
-node scripts/embed-corpus.mjs     # verse embeddings → semantic search (needs GEMINI_API_KEY)
-node scripts/seed-morphology.mjs  # Arabic roots → grounded "By Root" connections
-
-npm run dev
-```
-
-Start a local Postgres instance if you don't have one (the image must include pgvector):
-
-```bash
-docker run -d --name openh-db \
-  -e POSTGRES_DB=open_hikmah \
-  -e POSTGRES_USER=openh \
-  -e POSTGRES_PASSWORD=devpassword \
-  -p 5432:5432 \
-  pgvector/pgvector:pg16
-```
-
-Then set `DATABASE_URL=postgresql://openh:devpassword@localhost:5432/open_hikmah` in `.env.local`.
-
-> **Note:** the app runs without the seeds — search falls back to keyword mode and connections
-> to AI-from-memory generation. Run the seeds to enable semantic search and grounded connections.
-> `seed-morphology.mjs` ships with Al-Fatihah (surah 1); the rest of the corpus is a one-time backfill.
-
----
-
-## Testing
-
-```bash
-npm run test        # watch mode
-npm run test:ci     # single run (used in CI)
-```
-
-All external calls (fetch, Anthropic SDK, database) are mocked — tests run with no network access or API costs.
-
----
-
 ## Contributing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR. The project touches sacred content — theological changes (AI prompts, divine name data, verse framing) have extra requirements detailed in [Theological Standards](CONTRIBUTING.md#theological-standards).
@@ -100,3 +50,9 @@ Report vulnerabilities privately to **security@openhikmah.com**. See [SECURITY.m
 ## License
 
 [MIT](LICENSE)
+
+---
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Nazm-AI/open-hikmah&type=Date)](https://www.star-history.com/#Nazm-AI/open-hikmah&Date)
