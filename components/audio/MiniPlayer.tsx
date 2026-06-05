@@ -2,6 +2,7 @@
 
 import { useAudioStore } from "@/store/audio";
 import { Play, Pause, SkipBack, SkipForward, X, Loader2, Volume2 } from "lucide-react";
+import { IconButton } from "@/components/ui";
 
 export function MiniPlayer() {
   const {
@@ -25,84 +26,49 @@ export function MiniPlayer() {
   const queueLabel = queue.length > 1 ? ` (${queueIndex + 1}/${queue.length})` : "";
 
   return (
-    <div
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2.5 rounded-xl shadow-xl"
-      style={{
-        background: "var(--color-surface-raised)",
-        border: "1px solid var(--color-border)",
-        minWidth: 280,
-      }}
-    >
+    <div className="fixed bottom-4 left-1/2 z-50 flex min-w-[280px] -translate-x-1/2 items-center gap-3 rounded-xl border border-border bg-surface-raised px-4 py-2.5 shadow-floating">
       {/* Icon */}
-      <Volume2
-        className="w-3.5 h-3.5 shrink-0"
-        style={{ color: "var(--color-teal)" }}
-      />
+      <Volume2 className="h-3.5 w-3.5 shrink-0 text-teal" />
 
       {/* Track info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-mono truncate" style={{ color: "var(--color-text-primary)" }}>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-mono text-xs text-text-primary">
           {currentRef}
-          <span style={{ color: "var(--color-text-muted)" }}>{queueLabel}</span>
+          <span className="text-text-muted">{queueLabel}</span>
         </p>
         {currentSurahName && (
-          <p className="text-[10px] truncate" style={{ color: "var(--color-text-muted)" }}>
-            {currentSurahName}
-          </p>
+          <p className="truncate text-[10px] text-text-muted">{currentSurahName}</p>
         )}
       </div>
 
       {/* Controls */}
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex shrink-0 items-center gap-1">
         {hasPrev && (
-          <button
-            onClick={prev}
-            aria-label="Previous verse"
-            className="w-6 h-6 flex items-center justify-center rounded transition-colors cursor-pointer hover:text-[var(--color-teal)]"
-            style={{ color: "var(--color-text-muted)" }}
-          >
-            <SkipBack className="w-3.5 h-3.5" />
-          </button>
+          <IconButton tone="teal" size="xs" onClick={prev} aria-label="Previous verse" className="border-transparent">
+            <SkipBack />
+          </IconButton>
         )}
 
-        <button
+        <IconButton
+          tone="teal"
+          size="sm"
           onClick={isPlaying ? pause : resume}
           aria-label={isPlaying ? "Pause" : "Play"}
           disabled={isLoading}
-          className="w-7 h-7 flex items-center justify-center rounded border transition-colors cursor-pointer disabled:opacity-50"
-          style={{
-            borderColor: "var(--color-teal)",
-            color: "var(--color-teal)",
-          }}
+          className="border-teal text-teal"
         >
-          {isLoading ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : isPlaying ? (
-            <Pause className="w-3.5 h-3.5" />
-          ) : (
-            <Play className="w-3.5 h-3.5" />
-          )}
-        </button>
+          {isLoading ? <Loader2 className="animate-spin" /> : isPlaying ? <Pause /> : <Play />}
+        </IconButton>
 
         {hasNext && (
-          <button
-            onClick={next}
-            aria-label="Next verse"
-            className="w-6 h-6 flex items-center justify-center rounded transition-colors cursor-pointer hover:text-[var(--color-teal)]"
-            style={{ color: "var(--color-text-muted)" }}
-          >
-            <SkipForward className="w-3.5 h-3.5" />
-          </button>
+          <IconButton tone="teal" size="xs" onClick={next} aria-label="Next verse" className="border-transparent">
+            <SkipForward />
+          </IconButton>
         )}
 
-        <button
-          onClick={stop}
-          aria-label="Stop playback"
-          className="w-6 h-6 flex items-center justify-center rounded transition-colors cursor-pointer hover:text-red-400 ml-1"
-          style={{ color: "var(--color-text-muted)" }}
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
+        <IconButton tone="danger" size="xs" onClick={stop} aria-label="Stop playback" className="ml-1 border-transparent">
+          <X />
+        </IconButton>
       </div>
     </div>
   );

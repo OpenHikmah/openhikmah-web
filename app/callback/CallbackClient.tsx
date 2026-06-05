@@ -86,21 +86,15 @@ export function CallbackClient({ code, state, error }: Props) {
 
   if (failReason) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: "var(--color-bg)" }}
-      >
-        <div className="flex flex-col items-center gap-4 max-w-sm text-center px-4">
-          <p className="text-sm font-mono" style={{ color: "var(--color-text-muted)" }}>
-            Sign-in failed
-          </p>
-          <p className="text-xs font-mono px-3 py-2 rounded" style={{ background: "var(--color-surface)", color: "var(--color-text-muted)", border: "1px solid var(--color-border)" }}>
+      <div className="flex min-h-screen items-center justify-center bg-bg">
+        <div className="flex max-w-sm flex-col items-center gap-4 px-4 text-center">
+          <p className="font-mono text-sm text-text-muted">Sign-in failed</p>
+          <p className="rounded border border-border bg-surface px-3 py-2 font-mono text-xs text-text-muted">
             {failReason}
           </p>
           <button
             onClick={() => router.replace("/")}
-            className="text-xs underline"
-            style={{ color: "var(--color-teal)" }}
+            className="text-xs text-teal underline"
           >
             Back to home
           </button>
@@ -110,21 +104,10 @@ export function CallbackClient({ code, state, error }: Props) {
   }
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center"
-      style={{ background: "var(--color-bg)" }}
-    >
+    <div className="flex min-h-screen items-center justify-center bg-bg">
       <div className="flex items-center gap-2.5">
-        <Loader2
-          className="w-4 h-4 animate-spin"
-          style={{ color: "var(--color-teal)" }}
-        />
-        <p
-          className="text-sm font-mono"
-          style={{ color: "var(--color-text-muted)" }}
-        >
-          Signing in…
-        </p>
+        <Loader2 className="h-4 w-4 animate-spin text-teal" />
+        <p className="font-mono text-sm text-text-muted">Signing in…</p>
       </div>
     </div>
   );
