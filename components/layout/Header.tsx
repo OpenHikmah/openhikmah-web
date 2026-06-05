@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, Search, RotateCcw, LogIn, LogOut, Sparkles, Trophy, Share2, ListMusic, Heart, Flame, Save, FolderOpen, Menu } from "lucide-react";
+import { Search, RotateCcw, LogIn, LogOut, Sparkles, Trophy, Share2, ListMusic, Heart, Flame, Save, FolderOpen, Menu } from "lucide-react";
 import { useCanvasStore, serializeCanvas } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { Button, IconButton, Tooltip, buttonVariants, iconButtonVariants } from "@/components/ui";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 import { AccountMenu } from "./AccountMenu";
+import { Wordmark } from "./Wordmark";
 
 interface HeaderProps {
   onSearchOpen: () => void;
@@ -206,12 +207,8 @@ export function Header({ onSearchOpen }: HeaderProps) {
 
   return (
     <>
-      <header className="flex items-center justify-between px-4 h-14 shrink-0 bg-surface border-b border-border">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <BookOpen className="w-4 h-4 text-gold" />
-          <span className="text-sm font-medium text-text-primary">Open Hikmah</span>
-        </Link>
+      <header className="flex items-center justify-between px-6 md:px-12 h-[60px] shrink-0 bg-bg border-b border-border">
+        <Wordmark />
 
         {/* Right controls — desktop only (md+). Three groups separated by dividers */}
         <div className="hidden md:flex items-center gap-1.5">
