@@ -58,6 +58,17 @@ COPY --from=builder --chown=nextjs:nodejs /app/lib/db/migrations ./lib/db/migrat
 COPY --from=deps /app/node_modules/postgres ./node_modules/postgres
 COPY --from=deps /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
 
+# One-time data-backfill scripts (run manually from a container shell; all
+# idempotent + resumable). seed-quran pulls the corpus from alquran.cloud;
+# embed-corpus needs GEMINI_API_KEY + the verses table seeded; seed-morphology
+# reads data/morphology/*.jsonl. The Gemini SDK is bundled into the app chunks but
+# a standalone .mjs needs it resolvable in node_modules (same reason as postgres).
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/seed-quran.mjs ./scripts/seed-quran.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/embed-corpus.mjs ./scripts/embed-corpus.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/seed-morphology.mjs ./scripts/seed-morphology.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/data/morphology ./data/morphology
+COPY --from=deps /app/node_modules/@google/generative-ai ./node_modules/@google/generative-ai
+
 USER nextjs
 EXPOSE 3000
 # Run pending migrations (idempotent) then start the server.
