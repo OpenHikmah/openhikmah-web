@@ -3,6 +3,7 @@
 import { useAuthStore } from "@/store/auth";
 import { Check, X, UserMinus, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { Card, IconButton, Tooltip } from "@/components/ui";
 
 interface FriendEntry {
   id: number;
@@ -60,7 +61,7 @@ export function FriendList({ friends, onUpdate }: Props) {
 
   if (empty) {
     return (
-      <p className="text-sm py-4" style={{ color: "var(--color-text-muted)" }}>
+      <p className="py-4 text-sm text-text-muted">
         No friends yet. Add someone by username above.
       </p>
     );
@@ -70,87 +71,75 @@ export function FriendList({ friends, onUpdate }: Props) {
     <div className="space-y-4">
       {pending.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs font-mono mb-2" style={{ color: "var(--color-text-muted)" }}>
-            Pending requests
-          </p>
+          <p className="mb-2 font-mono text-xs text-text-muted">Pending requests</p>
           {pending.map((f) => (
-            <div
+            <Card
               key={f.id}
-              className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border"
-              style={{ borderColor: "var(--color-border)", background: "var(--color-surface-raised)" }}
+              variant="raised"
+              className="flex items-center justify-between gap-3 px-3 py-2"
             >
               <div className="flex items-center gap-2">
-                <span className="text-sm" style={{ color: "var(--color-text-primary)" }}>
-                  {f.friend?.username ?? "—"}
-                </span>
-                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                <span className="text-sm text-text-primary">{f.friend?.username ?? "—"}</span>
+                <span className="text-xs text-text-muted">
                   {f.direction === "sent" ? "sent" : "received"}
                 </span>
               </div>
               {f.direction === "received" && (
                 <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => patch(f.id, "accept")}
-                    disabled={busy === f.id}
-                    className="w-6 h-6 rounded border flex items-center justify-center transition-colors cursor-pointer hover:border-[var(--color-teal)] hover:text-[var(--color-teal)] disabled:opacity-40"
-                    style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
-                    title="Accept"
-                  >
-                    {busy === f.id ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Check className="w-3 h-3" />
-                    )}
-                  </button>
-                  <button
-                    onClick={() => patch(f.id, "decline")}
-                    disabled={busy === f.id}
-                    className="w-6 h-6 rounded border flex items-center justify-center transition-colors cursor-pointer hover:border-red-700 hover:text-red-400 disabled:opacity-40"
-                    style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
-                    title="Decline"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
+                  <Tooltip label="Accept">
+                    <IconButton
+                      tone="teal"
+                      size="xs"
+                      onClick={() => patch(f.id, "accept")}
+                      disabled={busy === f.id}
+                      aria-label="Accept request"
+                    >
+                      {busy === f.id ? <Loader2 className="animate-spin" /> : <Check />}
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip label="Decline">
+                    <IconButton
+                      tone="danger"
+                      size="xs"
+                      onClick={() => patch(f.id, "decline")}
+                      disabled={busy === f.id}
+                      aria-label="Decline request"
+                    >
+                      <X />
+                    </IconButton>
+                  </Tooltip>
                 </div>
               )}
-            </div>
+            </Card>
           ))}
         </div>
       )}
 
       {accepted.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs font-mono mb-2" style={{ color: "var(--color-text-muted)" }}>
-            Friends
-          </p>
+          <p className="mb-2 font-mono text-xs text-text-muted">Friends</p>
           {accepted.map((f) => (
-            <div
+            <Card
               key={f.id}
-              className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border"
-              style={{ borderColor: "var(--color-border)", background: "var(--color-surface-raised)" }}
+              variant="raised"
+              className="flex items-center justify-between gap-3 px-3 py-2"
             >
               <div className="flex items-center gap-2">
-                <span className="text-sm" style={{ color: "var(--color-text-primary)" }}>
-                  {f.friend?.username ?? "—"}
-                </span>
-                <span className="text-xs font-mono" style={{ color: "var(--color-gold)" }}>
-                  🔥 {f.friend?.streak ?? 0}
-                </span>
+                <span className="text-sm text-text-primary">{f.friend?.username ?? "—"}</span>
+                <span className="font-mono text-xs text-gold">🔥 {f.friend?.streak ?? 0}</span>
               </div>
-              <button
-                onClick={() => remove(f.id)}
-                disabled={busy === f.id}
-                className="w-6 h-6 rounded border flex items-center justify-center transition-colors cursor-pointer hover:border-red-700 hover:text-red-400 disabled:opacity-40"
-                style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
-                title="Remove friend"
-              >
-                {busy === f.id ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <UserMinus className="w-3 h-3" />
-                )}
-              </button>
-            </div>
+              <Tooltip label="Remove friend">
+                <IconButton
+                  tone="danger"
+                  size="xs"
+                  onClick={() => remove(f.id)}
+                  disabled={busy === f.id}
+                  aria-label="Remove friend"
+                >
+                  {busy === f.id ? <Loader2 className="animate-spin" /> : <UserMinus />}
+                </IconButton>
+              </Tooltip>
+            </Card>
           ))}
         </div>
       )}
