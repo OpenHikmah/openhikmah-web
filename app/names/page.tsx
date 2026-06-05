@@ -11,19 +11,19 @@ const CATEGORY_ORDER: NameCategory[] = ["dhat", "sifat", "af'al"];
 
 const CATEGORY_COLORS: Record<NameCategory, { border: string; badge: string; dot: string }> = {
   dhat: {
-    border: "border-[var(--color-gold)]",
-    badge: "bg-[color-mix(in_srgb,var(--color-gold)_12%,transparent)] text-[var(--color-gold)]",
-    dot: "bg-[var(--color-gold)]",
+    border: "border-gold",
+    badge: "bg-gold/[0.12] text-gold",
+    dot: "bg-gold",
   },
   sifat: {
-    border: "border-[var(--color-teal)]",
-    badge: "bg-[color-mix(in_srgb,var(--color-teal)_12%,transparent)] text-[var(--color-teal)]",
-    dot: "bg-[var(--color-teal)]",
+    border: "border-teal",
+    badge: "bg-teal/[0.12] text-teal",
+    dot: "bg-teal",
   },
   "af'al": {
-    border: "border-[#7c6af7]",
-    badge: "bg-[color-mix(in_srgb,#7c6af7_12%,transparent)] text-[#a89cf7]",
-    dot: "bg-[#7c6af7]",
+    border: "border-accent",
+    badge: "bg-accent/[0.12] text-accent-soft",
+    dot: "bg-accent",
   },
 };
 

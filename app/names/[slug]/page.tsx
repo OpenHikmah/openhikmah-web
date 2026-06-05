@@ -23,15 +23,15 @@ export async function generateMetadata({ params }: Props) {
 const CATEGORY_STYLES: Record<NameCategory, { accent: string; badge: string }> = {
   dhat: {
     accent: "var(--color-gold)",
-    badge: "bg-[color-mix(in_srgb,var(--color-gold)_15%,transparent)] text-[var(--color-gold)] border border-[color-mix(in_srgb,var(--color-gold)_30%,transparent)]",
+    badge: "border border-gold/30 bg-gold/15 text-gold",
   },
   sifat: {
     accent: "var(--color-teal)",
-    badge: "bg-[color-mix(in_srgb,var(--color-teal)_15%,transparent)] text-[var(--color-teal)] border border-[color-mix(in_srgb,var(--color-teal)_30%,transparent)]",
+    badge: "border border-teal/30 bg-teal/15 text-teal",
   },
   "af'al": {
-    accent: "#7c6af7",
-    badge: "bg-[color-mix(in_srgb,#7c6af7_15%,transparent)] text-[#a89cf7] border border-[color-mix(in_srgb,#7c6af7_30%,transparent)]",
+    accent: "var(--color-accent)",
+    badge: "border border-accent/30 bg-accent/15 text-accent-soft",
   },
 };
 
@@ -47,89 +47,46 @@ export default async function NameDetailPage({ params }: Props) {
   const nextName = DIVINE_NAMES.find((n) => n.id === name.id + 1);
 
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: "var(--color-bg)", color: "var(--color-text-primary)" }}
-    >
+    <div className="min-h-screen bg-bg text-text-primary">
       {/* Header */}
-      <header
-        className="sticky top-0 z-20 flex items-center justify-between px-6 h-12"
-        style={{
-          background: "var(--color-surface)",
-          borderBottom: "1px solid var(--color-border)",
-        }}
-      >
+      <header className="sticky top-0 z-20 flex h-12 items-center justify-between border-b border-border bg-surface px-6">
         <div className="flex items-center gap-3">
-          <BookOpen className="w-4 h-4" style={{ color: "var(--color-gold)" }} />
+          <BookOpen className="h-4 w-4 text-gold" />
           <span className="text-sm font-medium">Open Hikmah</span>
         </div>
         <Link
           href="/names"
-          className="flex items-center gap-1.5 text-xs transition-colors hover:opacity-80"
-          style={{ color: "var(--color-text-secondary)" }}
+          className="flex items-center gap-1.5 text-xs text-text-secondary transition-colors hover:text-text-primary"
         >
-          <ArrowLeft className="w-3.5 h-3.5" />
+          <ArrowLeft className="h-3.5 w-3.5" />
           <span>All Names</span>
         </Link>
       </header>
 
       {/* Name hero */}
-      <div
-        className="max-w-3xl mx-auto px-6 pt-14 pb-12 text-center"
-        style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-      >
-        <div
-          className="inline-block text-xs font-mono mb-6 px-2 py-1 rounded"
-          style={{
-            background: "var(--color-surface-raised)",
-            color: "var(--color-text-muted)",
-            border: "1px solid var(--color-border)",
-          }}
-        >
+      <div className="mx-auto max-w-3xl border-b border-border-subtle px-6 pt-14 pb-12 text-center">
+        <div className="mb-6 inline-block rounded border border-border bg-surface-raised px-2 py-1 font-mono text-xs text-text-muted">
           #{name.id} of 99
         </div>
 
-        <h1
-          className="font-arabic text-7xl mb-3"
-          style={{ color: styles.accent }}
-        >
+        <h1 className="mb-3 font-arabic text-7xl" style={{ color: styles.accent }}>
           {name.arabic}
         </h1>
 
-        <p
-          className="text-xl font-mono mb-2"
-          style={{ color: "var(--color-text-primary)" }}
-        >
-          {name.transliteration}
-        </p>
+        <p className="mb-2 font-mono text-xl text-text-primary">{name.transliteration}</p>
 
-        <p
-          className="text-lg mb-6"
-          style={{ color: "var(--color-text-secondary)" }}
-        >
-          {name.meaning}
-        </p>
+        <p className="mb-6 text-lg text-text-secondary">{name.meaning}</p>
 
-        <div className="flex items-center justify-center gap-3 flex-wrap mb-6">
-          <span className={`text-xs px-2.5 py-1 rounded font-medium ${styles.badge}`}>
+        <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
+          <span className={`rounded px-2.5 py-1 text-xs font-medium ${styles.badge}`}>
             {categoryLabel.en}
           </span>
-          <span
-            className="text-xs px-2.5 py-1 rounded font-mono"
-            style={{
-              background: "var(--color-surface-raised)",
-              color: "var(--color-text-secondary)",
-              border: "1px solid var(--color-border)",
-            }}
-          >
+          <span className="rounded border border-border bg-surface-raised px-2.5 py-1 font-mono text-xs text-text-secondary">
             Root: {name.root}
           </span>
         </div>
 
-        <p
-          className="text-sm leading-relaxed max-w-xl mx-auto"
-          style={{ color: "var(--color-text-secondary)" }}
-        >
+        <p className="mx-auto max-w-xl text-sm leading-relaxed text-text-secondary">
           {name.description}
         </p>
       </div>
@@ -144,10 +101,7 @@ export default async function NameDetailPage({ params }: Props) {
 
         {/* Verse Feed */}
         <div>
-          <h2
-            className="text-xs font-mono uppercase tracking-widest mb-6"
-            style={{ color: "var(--color-text-muted)" }}
-          >
+          <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-text-muted">
             Verses of this Name
           </h2>
           <NameVerses slug={slug} accent={styles.accent} />
@@ -155,20 +109,14 @@ export default async function NameDetailPage({ params }: Props) {
       </div>
 
       {/* Name navigation */}
-      <div
-        className="max-w-3xl mx-auto px-6 py-6 flex justify-between items-center"
-        style={{ borderTop: "1px solid var(--color-border-subtle)" }}
-      >
+      <div className="mx-auto flex max-w-3xl items-center justify-between border-t border-border-subtle px-6 py-6">
         {prevName ? (
           <Link
             href={`/names/${prevName.slug}`}
-            className="flex items-center gap-2 text-xs hover:opacity-80 transition-opacity group"
-            style={{ color: "var(--color-text-secondary)" }}
+            className="group flex items-center gap-2 text-xs text-text-secondary transition-opacity hover:opacity-80"
           >
-            <ArrowLeft className="w-3 h-3" />
-            <span className="font-arabic text-base" style={{ color: "var(--color-text-muted)" }}>
-              {prevName.arabic}
-            </span>
+            <ArrowLeft className="h-3 w-3" />
+            <span className="font-arabic text-base text-text-muted">{prevName.arabic}</span>
             <span>{prevName.transliteration}</span>
           </Link>
         ) : (
@@ -177,8 +125,7 @@ export default async function NameDetailPage({ params }: Props) {
 
         <Link
           href="/names"
-          className="text-xs hover:opacity-80 transition-opacity"
-          style={{ color: "var(--color-text-muted)" }}
+          className="text-xs text-text-muted transition-opacity hover:opacity-80"
         >
           All 99
         </Link>
@@ -186,14 +133,11 @@ export default async function NameDetailPage({ params }: Props) {
         {nextName ? (
           <Link
             href={`/names/${nextName.slug}`}
-            className="flex items-center gap-2 text-xs hover:opacity-80 transition-opacity group"
-            style={{ color: "var(--color-text-secondary)" }}
+            className="group flex items-center gap-2 text-xs text-text-secondary transition-opacity hover:opacity-80"
           >
             <span>{nextName.transliteration}</span>
-            <span className="font-arabic text-base" style={{ color: "var(--color-text-muted)" }}>
-              {nextName.arabic}
-            </span>
-            <ArrowRight className="w-3 h-3" />
+            <span className="font-arabic text-base text-text-muted">{nextName.arabic}</span>
+            <ArrowRight className="h-3 w-3" />
           </Link>
         ) : (
           <span />
