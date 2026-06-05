@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Search, X, Loader2, BookOpen, Network } from "lucide-react";
 import { useCanvasStore } from "@/store/canvas";
+import { findFreeSlot, viewportCenter, NODE_WIDTH, NODE_HEIGHT } from "@/lib/canvas-layout";
 import type { Verse, SearchResult } from "@/types/quran";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui";
@@ -37,6 +38,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const setPendingAutoExpand = useCanvasStore((s) => s.setPendingAutoExpand);
   const hasNode = useCanvasStore((s) => s.hasNode);
   const nodes = useCanvasStore((s) => s.nodes);
+  const viewport = useCanvasStore((s) => s.viewport);
 
   // Focus input when dialog opens — no setState, so this is safe in an effect
   useEffect(() => {
@@ -102,16 +104,33 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const mapConnections = useCallback(
     (verse: Verse) => {
       const isFirst = nodes.length === 0;
-      const nodeId = addVerseNode(
-        { ...verse, isRoot: isFirst },
-        isFirst ? { x: 0, y: 0 } : undefined
-      );
+      // First node anchors at the origin; later searches drop into the nearest
+      // empty slot beside the *visible* part of the graph, never overlapping.
+      let position: { x: number; y: number } | undefined;
+      if (isFirst) {
+        position = { x: 0, y: 0 };
+      } else {
+        const anchorCenter = viewportCenter(
+          viewport,
+          window.innerWidth,
+          window.innerHeight
+        );
+        const anchor = {
+          x: anchorCenter.x - NODE_WIDTH / 2,
+          y: anchorCenter.y - NODE_HEIGHT / 2,
+        };
+        position = findFreeSlot(
+          nodes.map((n) => n.position),
+          anchor
+        );
+      }
+      const nodeId = addVerseNode({ ...verse, isRoot: isFirst }, position);
       if (isFirst) {
         setPendingAutoExpand(nodeId);
       }
       onClose();
     },
-    [nodes.length, addVerseNode, setPendingAutoExpand, onClose]
+    [nodes, viewport, addVerseNode, setPendingAutoExpand, onClose]
   );
 
   const loadSeedVerse = useCallback(

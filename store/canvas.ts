@@ -10,6 +10,7 @@ import type {
 } from "@/types/quran";
 import type { Node, Edge, NodeChange, EdgeChange } from "@xyflow/react";
 import { applyNodeChanges, applyEdgeChanges } from "@xyflow/react";
+import { findFreeSlot } from "@/lib/canvas-layout";
 
 // ─── Persistence helpers ───────────────────────────────────────────────────────
 
@@ -73,6 +74,12 @@ export function deserializeCanvas(saved: SavedCanvas): { nodes: Node[]; edges: E
   return { nodes, edges };
 }
 
+interface CanvasViewport {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
 interface CanvasStore {
   nodes: Node[];
   edges: Edge[];
@@ -82,11 +89,13 @@ interface CanvasStore {
   sidebarContent: SidebarContent | null;
   pendingExpand: PendingExpand | null;
   pendingAutoExpand: string | null;
+  viewport: CanvasViewport;
 
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
+  setViewport: (viewport: CanvasViewport) => void;
 
   addVerseNode: (verse: Verse, position?: { x: number; y: number }) => string;
   addConnectionEdge: (edge: CanvasEdge) => void;
@@ -115,6 +124,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   sidebarContent: null,
   pendingExpand: null,
   pendingAutoExpand: null,
+  viewport: { x: 0, y: 0, zoom: 1 },
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
@@ -125,12 +135,15 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   onEdgesChange: (changes) =>
     set((s) => ({ edges: applyEdgeChanges(changes, s.edges) })),
 
+  setViewport: (viewport) => set({ viewport }),
+
   addVerseNode: (verse, position) => {
     const id = nextId();
-    const pos = position ?? {
-      x: (Math.random() - 0.5) * 700,
-      y: (Math.random() - 0.5) * 500,
-    };
+    // When no explicit position is given, drop the node into the nearest empty
+    // slot around the origin instead of a random point, so it never lands on an
+    // existing node. Callers with a meaningful anchor (search, expansion) pass one.
+    const pos =
+      position ?? findFreeSlot(get().nodes.map((n) => n.position), { x: 0, y: 0 });
     set((s) => ({
       nodes: [
         ...s.nodes,

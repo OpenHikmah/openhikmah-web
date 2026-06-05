@@ -15,6 +15,7 @@ import { HikmahEdge } from "./HikmahEdge";
 import { useCanvasStore } from "@/store/canvas";
 import { useActivityTracker } from "@/hooks/useActivityTracker";
 import { useCanvasPersistence } from "@/hooks/useCanvasPersistence";
+import { findFreeSlot } from "@/lib/canvas-layout";
 import type { ConnectionResult, Verse } from "@/types/quran";
 
 const nodeTypes = { verse: VerseNode };
@@ -64,6 +65,7 @@ function CanvasInner() {
   const setPendingAutoExpand = useCanvasStore((s) => s.setPendingAutoExpand);
   const setOpenExpandNodeId = useCanvasStore((s) => s.setOpenExpandNodeId);
   const setSidebarContent = useCanvasStore((s) => s.setSidebarContent);
+  const setViewport = useCanvasStore((s) => s.setViewport);
   const getNodeById = useCanvasStore((s) => s.getNodeById);
   const hasNode = useCanvasStore((s) => s.hasNode);
 
@@ -98,7 +100,11 @@ function CanvasInner() {
           const conn = connections[i];
           if (hasNode(conn.ref)) continue;
 
-          const pos = radialPos(sourcePos, i, connections.length);
+          // Fan out radially, then nudge off any collision with the live graph
+          // (including siblings added moments ago in this same expansion).
+          const target = radialPos(sourcePos, i, connections.length);
+          const existing = useCanvasStore.getState().nodes.map((n) => n.position);
+          const pos = findFreeSlot(existing, target);
           const newId = addVerseNode(conn as unknown as Verse, pos);
 
           addConnectionEdge({
@@ -180,6 +186,13 @@ function CanvasInner() {
     setOpenExpandNodeId(null);
   }, [setOpenExpandNodeId]);
 
+  const handleMove = useCallback(
+    (_: unknown, vp: { x: number; y: number; zoom: number }) => {
+      setViewport(vp);
+    },
+    [setViewport]
+  );
+
   return (
     <div className="w-full h-full">
       {expansionError && (
@@ -197,6 +210,7 @@ function CanvasInner() {
         onEdgesChange={onEdgesChange}
         onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}
+        onMove={handleMove}
         fitView
         fitViewOptions={{ padding: 0.4, maxZoom: 1 }}
         minZoom={0.1}

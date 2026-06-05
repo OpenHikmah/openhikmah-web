@@ -8,6 +8,7 @@ import { SearchDialog } from "@/components/search/SearchDialog";
 import { EmptyState } from "@/components/canvas/EmptyState";
 import { ContextSidebar } from "@/components/layout/ContextSidebar";
 import { useCanvasStore } from "@/store/canvas";
+import { findFreeSlot } from "@/lib/canvas-layout";
 import type { Verse } from "@/types/quran";
 
 const HikmahCanvas = dynamic(
@@ -42,7 +43,11 @@ function VerseLoader() {
       .then((r) => (r.ok ? r.json() : null))
       .then((verse: Verse | null) => {
         if (!verse) return;
-        const nodeId = addVerseNode({ ...verse, isRoot: true }, { x: 0, y: 0 });
+        // Usually a fresh canvas (origin), but if one was restored from storage,
+        // drop the incoming verse into free space instead of onto an existing node.
+        const existing = useCanvasStore.getState().nodes.map((n) => n.position);
+        const pos = existing.length === 0 ? { x: 0, y: 0 } : findFreeSlot(existing, { x: 0, y: 0 });
+        const nodeId = addVerseNode({ ...verse, isRoot: true }, pos);
         setPendingAutoExpand(nodeId);
         const url = new URL(window.location.href);
         url.searchParams.delete("verse");
