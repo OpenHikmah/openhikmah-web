@@ -5,13 +5,17 @@ import {
   ReactFlow,
   Background,
   BackgroundVariant,
+  MiniMap,
+  Panel,
   useReactFlow,
   ReactFlowProvider,
   type Edge,
+  type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { VerseNode } from "./VerseNode";
 import { HikmahEdge } from "./HikmahEdge";
+import { CanvasLegend } from "./CanvasLegend";
 import { useCanvasStore } from "@/store/canvas";
 import { useActivityTracker } from "@/hooks/useActivityTracker";
 import { useCanvasPersistence } from "@/hooks/useCanvasPersistence";
@@ -226,6 +230,27 @@ function CanvasInner() {
           color="var(--color-border)"
           style={{ opacity: 0.4 }}
         />
+        {nodes.length > 0 && (
+          <>
+            <Panel position="bottom-left">
+              <CanvasLegend />
+            </Panel>
+            <MiniMap
+              pannable
+              zoomable
+              ariaLabel="Canvas minimap"
+              nodeColor={(n: Node) =>
+                (n.data as { isRoot?: boolean })?.isRoot
+                  ? "var(--color-gold)"
+                  : "var(--color-text-secondary)"
+              }
+              nodeStrokeWidth={0}
+              maskColor="color-mix(in srgb, var(--color-bg) 72%, transparent)"
+              className="hidden rounded-md border border-border sm:block"
+              style={{ background: "var(--color-surface)" }}
+            />
+          </>
+        )}
       </ReactFlow>
     </div>
   );
