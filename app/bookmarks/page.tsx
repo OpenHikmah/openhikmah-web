@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BookOpen, Trash2, ArrowLeft, ExternalLink } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
+import { Card, IconButton, Tooltip, iconButtonVariants } from "@/components/ui";
 import type { Verse } from "@/types/quran";
 
 // Module-level cache — survives re-renders without touching refs during render
@@ -42,47 +43,37 @@ export default function BookmarksPage() {
   }, [bookmarks.join(",")]);
 
   return (
-    <div
-      className="min-h-screen flex flex-col"
-      style={{ background: "var(--color-bg)", color: "var(--color-text-primary)" }}
-    >
+    <div className="flex min-h-screen flex-col bg-bg text-text-primary">
       {/* Header */}
-      <header
-        className="flex items-center gap-3 px-6 h-12 shrink-0 border-b"
-        style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
-      >
-        <Link
-          href="/"
-          className="w-7 h-7 rounded border flex items-center justify-center transition-colors"
-          style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-        </Link>
-        <BookOpen className="w-4 h-4" style={{ color: "var(--color-gold)" }} />
+      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border bg-surface px-6">
+        <Tooltip label="Back home">
+          <Link
+            href="/"
+            aria-label="Back home"
+            className={iconButtonVariants({ size: "xs" })}
+          >
+            <ArrowLeft />
+          </Link>
+        </Tooltip>
+        <BookOpen className="h-4 w-4 text-gold" />
         <span className="text-sm font-medium">Bookmarks</span>
         {bookmarks.length > 0 && (
-          <span
-            className="text-xs font-mono px-1.5 py-0.5 rounded"
-            style={{ background: "var(--color-surface-overlay)", color: "var(--color-text-muted)" }}
-          >
+          <span className="rounded bg-surface-overlay px-1.5 py-0.5 font-mono text-xs text-text-muted">
             {bookmarks.length}
           </span>
         )}
       </header>
 
-      <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
+      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
         {bookmarks.length === 0 ? (
-          <div className="text-center py-20 space-y-3">
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              No bookmarks yet.
-            </p>
-            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          <div className="space-y-3 py-20 text-center">
+            <p className="text-sm text-text-muted">No bookmarks yet.</p>
+            <p className="text-xs text-text-muted">
               Tap the heart icon on any verse in the canvas to save it.
             </p>
             <Link
               href="/"
-              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border transition-colors mt-2"
-              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+              className="mt-2 inline-flex items-center gap-1.5 rounded border border-border px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-gold-muted hover:text-gold"
             >
               Open Canvas
             </Link>
@@ -90,15 +81,11 @@ export default function BookmarksPage() {
         ) : loading ? (
           <div className="space-y-3">
             {bookmarks.map((ref) => (
-              <div
-                key={ref}
-                className="rounded-lg border p-4 animate-pulse"
-                style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
-              >
-                <div className="h-3 w-16 rounded mb-3" style={{ background: "var(--color-surface-overlay)" }} />
-                <div className="h-4 w-full rounded mb-2" style={{ background: "var(--color-surface-overlay)" }} />
-                <div className="h-4 w-3/4 rounded" style={{ background: "var(--color-surface-overlay)" }} />
-              </div>
+              <Card key={ref} className="animate-pulse p-4">
+                <div className="mb-3 h-3 w-16 rounded bg-surface-overlay" />
+                <div className="mb-2 h-4 w-full rounded bg-surface-overlay" />
+                <div className="h-4 w-3/4 rounded bg-surface-overlay" />
+              </Card>
             ))}
           </div>
         ) : (
@@ -106,67 +93,48 @@ export default function BookmarksPage() {
             {bookmarks.map((ref) => {
               const verse = verses.get(ref);
               return (
-                <div
-                  key={ref}
-                  className="rounded-lg border p-4 space-y-3"
-                  style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }}
-                >
+                <Card key={ref} className="space-y-3 p-4">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span
-                        className="text-xs font-mono px-1.5 py-0.5 rounded border"
-                        style={{
-                          color: "var(--color-gold)",
-                          borderColor: "var(--color-gold)",
-                          background: "rgba(201,168,76,0.08)",
-                        }}
-                      >
+                      <span className="rounded border border-gold bg-gold/[0.08] px-1.5 py-0.5 font-mono text-xs text-gold">
                         {ref}
                       </span>
-                      {verse && (
-                        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                          {verse.surahName}
-                        </span>
-                      )}
+                      {verse && <span className="text-xs text-text-muted">{verse.surahName}</span>}
                     </div>
                     <div className="flex items-center gap-1">
-                      <Link
-                        href={`/?verse=${ref}`}
-                        title="Open in canvas"
-                        className="w-6 h-6 rounded flex items-center justify-center transition-colors hover:text-[var(--color-teal)]"
-                        style={{ color: "var(--color-text-muted)" }}
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </Link>
-                      <button
-                        onClick={() => toggleBookmark(ref)}
-                        title="Remove bookmark"
-                        className="w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer hover:text-red-400"
-                        style={{ color: "var(--color-text-muted)" }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <Tooltip label="Open in canvas">
+                        <Link
+                          href={`/?verse=${ref}`}
+                          aria-label="Open in canvas"
+                          className={iconButtonVariants({ tone: "teal", size: "xs" })}
+                        >
+                          <ExternalLink />
+                        </Link>
+                      </Tooltip>
+                      <Tooltip label="Remove bookmark">
+                        <IconButton
+                          tone="danger"
+                          size="xs"
+                          onClick={() => toggleBookmark(ref)}
+                          aria-label="Remove bookmark"
+                        >
+                          <Trash2 />
+                        </IconButton>
+                      </Tooltip>
                     </div>
                   </div>
 
                   {verse ? (
                     <>
-                      <p
-                        className="font-arabic text-right text-base leading-loose"
-                        style={{ color: "var(--color-text-primary)" }}
-                      >
+                      <p className="font-arabic text-right text-base leading-loose text-text-primary">
                         {verse.arabicText}
                       </p>
-                      <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
-                        {verse.translation}
-                      </p>
+                      <p className="text-sm leading-relaxed text-text-secondary">{verse.translation}</p>
                     </>
                   ) : (
-                    <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                      Could not load verse text.
-                    </p>
+                    <p className="text-xs text-text-muted">Could not load verse text.</p>
                   )}
-                </div>
+                </Card>
               );
             })}
           </div>
