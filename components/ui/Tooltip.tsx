@@ -25,7 +25,7 @@ export function Tooltip({
         <RadixTooltip.Content
           side={side}
           sideOffset={6}
-          className="z-50 select-none rounded-md border border-border bg-surface-overlay px-2.5 py-1.5 text-xs text-text-primary shadow-[0_2px_8px_rgba(0,0,0,0.35)] data-[state=delayed-open]:animate-[fadeIn_120ms_ease-out]"
+          className="z-50 select-none rounded-md border border-border bg-surface-overlay px-2.5 py-1.5 text-xs text-text-primary shadow-sm data-[state=delayed-open]:animate-[fadeIn_120ms_ease-out]"
         >
           {label}
           <RadixTooltip.Arrow className="fill-[var(--color-surface-overlay)]" />
