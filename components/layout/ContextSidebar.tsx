@@ -7,6 +7,7 @@ import { useAuthStore } from "@/store/auth";
 import { useState, useEffect } from "react";
 import type { EdgeKind } from "@/types/quran";
 import { Card } from "@/components/ui";
+import { InteractiveArabic } from "@/components/morphology/InteractiveArabic";
 
 function TafsirSection({ surah, ayah }: { surah: number; ayah: number }) {
   const [open, setOpen] = useState(false);
@@ -217,9 +218,7 @@ export function ContextSidebar() {
                   </span>
                 </div>
 
-                <p className="font-arabic text-right text-lg leading-loose text-text-primary">
-                  {sidebarContent.verse.arabicText}
-                </p>
+                <InteractiveArabic key={sidebarContent.verse.ref} verse={sidebarContent.verse} />
 
                 <p className="text-sm leading-relaxed text-text-secondary">
                   {sidebarContent.verse.translation}

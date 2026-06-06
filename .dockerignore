@@ -10,5 +10,9 @@ __tests__
 scripts
 !scripts/migrate.mjs
 !scripts/ensure-tables.mjs
+# One-time data backfills, shipped so they can be run from a container shell.
+!scripts/seed-quran.mjs
+!scripts/embed-corpus.mjs
+!scripts/seed-morphology.mjs
 hosting.md
 plan.md
