@@ -344,7 +344,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
           {menuOpen && (
             <div
               role="menu"
-              className="absolute right-0 top-[calc(100%+10px)] z-50 w-60 rounded-xl border border-border bg-surface-overlay p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.5)]"
+              className="absolute right-0 top-[calc(100%+10px)] z-50 w-60 rounded-xl border border-border bg-surface-overlay p-1.5 shadow-floating"
             >
               {accessToken && (
                 <div className="flex items-center gap-2 px-3 py-2 mb-1 border-b border-border">

@@ -42,7 +42,8 @@ export async function GET(req: NextRequest) {
     })
     .from(users)
     .where(or(...allIds.map((id) => eq(users.id, id))))
-    .orderBy(desc(users.currentStreak));
+    .orderBy(desc(users.currentStreak))
+    .limit(500);
 
   return NextResponse.json(
     leaderboard.map((u, i) => ({

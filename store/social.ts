@@ -45,7 +45,14 @@ export const useSocialStore = create<SocialStore>()(
     }),
     {
       name: "open-hikmah-social",
-      partialize: (s) => ({ userId: s.userId, username: s.username }),
+      // Persist the streak too so it shows immediately on reload (then refreshes
+      // from /api/social/me) instead of flashing to 0.
+      partialize: (s) => ({
+        userId: s.userId,
+        username: s.username,
+        streak: s.streak,
+        longestStreak: s.longestStreak,
+      }),
     }
   )
 );

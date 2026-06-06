@@ -2,7 +2,6 @@ import { callAI } from "@/lib/ai";
 import { db } from "@/lib/db";
 import { aiGenerations } from "@/lib/db/schema";
 import { isValidRef, getVerses } from "@/lib/quran-corpus";
-import { resolveVerse } from "@/lib/verse-resolver";
 import type { ConnectionResult, EdgeKind, Verse } from "@/types/quran";
 
 /**
@@ -107,12 +106,14 @@ export async function generateConnections(
     .filter((c) => isValidRef(c.ref) && c.ref !== fromRef)
     .slice(0, 3);
 
-  // Resolve each ref — drops hallucinated references that resolve nowhere.
-  const resolved = await Promise.all(candidates.map((c) => resolveVerse(c.ref)));
+  // Hydrate from the LOCAL corpus only. This both drops hallucinated references
+  // and guarantees a verse that isn't in the corpus can never be persisted as a
+  // connection — independent of any external API's behaviour.
+  const verseMap = await getVerses(candidates.map((c) => c.ref));
 
   return candidates
-    .map((c, i) => {
-      const verse = resolved[i];
+    .map((c) => {
+      const verse = verseMap.get(c.ref);
       if (!verse) return null;
       const result: ConnectionResult = {
         surah: verse.surah,

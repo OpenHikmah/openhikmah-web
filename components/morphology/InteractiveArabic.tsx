@@ -34,18 +34,16 @@ export function InteractiveArabic({ verse }: { verse: InteractiveVerse }) {
   );
 
   useEffect(() => {
-    let active = true;
-    fetch(`/api/verse/${verse.surah}/${verse.ayah}/morphology`)
+    const controller = new AbortController();
+    fetch(`/api/verse/${verse.surah}/${verse.ayah}/morphology`, { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : { words: [] }))
       .then((data: { words?: MorphologyWord[] }) => {
-        if (active) setTokens(tokenizeVerse(verse.arabicText, data.words ?? []));
+        setTokens(tokenizeVerse(verse.arabicText, data.words ?? []));
       })
       .catch(() => {
-        // Leave the plain-text tokens in place on failure.
+        // Aborted on verse change, or failed — leave the plain-text tokens.
       });
-    return () => {
-      active = false;
-    };
+    return () => controller.abort();
   }, [verse.surah, verse.ayah, verse.arabicText]);
 
   return (
@@ -91,7 +89,10 @@ function WordPopover({ token, currentRef }: { token: VerseToken; currentRef: str
       }}
     >
       <Popover.Trigger asChild>
-        <button className="cursor-pointer rounded underline decoration-dotted decoration-text-muted underline-offset-4 transition-colors hover:text-gold hover:decoration-gold">
+        <button
+          aria-label={`${token.text}, show root and related verses`}
+          className="cursor-pointer rounded underline decoration-dotted decoration-text-muted underline-offset-4 transition-colors hover:text-gold hover:decoration-gold"
+        >
           {token.text}
         </button>
       </Popover.Trigger>

@@ -44,6 +44,14 @@ function VerseLoader() {
       .then((r) => (r.ok ? r.json() : null))
       .then((verse: Verse | null) => {
         if (!verse) return;
+        // Already on the canvas (re-opened from a bookmark, journey, or a
+        // concordance link)? Don't stack a duplicate — just clean the URL.
+        const url0 = new URL(window.location.href);
+        url0.searchParams.delete("verse");
+        if (useCanvasStore.getState().hasNode(verse.ref)) {
+          window.history.replaceState(null, "", url0.toString());
+          return;
+        }
         // Usually a fresh canvas (origin), but if one was restored from storage,
         // drop the incoming verse into free space instead of onto an existing node.
         const existing = useCanvasStore.getState().nodes.map((n) => n.position);

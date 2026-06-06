@@ -17,7 +17,9 @@ export async function buildShareUrl(canvas: SavedCanvas): Promise<string> {
   if (!res.ok) throw new Error("Share failed");
   const { id } = await res.json() as { id: string };
   const url = new URL(window.location.href);
-  url.pathname = "/";
+  // Point at the canvas — that's where the share is restored (see the mount
+  // effect below). A "/" link would just land on the marketing page.
+  url.pathname = "/canvas";
   url.search = "";
   url.hash = "";
   url.searchParams.set("share", id);

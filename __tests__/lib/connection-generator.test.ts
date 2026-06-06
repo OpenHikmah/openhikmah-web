@@ -1,15 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Verse, VerseRef } from "@/types/quran";
 
-const { mockCallAI, mockResolveVerse, mockInsert, mockGetVerses } = vi.hoisted(() => ({
+const { mockCallAI, mockInsert, mockGetVerses } = vi.hoisted(() => ({
   mockCallAI: vi.fn(),
-  mockResolveVerse: vi.fn(),
   mockInsert: vi.fn(() => ({ values: vi.fn().mockResolvedValue(undefined) })),
   mockGetVerses: vi.fn(),
 }));
 
 vi.mock("@/lib/ai", () => ({ callAI: mockCallAI }));
-vi.mock("@/lib/verse-resolver", () => ({ resolveVerse: mockResolveVerse }));
 vi.mock("@/lib/db", () => ({ db: { insert: mockInsert } }));
 vi.mock("@/lib/quran-corpus", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/quran-corpus")>();
@@ -34,10 +32,12 @@ function verse(ref: string): Verse {
 describe("generateConnections", () => {
   beforeEach(() => {
     mockCallAI.mockReset();
-    mockResolveVerse.mockReset();
     mockInsert.mockClear();
-    // Default: every ref resolves.
-    mockResolveVerse.mockImplementation(async (ref: string) => verse(ref));
+    mockGetVerses.mockReset();
+    // Default: every requested ref hydrates from the local corpus.
+    mockGetVerses.mockImplementation(async (refs: string[]) =>
+      new Map(refs.map((r) => [r, verse(r)]))
+    );
   });
 
   it("returns hydrated connections from the AI response", async () => {
@@ -60,15 +60,15 @@ describe("generateConnections", () => {
     expect(mockInsert).toHaveBeenCalledTimes(1);
   });
 
-  it("drops references that resolve nowhere (hallucinated)", async () => {
+  it("drops references not in the local corpus (hallucinated)", async () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([
         { ref: "2:255", reason: "real" },
         { ref: "9:999", reason: "fake" },
       ])
     );
-    mockResolveVerse.mockImplementation(async (ref: string) =>
-      ref === "9:999" ? null : verse(ref)
+    mockGetVerses.mockImplementation(async (refs: string[]) =>
+      new Map(refs.filter((r) => r !== "9:999").map((r) => [r, verse(r)]))
     );
     const out = await generateConnections("1:1", "ar", "tr", "thematic");
     expect(out.map((c) => c.ref)).toEqual(["2:255"]);

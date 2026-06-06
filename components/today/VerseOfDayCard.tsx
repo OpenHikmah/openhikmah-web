@@ -58,7 +58,7 @@ export function VerseOfDayCard({
   };
 
   return (
-    <Card className="relative w-full max-w-xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+    <Card className="relative w-full max-w-xl overflow-hidden shadow-floating">
       {/* Gold top-accent rule — shadows/accents are allowed on floating surfaces (§3.3) */}
       <div className="h-1 w-full bg-gold" />
 

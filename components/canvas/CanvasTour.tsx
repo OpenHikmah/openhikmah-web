@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Search, Network, MessageSquareText, X } from "lucide-react";
 import { Card, Button } from "@/components/ui";
 
@@ -34,6 +34,7 @@ export function CanvasTour() {
   // a hydration mismatch and a flash for returning users.
   const [show, setShow] = useState(false);
   const [step, setStep] = useState(0);
+  const primaryRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     try {
@@ -55,6 +56,17 @@ export function CanvasTour() {
     setShow(false);
   };
 
+  // Move focus to the primary action when the tour appears, and let Escape dismiss.
+  useEffect(() => {
+    if (!show) return;
+    primaryRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") dismiss();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [show]);
+
   if (!show) return null;
 
   const current = STEPS[step];
@@ -65,6 +77,9 @@ export function CanvasTour() {
     <div className="pointer-events-none absolute bottom-20 left-1/2 z-50 w-[min(360px,calc(100vw-2rem))] -translate-x-1/2 md:bottom-6 md:left-6 md:translate-x-0">
       <Card
         variant="floating"
+        role="dialog"
+        aria-labelledby="canvas-tour-title"
+        aria-describedby="canvas-tour-body"
         className="pointer-events-auto animate-[fadeIn_200ms_ease-out] p-5"
       >
         <div className="flex items-start justify-between gap-3">
@@ -83,8 +98,12 @@ export function CanvasTour() {
           </button>
         </div>
 
-        <p className="mt-3 text-sm font-medium text-text-primary">{current.title}</p>
-        <p className="mt-1.5 text-xs leading-relaxed text-text-secondary">{current.body}</p>
+        <p id="canvas-tour-title" className="mt-3 text-sm font-medium text-text-primary">
+          {current.title}
+        </p>
+        <p id="canvas-tour-body" className="mt-1.5 text-xs leading-relaxed text-text-secondary">
+          {current.body}
+        </p>
 
         <div className="mt-4 flex items-center justify-between gap-3">
           <div className="flex gap-1.5">
@@ -104,6 +123,7 @@ export function CanvasTour() {
               </Button>
             )}
             <Button
+              ref={primaryRef}
               variant="primary"
               size="sm"
               onClick={() => (isLast ? dismiss() : setStep((s) => s + 1))}

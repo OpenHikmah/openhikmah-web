@@ -53,12 +53,11 @@ export function ExpandMenu({ onSelect, onClose }: ExpandMenuProps) {
   return (
     <div
       ref={menuRef}
-      className={`absolute left-1/2 -translate-x-1/2 w-48 ${openUp ? "bottom-full mb-1" : "top-full mt-1"}`}
-      style={{ zIndex: 9999 }}
+      className={`absolute left-1/2 z-50 w-48 -translate-x-1/2 ${openUp ? "bottom-full mb-1" : "top-full mt-1"}`}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="rounded-md border border-border overflow-hidden bg-surface-overlay shadow-[0_2px_8px_rgba(0,0,0,0.25)]">
+      <div className="rounded-md border border-border overflow-hidden bg-surface-overlay shadow-sm">
         {OPTIONS.map((opt) => (
           <button
             key={opt.kind}

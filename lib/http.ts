@@ -39,7 +39,7 @@ const IP_PATTERN = /^[0-9a-fA-F:.]{1,45}$/;
  * "unknown" bucket rather than omitting the key: a paid path must always be
  * rate-limited, even when no usable IP is present.
  */
-export function clientKey(req: NextRequest): string {
+export function clientKey(req: Request): string {
   const fwd = req.headers.get("x-forwarded-for");
   const candidate =
     fwd?.split(",")[0]?.trim() || req.headers.get("x-real-ip")?.trim() || "";

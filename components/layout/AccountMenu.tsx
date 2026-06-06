@@ -108,7 +108,7 @@ export function AccountMenu() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-[calc(100%+8px)] z-50 w-[268px] overflow-hidden rounded-2xl border border-border bg-surface-overlay shadow-[0_20px_50px_rgba(0,0,0,0.55)]"
+          className="absolute right-0 top-[calc(100%+8px)] z-50 w-[268px] overflow-hidden rounded-2xl border border-border bg-surface-overlay shadow-floating"
         >
           {/* Profile header — a soft gold→teal wash derived from palette tokens. */}
           <div

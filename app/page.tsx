@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { HomeView } from "@/components/home/HomeView";
 import { getVerseOfDay } from "@/lib/verse-of-day";
@@ -15,7 +16,16 @@ export const metadata: Metadata = {
 // freeze the verse, diverging from /today.
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ share?: string }>;
+}) {
+  // Back-compat: old share links were "/?share=<id>". Shares now live on the
+  // canvas, where they're restored — forward them there.
+  const { share } = await searchParams;
+  if (share) redirect(`/canvas?share=${encodeURIComponent(share)}`);
+
   const verse = await getVerseOfDay().catch(() => null);
 
   return (

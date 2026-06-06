@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import type { Verse } from "@/types/quran";
 
 /**
@@ -9,17 +10,17 @@ import type { Verse } from "@/types/quran";
 export function VerseOfDayStrip({ verse }: { verse: Verse }) {
   return (
     <div className="flex flex-col gap-3 border-t border-border pt-5 md:flex-row md:items-center md:gap-7 md:pt-7">
-      <div className="min-w-[150px] shrink-0">
-        <Link
-          href="/today"
-          className="font-mono text-[11px] uppercase tracking-[0.14em] text-text-muted transition-colors hover:text-gold"
-        >
+      {/* The whole meta block is the link to the full verse — with a persistent
+          arrow + hover so it clearly reads as tappable (not a passive label). */}
+      <Link href="/today" className="group min-w-[150px] shrink-0">
+        <span className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.14em] text-text-muted transition-colors group-hover:text-gold">
           Verse of the day
-        </Link>
-        <div className="mt-1.5 font-mono text-[13px] tracking-wide text-gold">
+          <ArrowRight className="h-3 w-3 opacity-60 transition-transform group-hover:translate-x-0.5 group-hover:opacity-100" />
+        </span>
+        <div className="mt-1.5 font-mono text-[13px] tracking-wide text-gold underline-offset-4 group-hover:underline">
           {verse.ref} · {verse.surahName}
         </div>
-      </div>
+      </Link>
 
       {/* One-line teaser: clamp the Arabic and fade the (left/RTL) cut edge
           rather than appending a "…" glyph to the Qur'an text. min-w-0 lets the
