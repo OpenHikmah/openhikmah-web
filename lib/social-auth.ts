@@ -165,6 +165,14 @@ export async function requireUser(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Opportunistically evict expired entries so the in-process cache can't grow
+  // unbounded across many distinct tokens.
+  if (tokenCache.size > 64 && Math.random() < 0.05) {
+    const now = Date.now();
+    for (const [t, v] of tokenCache) {
+      if (v.expiresAt <= now) tokenCache.delete(t);
+    }
+  }
   tokenCache.set(token, { user, expiresAt: Date.now() + CACHE_TTL_MS });
   return { userId: user.id, user };
 }

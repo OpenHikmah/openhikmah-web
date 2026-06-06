@@ -43,8 +43,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing data" }, { status: 400 });
   }
 
-  const name = (body.name?.trim()) || "Untitled canvas";
-  const nodeCount = typeof body.nodeCount === "number" ? body.nodeCount : 0;
+  const data = JSON.stringify(body.data);
+  if (data.length > 512 * 1024) {
+    return NextResponse.json({ error: "Canvas too large" }, { status: 413 });
+  }
+
+  const name = ((body.name?.trim()) || "Untitled canvas").slice(0, 120);
+  const nodeCount = Math.max(
+    0,
+    Math.min(typeof body.nodeCount === "number" ? body.nodeCount : 0, 50000)
+  );
 
   try {
     const [inserted] = await db
@@ -52,7 +60,7 @@ export async function POST(req: NextRequest) {
       .values({
         userId: authed.userId,
         name,
-        data: JSON.stringify(body.data),
+        data,
         nodeCount,
       })
       .returning({ id: savedWorkspaces.id, name: savedWorkspaces.name, createdAt: savedWorkspaces.createdAt });

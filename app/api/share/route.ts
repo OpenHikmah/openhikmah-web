@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { lt } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { sharedCanvases } from "@/lib/db/schema";
+import { clientKey } from "@/lib/http";
 
 const MAX_BYTES = 512 * 1024; // 512 KB
 const RATE_LIMIT = 10;
@@ -10,20 +11,18 @@ const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 const ipBuckets = new Map<string, { count: number; windowStart: number }>();
 
-function getIp(req: Request): string {
-  return (
-    (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() ||
-    req.headers.get("x-real-ip") ||
-    "unknown"
-  );
-}
-
 export async function POST(req: Request) {
-  const ip = getIp(req);
+  const ip = clientKey(req);
   const now = Date.now();
   const bucket = ipBuckets.get(ip);
   if (!bucket || now - bucket.windowStart > WINDOW_MS) {
     ipBuckets.set(ip, { count: 1, windowStart: now });
+    // Opportunistically evict expired buckets so the map can't grow unbounded.
+    if (Math.random() < 0.05) {
+      for (const [key, b] of ipBuckets) {
+        if (now - b.windowStart > WINDOW_MS) ipBuckets.delete(key);
+      }
+    }
   } else {
     bucket.count += 1;
     if (bucket.count > RATE_LIMIT) {

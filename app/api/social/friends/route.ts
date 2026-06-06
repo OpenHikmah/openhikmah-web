@@ -26,7 +26,8 @@ export async function GET(req: NextRequest) {
         eq(friendships.requesterId, userId),
         eq(friendships.addresseeId, userId)
       )
-    );
+    )
+    .limit(500);
 
   // Enrich with the friend's username (the other side)
   const friendIds = rows.map((r) =>
