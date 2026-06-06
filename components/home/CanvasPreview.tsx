@@ -123,7 +123,7 @@ function PreviewCard({ node, delay }: { node: PreviewNode; delay: string }) {
     >
       <div className="space-y-2 p-2.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate font-mono text-[10px] text-text-muted">{node.surahName}</span>
+          <span className="min-w-0 truncate font-mono text-[10px] text-text-muted">{node.surahName}</span>
           <div className="flex shrink-0 items-center gap-1">
             <span
               className={cn(

@@ -26,7 +26,7 @@ export function MarketingHero({ verse }: { verse: Verse | null }) {
           <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-text-muted">
             The Qur&apos;an, connected
           </p>
-          <h1 className="mt-4 max-w-[15ch] text-[clamp(1.85rem,4.4vw,3.1rem)] font-semibold leading-[1.06] tracking-[-0.025em] text-text-primary">
+          <h1 className="mt-4 max-w-[15ch] text-balance text-[clamp(1.85rem,4.4vw,3.1rem)] font-semibold leading-[1.06] tracking-[-0.025em] text-text-primary">
             Explore the Qur&apos;an as a <span className="text-gold">connected graph</span>.
           </h1>
           <p className="mt-4 max-w-[46ch] text-[16.5px] leading-relaxed text-text-secondary">

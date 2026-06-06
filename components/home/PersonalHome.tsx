@@ -66,7 +66,7 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
           <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-text-muted">
             Assalamu alaykum
           </p>
-          <h1 className="mt-2 text-[clamp(1.6rem,4vw,2.4rem)] font-semibold tracking-[-0.02em] text-text-primary">
+          <h1 className="mt-2 text-balance text-[clamp(1.6rem,4vw,2.4rem)] font-semibold tracking-[-0.02em] text-text-primary">
             Welcome back{username ? ", " : ""}
             {username && <span className="text-gold">{username}</span>}
           </h1>
