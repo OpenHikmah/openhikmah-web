@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { BookOpen, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { DIVINE_NAMES, CATEGORY_LABELS, type NameCategory } from "@/lib/divine-names";
+import { Wordmark } from "@/components/layout/Wordmark";
 
 export const metadata = {
   title: "Asma-ul-Husna — Open Hikmah",
@@ -37,12 +38,9 @@ export default function NamesPage() {
     <div className="min-h-screen bg-bg text-text-primary">
       {/* Top nav */}
       <header className="sticky top-0 z-20 flex items-center justify-between px-6 h-14 bg-surface border-b border-border">
-        <div className="flex items-center gap-3">
-          <BookOpen className="w-4 h-4 text-gold" />
-          <span className="text-sm font-medium">Open Hikmah</span>
-        </div>
+        <Wordmark />
         <Link
-          href="/"
+          href="/canvas"
           className="flex items-center gap-1.5 text-xs text-text-secondary transition-colors hover:text-text-primary"
         >
           <ArrowLeft className="w-3.5 h-3.5" />

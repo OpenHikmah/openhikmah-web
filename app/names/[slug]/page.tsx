@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowRight, BookOpen } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { getNameBySlug, DIVINE_NAMES, CATEGORY_LABELS, type NameCategory } from "@/lib/divine-names";
+import { Wordmark } from "@/components/layout/Wordmark";
 import { NameVerses } from "./NameVerses";
 import { NameReflection } from "./NameReflection";
 import { NamePairings } from "./NamePairings";
@@ -50,10 +51,7 @@ export default async function NameDetailPage({ params }: Props) {
     <div className="min-h-screen bg-bg text-text-primary">
       {/* Header */}
       <header className="sticky top-0 z-20 flex h-12 items-center justify-between border-b border-border bg-surface px-6">
-        <div className="flex items-center gap-3">
-          <BookOpen className="h-4 w-4 text-gold" />
-          <span className="text-sm font-medium">Open Hikmah</span>
-        </div>
+        <Wordmark />
         <Link
           href="/names"
           className="flex items-center gap-1.5 text-xs text-text-secondary transition-colors hover:text-text-primary"
