@@ -11,15 +11,16 @@ import type { EdgeKind } from "@/types/quran";
  * interactivity. `aria-hidden` + `pointer-events-none` keep it out of the
  * accessibility tree and off the tab order.
  *
- * The verses are a real, coherent cluster around the Basmalah (the divine names
- * Ar-Rahman / Ar-Raheem). Text is canonical (Arabic: ar-simple-clean;
- * translation: Abdel Haleem) — every edge label is a plain observation of the
- * fetched text, not a scholarly interpretation.
+ * Reverence first: the Qur'anic text is NEVER truncated. We use three short
+ * verses on the theme of divine mercy so each ayah and its translation render in
+ * full, and the cards are sized small enough to all fit without clipping. Text is
+ * canonical (Arabic: ar-simple-clean; translation: Abdel Haleem); every edge
+ * label is a plain observation of the fetched text, not a scholarly claim.
  *
- * It is laid out left-to-right so the root node reads clearly on the left and the
- * cluster bleeds off the right edge, where a radial mask feathers it into the
- * page (borderless — no card, no frame). A soft gold→teal glow and a dotted grid
- * (like the canvas background) sit behind it for depth.
+ * The node cards, edges and their reason-labels sit in a crisp foreground layer
+ * (so nothing is ever cut off). Only the ambient background — a dotted canvas grid
+ * and a soft gold→teal glow — fades at the edges, giving the borderless, bleeds-
+ * into-the-page feel without sacrificing legibility.
  */
 
 interface PreviewNode {
@@ -44,10 +45,9 @@ interface PreviewEdge {
   ly: number;
 }
 
-const ROOT = { x: 24, y: 50 };
-const N_RAHEEM = { x: 58, y: 18 };
-const N_NAML = { x: 62, y: 81 };
-const N_ISRA = { x: 93, y: 46 };
+const ROOT = { x: 25, y: 50 };
+const N_RAHEEM = { x: 75, y: 22 };
+const N_RAHMAN = { x: 75, y: 78 };
 
 const NODES: PreviewNode[] = [
   {
@@ -67,25 +67,18 @@ const NODES: PreviewNode[] = [
     ...N_RAHEEM,
   },
   {
-    ref: "27:30",
-    surahName: "An-Naml",
-    arabic: "إِنَّهُ مِن سُلَيْمَانَ وَإِنَّهُ بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
-    translation: "It is from Solomon, and it says, “In the name of God, the Lord of Mercy, the Giver of Mercy,",
-    ...N_NAML,
-  },
-  {
-    ref: "17:110",
-    surahName: "Al-Isra",
-    arabic: "قُلِ ادْعُوا اللَّهَ أَوِ ادْعُوا الرَّحْمَٰنَ ۖ أَيًّا مَّا تَدْعُوا فَلَهُ الْأَسْمَاءُ الْحُسْنَىٰ",
-    translation: "Say, ‘Call on God, or on the Lord of Mercy — whatever names you call Him, the best names belong to Him.’",
-    ...N_ISRA,
+    ref: "55:1",
+    surahName: "Ar-Rahman",
+    arabic: "الرَّحْمَٰنُ",
+    translation: "It is the Lord of Mercy",
+    bookmarked: true,
+    ...N_RAHMAN,
   },
 ];
 
 const EDGES: PreviewEdge[] = [
-  { kind: "root", label: "Shares Ar-Rahman, Ar-Raheem", from: ROOT, to: N_RAHEEM, lx: 41, ly: 31 },
-  { kind: "thematic", label: "Both open with the Basmalah", from: ROOT, to: N_NAML, lx: 40, ly: 69 },
-  { kind: "thematic", label: "Calls on Allah and Ar-Rahman", from: ROOT, to: N_ISRA, lx: 70, ly: 41 },
+  { kind: "root", label: "Shares Ar-Rahman & Ar-Raheem", from: ROOT, to: N_RAHEEM, lx: 50, ly: 35 },
+  { kind: "thematic", label: "Both name Ar-Rahman", from: ROOT, to: N_RAHMAN, lx: 49, ly: 65 },
 ];
 
 const EDGE_COLOR: Record<EdgeKind, string> = {
@@ -118,7 +111,7 @@ function IconChip({ children, tone }: { children: React.ReactNode; tone?: "gold"
 function PreviewCard({ node, delay }: { node: PreviewNode; delay: string }) {
   return (
     <div
-      className="absolute w-[196px] -translate-x-1/2 -translate-y-1/2 animate-[floatNode_7s_ease-in-out_infinite] rounded-lg border border-border bg-surface-raised shadow-sm"
+      className="absolute w-[158px] -translate-x-1/2 -translate-y-1/2 animate-[floatNode_7s_ease-in-out_infinite] rounded-lg border border-border bg-surface-raised shadow-md sm:w-[188px]"
       style={{ left: `${node.x}%`, top: `${node.y}%`, animationDelay: delay }}
     >
       <div className="space-y-2 p-2.5">
@@ -142,13 +135,10 @@ function PreviewCard({ node, delay }: { node: PreviewNode; delay: string }) {
           </div>
         </div>
 
-        <p className="line-clamp-2 text-right font-arabic text-[13px] leading-loose text-text-primary">
-          {node.arabic}
-        </p>
+        {/* The ayah is shown in full — never clamped. */}
+        <p className="text-right font-arabic text-[15px] leading-loose text-text-primary">{node.arabic}</p>
 
-        <p className="line-clamp-2 text-[10.5px] leading-relaxed text-text-secondary">
-          {node.translation}
-        </p>
+        <p className="text-[11px] leading-relaxed text-text-secondary">{node.translation}</p>
       </div>
 
       <div className="flex justify-center pb-2">
@@ -163,16 +153,15 @@ function PreviewCard({ node, delay }: { node: PreviewNode; delay: string }) {
 export function CanvasPreview({ className }: { className?: string }) {
   return (
     <div className={cn("relative h-full w-full overflow-hidden", className)} aria-hidden="true">
-      {/* Everything is masked together so the cluster reads clearly on the left and
-          feathers into the page toward the right/edges — borderless, no container. */}
+      {/* Ambient background only — this is the part that feathers into the page so
+          the graphic reads as borderless. The cards/edges stay crisp (below). */}
       <div
         className="absolute inset-0"
         style={{
-          maskImage: "radial-gradient(125% 108% at 34% 50%, black 56%, transparent 92%)",
-          WebkitMaskImage: "radial-gradient(125% 108% at 34% 50%, black 56%, transparent 92%)",
+          maskImage: "radial-gradient(125% 110% at 42% 50%, black 55%, transparent 92%)",
+          WebkitMaskImage: "radial-gradient(125% 110% at 42% 50%, black 55%, transparent 92%)",
         }}
       >
-        {/* Dotted canvas grid */}
         <div
           className="absolute inset-0 opacity-70"
           style={{
@@ -181,50 +170,49 @@ export function CanvasPreview({ className }: { className?: string }) {
             backgroundSize: "22px 22px",
           }}
         />
-
-        {/* Ambient gold→teal glow */}
         <div
           className="absolute inset-0"
           style={{
             background:
-              "radial-gradient(38% 42% at 38% 38%, color-mix(in srgb, var(--color-gold) 16%, transparent), transparent 72%), radial-gradient(44% 48% at 60% 76%, color-mix(in srgb, var(--color-teal) 14%, transparent), transparent 72%)",
-            filter: "blur(22px)",
+              "radial-gradient(40% 44% at 36% 36%, color-mix(in srgb, var(--color-gold) 16%, transparent), transparent 72%), radial-gradient(46% 50% at 62% 76%, color-mix(in srgb, var(--color-teal) 14%, transparent), transparent 72%)",
+            filter: "blur(24px)",
           }}
         />
-
-        {/* Edges (behind the cards) */}
-        <svg
-          className="absolute inset-0 h-full w-full overflow-visible"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-        >
-          {EDGES.map((e, i) => (
-            <path
-              key={i}
-              d={edgePath(e.from, e.to)}
-              fill="none"
-              style={{ stroke: EDGE_COLOR[e.kind], strokeWidth: 1.5, opacity: 0.7 }}
-              vectorEffect="non-scaling-stroke"
-            />
-          ))}
-        </svg>
-
-        {/* Edge labels */}
-        {EDGES.map((e, i) => (
-          <span
-            key={i}
-            className="absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border bg-surface-raised px-2 py-[3px] font-mono text-[9px] leading-none"
-            style={{ left: `${e.lx}%`, top: `${e.ly}%`, color: EDGE_COLOR[e.kind], borderColor: EDGE_COLOR[e.kind], opacity: 0.9 }}
-          >
-            {e.label}
-          </span>
-        ))}
-
-        {/* Node cards */}
-        {NODES.map((node, i) => (
-          <PreviewCard key={node.ref} node={node} delay={`${-1.6 * i}s`} />
-        ))}
       </div>
+
+      {/* Foreground — fully legible, never masked or clipped. */}
+      {/* Edges, behind the cards */}
+      <svg
+        className="absolute inset-0 h-full w-full overflow-visible"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+      >
+        {EDGES.map((e, i) => (
+          <path
+            key={i}
+            d={edgePath(e.from, e.to)}
+            fill="none"
+            style={{ stroke: EDGE_COLOR[e.kind], strokeWidth: 2, opacity: 0.85 }}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+      </svg>
+
+      {/* Node cards */}
+      {NODES.map((node, i) => (
+        <PreviewCard key={node.ref} node={node} delay={`${-1.8 * i}s`} />
+      ))}
+
+      {/* Reason labels last, so they sit clearly on top of edges and cards */}
+      {EDGES.map((e, i) => (
+        <span
+          key={i}
+          className="absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border bg-surface-raised px-2.5 py-1 font-mono text-[10px] leading-none shadow-sm"
+          style={{ left: `${e.lx}%`, top: `${e.ly}%`, color: EDGE_COLOR[e.kind], borderColor: EDGE_COLOR[e.kind] }}
+        >
+          {e.label}
+        </span>
+      ))}
     </div>
   );
 }
