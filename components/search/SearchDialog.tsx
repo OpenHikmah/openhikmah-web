@@ -123,6 +123,12 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
   const mapConnections = useCallback(
     (verse: Verse) => {
+      // Defensive: triggers are already disabled for added verses, but never stack
+      // a duplicate node regardless of how this is reached.
+      if (hasNode(verse.ref)) {
+        onClose();
+        return;
+      }
       const isFirst = nodes.length === 0;
       // First node anchors at the origin; later searches drop into the nearest
       // empty slot beside the *visible* part of the graph, never overlapping.
@@ -150,7 +156,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
       }
       onClose();
     },
-    [nodes, viewport, addVerseNode, setPendingAutoExpand, onClose]
+    [nodes, viewport, hasNode, addVerseNode, setPendingAutoExpand, onClose]
   );
 
   const loadSeedVerse = useCallback(

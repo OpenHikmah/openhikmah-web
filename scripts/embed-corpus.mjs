@@ -28,26 +28,50 @@ if (!process.env.GEMINI_API_KEY) {
   process.exit(1);
 }
 
+// Cap a single rate-limit wait. Per-minute (free-tier) 429s ask ~20-60s; a daily
+// quota asks for far longer — beyond this we stop and let the user resume later
+// (the run is idempotent).
+const MAX_RATE_WAIT_S = 120;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function retryDelaySeconds(body) {
+  const m = body.match(/"retryDelay":\s*"([\d.]+)s"/) || body.match(/retry in ([\d.]+)s/i);
+  return m ? Math.ceil(parseFloat(m[1])) : 30;
+}
+
+// Returns the vectors, or null to signal "rate limited beyond the cap — stop and
+// resume later". Retries on 429 honoring Google's suggested retryDelay so a single
+// run self-paces under the free-tier per-minute quota.
 async function embedBatch(texts) {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:batchEmbedContents?key=${process.env.GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        requests: texts.map((text) => ({
-          model: `models/${EMBEDDING_MODEL}`,
-          content: { parts: [{ text }] },
-          outputDimensionality: OUTPUT_DIM,
-        })),
-      }),
+  for (;;) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:batchEmbedContents?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requests: texts.map((text) => ({
+            model: `models/${EMBEDDING_MODEL}`,
+            content: { parts: [{ text }] },
+            outputDimensionality: OUTPUT_DIM,
+          })),
+        }),
+      }
+    );
+
+    if (res.status === 429) {
+      const wait = retryDelaySeconds(await res.text().catch(() => "")) + 2;
+      if (wait > MAX_RATE_WAIT_S) return null;
+      console.log(`Rate limited (429) — waiting ${wait}s before retrying…`);
+      await sleep(wait * 1000);
+      continue;
     }
-  );
-  if (!res.ok) {
-    throw new Error(`Embedding request failed: ${res.status} ${await res.text().catch(() => "")}`);
+    if (!res.ok) {
+      throw new Error(`Embedding request failed: ${res.status} ${await res.text().catch(() => "")}`);
+    }
+    const data = await res.json();
+    return (data.embeddings ?? []).map((e) => e.values);
   }
-  const data = await res.json();
-  return (data.embeddings ?? []).map((e) => e.values);
 }
 
 const sql = postgres(process.env.DATABASE_URL, { max: 1 });
@@ -72,6 +96,14 @@ try {
   for (let i = 0; i < pending.length; i += BATCH) {
     const batch = pending.slice(i, i + BATCH);
     const vectors = await embedBatch(batch.map((r) => r.translation));
+
+    if (vectors === null) {
+      console.log(
+        `Stopped at ${done}/${pending.length} — rate limit needs a long wait ` +
+          `(likely a daily quota). Re-run later to resume (idempotent), or enable billing.`
+      );
+      break;
+    }
 
     for (let j = 0; j < batch.length; j++) {
       const vec = `[${vectors[j].join(",")}]`;
