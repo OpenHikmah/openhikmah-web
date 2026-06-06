@@ -10,10 +10,14 @@
  * Embeddings are always Gemini (Anthropic has none) regardless of AI_PROVIDER.
  */
 import postgres from "postgres";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL ?? "text-embedding-004";
-const BATCH = 100; // Gemini batchEmbedContents caps at 100 requests per call.
+// gemini-embedding-001 is natively 3072-dim; we reduce to 768 via
+// outputDimensionality to match the verse_embeddings vector(768) column. Must stay
+// in sync with lib/ai.ts (the runtime query embedder). Override the model via
+// GEMINI_EMBEDDING_MODEL and the batch size via EMBED_BATCH if the API tightens.
+const EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL ?? "gemini-embedding-001";
+const OUTPUT_DIM = 768;
+const BATCH = Number(process.env.EMBED_BATCH ?? 100);
 
 if (!process.env.DATABASE_URL) {
   console.error("DATABASE_URL is not set");
@@ -24,15 +28,26 @@ if (!process.env.GEMINI_API_KEY) {
   process.exit(1);
 }
 
-const model = new GoogleGenerativeAI(process.env.GEMINI_API_KEY).getGenerativeModel({
-  model: EMBEDDING_MODEL,
-});
-
 async function embedBatch(texts) {
-  const { embeddings } = await model.batchEmbedContents({
-    requests: texts.map((text) => ({ content: { role: "user", parts: [{ text }] } })),
-  });
-  return embeddings.map((e) => e.values);
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:batchEmbedContents?key=${process.env.GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requests: texts.map((text) => ({
+          model: `models/${EMBEDDING_MODEL}`,
+          content: { parts: [{ text }] },
+          outputDimensionality: OUTPUT_DIM,
+        })),
+      }),
+    }
+  );
+  if (!res.ok) {
+    throw new Error(`Embedding request failed: ${res.status} ${await res.text().catch(() => "")}`);
+  }
+  const data = await res.json();
+  return (data.embeddings ?? []).map((e) => e.values);
 }
 
 const sql = postgres(process.env.DATABASE_URL, { max: 1 });

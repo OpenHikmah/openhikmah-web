@@ -40,36 +40,56 @@ async function callGemini(prompt: string): Promise<string> {
 
 // ─── Embeddings ───────────────────────────────────────────────────────────────
 // Anthropic has no embeddings API, so embeddings are always Gemini regardless of
-// AI_PROVIDER. Used to populate verse_embeddings (semantic search + grounded
-// thematic/contrast discovery). The dimension must match the verse_embeddings
-// vector(N) column in the schema.
+// AI_PROVIDER. We hit the REST endpoint directly (not the SDK) so we can pass
+// `outputDimensionality`: gemini-embedding-001 is natively 3072-dim, reduced here
+// to 768 to match the verse_embeddings vector(768) column and its pgvector HNSW
+// index (which caps at 2000 dims). The query and corpus must use the same model,
+// so scripts/embed-corpus.mjs mirrors this exactly.
 
 export const EMBEDDING_DIMENSIONS = 768;
+const EMBEDDING_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 function embeddingModelName(): string {
-  return process.env.GEMINI_EMBEDDING_MODEL ?? "text-embedding-004";
+  return process.env.GEMINI_EMBEDDING_MODEL ?? "gemini-embedding-001";
 }
 
-function embeddingClient() {
+async function embedViaRest(texts: string[]): Promise<number[][]> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
-  return new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: embeddingModelName() });
+  const model = embeddingModelName();
+  const res = await fetch(
+    `${EMBEDDING_API_BASE}/models/${model}:batchEmbedContents?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requests: texts.map((text) => ({
+          model: `models/${model}`,
+          content: { parts: [{ text }] },
+          outputDimensionality: EMBEDDING_DIMENSIONS,
+        })),
+      }),
+    }
+  );
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Embedding request failed: ${res.status} ${detail}`);
+  }
+  const data = (await res.json()) as { embeddings?: Array<{ values: number[] }> };
+  return (data.embeddings ?? []).map((e) => e.values);
 }
 
 /** Embeds a single piece of text into a fixed-length semantic vector. */
 export async function embed(text: string): Promise<number[]> {
-  const { embedding } = await embeddingClient().embedContent(text);
-  return embedding.values;
+  const [vector] = await embedViaRest([text]);
+  if (!vector) throw new Error("No embedding returned");
+  return vector;
 }
 
 /** Embeds many texts in one request, preserving input order. */
 export async function embedBatch(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
-  const model = embeddingClient();
-  const { embeddings } = await model.batchEmbedContents({
-    requests: texts.map((text) => ({ content: { role: "user", parts: [{ text }] } })),
-  });
-  return embeddings.map((e) => e.values);
+  return embedViaRest(texts);
 }
 
 /** The model identifier persisted alongside each stored embedding. */
