@@ -36,7 +36,7 @@ export function MarketingHero({ verse }: { verse: Verse | null }) {
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <Link href="/canvas" className={`${buttonVariants({ variant: "primary", size: "lg" })} w-full sm:w-auto`}>
-              Open the canvas
+              Start exploring
             </Link>
             <Link
               href="/names"
@@ -47,7 +47,7 @@ export function MarketingHero({ verse }: { verse: Verse | null }) {
           </div>
 
           <div className="mt-6 flex flex-wrap items-center gap-2.5">
-            <span className="mr-1 text-[13px] text-text-muted">Begin with</span>
+            <span className="mr-1 text-[13px] text-text-muted">Try exploring:</span>
             {JOURNEYS.map((j) => (
               <Link
                 key={j.ref}
