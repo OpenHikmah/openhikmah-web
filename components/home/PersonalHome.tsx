@@ -7,6 +7,7 @@ import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { Card } from "@/components/ui";
 import { VerseOfDayCard } from "@/components/today/VerseOfDayCard";
+import { CanvasPreview } from "./CanvasPreview";
 import { CANVAS_STORAGE_KEY } from "@/hooks/useCanvasPersistence";
 import { JOURNEYS } from "@/lib/journeys";
 import type { Verse } from "@/types/quran";
@@ -51,14 +52,21 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
   const hasContinue = continueCount !== null && continueCount > 0;
 
   return (
-    <main className="mx-auto w-full max-w-[1180px] flex-1 px-6 py-10 md:px-12">
+    <main className="relative mx-auto w-full max-w-[1180px] flex-1 overflow-hidden px-6 py-10 md:px-12">
+      {/* Quiet canvas-graph accent, echoing the landing so signed-in and signed-out
+          feel like one product. Decorative, faint, and lg-only so it never competes
+          with the content or causes horizontal scroll. */}
+      <div className="pointer-events-none absolute -right-10 -top-4 z-0 hidden h-[230px] w-[48%] opacity-40 lg:block">
+        <CanvasPreview />
+      </div>
+
       {/* Greeting */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-text-muted">
             Assalamu alaykum
           </p>
-          <h1 className="mt-2 text-[clamp(1.6rem,4vw,2.4rem)] font-semibold tracking-[-0.02em] text-text-primary">
+          <h1 className="mt-2 text-balance text-[clamp(1.6rem,4vw,2.4rem)] font-semibold tracking-[-0.02em] text-text-primary">
             Welcome back{username ? ", " : ""}
             {username && <span className="text-gold">{username}</span>}
           </h1>
@@ -72,7 +80,7 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
       </div>
 
       {/* Quick entry points */}
-      <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="relative z-10 mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Link href="/canvas" className="block h-full">
           <Card interactive className="flex h-full flex-col gap-2 p-5">
             <Network className="h-5 w-5 text-teal" />
@@ -117,7 +125,7 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
       </div>
 
       {/* Journeys */}
-      <div className="mt-10">
+      <div className="relative z-10 mt-10">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-gold" />
           <h2 className="text-sm font-medium text-text-primary">Begin a journey</h2>
@@ -137,7 +145,7 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
 
       {/* Verse of the Day */}
       {verse && (
-        <div className="mt-10">
+        <div className="relative z-10 mt-10">
           <VerseOfDayCard verse={verse} />
         </div>
       )}
