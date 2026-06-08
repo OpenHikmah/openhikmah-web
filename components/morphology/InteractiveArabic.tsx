@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import * as Popover from "@radix-ui/react-popover";
 import { Loader2 } from "lucide-react";
@@ -29,8 +29,9 @@ interface ConcordanceVerse {
  * Mount per verse (key on the ref) so token state resets cleanly between verses.
  */
 export function InteractiveArabic({ verse }: { verse: InteractiveVerse }) {
-  const [tokens, setTokens] = useState<VerseToken[]>(() =>
-    tokenizeVerse(verse.arabicText, [])
+  // Tag stored morphology with its verse ref so stale callbacks are ignored.
+  const [morphology, setMorphology] = useState<{ ref: string; words: MorphologyWord[] }>(
+    { ref: "", words: [] }
   );
 
   useEffect(() => {
@@ -38,13 +39,20 @@ export function InteractiveArabic({ verse }: { verse: InteractiveVerse }) {
     fetch(`/api/verse/${verse.surah}/${verse.ayah}/morphology`, { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : { words: [] }))
       .then((data: { words?: MorphologyWord[] }) => {
-        setTokens(tokenizeVerse(verse.arabicText, data.words ?? []));
+        setMorphology({ ref: verse.ref, words: data.words ?? [] });
       })
       .catch(() => {
-        // Aborted on verse change, or failed — leave the plain-text tokens.
+        // Aborted on verse change, or failed — leave plain-text tokens.
       });
     return () => controller.abort();
-  }, [verse.surah, verse.ayah, verse.arabicText]);
+  }, [verse.surah, verse.ayah, verse.ref]);
+
+  // tokens is always derived from the current verse.arabicText prop. Morphology
+  // is only applied when it matches the current ref — stale data is silently skipped.
+  const tokens = useMemo(
+    () => tokenizeVerse(verse.arabicText, morphology.ref === verse.ref ? morphology.words : []),
+    [verse.arabicText, verse.ref, morphology]
+  );
 
   return (
     <p dir="rtl" className="font-arabic text-right text-lg leading-loose text-text-primary">

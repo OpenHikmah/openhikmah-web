@@ -30,8 +30,7 @@ export function MarketingHero({ verse }: { verse: Verse | null }) {
             Explore the Qur&apos;an as a <span className="text-gold">connected graph</span>.
           </h1>
           <p className="mt-4 max-w-[46ch] text-[16.5px] leading-relaxed text-text-secondary">
-            Search any verse and map its connections — shared roots, themes, and contrasts —
-            grounded in canonical data, not guessed by AI.
+            Search any verse and map its connections — shared roots, themes, and contrasts.
           </p>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
