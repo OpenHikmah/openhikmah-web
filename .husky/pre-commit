@@ -1,6 +1,9 @@
 # pre-commit — quiet on success, full output only on failure (mirrors pre-push).
 # Each step's output is captured and printed only if that step fails.
 
+# Bun installs to ~/.bun/bin which is not in Git's shell PATH on Windows.
+export PATH="$HOME/.bun/bin:$PATH"
+
 step() {
   label=$1
   shift
@@ -17,12 +20,12 @@ step() {
 step "guards" node scripts/precommit-checks.mjs
 
 # 2. ESLint on staged files, zero warnings tolerated
-step "lint" npx lint-staged
+step "lint" bunx lint-staged
 
 # 3. Project-wide typecheck
-step "typecheck" npm run typecheck
+step "typecheck" bun run typecheck
 
 # 4. Full unit test suite
-step "tests" npm run test:ci
+step "tests" bun run test:ci
 
 echo "pre-commit: checks passed."
