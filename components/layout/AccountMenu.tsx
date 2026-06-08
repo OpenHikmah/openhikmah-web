@@ -61,7 +61,7 @@ export function AccountMenu() {
     return (
       <button
         onClick={signIn}
-        className="inline-flex items-center gap-1.5 rounded-md bg-gold px-3.5 py-1.5 text-[13px] font-semibold text-ink transition-[filter] duration-[120ms] hover:brightness-110"
+        className="inline-flex items-center gap-1.5 rounded-md border border-gold px-3.5 py-1.5 text-[13px] font-semibold text-gold transition-colors duration-[120ms] hover:bg-gold/10"
       >
         <LogIn className="size-3.5" />
         Sign in
