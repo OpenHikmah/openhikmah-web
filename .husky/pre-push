@@ -2,13 +2,16 @@
 # pass before any push. No Docker = no push (fail closed). Output is kept quiet
 # on success and shown in full only on failure.
 
+# Bun installs to ~/.bun/bin which is not in Git's shell PATH on Windows.
+export PATH="$HOME/.bun/bin:$PATH"
+
 if ! docker info >/dev/null 2>&1; then
   echo "pre-push: Docker daemon not running — integration tests are required. Start Docker and retry." >&2
   exit 1
 fi
 
 echo "pre-push: running integration tests (Testcontainers)…"
-output=$(npm run test:integration 2>&1)
+output=$(bun run test:integration 2>&1)
 status=$?
 
 if [ "$status" -ne 0 ]; then

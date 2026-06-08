@@ -1,11 +1,11 @@
 # Stage 1: Install all dependencies
-FROM node:22-alpine AS deps
+FROM oven/bun:1-alpine AS deps
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+COPY package.json bun.lockb ./
+RUN bun install --frozen-lockfile
 
 # Stage 2: Build the Next.js app
-FROM node:22-alpine AS builder
+FROM oven/bun:1-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -30,10 +30,10 @@ ENV QF_API_BASE=https://placeholder.example.com
 ENV QF_AUTH_BASE=https://placeholder.example.com
 ENV DATABASE_URL=postgresql://openh:placeholder@localhost:5432/open_hikmah
 
-RUN npm run build
+RUN bun run build
 
 # Stage 3: Minimal production image using Next.js standalone output
-FROM node:22-alpine AS runner
+FROM oven/bun:1-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
@@ -48,7 +48,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Migration runner — node scripts/migrate.mjs (uses drizzle-orm, no drizzle-kit needed)
+# Migration runner — bun scripts/migrate.mjs (uses drizzle-orm, no drizzle-kit needed)
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/ensure-tables.mjs ./scripts/ensure-tables.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/lib/db/migrations ./lib/db/migrations
@@ -73,4 +73,4 @@ USER nextjs
 EXPOSE 3000
 # Run pending migrations (idempotent) then start the server.
 # This ensures new tables are always created on deploy without a manual step.
-CMD ["sh", "-c", "node scripts/migrate.mjs && node scripts/ensure-tables.mjs && node server.js"]
+CMD ["sh", "-c", "bun scripts/migrate.mjs && bun scripts/ensure-tables.mjs && bun server.js"]
