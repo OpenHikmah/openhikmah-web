@@ -28,7 +28,7 @@ export function VerseOfDayStrip({ verse }: { verse: Verse }) {
           the full verse is one tap away at /today. */}
       <p
         dir="rtl"
-        className="min-w-0 flex-1 overflow-hidden whitespace-nowrap font-arabic text-[22px] leading-[1.9] text-text-primary [mask-image:linear-gradient(to_left,#000_72%,transparent)] md:text-[28px]"
+        className="min-w-0 flex-1 overflow-hidden whitespace-nowrap font-arabic text-[22px] leading-[1.9] text-text-primary md:text-[28px]"
       >
         {verse.arabicText}
       </p>
