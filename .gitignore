@@ -54,5 +54,18 @@ hosting.md
 # Claude Code personal/local settings (machine-specific; shared config lives in .claude/settings.json)
 .claude/settings.local.json
 
-# Claude Code managed skills (tooling-synced duplicate; tracked under .agents/skills)
-/.claude/skills/
+# Skill LICENSE and binary files — not needed by the AI agent
+.agents/skills/**/LICENSE
+.agents/skills/**/LICENSE.txt
+.agents/skills/**/images/
+.agents/skills/**/*.png
+.agents/skills/**/*.jpg
+.agents/skills/**/*.jpeg
+.agents/skills/**/*.gif
+.claude/commands/**/LICENSE
+.claude/commands/**/LICENSE.txt
+.claude/commands/**/images/
+.claude/commands/**/*.png
+.claude/commands/**/*.jpg
+.claude/commands/**/*.jpeg
+.claude/commands/**/*.gif
