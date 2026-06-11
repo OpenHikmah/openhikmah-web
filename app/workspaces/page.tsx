@@ -20,7 +20,7 @@ interface WorkspaceMeta {
 export default function WorkspacesPage() {
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
-  const restoreCanvas = useCanvasStore((s) => s.restoreCanvas);
+  const appendWorkspace = useCanvasStore((s) => s.appendWorkspace);
 
   const [workspaces, setWorkspaces] = useState<WorkspaceMeta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +56,7 @@ export default function WorkspacesPage() {
       if (!res.ok) return;
       const saved: SavedCanvas = await res.json();
       if (saved?.v === 1) {
-        restoreCanvas(saved);
+        appendWorkspace(saved);
         router.push("/canvas");
       }
     } finally {
