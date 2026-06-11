@@ -21,9 +21,25 @@ const amiri = Amiri({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://openhikmah.com"),
   title: "Open Hikmah",
-  description: "Explore the Quran through semantic connections — an infinite traversal canvas for discovering how verses, themes, and divine attributes interweave.",
+  description:
+    "Explore the Quran through semantic connections — an infinite traversal canvas for discovering how verses, themes, and divine attributes interweave.",
   keywords: ["Quran", "Islamic", "theology", "semantic search", "knowledge graph"],
+  openGraph: {
+    type: "website",
+    url: "https://openhikmah.com",
+    title: "Open Hikmah",
+    description:
+      "Explore the Quran through semantic connections — an infinite traversal canvas for discovering how verses, themes, and divine attributes interweave.",
+    siteName: "Open Hikmah",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Open Hikmah",
+    description:
+      "Explore the Quran through semantic connections — an infinite traversal canvas for discovering how verses, themes, and divine attributes interweave.",
+  },
 };
 
 export default function RootLayout({
