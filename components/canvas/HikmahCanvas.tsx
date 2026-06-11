@@ -108,7 +108,17 @@ function CanvasInner() {
           // Fan out radially, then nudge off any collision with the live graph
           // (including siblings added moments ago in this same expansion).
           const target = radialPos(sourcePos, i, connections.length);
-          const existing = useCanvasStore.getState().nodes.map((n) => n.position);
+          const state = useCanvasStore.getState();
+          const nodePositions = state.nodes.map((n) => n.position);
+          // Also treat each edge's midpoint as an obstacle so new nodes don't
+          // land on top of the AI explanation labels rendered at edge midpoints.
+          const edgeMidpoints = state.edges.flatMap((e) => {
+            const src = state.nodes.find((n) => n.id === e.source);
+            const tgt = state.nodes.find((n) => n.id === e.target);
+            if (!src || !tgt) return [];
+            return [{ x: (src.position.x + tgt.position.x) / 2, y: (src.position.y + tgt.position.y) / 2 }];
+          });
+          const existing = [...nodePositions, ...edgeMidpoints];
           const pos = findFreeSlot(existing, target);
           const newId = addVerseNode(conn as unknown as Verse, pos);
 
