@@ -51,7 +51,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
     <div
       onClick={() => setSelectedNode(selected ? null : id)}
       className={cn(
-        "relative w-72 rounded-lg border transition-colors duration-150 cursor-pointer select-none",
+        "relative w-72 rounded-lg border transition-colors duration-150 cursor-pointer select-none node-entrance",
         "bg-surface-raised border-border",
         selected && "node-selected",
         isExpanding && "node-expanding",

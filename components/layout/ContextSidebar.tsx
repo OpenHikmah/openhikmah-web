@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronDown, ChevronRight } from "lucide-react";
+import Link from "next/link";
 import { useCanvasStore } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import { useState, useEffect } from "react";
@@ -163,6 +164,61 @@ function NotesSection({ verseRef }: { verseRef: string }) {
   );
 }
 
+function SimilarSection({ surah, ayah }: { surah: number; ayah: number }) {
+  const [open, setOpen] = useState(false);
+  const [refs, setRefs] = useState<string[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleOpen = async () => {
+    if (open) { setOpen(false); return; }
+    setOpen(true);
+    if (refs !== null) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/verse/${surah}/${ayah}/similar`);
+      const data: { verse: string }[] = res.ok ? await res.json() : [];
+      setRefs(data.map((d) => d.verse));
+    } catch {
+      setRefs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card variant="raised" className="rounded-md">
+      <button
+        onClick={handleOpen}
+        className="flex w-full cursor-pointer items-center justify-between px-3 py-2 text-text-secondary"
+      >
+        <span className="text-xs font-medium">Similar verses</span>
+        {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+      </button>
+      {open && (
+        <div className="px-3 pb-3">
+          {loading ? (
+            <p className="text-xs text-text-muted">Loading…</p>
+          ) : !refs?.length ? (
+            <p className="text-xs text-text-muted">None found.</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {refs.map((ref) => (
+                <Link
+                  key={ref}
+                  href={`/canvas?verse=${ref}`}
+                  className="rounded border border-border px-2 py-0.5 font-mono text-xs text-text-secondary transition-colors hover:border-gold-muted hover:text-gold"
+                >
+                  {ref}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 const KIND_LABEL: Record<EdgeKind, string> = {
   thematic: "Thematic",
   root: "Root word",
@@ -227,6 +283,7 @@ export function ContextSidebar() {
                 <TafsirSection key={sidebarContent.verse.ref} surah={sidebarContent.verse.surah} ayah={sidebarContent.verse.ayah} />
 
                 <NotesSection key={`notes-${sidebarContent.verse.ref}`} verseRef={sidebarContent.verse.ref} />
+                <SimilarSection key={`similar-${sidebarContent.verse.ref}`} surah={sidebarContent.verse.surah} ayah={sidebarContent.verse.ayah} />
               </>
             )}
 
