@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Search, BookOpen } from "lucide-react";
+import { Search } from "lucide-react";
 import { JOURNEYS } from "@/lib/journeys";
 
 interface EmptyStateProps {
@@ -12,13 +12,8 @@ export function EmptyState({ onSearchOpen }: EmptyStateProps) {
   return (
     <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
       <div className="pointer-events-auto max-w-sm text-center">
-        <div className="mx-auto mb-5 flex h-10 w-10 items-center justify-center rounded-md border border-gold/20 bg-gold/[0.07]">
-          <BookOpen className="h-5 w-5 text-gold" />
-        </div>
-
-        <p className="mb-1.5 text-sm font-medium text-text-primary">Start exploring</p>
-        <p className="mb-6 text-xs leading-relaxed text-text-muted">
-          Search a verse or theme. AI maps semantic connections across the Quran.
+        <p className="mb-6 text-sm leading-relaxed text-text-muted">
+          Search a verse or theme — AI maps semantic connections across the Qur&apos;an.
         </p>
 
         <button

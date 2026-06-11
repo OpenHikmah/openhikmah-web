@@ -2,7 +2,6 @@ import Link from "next/link";
 import { VerseOfDayStrip } from "@/components/today/VerseOfDayStrip";
 import { CanvasPreview } from "./CanvasPreview";
 import { buttonVariants } from "@/components/ui/Button";
-import { JOURNEYS } from "@/lib/journeys";
 import type { Verse } from "@/types/quran";
 
 /**
@@ -33,29 +32,10 @@ export function MarketingHero({ verse }: { verse: Verse | null }) {
             Search any verse and map its connections — shared roots, themes, and contrasts.
           </p>
 
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Link href="/canvas" className={`${buttonVariants({ variant: "primary", size: "lg" })} w-full sm:w-auto`}>
               Start exploring
             </Link>
-            <Link
-              href="/names"
-              className="text-[14.5px] text-text-secondary underline-offset-4 transition-colors hover:text-gold hover:underline"
-            >
-              Browse the Asma&apos;ul Husna →
-            </Link>
-          </div>
-
-          <div className="mt-6 flex flex-wrap items-center gap-2.5">
-            <span className="mr-1 text-[13px] text-text-muted">Try exploring:</span>
-            {JOURNEYS.map((j) => (
-              <Link
-                key={j.ref}
-                href={`/canvas?verse=${j.ref}`}
-                className="rounded-md border border-border bg-surface px-4 py-2 text-sm text-text-primary transition-[color,border-color] duration-[120ms] hover:border-gold-muted hover:text-gold"
-              >
-                {j.label}
-              </Link>
-            ))}
           </div>
         </div>
 
