@@ -148,7 +148,7 @@ export function NameVerses({ slug, accent }: Props) {
           {/* Open in canvas */}
           <div className="mt-3 flex justify-end">
             <Link
-              href={`/?verse=${verse.ref}`}
+              href={`/canvas?verse=${verse.ref}`}
               className="text-xs flex items-center gap-1 transition-opacity hover:opacity-80"
               style={{ color: accent }}
             >

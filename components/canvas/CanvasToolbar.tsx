@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Share2, Save, Maximize2, RotateCcw, ListMusic, Loader2, Check } from "lucide-react";
+import { Share2, Save, Maximize2, RotateCcw, ListMusic, Loader2, Check, AlertCircle } from "lucide-react";
 import { Panel, useReactFlow } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { useCanvasStore, serializeCanvas } from "@/store/canvas";
@@ -51,6 +51,7 @@ export function CanvasToolbar() {
   const { copied, copy } = useCopyFeedback();
 
   const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(false);
@@ -72,7 +73,8 @@ export function CanvasToolbar() {
       const url = await buildShareUrl(serializeCanvas(nodes, edges));
       await copy(url);
     } catch {
-      // silent
+      setShareError(true);
+      setTimeout(() => setShareError(false), 2500);
     } finally {
       setSharing(false);
     }
@@ -118,15 +120,22 @@ export function CanvasToolbar() {
   return (
     <Panel position="top-center" className="hidden md:block">
       <div className="flex items-center gap-0.5 rounded-xl border border-border bg-surface/90 px-2 py-1.5 shadow-floating backdrop-blur-sm">
-        <ToolbarBtn onClick={handleShare} disabled={sharing} active={copied}>
+        <ToolbarBtn
+          onClick={handleShare}
+          disabled={sharing}
+          active={copied}
+          className={shareError ? "text-error" : undefined}
+        >
           {sharing ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : copied ? (
             <Check className="h-3.5 w-3.5" />
+          ) : shareError ? (
+            <AlertCircle className="h-3.5 w-3.5" />
           ) : (
             <Share2 className="h-3.5 w-3.5" />
           )}
-          {copied ? "Copied" : "Share"}
+          {copied ? "Copied" : shareError ? "Failed" : "Share"}
         </ToolbarBtn>
 
         {accessToken && (
