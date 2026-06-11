@@ -29,7 +29,7 @@ export default async function Home({
   const verse = await getVerseOfDay().catch(() => null);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-bg">
+    <div className="flex h-dvh flex-col overflow-hidden bg-bg">
       <LandingHeader />
 
       <HomeView verse={verse} />

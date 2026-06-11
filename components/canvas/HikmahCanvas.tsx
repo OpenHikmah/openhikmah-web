@@ -13,11 +13,10 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Maximize2 } from "lucide-react";
 import { VerseNode } from "./VerseNode";
 import { HikmahEdge } from "./HikmahEdge";
 import { CanvasLegend } from "./CanvasLegend";
-import { Tooltip } from "@/components/ui";
+import { CanvasToolbar } from "./CanvasToolbar";
 import { useCanvasStore } from "@/store/canvas";
 import { useActivityTracker } from "@/hooks/useActivityTracker";
 import { useCanvasPersistence } from "@/hooks/useCanvasPersistence";
@@ -234,19 +233,9 @@ function CanvasInner() {
         />
         {nodes.length > 0 && (
           <>
+            <CanvasToolbar />
             <Panel position="bottom-left">
               <CanvasLegend />
-            </Panel>
-            <Panel position="top-right">
-              <Tooltip label="Fit to screen">
-                <button
-                  onClick={() => reactFlow.fitView({ padding: 0.35, maxZoom: 1, duration: 400 })}
-                  aria-label="Fit canvas to screen"
-                  className="grid h-8 w-8 place-items-center rounded border border-border bg-surface text-text-secondary transition-colors hover:border-text-muted hover:text-text-primary"
-                >
-                  <Maximize2 className="h-3.5 w-3.5" />
-                </button>
-              </Tooltip>
             </Panel>
             <MiniMap
               pannable
