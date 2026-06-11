@@ -75,7 +75,7 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
 
       {/* Continue canvas — single primary action */}
       <div className="mt-6">
-        <Link href="/canvas" className="block">
+        <Link href="/canvas" className="group block">
           <Card
             interactive
             className="flex items-center justify-between gap-4 rounded-xl p-5"
