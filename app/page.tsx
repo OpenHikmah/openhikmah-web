@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { LandingHeader } from "@/components/layout/LandingHeader";
+import { NavBar } from "@/components/layout/NavBar";
 import { HomeView } from "@/components/home/HomeView";
 import { getVerseOfDay } from "@/lib/verse-of-day";
 
@@ -31,6 +32,7 @@ export default async function Home({
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-bg">
       <LandingHeader />
+      <NavBar />
 
       <HomeView verse={verse} />
 

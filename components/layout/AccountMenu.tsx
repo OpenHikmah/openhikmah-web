@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Flame, Award, Heart, FolderOpen, Trophy, LogOut, LogIn, ChevronDown, Loader2 } from "lucide-react";
+import { Flame, Award, Heart, FolderOpen, Trophy, LogOut, LogIn, ChevronDown, Loader2, LayoutTemplate, Sparkles } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { buildAuthUrl } from "@/lib/pkce";
@@ -157,6 +157,18 @@ export function AccountMenu() {
           </div>
 
           <div className="h-px bg-border" />
+
+          {/* Mobile-only nav shortcuts — desktop has the NavBar strip */}
+          <div className="md:hidden p-1.5">
+            <Link href="/canvas" onClick={() => setOpen(false)} className={linkRow}>
+              <LayoutTemplate /> Canvas
+            </Link>
+            <Link href="/names" onClick={() => setOpen(false)} className={linkRow}>
+              <Sparkles /> Asma&apos;ul Husna
+            </Link>
+          </div>
+
+          <div className="md:hidden h-px bg-border" />
 
           <div className="p-1.5">
             <Link href="/bookmarks" onClick={() => setOpen(false)} className={linkRow}>

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Header } from "@/components/layout/Header";
+import { NavBar } from "@/components/layout/NavBar";
 import { SearchDialog } from "@/components/search/SearchDialog";
 import { EmptyState } from "@/components/canvas/EmptyState";
 import { CanvasTour } from "@/components/canvas/CanvasTour";
@@ -100,6 +101,7 @@ export function CanvasPageClient() {
       </Suspense>
 
       <Header onSearchOpen={() => setSearchOpen(true)} />
+      <NavBar />
 
       <main className="flex-1 relative overflow-hidden">
         {nodes.length === 0 && (
