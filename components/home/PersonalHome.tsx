@@ -43,7 +43,7 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
   const hasContinue = continueCount !== null && continueCount > 0;
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-10 md:px-8">
+    <main className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-6 py-10 md:px-8">
       {/* Greeting */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

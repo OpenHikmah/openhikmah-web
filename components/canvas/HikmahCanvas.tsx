@@ -13,15 +13,14 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Maximize2 } from "lucide-react";
 import { VerseNode } from "./VerseNode";
 import { HikmahEdge } from "./HikmahEdge";
 import { CanvasLegend } from "./CanvasLegend";
-import { Tooltip } from "@/components/ui";
+import { CanvasToolbar } from "./CanvasToolbar";
 import { useCanvasStore } from "@/store/canvas";
 import { useActivityTracker } from "@/hooks/useActivityTracker";
 import { useCanvasPersistence } from "@/hooks/useCanvasPersistence";
-import { findFreeSlot } from "@/lib/canvas-layout";
+import { findFreeSlot, NODE_WIDTH, NODE_HEIGHT } from "@/lib/canvas-layout";
 import type { ConnectionResult, Verse } from "@/types/quran";
 
 const nodeTypes = { verse: VerseNode };
@@ -109,8 +108,22 @@ function CanvasInner() {
           // Fan out radially, then nudge off any collision with the live graph
           // (including siblings added moments ago in this same expansion).
           const target = radialPos(sourcePos, i, connections.length);
-          const existing = useCanvasStore.getState().nodes.map((n) => n.position);
-          const pos = findFreeSlot(existing, target);
+          const state = useCanvasStore.getState();
+          const existing = state.nodes.map((n) => n.position);
+          // Edge labels (AI explanation pills, ~120×22px) render at edge midpoints.
+          // Treat them as slim obstacles so new nodes avoid overlapping them without
+          // being pushed as far as a full node would require.
+          const labelObstacles = state.edges.flatMap((e) => {
+            const src = state.nodes.find((n) => n.id === e.source);
+            const tgt = state.nodes.find((n) => n.id === e.target);
+            if (!src || !tgt) return [];
+            return [{
+              pos: { x: (src.position.x + tgt.position.x) / 2, y: (src.position.y + tgt.position.y) / 2 },
+              w: NODE_WIDTH + 60,   // full node width + half-label width
+              h: NODE_HEIGHT + 16,  // full node height + half-label height
+            }];
+          });
+          const pos = findFreeSlot(existing, target, { labelObstacles });
           const newId = addVerseNode(conn as unknown as Verse, pos);
 
           addConnectionEdge({
@@ -234,19 +247,9 @@ function CanvasInner() {
         />
         {nodes.length > 0 && (
           <>
+            <CanvasToolbar />
             <Panel position="bottom-left">
               <CanvasLegend />
-            </Panel>
-            <Panel position="top-right">
-              <Tooltip label="Fit to screen">
-                <button
-                  onClick={() => reactFlow.fitView({ padding: 0.35, maxZoom: 1, duration: 400 })}
-                  aria-label="Fit canvas to screen"
-                  className="grid h-8 w-8 place-items-center rounded border border-border bg-surface text-text-secondary transition-colors hover:border-text-muted hover:text-text-primary"
-                >
-                  <Maximize2 className="h-3.5 w-3.5" />
-                </button>
-              </Tooltip>
             </Panel>
             <MiniMap
               pannable

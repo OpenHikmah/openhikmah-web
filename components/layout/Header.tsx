@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Search, RotateCcw, LogIn, LogOut, Sparkles, Trophy, Share2, ListMusic, Heart, Flame, Save, FolderOpen, Menu, Loader2 } from "lucide-react";
+import { Search, RotateCcw, LogIn, LogOut, Sparkles, Trophy, Share2, ListMusic, Heart, Flame, FolderOpen, Menu, Loader2 } from "lucide-react";
 import { useCanvasStore, serializeCanvas } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
@@ -16,6 +16,9 @@ import { Button, IconButton, Tooltip, buttonVariants, iconButtonVariants } from 
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 import { AccountMenu } from "./AccountMenu";
 import { Wordmark } from "./Wordmark";
+
+// Canvas action state (share/save/play) is now owned by CanvasToolbar on desktop.
+// Header retains these only for the mobile bottom action bar.
 
 interface HeaderProps {
   onSearchOpen: () => void;
@@ -57,9 +60,6 @@ function BarButton({
 export function Header({ onSearchOpen }: HeaderProps) {
   const { copied, copy } = useCopyFeedback();
   const [sharing, setSharing] = useState(false);
-  const [workspaceSaved, setWorkspaceSaved] = useState(false);
-  const [workspaceSaving, setWorkspaceSaving] = useState(false);
-  const [workspaceSaveError, setWorkspaceSaveError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -161,32 +161,6 @@ export function Header({ onSearchOpen }: HeaderProps) {
     }
   };
 
-  const handleSaveWorkspace = async () => {
-    if (workspaceSaving || !accessToken || nodeCount === 0) return;
-    setWorkspaceSaving(true);
-    try {
-      const date = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      const name = `${nodeCount} verse${nodeCount === 1 ? "" : "s"} — ${date}`;
-      const res = await fetch("/api/workspace", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ name, data: serializeCanvas(nodes, edges), nodeCount }),
-      });
-      if (res.ok) {
-        setWorkspaceSaved(true);
-        setTimeout(() => setWorkspaceSaved(false), 2000);
-      } else {
-        setWorkspaceSaveError(true);
-        setTimeout(() => setWorkspaceSaveError(false), 2000);
-      }
-    } catch {
-      setWorkspaceSaveError(true);
-      setTimeout(() => setWorkspaceSaveError(false), 2000);
-    } finally {
-      setWorkspaceSaving(false);
-    }
-  };
-
   const handleSignOut = async () => {
     await fetch("/api/auth/signout", { method: "POST" }).catch(() => {});
     clearAuth();
@@ -213,63 +187,10 @@ export function Header({ onSearchOpen }: HeaderProps) {
       <header className="flex items-center justify-between px-6 md:px-12 h-[60px] shrink-0 bg-bg border-b border-border">
         <Wordmark />
 
-        {/* Right controls — desktop only (md+). Three groups separated by dividers */}
+        {/* Right controls — desktop only (md+). Canvas actions live in CanvasToolbar. */}
         <div className="hidden md:flex items-center gap-1.5">
 
-          {/* Group 1: Canvas controls (only when nodes exist) */}
-          {nodeCount > 0 && (
-            <>
-              <div className="flex items-center gap-1.5">
-                <Tooltip label={sharing ? "Generating link…" : copied ? "Copied!" : "Copy shareable link"}>
-                  <IconButton
-                    onClick={handleShare}
-                    disabled={sharing}
-                    aria-label="Copy shareable canvas link"
-                    className={cn("disabled:cursor-wait", copied && "border-teal text-teal")}
-                  >
-                    <Share2 />
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip label={audioCurrentRef ? "Stop playback" : "Play all verses in Quran order"}>
-                  <IconButton
-                    onClick={handlePlayGraph}
-                    aria-label={audioCurrentRef ? "Stop audio playback" : "Play Graph — recite all verses"}
-                    className={cn(audioCurrentRef && "border-teal text-teal")}
-                  >
-                    <ListMusic />
-                  </IconButton>
-                </Tooltip>
-
-                {accessToken && (
-                  <Tooltip label={workspaceSaved ? "Saved!" : workspaceSaveError ? "Save failed — try again" : "Save canvas to account"}>
-                    <IconButton
-                      onClick={handleSaveWorkspace}
-                      disabled={workspaceSaving}
-                      aria-label="Save canvas to account"
-                      className={cn(
-                        "disabled:cursor-wait",
-                        workspaceSaved && "border-teal text-teal",
-                        workspaceSaveError && "border-error text-error"
-                      )}
-                    >
-                      <Save />
-                    </IconButton>
-                  </Tooltip>
-                )}
-
-                <Tooltip label="Clear canvas">
-                  <IconButton tone="danger" onClick={reset} aria-label="Clear all verses from canvas">
-                    <RotateCcw />
-                  </IconButton>
-                </Tooltip>
-              </div>
-
-              {divider}
-            </>
-          )}
-
-          {/* Group 2: Navigation */}
+          {/* Navigation */}
           <div className="flex items-center gap-1.5">
             <Link href="/names" className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>
               <Sparkles className="w-3.5 h-3.5" />

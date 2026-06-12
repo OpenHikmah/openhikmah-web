@@ -18,12 +18,22 @@ export const NODE_WIDTH = 288;
 export const NODE_HEIGHT = 240;
 export const NODE_GAP = 48;
 
+export interface LabelObstacle {
+  pos: XY;
+  /** Full clearance span along X: node width + half-label width (passed directly to overlaps as `w`). */
+  w: number;
+  /** Full clearance span along Y: node height + half-label height. */
+  h: number;
+}
+
 export interface FreeSlotOptions {
   width?: number;
   height?: number;
   gap?: number;
   /** How many rings to search before falling back. */
   maxRings?: number;
+  /** Extra obstacles (e.g. edge label midpoints) that use a custom bounding box. */
+  labelObstacles?: LabelObstacle[];
 }
 
 /** Axis-aligned overlap test between two top-left anchored boxes, with a gap margin. */
@@ -47,8 +57,11 @@ export function findFreeSlot(
   const h = options.height ?? NODE_HEIGHT;
   const gap = options.gap ?? NODE_GAP;
   const maxRings = options.maxRings ?? 16;
+  const labelObstacles = options.labelObstacles ?? [];
 
-  const collides = (p: XY) => existing.some((q) => overlaps(p, q, w, h, gap));
+  const collides = (p: XY) =>
+    existing.some((q) => overlaps(p, q, w, h, gap)) ||
+    labelObstacles.some((o) => overlaps(p, o.pos, o.w, o.h, gap));
 
   if (!collides(anchor)) return anchor;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect } from "react";
+import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { Verse, EdgeKind } from "@/types/quran";
 import { useCanvasStore } from "@/store/canvas";
@@ -36,20 +36,21 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
   const isExpanding = expandingNodeId === id;
   const expandMenuOpen = openExpandNodeId === id;
 
-  useEffect(() => {
-    if (selected) {
-      setSidebarContent({ type: "node", verse: verse as Verse });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected]);
-
   const handleExpandSelect = (kind: EdgeKind) => {
     setPendingExpand({ nodeId: id, ref: verse.ref, kind });
   };
 
   return (
     <div
-      onClick={() => setSelectedNode(selected ? null : id)}
+      onClick={() => {
+        if (selected) {
+          setSidebarContent(null);
+          setSelectedNode(null);
+        } else {
+          setSidebarContent({ type: "node", verse: verse as Verse });
+          setSelectedNode(id);
+        }
+      }}
       className={cn(
         "relative w-72 rounded-lg border transition-colors duration-150 cursor-pointer select-none node-entrance",
         "bg-surface-raised border-border",
