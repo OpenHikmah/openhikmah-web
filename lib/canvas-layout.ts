@@ -20,9 +20,9 @@ export const NODE_GAP = 48;
 
 export interface LabelObstacle {
   pos: XY;
-  /** Combined half-width of the label + node along X (label pill is ~120px wide). */
+  /** Full clearance span along X: node width + half-label width (passed directly to overlaps as `w`). */
   w: number;
-  /** Combined half-height of the label + node along Y. */
+  /** Full clearance span along Y: node height + half-label height. */
   h: number;
 }
 

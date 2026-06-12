@@ -119,8 +119,8 @@ function CanvasInner() {
             if (!src || !tgt) return [];
             return [{
               pos: { x: (src.position.x + tgt.position.x) / 2, y: (src.position.y + tgt.position.y) / 2 },
-              w: NODE_WIDTH / 2 + 60,   // half-node + half-label width
-              h: NODE_HEIGHT / 2 + 16,  // half-node + half-label height
+              w: NODE_WIDTH + 60,   // full node width + half-label width
+              h: NODE_HEIGHT + 16,  // full node height + half-label height
             }];
           });
           const pos = findFreeSlot(existing, target, { labelObstacles });
