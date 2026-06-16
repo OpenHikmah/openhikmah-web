@@ -62,7 +62,7 @@ export function VerseOfDayCard({
       {/* Gold top-accent rule — shadows/accents are allowed on floating surfaces (§3.3) */}
       <div className="h-1 w-full bg-gold" />
 
-      <div className="space-y-5 p-6 sm:p-8">
+      <div className="space-y-[clamp(0.85rem,2.5vh,1.25rem)] p-[clamp(1.15rem,3.5vh,2rem)]">
         <div className="flex items-center justify-between gap-3">
           <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-text-muted">
             Verse of the day

@@ -22,7 +22,7 @@ import type { Verse } from "@/types/quran";
 export function MarketingHero({ verse }: { verse: Verse | null }) {
   return (
     <main className="relative mx-auto flex w-full min-h-0 max-w-[1180px] flex-1 flex-col overflow-y-auto px-6 md:overflow-hidden md:px-12">
-      <div className="grid flex-1 grid-cols-1 items-center gap-10 py-8 md:grid-cols-[1.02fr_0.98fr] md:gap-6">
+      <div className="grid flex-1 grid-cols-1 items-center gap-10 py-[clamp(0.75rem,3vh,2rem)] md:grid-cols-[1.02fr_0.98fr] md:gap-6">
         {/* Left — copy + actions (first, so it's always above the fold) */}
         <div className="relative z-10">
           <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-text-muted">
@@ -45,7 +45,7 @@ export function MarketingHero({ verse }: { verse: Verse | null }) {
         {/* Right — borderless canvas recreation. Cards stay fully on-screen
             (readable, never clipped); only the ambient backdrop feathers out. A
             bounded height on mobile keeps it a self-contained block below the copy. */}
-        <div className="relative h-[450px] self-stretch md:h-auto md:min-h-[450px]">
+        <div className="relative h-[clamp(300px,45vh,450px)] self-stretch md:h-auto md:min-h-[clamp(280px,50vh,450px)]">
           <CanvasPreview className="md:absolute md:inset-0" />
         </div>
       </div>

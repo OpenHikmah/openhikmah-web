@@ -74,7 +74,7 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
   const hasContinue = continueCount !== null && continueCount > 0;
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto px-6 py-10 md:px-8">
+    <main className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto px-6 py-[clamp(0.75rem,4.5vh,2.5rem)] md:px-8">
       {/* Greeting */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -99,7 +99,7 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
 
       {/* Two columns at lg: the Verse of the Day leads, destinations sit alongside
           so the page fills the width instead of stranding a narrow centre column. */}
-      <div className="mt-8 grid items-start gap-6 lg:grid-cols-[1.5fr_1fr]">
+      <div className="mt-[clamp(1rem,3.5vh,2rem)] grid items-start gap-6 lg:grid-cols-[1.5fr_1fr]">
         {verse && <VerseOfDayCard verse={verse} />}
 
         <div className="grid gap-3">
