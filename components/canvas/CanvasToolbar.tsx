@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Share2, Save, Maximize2, RotateCcw, ListMusic, Loader2, Check, AlertCircle } from "lucide-react";
+import { Share2, Save, Maximize2, RotateCcw, ListMusic, Loader2, Check, AlertCircle, LogIn } from "lucide-react";
 import { Panel, useReactFlow } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { useCanvasStore, serializeCanvas } from "@/store/canvas";
@@ -9,6 +9,7 @@ import { useAuthStore } from "@/store/auth";
 import { useAudioStore } from "@/store/audio";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 import { buildShareUrl } from "@/hooks/useCanvasPersistence";
+import { buildAuthUrl } from "@/lib/pkce";
 import type { AudioVerse } from "@/store/audio";
 import type { Verse } from "@/types/quran";
 
@@ -32,7 +33,7 @@ function ToolbarBtn({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-wait disabled:opacity-50",
+        "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-[color,background-color,transform] duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.97] disabled:cursor-wait disabled:opacity-50",
         "text-text-secondary hover:bg-white/8 hover:text-text-primary",
         active && "text-teal",
         danger && "text-error hover:bg-error/[0.07] hover:text-error",
@@ -55,6 +56,7 @@ export function CanvasToolbar() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
 
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
@@ -107,6 +109,18 @@ export function CanvasToolbar() {
     }
   };
 
+  // The canvas is persisted to localStorage, so signing in and coming back keeps
+  // the current graph — the user can save it the moment they return.
+  const handleSignIn = async () => {
+    if (signingIn) return;
+    setSigningIn(true);
+    const { url, codeVerifier, state, nonce } = await buildAuthUrl();
+    sessionStorage.setItem("pkce_code_verifier", codeVerifier);
+    sessionStorage.setItem("pkce_state", state);
+    sessionStorage.setItem("pkce_nonce", nonce);
+    window.location.href = url;
+  };
+
   const handlePlay = () => {
     if (currentRef) { stopAudio(); return; }
     const verses: AudioVerse[] = [...nodes]
@@ -138,10 +152,10 @@ export function CanvasToolbar() {
           {copied ? "Copied" : shareError ? "Failed" : "Share"}
         </ToolbarBtn>
 
-        {accessToken && (
+        {accessToken ? (
           <ToolbarBtn
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || nodes.length === 0}
             active={saved}
             className={saveError ? "text-error" : undefined}
           >
@@ -153,6 +167,16 @@ export function CanvasToolbar() {
               <Save className="h-3.5 w-3.5" />
             )}
             {saving ? "Saving…" : saved ? "Saved" : saveError ? "Failed" : "Save"}
+          </ToolbarBtn>
+        ) : (
+          // Don't silently hide Save when signed out — offer the way to enable it.
+          <ToolbarBtn onClick={handleSignIn} disabled={signingIn}>
+            {signingIn ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <LogIn className="h-3.5 w-3.5" />
+            )}
+            Sign in to save
           </ToolbarBtn>
         )}
 

@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  * never rely on a native title. Keep a ≥44px hit area via the wrapper when 32px.
  */
 const iconButton = cva(
-  "inline-flex items-center justify-center rounded-md border transition-[color,background-color,border-color] duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)] disabled:pointer-events-none disabled:opacity-40",
+  "inline-flex items-center justify-center rounded-md border transition-[color,background-color,border-color,transform] duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)] active:scale-95 disabled:pointer-events-none disabled:opacity-40",
   {
     variants: {
       tone: {

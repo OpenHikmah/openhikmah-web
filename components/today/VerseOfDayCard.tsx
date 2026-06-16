@@ -87,7 +87,7 @@ export function VerseOfDayCard({
 
         {reflection && <ReflectionNote>{reflection}</ReflectionNote>}
 
-        <div className="flex items-center gap-2 pt-1">
+        <div className="flex flex-wrap items-center gap-2 pt-1">
           <Link
             href={`/canvas?verse=${verse.ref}`}
             className={cn(buttonVariants({ variant: "primary", size: "md" }), "gap-2")}

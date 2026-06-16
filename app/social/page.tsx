@@ -139,18 +139,18 @@ export default function SocialPage() {
                 <button
                   key={t}
                   onClick={() => setTab(t)}
-                  className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 py-2 text-xs font-medium capitalize transition-colors ${
+                  className={`flex min-h-[44px] flex-1 cursor-pointer items-center justify-center gap-1.5 px-1 py-2 text-[13px] font-medium capitalize transition-colors ${
                     tab === t
                       ? "bg-surface-raised text-text-primary"
                       : "text-text-muted hover:text-text-secondary"
                   }`}
                 >
                   {t === "leaderboard" ? (
-                    <Trophy className="h-3.5 w-3.5" />
+                    <Trophy className="h-4 w-4" />
                   ) : t === "friends" ? (
-                    <Users className="h-3.5 w-3.5" />
+                    <Users className="h-4 w-4" />
                   ) : (
-                    <Swords className="h-3.5 w-3.5" />
+                    <Swords className="h-4 w-4" />
                   )}
                   {t === "leaderboard" ? "Leaderboard" : t === "friends" ? "Friends" : "Challenges"}
                 </button>

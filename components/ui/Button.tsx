@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  * Resting states are legible; hover adds a soft wash; focus uses the global ring.
  */
 const button = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-[color,background-color,border-color,filter] duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)] disabled:pointer-events-none disabled:opacity-40",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-[color,background-color,border-color,filter,transform] duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40",
   {
     variants: {
       variant: {
