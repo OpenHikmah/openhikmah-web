@@ -41,11 +41,17 @@ export function AccountMenu() {
   const signIn = async () => {
     if (signingIn) return;
     setSigningIn(true);
-    const { url, codeVerifier, state, nonce } = await buildAuthUrl();
-    sessionStorage.setItem("pkce_code_verifier", codeVerifier);
-    sessionStorage.setItem("pkce_state", state);
-    sessionStorage.setItem("pkce_nonce", nonce);
-    window.location.href = url;
+    try {
+      const { url, codeVerifier, state, nonce } = await buildAuthUrl();
+      sessionStorage.setItem("pkce_code_verifier", codeVerifier);
+      sessionStorage.setItem("pkce_state", state);
+      sessionStorage.setItem("pkce_nonce", nonce);
+      window.location.href = url;
+    } catch {
+      // Building the auth URL failed — re-enable the button instead of leaving
+      // it stuck on "signing in".
+      setSigningIn(false);
+    }
   };
 
   const signOut = async () => {
