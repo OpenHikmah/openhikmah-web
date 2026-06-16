@@ -44,11 +44,14 @@ interface PreviewEdge {
   ly: number;
 }
 
-// Root far left, spokes far right → a wide empty middle for the labels.
-const ROOT = { x: 17, y: 50 };
-const N_RAHEEM = { x: 82, y: 15 };
-const N_NAML = { x: 84, y: 50 };
-const N_RAHMAN = { x: 82, y: 85 };
+// Root left, spokes right → a wide empty middle for the labels. Positions are
+// kept inside a safe band (x 23–77, y 20–80) so that a card's own width/height
+// (it's centred on its point) never reaches the scene edge — the float animation
+// has room to breathe and nothing clips, even in the narrow mobile column.
+const ROOT = { x: 23, y: 50 };
+const N_RAHEEM = { x: 76, y: 20 };
+const N_NAML = { x: 77, y: 50 };
+const N_RAHMAN = { x: 76, y: 80 };
 
 const NODES: PreviewNode[] = [
   {
@@ -215,7 +218,7 @@ export function CanvasPreview({ className }: { className?: string }) {
       {EDGES.map((e, i) => (
         <span
           key={i}
-          className="absolute max-w-[88px] -translate-x-1/2 -translate-y-1/2 whitespace-normal rounded-full border bg-surface-raised px-2.5 py-1 text-center font-mono text-[10px] leading-tight shadow-sm sm:max-w-none sm:whitespace-nowrap"
+          className="absolute hidden max-w-[112px] -translate-x-1/2 -translate-y-1/2 whitespace-normal rounded-full border bg-surface-raised px-2.5 py-1 text-center font-mono text-[10px] leading-tight shadow-sm sm:inline-block"
           style={{ left: `${e.lx}%`, top: `${e.ly}%`, color: EDGE_COLOR[e.kind], borderColor: EDGE_COLOR[e.kind] }}
         >
           {e.label}
