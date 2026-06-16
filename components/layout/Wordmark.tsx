@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen } from "lucide-react";
+import Image from "next/image";
 
 /**
  * The Open Hikmah logo + wordmark, linking home. Single source of truth shared
@@ -9,7 +9,7 @@ import { BookOpen } from "lucide-react";
 export function Wordmark() {
   return (
     <Link href="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
-      <BookOpen className="size-4 text-gold" />
+      <Image src="/logo-mark.png" alt="" width={20} height={20} className="size-5" priority />
       <span className="text-[15px] font-semibold text-text-primary">Open Hikmah</span>
     </Link>
   );
