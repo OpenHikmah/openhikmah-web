@@ -45,7 +45,7 @@ export function MarketingHero({ verse }: { verse: Verse | null }) {
         {/* Right — borderless canvas recreation. Cards stay fully on-screen
             (readable, never clipped); only the ambient backdrop feathers out. A
             bounded height on mobile keeps it a self-contained block below the copy. */}
-        <div className="relative h-[360px] self-stretch sm:h-[400px] md:h-auto md:min-h-[400px]">
+        <div className="relative h-[450px] self-stretch md:h-auto md:min-h-[450px]">
           <CanvasPreview className="md:absolute md:inset-0" />
         </div>
       </div>
