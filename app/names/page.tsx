@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { DIVINE_NAMES, CATEGORY_LABELS, type NameCategory } from "@/lib/divine-names";
-import { Wordmark } from "@/components/layout/Wordmark";
+import { LandingHeader } from "@/components/layout/LandingHeader";
+import { NavBar } from "@/components/layout/NavBar";
 
 export const metadata = {
   title: "Asma-ul-Husna — Open Hikmah",
@@ -35,18 +35,11 @@ export default function NamesPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-bg text-text-primary">
-      {/* Top nav */}
-      <header className="sticky top-0 z-20 flex items-center justify-between px-6 h-14 bg-surface border-b border-border">
-        <Wordmark />
-        <Link
-          href="/canvas"
-          className="flex items-center gap-1.5 text-xs text-text-secondary transition-colors hover:text-text-primary"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Canvas</span>
-        </Link>
-      </header>
+    <div className="min-h-screen bg-bg pb-[calc(72px+env(safe-area-inset-bottom))] text-text-primary md:pb-0">
+      {/* Shared chrome — same wordmark, section nav, and account menu as the rest
+          of the app, so signed-in users can reach their account from here too. */}
+      <LandingHeader />
+      <NavBar />
 
       {/* Hero */}
       <div className="px-6 pt-12 pb-10 text-center border-b border-border-subtle">

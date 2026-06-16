@@ -2,22 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutTemplate, Sparkles, Heart } from "lucide-react";
+import { LayoutTemplate, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuthStore } from "@/store/auth";
 
-const BASE_ITEMS = [
+// The NavBar is the single place for primary section navigation. Personal items
+// (Bookmarks, Saved canvases, Friends) live in the AccountMenu — never duplicated
+// here — so there is exactly one home for each destination.
+const ITEMS = [
   { href: "/canvas", label: "Canvas", icon: LayoutTemplate },
   { href: "/names", label: "Asma’ul Husna", icon: Sparkles },
 ] as const;
 
-const BOOKMARKS_ITEM = { href: "/bookmarks", label: "Bookmarks", icon: Heart } as const;
-
 export function NavBar() {
   const pathname = usePathname();
-  const accessToken = useAuthStore((s) => s.accessToken);
 
-  const items = accessToken ? [...BASE_ITEMS, BOOKMARKS_ITEM] : [...BASE_ITEMS];
+  const items = ITEMS;
 
   const isActive = (href: string) =>
     href === "/canvas" ? pathname === "/canvas" : pathname.startsWith(href);

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import Link from "next/link";
-import { Flame } from "lucide-react";
+import { Flame, LayoutTemplate, FolderOpen, Heart, ArrowRight } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { Card } from "@/components/ui";
@@ -10,6 +10,37 @@ import { VerseOfDayCard } from "@/components/today/VerseOfDayCard";
 import { CANVAS_STORAGE_KEY } from "@/hooks/useCanvasPersistence";
 import type { Verse } from "@/types/quran";
 import type { SavedCanvas } from "@/store/canvas";
+
+/** A compact destination row: icon, title, supporting count, and a hover arrow. */
+function QuickLink({
+  href,
+  icon: Icon,
+  title,
+  subtitle,
+}: {
+  href: string;
+  icon: ComponentType<{ className?: string }>;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <Link href={href} className="group block">
+      <Card
+        interactive
+        className="flex items-center gap-3.5 rounded-xl p-4 active:scale-[0.99]"
+      >
+        <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-surface-raised text-text-secondary transition-colors group-hover:border-gold-muted group-hover:text-gold">
+          <Icon className="size-[18px]" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-text-primary">{title}</p>
+          <p className="mt-0.5 truncate text-xs text-text-muted">{subtitle}</p>
+        </div>
+        <ArrowRight className="size-4 shrink-0 text-text-muted transition-transform duration-[160ms] ease-[cubic-bezier(0.2,0,0,1)] group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+      </Card>
+    </Link>
+  );
+}
 
 export function PersonalHome({ verse }: { verse: Verse | null }) {
   const bookmarks = useAuthStore((s) => s.bookmarks);
@@ -43,7 +74,7 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
   const hasContinue = continueCount !== null && continueCount > 0;
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-6 py-10 md:px-8">
+    <main className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto px-6 py-10 md:px-8">
       {/* Greeting */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -66,52 +97,43 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
         )}
       </div>
 
-      {/* Verse of the Day — primary daily touchpoint */}
-      {verse && (
-        <div className="mt-8">
-          <VerseOfDayCard verse={verse} />
+      {/* Two columns at lg: the Verse of the Day leads, destinations sit alongside
+          so the page fills the width instead of stranding a narrow centre column. */}
+      <div className="mt-8 grid items-start gap-6 lg:grid-cols-[1.5fr_1fr]">
+        {verse && <VerseOfDayCard verse={verse} />}
+
+        <div className="grid gap-3">
+          <QuickLink
+            href="/canvas"
+            icon={LayoutTemplate}
+            title={hasContinue ? "Continue your canvas" : "Open the canvas"}
+            subtitle={
+              hasContinue
+                ? `${continueCount} verse${continueCount === 1 ? "" : "s"} in progress`
+                : "Search a verse and map its connections"
+            }
+          />
+          <QuickLink
+            href="/workspaces"
+            icon={FolderOpen}
+            title="Saved canvases"
+            subtitle={
+              savedCount !== null
+                ? `${savedCount} saved canvas${savedCount === 1 ? "" : "es"}`
+                : "Your saved graphs"
+            }
+          />
+          <QuickLink
+            href="/bookmarks"
+            icon={Heart}
+            title="Bookmarks"
+            subtitle={
+              bookmarks.length > 0
+                ? `${bookmarks.length} saved verse${bookmarks.length === 1 ? "" : "s"}`
+                : "No bookmarks yet"
+            }
+          />
         </div>
-      )}
-
-      {/* Continue canvas — single primary action */}
-      <div className="mt-6">
-        <Link href="/canvas" className="group block">
-          <Card
-            interactive
-            className="flex items-center justify-between gap-4 rounded-xl p-5"
-          >
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-text-primary">
-                {hasContinue ? "Continue your canvas" : "Open the canvas"}
-              </p>
-              <p className="mt-0.5 text-xs text-text-muted">
-                {hasContinue
-                  ? `${continueCount} verse${continueCount === 1 ? "" : "s"} in progress`
-                  : "Search a verse and map its connections"}
-              </p>
-            </div>
-            <span className="shrink-0 rounded border border-border px-3 py-1.5 text-xs text-text-secondary transition-colors group-hover:border-text-muted">
-              Open →
-            </span>
-          </Card>
-        </Link>
-      </div>
-
-      {/* Stat row */}
-      <div className="mt-4 flex gap-3 text-xs text-text-muted">
-        {savedCount !== null && savedCount > 0 && (
-          <Link href="/workspaces" className="transition-colors hover:text-gold">
-            {savedCount} saved canvas{savedCount === 1 ? "" : "es"}
-          </Link>
-        )}
-        {savedCount !== null && savedCount > 0 && bookmarks.length > 0 && (
-          <span>·</span>
-        )}
-        {bookmarks.length > 0 && (
-          <Link href="/bookmarks" className="transition-colors hover:text-gold">
-            {bookmarks.length} bookmark{bookmarks.length === 1 ? "" : "s"}
-          </Link>
-        )}
       </div>
     </main>
   );
