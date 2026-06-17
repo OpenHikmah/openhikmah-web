@@ -6,6 +6,17 @@ function randomString(length: number): string {
   return Array.from(bytes, (b) => chars[b % chars.length]).join("");
 }
 
+// QF-required OAuth scopes — fixed across all environments, so hardcoded rather
+// than env-configurable (an empty NEXT_PUBLIC_QF_SCOPE build arg previously got
+// baked in as "", which dropped offline_access and broke session persistence).
+// The scope is public (it appears in the authorize URL), so this is safe.
+//   openid         → OIDC id token
+//   offline_access → REQUIRED for a refresh token; without it the session can't
+//                    survive a page reload
+//   user           → userinfo / profile claims
+//   collection     → bookmarks and collection APIs
+const SCOPE = "openid offline_access user collection";
+
 async function sha256Base64url(input: string): Promise<string> {
   const encoded = new TextEncoder().encode(input);
   const digest = await crypto.subtle.digest("SHA-256", encoded);
@@ -29,14 +40,11 @@ export async function buildAuthUrl(): Promise<{
 
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/callback`;
 
-  // Docs-required scopes: openid offline_access user collection
-  // user   → userinfo / profile claims
-  // collection → bookmarks and collection APIs
   const params = new URLSearchParams({
     response_type: "code",
     client_id: process.env.NEXT_PUBLIC_QF_CLIENT_ID ?? "",
     redirect_uri: redirectUri,
-    scope: process.env.NEXT_PUBLIC_QF_SCOPE ?? "openid offline_access user",
+    scope: SCOPE,
     state,
     nonce,
     code_challenge: codeChallenge,
