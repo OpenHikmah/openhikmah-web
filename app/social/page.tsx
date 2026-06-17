@@ -15,10 +15,18 @@ import { AuthShell } from "@/components/layout/AuthShell";
 
 type Tab = "friends" | "leaderboard" | "challenges";
 
+/** Count of incoming pending requests — drives the header badge. */
+function countPendingReceived(friends: unknown[]): number {
+  return (friends as { status?: string; direction?: string }[]).filter(
+    (f) => f.status === "pending" && f.direction === "received"
+  ).length;
+}
+
 export default function SocialPage() {
   const accessToken = useAuthStore((s) => s.accessToken);
   const userId = useSocialStore((s) => s.userId);
   const username = useSocialStore((s) => s.username);
+  const setPendingFriendCount = useSocialStore((s) => s.setPendingFriendCount);
 
   const [tab, setTab] = useState<Tab>("leaderboard");
   const [friends, setFriends] = useState<unknown[]>([]);
@@ -27,6 +35,7 @@ export default function SocialPage() {
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
   const [loadingChallenges, setLoadingChallenges] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [profileTimedOut, setProfileTimedOut] = useState(false);
 
   const fetchFriends = useCallback(async () => {
@@ -36,11 +45,21 @@ export default function SocialPage() {
       const res = await fetch("/api/social/friends", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      if (res.ok) setFriends(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setFriends(data);
+        // Keep the header badge in sync immediately after any friend action.
+        setPendingFriendCount(countPendingReceived(data));
+        setLoadError(false);
+      } else {
+        setLoadError(true);
+      }
+    } catch {
+      setLoadError(true);
     } finally {
       setLoadingFriends(false);
     }
-  }, [accessToken]);
+  }, [accessToken, setPendingFriendCount]);
 
   const fetchLeaderboard = useCallback(async () => {
     if (!accessToken) return;
@@ -49,7 +68,14 @@ export default function SocialPage() {
       const res = await fetch("/api/social/leaderboard", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      if (res.ok) setLeaderboard(await res.json());
+      if (res.ok) {
+        setLeaderboard(await res.json());
+        setLoadError(false);
+      } else {
+        setLoadError(true);
+      }
+    } catch {
+      setLoadError(true);
     } finally {
       setLoadingLeaderboard(false);
     }
@@ -85,7 +111,10 @@ export default function SocialPage() {
     setLoadingFriends(true);
     fetch("/api/social/friends", { headers: { Authorization: `Bearer ${accessToken}` }, signal })
       .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setFriends(data))
+      .then((data) => {
+        setFriends(data);
+        setPendingFriendCount(countPendingReceived(data));
+      })
       .catch(() => {})
       .finally(() => setLoadingFriends(false));
 
@@ -104,7 +133,7 @@ export default function SocialPage() {
       .finally(() => setLoadingChallenges(false));
 
     return () => ctrl.abort();
-  }, [accessToken, userId]);
+  }, [accessToken, userId, setPendingFriendCount]);
 
   return (
     <AuthShell>
@@ -156,6 +185,22 @@ export default function SocialPage() {
                 </button>
               ))}
             </div>
+
+            {loadError && !loadingFriends && !loadingLeaderboard && (
+              <p className="mb-3 text-center text-xs text-error">
+                Couldn&apos;t load.{" "}
+                <button
+                  onClick={() => {
+                    fetchFriends();
+                    fetchLeaderboard();
+                    fetchChallenges();
+                  }}
+                  className="cursor-pointer underline"
+                >
+                  Retry
+                </button>
+              </p>
+            )}
 
             {tab === "friends" && (
               <div className="space-y-4">
