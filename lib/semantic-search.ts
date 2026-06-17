@@ -1,9 +1,39 @@
+import { createHash } from "node:crypto";
 import { cosineDistance, desc, eq, ne, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { verseEmbeddings } from "@/lib/db/schema";
 import { embed } from "@/lib/ai";
+import { redisGet, redisSet } from "@/lib/redis";
 import { getVerses } from "@/lib/quran-corpus";
 import type { Verse } from "@/types/quran";
+
+/**
+ * Embeds a free-text query, caching the vector in Redis keyed by the normalized
+ * query text. The live Gemini embedding call is the hardest ceiling under load
+ * (free tier ~60/min), so repeated/popular searches skip it entirely. Falls back
+ * to a direct embed when Redis is disabled. Only user queries are cached — corpus
+ * embeddings are precomputed and never hit this path.
+ */
+const EMBED_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
+
+async function embedQueryCached(query: string): Promise<number[]> {
+  const normalized = query.toLowerCase();
+  const cacheKey = `emb:q:${createHash("sha256").update(normalized).digest("hex")}`;
+
+  const cached = await redisGet(cacheKey);
+  if (cached) {
+    try {
+      const vec = JSON.parse(cached) as number[];
+      if (Array.isArray(vec) && vec.length > 0) return vec;
+    } catch {
+      // Corrupt entry — fall through and re-embed.
+    }
+  }
+
+  const vec = await embed(query);
+  void redisSet(cacheKey, JSON.stringify(vec), EMBED_CACHE_TTL_SECONDS);
+  return vec;
+}
 
 /**
  * Semantic search over the verse corpus. Reads precomputed vectors from
@@ -52,7 +82,7 @@ async function hydrate(
 export async function searchByMeaning(query: string, limit = 10): Promise<SemanticMatch[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
-  const queryVec = await embed(trimmed);
+  const queryVec = await embedQueryCached(trimmed);
   return hydrate(await nearest(queryVec, limit));
 }
 
