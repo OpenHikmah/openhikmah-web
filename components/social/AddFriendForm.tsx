@@ -1,87 +1,154 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/auth";
-import { Loader2, UserPlus } from "lucide-react";
-import { Input } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { Loader2, UserPlus, Check, Clock } from "lucide-react";
+import { Input, Card } from "@/components/ui";
 
 interface Props {
   onAdded: () => void;
 }
 
+type Status = "none" | "accepted" | "pending_sent" | "pending_received";
+interface SearchResult {
+  id: number;
+  username: string;
+  displayName: string | null;
+  status: Status;
+}
+
 export function AddFriendForm({ onAdded }: Props) {
   const accessToken = useAuthStore((s) => s.accessToken);
-  const [username, setUsername] = useState("");
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [sendingId, setSendingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = username.trim();
-    if (!trimmed || !accessToken) return;
+  // Debounced search whenever the query changes. State is only ever set from the
+  // async callbacks below (never synchronously in the effect body), so a stale
+  // query never leaves the results out of sync.
+  useEffect(() => {
+    const q = query.trim();
+    // Nothing to do for an empty query — the results dropdown is gated on a
+    // non-empty query in render, so there's no stale state to clear here.
+    if (!q || !accessToken) return;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => {
+      setSearching(true);
+      setResults([]);
+      fetch(`/api/social/users?q=${encodeURIComponent(q)}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: ctrl.signal,
+      })
+        .then((r) => (r.ok ? r.json() : []))
+        .then((data: SearchResult[]) => setResults(data))
+        .catch(() => {})
+        .finally(() => setSearching(false));
+    }, 300);
+    return () => {
+      ctrl.abort();
+      clearTimeout(timer);
+    };
+  }, [query, accessToken]);
 
-    setSending(true);
+  const sendRequest = async (user: SearchResult) => {
+    if (!accessToken || sendingId !== null) return;
+    setSendingId(user.id);
     setError(null);
-    setSuccess(null);
-
     try {
       const res = await fetch("/api/social/friends", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ username: trimmed }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ username: user.username }),
       });
-
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "Could not send request");
         return;
       }
-
-      setSuccess(`Request sent to ${data.friend?.username ?? trimmed}`);
-      setUsername("");
+      // Reflect the new state locally; mutual requests come back accepted.
+      const newStatus: Status = data.mutual ? "accepted" : "pending_sent";
+      setResults((prev) => prev.map((r) => (r.id === user.id ? { ...r, status: newStatus } : r)));
       onAdded();
     } catch {
       setError("Network error. Try again.");
     } finally {
-      setSending(false);
+      setSendingId(null);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2">
+    <div className="space-y-2">
       <Input
         type="text"
-        value={username}
+        value={query}
         onChange={(e) => {
-          setUsername(e.target.value);
+          setQuery(e.target.value);
           setError(null);
-          setSuccess(null);
         }}
-        placeholder="Add by username…"
+        placeholder="Search by username…"
         maxLength={20}
         autoComplete="off"
         spellCheck={false}
-        className={cn("h-auto flex-1 rounded px-3 py-1.5", error && "border-error")}
+        className="h-auto w-full rounded px-3 py-1.5"
       />
-      <button
-        type="submit"
-        disabled={sending || !username.trim()}
-        className="flex cursor-pointer items-center gap-1.5 rounded border border-teal px-3 py-1.5 text-xs font-medium text-teal transition-colors hover:bg-teal/10 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {sending ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <UserPlus className="h-3.5 w-3.5" />
-        )}
-        Add
-      </button>
-      {error && <p className="self-center text-xs text-error">{error}</p>}
-      {success && <p className="self-center text-xs text-teal">{success}</p>}
-    </form>
+
+      {error && <p className="text-xs text-error">{error}</p>}
+
+      {query.trim() && (
+        <div className="space-y-1">
+          {searching && results.length === 0 ? (
+            <p className="px-1 py-1 text-xs text-text-muted">Searching…</p>
+          ) : results.length === 0 ? (
+            <p className="px-1 py-1 text-xs text-text-muted">No users found.</p>
+          ) : (
+            results.map((u) => (
+              <Card
+                key={u.id}
+                variant="raised"
+                className="flex items-center justify-between gap-3 px-3 py-2"
+              >
+                <span className="truncate text-sm text-text-primary">{u.username}</span>
+                <FriendAction
+                  status={u.status}
+                  sending={sendingId === u.id}
+                  onClick={() => sendRequest(u)}
+                />
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FriendAction({
+  status,
+  sending,
+  onClick,
+}: {
+  status: Status;
+  sending: boolean;
+  onClick: () => void;
+}) {
+  if (status === "accepted") {
+    return <span className="flex items-center gap-1 text-xs text-text-muted"><Check className="h-3.5 w-3.5" /> Friends</span>;
+  }
+  if (status === "pending_sent") {
+    return <span className="flex items-center gap-1 text-xs text-text-muted"><Clock className="h-3.5 w-3.5" /> Sent</span>;
+  }
+  // "none" or "pending_received" — both move the relationship forward (a request
+  // back to someone who already invited you is auto-accepted server-side).
+  return (
+    <button
+      onClick={onClick}
+      disabled={sending}
+      className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded border border-teal px-2.5 py-1 text-xs font-medium text-teal transition-colors hover:bg-teal/10 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}
+      {status === "pending_received" ? "Accept" : "Add"}
+    </button>
   );
 }

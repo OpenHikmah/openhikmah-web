@@ -21,6 +21,7 @@ interface Props {
 export function FriendList({ friends, onUpdate }: Props) {
   const accessToken = useAuthStore((s) => s.accessToken);
   const [busy, setBusy] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const accepted = friends.filter((f) => f.status === "accepted");
   const pending = friends.filter((f) => f.status === "pending");
@@ -28,8 +29,9 @@ export function FriendList({ friends, onUpdate }: Props) {
   const patch = async (id: number, action: "accept" | "decline") => {
     if (!accessToken) return;
     setBusy(id);
+    setError(null);
     try {
-      await fetch(`/api/social/friends/${id}`, {
+      const res = await fetch(`/api/social/friends/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -37,7 +39,13 @@ export function FriendList({ friends, onUpdate }: Props) {
         },
         body: JSON.stringify({ action }),
       });
+      if (!res.ok) {
+        setError(`Couldn't ${action} request — try again.`);
+        return;
+      }
       onUpdate();
+    } catch {
+      setError("Network error — try again.");
     } finally {
       setBusy(null);
     }
@@ -46,12 +54,19 @@ export function FriendList({ friends, onUpdate }: Props) {
   const remove = async (id: number) => {
     if (!accessToken) return;
     setBusy(id);
+    setError(null);
     try {
-      await fetch(`/api/social/friends/${id}`, {
+      const res = await fetch(`/api/social/friends/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${accessToken}` },
       });
+      if (!res.ok) {
+        setError("Couldn't remove — try again.");
+        return;
+      }
       onUpdate();
+    } catch {
+      setError("Network error — try again.");
     } finally {
       setBusy(null);
     }
@@ -69,6 +84,7 @@ export function FriendList({ friends, onUpdate }: Props) {
 
   return (
     <div className="space-y-4">
+      {error && <p className="text-xs text-error">{error}</p>}
       {pending.length > 0 && (
         <div className="space-y-1">
           <p className="mb-2 font-mono text-xs text-text-muted">Pending requests</p>
@@ -84,7 +100,7 @@ export function FriendList({ friends, onUpdate }: Props) {
                   {f.direction === "sent" ? "sent" : "received"}
                 </span>
               </div>
-              {f.direction === "received" && (
+              {f.direction === "received" ? (
                 <div className="flex items-center gap-1">
                   <Tooltip label="Accept">
                     <IconButton
@@ -109,6 +125,18 @@ export function FriendList({ friends, onUpdate }: Props) {
                     </IconButton>
                   </Tooltip>
                 </div>
+              ) : (
+                <Tooltip label="Cancel request">
+                  <IconButton
+                    tone="danger"
+                    size="xs"
+                    onClick={() => remove(f.id)}
+                    disabled={busy === f.id}
+                    aria-label="Cancel request"
+                  >
+                    {busy === f.id ? <Loader2 className="animate-spin" /> : <X />}
+                  </IconButton>
+                </Tooltip>
               )}
             </Card>
           ))}
