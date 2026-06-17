@@ -9,25 +9,24 @@ import { useState, useEffect } from "react";
 import type { EdgeKind } from "@/types/quran";
 import { Card } from "@/components/ui";
 import { InteractiveArabic } from "@/components/morphology/InteractiveArabic";
+import type { TafsirBlock } from "@/lib/tafsir";
 
 function TafsirSection({ surah, ayah }: { surah: number; ayah: number }) {
   const [open, setOpen] = useState(false);
-  const [text, setText] = useState<string | null>(null);
+  const [blocks, setBlocks] = useState<TafsirBlock[] | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleOpen = async () => {
     if (open) { setOpen(false); return; }
     setOpen(true);
-    if (text !== null) return;
+    if (blocks !== null) return;
     setLoading(true);
     try {
-      const res = await fetch(
-        `https://api.alquran.cloud/v1/ayah/${surah}:${ayah}/editions/en.ibn-kathir`
-      );
-      const json = await res.json();
-      setText(json?.data?.[0]?.text ?? "Tafsir unavailable.");
+      const res = await fetch(`/api/verse/${surah}/${ayah}/tafsir`);
+      const json: { blocks?: TafsirBlock[] } = res.ok ? await res.json() : {};
+      setBlocks(json.blocks ?? []);
     } catch {
-      setText("Could not load tafsir.");
+      setBlocks([]);
     } finally {
       setLoading(false);
     }
@@ -43,11 +42,23 @@ function TafsirSection({ surah, ayah }: { surah: number; ayah: number }) {
         {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
       </button>
       {open && (
-        <div className="px-3 pb-3">
+        <div className="space-y-2 px-3 pb-3">
           {loading ? (
             <p className="text-xs text-text-muted">Loading…</p>
+          ) : !blocks?.length ? (
+            <p className="text-xs text-text-muted">Tafsir unavailable.</p>
           ) : (
-            <p className="text-xs leading-relaxed text-text-secondary">{text}</p>
+            blocks.map((b, i) =>
+              b.arabic ? (
+                <p key={i} dir="rtl" className="font-arabic text-right text-sm leading-loose text-text-primary">
+                  {b.text}
+                </p>
+              ) : (
+                <p key={i} className="text-xs leading-relaxed text-text-secondary">
+                  {b.text}
+                </p>
+              )
+            )
           )}
         </div>
       )}
@@ -274,13 +285,13 @@ export function ContextSidebar() {
                   </span>
                 </div>
 
-                <InteractiveArabic key={sidebarContent.verse.ref} verse={sidebarContent.verse} />
+                <InteractiveArabic key={`arabic-${sidebarContent.verse.ref}`} verse={sidebarContent.verse} />
 
                 <p className="text-sm leading-relaxed text-text-secondary">
                   {sidebarContent.verse.translation}
                 </p>
 
-                <TafsirSection key={sidebarContent.verse.ref} surah={sidebarContent.verse.surah} ayah={sidebarContent.verse.ayah} />
+                <TafsirSection key={`tafsir-${sidebarContent.verse.ref}`} surah={sidebarContent.verse.surah} ayah={sidebarContent.verse.ayah} />
 
                 <NotesSection key={`notes-${sidebarContent.verse.ref}`} verseRef={sidebarContent.verse.ref} />
                 <SimilarSection key={`similar-${sidebarContent.verse.ref}`} surah={sidebarContent.verse.surah} ayah={sidebarContent.verse.ayah} />
