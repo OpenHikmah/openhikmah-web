@@ -6,16 +6,17 @@ function randomString(length: number): string {
   return Array.from(bytes, (b) => chars[b % chars.length]).join("");
 }
 
-// QF-required OAuth scopes — fixed across all environments, so hardcoded rather
-// than env-configurable (an empty NEXT_PUBLIC_QF_SCOPE build arg previously got
-// baked in as "", which dropped offline_access and broke session persistence).
-// The scope is public (it appears in the authorize URL), so this is safe.
+// OAuth scopes the QF client is approved for — hardcoded (the scope is public; it
+// appears in the authorize URL). Kept to exactly what BOTH the prod and prelive
+// clients allow: the production client is NOT approved for `collection`, and
+// requesting it makes Ory reject the whole authorize request (invalid_scope), so
+// it's omitted. We don't call QF's collection API anyway (bookmarks live in our
+// own DB), so nothing is lost.
 //   openid         → OIDC id token
 //   offline_access → REQUIRED for a refresh token; without it the session can't
 //                    survive a page reload
 //   user           → userinfo / profile claims
-//   collection     → bookmarks and collection APIs
-const SCOPE = "openid offline_access user collection";
+const SCOPE = "openid offline_access user";
 
 async function sha256Base64url(input: string): Promise<string> {
   const encoded = new TextEncoder().encode(input);

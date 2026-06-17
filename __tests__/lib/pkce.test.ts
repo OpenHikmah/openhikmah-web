@@ -28,9 +28,10 @@ describe("buildAuthUrl", () => {
   it("requests the fixed QF scope including offline_access", async () => {
     const { url } = await buildAuthUrl();
     const scope = new URL(url).searchParams.get("scope") ?? "";
-    // Scope is hardcoded (not env-configurable). offline_access is mandatory —
-    // without it no refresh token is issued and the session dies on reload.
-    expect(scope).toBe("openid offline_access user collection");
+    // Scope is hardcoded to what the QF client is approved for. offline_access is
+    // mandatory (refresh token); `collection` is omitted — the prod client isn't
+    // approved for it, which would make Ory reject the authorize request.
+    expect(scope).toBe("openid offline_access user");
   });
 
   it("codeVerifier is 128 characters long", async () => {
