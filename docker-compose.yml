@@ -27,8 +27,13 @@ services:
       - NEXT_PUBLIC_QF_AUTH_BASE=${NEXT_PUBLIC_QF_AUTH_BASE}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
       - DATABASE_URL=postgresql://openh:${DB_PASSWORD}@db:5432/open_hikmah
+      # Optional accelerator. If REDIS_PASSWORD is unset the app simply runs
+      # without Redis and falls back to in-process/Postgres behavior.
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@redis:6379
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
@@ -56,5 +61,22 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    container_name: open-hikmah-redis
+    # Externalized state: token/JWKS caches, the rate limiter, and the query
+    # embedding cache. Optional — the app degrades to in-process/Postgres if this
+    # is down. An empty REDIS_PASSWORD disables auth on both ends.
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-}", "--save", "60", "1", "--appendonly", "no"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   postgres_data:
+  redis_data:
