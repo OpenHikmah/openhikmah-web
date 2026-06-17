@@ -12,6 +12,7 @@
     "test": "vitest",
     "test:ci": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "embed": "bun scripts/embed-corpus.mjs",
     "prepare": "husky"
   },
   "lint-staged": {

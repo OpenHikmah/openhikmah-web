@@ -176,11 +176,27 @@ describe("GET /api/search", () => {
     expect(mockSearchByMeaning).not.toHaveBeenCalled();
   });
 
-  it("mode=meaning returns [] when semantic search throws", async () => {
+  it("mode=meaning falls back to keyword search when semantic search throws", async () => {
     mockSearchByMeaning.mockRejectedValueOnce(new Error("no embeddings"));
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([{ verse_key: "1:3", translations: [{ text: "the Lord of Mercy" }] }])
+    );
     const res = await GET(makeMeaningReq("mercy"));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual([]);
+    expect(res.headers.get("x-search-fallback")).toBe("keyword");
+    const body = await res.json();
+    expect(body.map((r: { ref: string }) => r.ref)).toEqual(["1:3"]);
+  });
+
+  it("mode=meaning falls back to keyword when semantic search is empty (not seeded)", async () => {
+    mockSearchByMeaning.mockResolvedValueOnce([]);
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([{ verse_key: "1:1", translations: [{ text: "In the name of God" }] }])
+    );
+    const res = await GET(makeMeaningReq("mercy"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-search-fallback")).toBe("keyword");
+    expect((await res.json())[0].ref).toBe("1:1");
   });
 
   it("mode=meaning rate-limits under the client IP from x-forwarded-for", async () => {
@@ -195,11 +211,16 @@ describe("GET /api/search", () => {
     expect(mockConsume).toHaveBeenCalledWith("search:unknown");
   });
 
-  it("mode=meaning returns 429 when the rate limit is exceeded, without embedding", async () => {
+  it("mode=meaning falls back to keyword (not 429) when rate-limited, without embedding", async () => {
     mockConsume.mockResolvedValue(false);
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([{ verse_key: "2:1", translations: [{ text: "Alif Lam Mim" }] }])
+    );
     const res = await GET(makeMeaningReq("mercy"));
-    expect(res.status).toBe(429);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-search-fallback")).toBe("keyword");
     expect(mockSearchByMeaning).not.toHaveBeenCalled();
+    expect((await res.json())[0].ref).toBe("2:1");
   });
 
   it("does not rate-limit the keyword path", async () => {

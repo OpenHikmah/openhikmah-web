@@ -36,7 +36,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [previewError, setPreviewError] = useState(false);
   const [mode, setMode] = useState<SearchMode>("keyword");
-  const [rateLimited, setRateLimited] = useState(false);
+  const [fellBackToKeyword, setFellBackToKeyword] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -74,20 +74,19 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     async (q: string, signal: AbortSignal, searchMode: SearchMode) => {
       setIsSearching(true);
       setSearchResults([]);
-      setRateLimited(false);
+      setFellBackToKeyword(false);
       try {
         const url = `/api/search?q=${encodeURIComponent(q)}${
           searchMode === "meaning" ? "&mode=meaning" : ""
         }`;
         const res = await fetch(url, { signal });
-        // The semantic path is rate-limited per IP (it calls a paid embedding
-        // provider); surface that distinctly rather than as "no results".
-        if (res.status === 429) {
-          setRateLimited(true);
-          return;
-        }
         if (!res.ok) throw new Error();
         const results: SearchResult[] = await res.json();
+        // In "by meaning" mode the server falls back to keyword search when
+        // semantic results aren't available; flag it so we can tell the user.
+        setFellBackToKeyword(
+          searchMode === "meaning" && res.headers.get("x-search-fallback") === "keyword"
+        );
         setSearchResults(results);
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
@@ -199,7 +198,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
           setPreviewError(false);
           setLoading(false);
           setIsSearching(false);
-          setRateLimited(false);
+          setFellBackToKeyword(false);
           setMode("keyword");
           onClose();
         }
@@ -234,7 +233,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                     setPreviewError(false);
                     setLoading(false);
                     setIsSearching(false);
-                    setRateLimited(false);
+                    setFellBackToKeyword(false);
                   }
                 }}
                 placeholder={
@@ -300,6 +299,11 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
               {showResults && (
                 <div className="p-3 space-y-0.5">
+                  {fellBackToKeyword && (
+                    <p className="px-2 pb-1.5 text-[10px] text-text-muted">
+                      Showing keyword matches — semantic search is warming up.
+                    </p>
+                  )}
                   {searchResults.map((result) => (
                     <SearchResultRow
                       key={result.ref}
@@ -323,15 +327,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                 </div>
               )}
 
-              {rateLimited && !busy && (
-                <div className="px-4 py-6 text-center">
-                  <p className="text-sm text-text-muted">
-                    Too many searches — please wait a moment and try again.
-                  </p>
-                </div>
-              )}
-
-              {!showSeedVerses && !showPreview && !showResults && !busy && !previewError && !rateLimited && (
+              {!showSeedVerses && !showPreview && !showResults && !busy && !previewError && (
                 <div className="px-4 py-8 text-center">
                   <p className="text-sm text-text-muted">
                     {mode === "meaning"
