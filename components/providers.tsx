@@ -19,7 +19,19 @@ function SessionRestorer() {
     if (didRun.current) return;
     didRun.current = true;
 
-    fetch("/api/auth/refresh", { method: "POST" })
+    // If a token is already in memory we just signed in (the OAuth callback set
+    // it and soft-navigated here). Calling refresh now would consume+rotate the
+    // refresh-token cookie a second time; if the user then hard-navigates before
+    // the rotated cookie commits, Ory sees the old token reused and revokes the
+    // whole session — leaving them stuck on "Sign in". Skip the redundant call.
+    if (useAuthStore.getState().accessToken) {
+      setSessionLoaded();
+      return;
+    }
+
+    // keepalive: let an in-flight refresh finish (and its rotated Set-Cookie be
+    // applied) even if the user navigates away mid-request.
+    fetch("/api/auth/refresh", { method: "POST", keepalive: true })
       .then(async (res) => {
         if (!res.ok) return;
         const { accessToken } = await res.json() as { accessToken?: string };
