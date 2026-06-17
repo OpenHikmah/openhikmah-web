@@ -69,6 +69,8 @@ function makeReq() {
   });
 }
 
+const today = new Date().toISOString().slice(0, 10);
+
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
 describe("GET /api/social/leaderboard", () => {
@@ -117,7 +119,7 @@ describe("GET /api/social/leaderboard", () => {
     mockSelect
       .mockReturnValueOnce(makeDbChain([]))
       .mockReturnValueOnce(makeDbChain([
-        { id: 1, username: "testuser", displayName: null, currentStreak: 7, longestStreak: 12 },
+        { id: 1, username: "testuser", displayName: null, currentStreak: 7, longestStreak: 12, lastActivityDate: today },
       ]));
     const res = await GET(makeReq());
     const body = await res.json();
@@ -127,6 +129,37 @@ describe("GET /api/social/leaderboard", () => {
       longestStreak: 12,
       isYou: true,
     });
+  });
+
+  it("decays a broken streak to 0 so it ranks below an active one", async () => {
+    authedAs(makeUser({ id: 1 }));
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([{ requesterId: 1, addresseeId: 2 }]))
+      .mockReturnValueOnce(makeDbChain([
+        // Friend's stored streak is 30 but last activity was long ago → effective 0.
+        { id: 2, username: "stale", displayName: null, currentStreak: 30, longestStreak: 30, lastActivityDate: "2000-01-01" },
+        // Self is active today with a smaller streak → should rank first.
+        { id: 1, username: "testuser", displayName: null, currentStreak: 3, longestStreak: 3, lastActivityDate: today },
+      ]));
+    const res = await GET(makeReq());
+    const body = await res.json();
+    expect(body[0]).toMatchObject({ id: 1, rank: 1, streak: 3 });
+    expect(body[1]).toMatchObject({ id: 2, rank: 2, streak: 0 });
+  });
+
+  it("breaks ties deterministically by longest streak then username", async () => {
+    authedAs(makeUser({ id: 1 }));
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([{ requesterId: 1, addresseeId: 2 }]))
+      .mockReturnValueOnce(makeDbChain([
+        { id: 1, username: "zoe", displayName: null, currentStreak: 5, longestStreak: 5, lastActivityDate: today },
+        { id: 2, username: "amy", displayName: null, currentStreak: 5, longestStreak: 9, lastActivityDate: today },
+      ]));
+    const res = await GET(makeReq());
+    const body = await res.json();
+    // Equal current streak → higher longest streak wins.
+    expect(body[0]).toMatchObject({ id: 2, rank: 1 });
+    expect(body[1]).toMatchObject({ id: 1, rank: 2 });
   });
 
   it("friends are included alongside self", async () => {

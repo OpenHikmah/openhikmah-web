@@ -55,7 +55,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     lastActiveAt: new Date("2025-01-15"),
     currentStreak: 3,
     longestStreak: 7,
-    lastActivityDate: "2025-01-15",
+    lastActivityDate: new Date().toISOString().slice(0, 10),
     ...overrides,
   };
 }
@@ -110,6 +110,14 @@ describe("GET /api/social/me", () => {
     const res = await GET(makeGetReq());
     const body = await res.json();
     expect(body.qfId).toBeUndefined();
+  });
+
+  it("reports a broken streak as 0 (decay) while keeping longestStreak", async () => {
+    authedAs(makeUser({ currentStreak: 30, longestStreak: 30, lastActivityDate: "2000-01-01" }));
+    const res = await GET(makeGetReq());
+    const body = await res.json();
+    expect(body.currentStreak).toBe(0);
+    expect(body.longestStreak).toBe(30);
   });
 });
 
