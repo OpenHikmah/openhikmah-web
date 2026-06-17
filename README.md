@@ -1,4 +1,7 @@
-# Open Hikmah
+<h1>
+  <img src="public/logo-mark.png" alt="Open Hikmah logo" height="32" align="center" />
+  &nbsp;Open Hikmah
+</h1>
 
 [![CI](https://github.com/Nazm-AI/open-hikmah/actions/workflows/ci.yml/badge.svg)](https://github.com/Nazm-AI/open-hikmah/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
