@@ -1,5 +1,5 @@
-<h1>
-  <img src="public/logo-mark.png" alt="Open Hikmah logo" height="32" align="center" />
+<h1 align="center">
+  <img src="public/logo-mark.png" alt="Open Hikmah logo" height="48" align="center" />
   &nbsp;Open Hikmah
 </h1>
 
