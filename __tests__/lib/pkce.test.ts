@@ -25,10 +25,12 @@ describe("buildAuthUrl", () => {
     expect(parsed.searchParams.get("redirect_uri")).toContain("/callback");
   });
 
-  it("url includes scope with required values", async () => {
+  it("requests the fixed QF scope including offline_access", async () => {
     const { url } = await buildAuthUrl();
     const scope = new URL(url).searchParams.get("scope") ?? "";
-    expect(scope).toContain("openid");
+    // Scope is hardcoded (not env-configurable). offline_access is mandatory —
+    // without it no refresh token is issued and the session dies on reload.
+    expect(scope).toBe("openid offline_access user collection");
   });
 
   it("codeVerifier is 128 characters long", async () => {

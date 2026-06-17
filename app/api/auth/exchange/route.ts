@@ -66,6 +66,16 @@ export async function POST(req: NextRequest) {
     const refreshToken = data.refresh_token ?? null;
     const COOKIE_NAME = "qf_refresh_token";
 
+    // No refresh token ⇒ the session cookie can't be set, so the user is logged
+    // out on the next reload. This almost always means `offline_access` wasn't in
+    // the requested/granted scope. Surface it loudly instead of failing silently.
+    if (!refreshToken) {
+      console.warn(
+        "Auth exchange returned no refresh_token — session will not survive reload. " +
+        "Check the OAuth scope includes 'offline_access' and the client is allowed it."
+      );
+    }
+
     // Step 2: Resolve QF user identity and upsert our user record.
     // If this fails (QF userinfo unreachable), degrade gracefully — tokens
     // still work for bookmarks; social features will be unavailable.
