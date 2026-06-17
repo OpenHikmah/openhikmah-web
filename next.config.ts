@@ -9,6 +9,24 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  // Long-lived caching for static assets served from /public (images, icons,
+  // fonts). Next already marks hashed /_next/static assets immutable; this covers
+  // the un-hashed public files so Cloudflare (and browsers) can cache them at the
+  // edge. The extension-anchored source only matches asset files — never HTML
+  // routes (which have no extension) or API routes — so pages are never cached.
+  async headers() {
+    return [
+      {
+        source: "/:path*.(ico|png|jpg|jpeg|gif|svg|webp|avif|woff|woff2)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

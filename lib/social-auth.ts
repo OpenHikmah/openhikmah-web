@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { users, type User } from "./db/schema";
 import { redisGet, redisSet, redisDel } from "./redis";
+import { incr } from "./metrics";
 
 export interface AuthedUser {
   userId: number;
@@ -174,6 +175,7 @@ export async function requireUser(
   // L1 — in-process cache, zero round-trip.
   const cached = tokenCache.get(token);
   if (cached && cached.expiresAt > Date.now()) {
+    incr("auth_l1_hit");
     return { userId: cached.user.id, user: cached.user };
   }
 
@@ -185,6 +187,7 @@ export async function requireUser(
     if (Number.isInteger(id)) {
       const [u] = await db.select().from(users).where(eq(users.id, id)).limit(1);
       if (u) {
+        incr("auth_l2_hit");
         tokenCache.set(token, { user: u, expiresAt: Date.now() + CACHE_TTL_MS });
         return { userId: u.id, user: u };
       }
@@ -218,6 +221,7 @@ export async function requireUser(
       if (v.expiresAt <= now) tokenCache.delete(t);
     }
   }
+  incr("auth_cache_miss");
   tokenCache.set(token, { user, expiresAt: Date.now() + CACHE_TTL_MS });
   void redisSet(tokenRedisKey(token), String(user.id), CACHE_TTL_SECONDS);
   return { userId: user.id, user };

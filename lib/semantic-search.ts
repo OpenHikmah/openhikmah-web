@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { verseEmbeddings } from "@/lib/db/schema";
 import { embed } from "@/lib/ai";
 import { redisGet, redisSet } from "@/lib/redis";
+import { incr } from "@/lib/metrics";
 import { getVerses } from "@/lib/quran-corpus";
 import type { Verse } from "@/types/quran";
 
@@ -24,12 +25,16 @@ async function embedQueryCached(query: string): Promise<number[]> {
   if (cached) {
     try {
       const vec = JSON.parse(cached) as number[];
-      if (Array.isArray(vec) && vec.length > 0) return vec;
+      if (Array.isArray(vec) && vec.length > 0) {
+        incr("embed_cache_hit");
+        return vec;
+      }
     } catch {
       // Corrupt entry — fall through and re-embed.
     }
   }
 
+  incr("embed_cache_miss");
   const vec = await embed(query);
   void redisSet(cacheKey, JSON.stringify(vec), EMBED_CACHE_TTL_SECONDS);
   return vec;

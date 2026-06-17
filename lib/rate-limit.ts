@@ -2,6 +2,7 @@ import { lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { rateLimits } from "@/lib/db/schema";
 import { redisIncrWithTtl } from "@/lib/redis";
+import { incr } from "@/lib/metrics";
 
 /**
  * Fixed-window rate limiter. Guards the expensive AI generation path so a single
@@ -84,7 +85,9 @@ export async function consume(
   // in which case we fall through to the Postgres counter below.
   const redisCount = await redisIncrWithTtl(`rl:${rowKey}`, windowSeconds * 2);
   if (redisCount !== null) {
-    return redisCount <= limit;
+    const allowed = redisCount <= limit;
+    incr(allowed ? "ratelimit_allow" : "ratelimit_block");
+    return allowed;
   }
 
   try {
