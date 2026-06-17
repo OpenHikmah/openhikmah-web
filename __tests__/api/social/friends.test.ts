@@ -27,16 +27,17 @@ function makeDbChain(resolveWith: unknown = []) {
   return chain;
 }
 
-const { mockSelect, mockInsert } = vi.hoisted(() => ({
+const { mockSelect, mockInsert, mockUpdate } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
   mockInsert: vi.fn(() => makeDbChain([])),
+  mockUpdate: vi.fn(() => makeDbChain([])),
 }));
 
 vi.mock("@/lib/db", () => ({
   db: {
     select: mockSelect,
     insert: mockInsert,
-    update: vi.fn(() => makeDbChain([])),
+    update: mockUpdate,
   },
 }));
 
@@ -115,6 +116,7 @@ describe("POST /api/social/friends", () => {
     mockInsert.mockReturnValue(
       makeDbChain([{ id: 10, status: "pending", requesterId: 1, addresseeId: 2 }])
     );
+    mockUpdate.mockReturnValue(makeDbChain([]));
   });
 
   it("returns 401 when unauthorized", async () => {
@@ -173,15 +175,42 @@ describe("POST /api/social/friends", () => {
     expect(body.error).toMatch(/already friends/i);
   });
 
-  it("returns 409 when request already pending", async () => {
+  it("returns 409 when an outgoing request is already pending", async () => {
     authedAs(makeUser({ id: 1 }));
     mockSelect
       .mockReturnValueOnce(makeDbChain([{ id: 2, username: "friend99" }]))
-      .mockReturnValueOnce(makeDbChain([{ id: 10, status: "pending" }]));
+      // requesterId is me (1) → outgoing pending
+      .mockReturnValueOnce(makeDbChain([{ id: 10, status: "pending", requesterId: 1 }]));
     const res = await POST(makePostReq({ username: "friend99" }));
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body.error).toMatch(/request already sent/i);
+  });
+
+  it("auto-accepts when the target already sent you a pending request", async () => {
+    authedAs(makeUser({ id: 1 }));
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([{ id: 2, username: "friend99" }]))
+      // requesterId is the target (2) → incoming pending, should be accepted
+      .mockReturnValueOnce(makeDbChain([{ id: 10, status: "pending", requesterId: 2 }]));
+    mockUpdate.mockReturnValueOnce(makeDbChain([{ id: 10, status: "accepted" }]));
+    const res = await POST(makePostReq({ username: "friend99" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("accepted");
+    expect(body.mutual).toBe(true);
+  });
+
+  it("returns 409 (not 500) when a concurrent insert hits the unique constraint", async () => {
+    authedAs(makeUser({ id: 1 }));
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([{ id: 2, username: "friend99" }]))
+      .mockReturnValueOnce(makeDbChain([]));
+    mockInsert.mockReturnValueOnce({
+      values: () => ({ returning: () => Promise.reject({ code: "23505" }) }),
+    } as unknown as ReturnType<typeof mockInsert>);
+    const res = await POST(makePostReq({ username: "friend99" }));
+    expect(res.status).toBe(409);
   });
 
   it("returns 201 with friendship data on success", async () => {

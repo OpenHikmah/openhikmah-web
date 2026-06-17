@@ -3,18 +3,9 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { activityLog, users } from "@/lib/db/schema";
 import { requireUser, invalidateTokenCache } from "@/lib/social-auth";
+import { todayUTC, yesterdayUTC, effectiveStreak } from "@/lib/streak";
 
 const VALID_TYPES = new Set(["verse_added", "connection_made", "hadith_read"]);
-
-function todayUTC(): string {
-  return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
-}
-
-function yesterdayUTC(): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
 
 export async function POST(req: NextRequest) {
   const authed = await requireUser(req);
@@ -93,7 +84,7 @@ export async function GET(req: NextRequest) {
 
   const { user } = authed;
   return NextResponse.json({
-    streak: user.currentStreak,
+    streak: effectiveStreak(user.currentStreak, user.lastActivityDate),
     longestStreak: user.longestStreak,
     lastActivityDate: user.lastActivityDate,
   });

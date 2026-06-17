@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { friendships, users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
+import { effectiveStreak } from "@/lib/streak";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
@@ -32,26 +33,37 @@ export async function GET(req: NextRequest) {
   const allIds = [userId, ...friendIds];
   if (allIds.length === 0) return NextResponse.json([]);
 
-  const leaderboard = await db
+  const rows = await db
     .select({
       id: users.id,
       username: users.username,
       displayName: users.displayName,
       currentStreak: users.currentStreak,
       longestStreak: users.longestStreak,
+      lastActivityDate: users.lastActivityDate,
     })
     .from(users)
     .where(or(...allIds.map((id) => eq(users.id, id))))
-    .orderBy(desc(users.currentStreak))
     .limit(500);
 
+  // Rank by the *effective* (decayed) streak so broken streaks don't sit at the
+  // top stale, with deterministic tie-breakers: longest streak, then username.
+  const ranked = rows
+    .map((u) => ({ ...u, streak: effectiveStreak(u.currentStreak, u.lastActivityDate) }))
+    .sort(
+      (a, b) =>
+        b.streak - a.streak ||
+        b.longestStreak - a.longestStreak ||
+        a.username.localeCompare(b.username)
+    );
+
   return NextResponse.json(
-    leaderboard.map((u, i) => ({
+    ranked.map((u, i) => ({
       rank: i + 1,
       id: u.id,
       username: u.username,
       displayName: u.displayName,
-      streak: u.currentStreak,
+      streak: u.streak,
       longestStreak: u.longestStreak,
       isYou: u.id === userId,
     }))
