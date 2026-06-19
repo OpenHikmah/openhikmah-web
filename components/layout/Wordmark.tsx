@@ -9,7 +9,7 @@ import Image from "next/image";
 export function Wordmark() {
   return (
     <Link href="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
-      <Image src="/logo-mark.png" alt="" width={20} height={20} className="size-5" priority />
+      <Image src="/logo-mark.png" alt="" width={24} height={24} className="size-6" priority />
       <span className="text-[15px] font-semibold text-text-primary">Open Hikmah</span>
     </Link>
   );
