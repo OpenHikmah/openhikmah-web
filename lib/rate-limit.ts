@@ -1,13 +1,17 @@
 import { lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { rateLimits } from "@/lib/db/schema";
+import { redisIncrWithTtl } from "@/lib/redis";
+import { incr } from "@/lib/metrics";
 
 /**
- * Fixed-window rate limiter backed by Postgres (no Redis). Guards the expensive
- * AI generation path so a single client can't run up the API bill. Cache hits
- * are not limited — only actual generations consume budget.
+ * Fixed-window rate limiter. Guards the expensive AI generation path so a single
+ * client can't run up the API bill. Cache hits are not limited — only actual
+ * generations consume budget.
  *
- * Redis is the upgrade path once traffic warrants it; the interface stays the same.
+ * Counts live in Redis when configured (atomic INCR+EXPIRE, no DB contention) and
+ * fall back to a Postgres counter when Redis is absent or erroring — so the same
+ * limit is enforced regardless of which backend is available.
  */
 
 export class RateLimitError extends Error {
@@ -76,6 +80,20 @@ export async function consume(
   const bucket = Math.floor(Date.now() / 1000 / windowSeconds);
   const rowKey = `${key}:${bucket}`;
 
+  // Prefer Redis: atomic, no Postgres write contention. Expire after two windows
+  // so the bucket key self-cleans. Returns null when Redis is disabled/erroring,
+  // in which case we fall through to the Postgres counter below.
+  const redisCount = await redisIncrWithTtl(`rl:${rowKey}`, windowSeconds * 2);
+  if (redisCount !== null) {
+    const allowed = redisCount <= limit;
+    incr(allowed ? "ratelimit_allow" : "ratelimit_block");
+    return allowed;
+  }
+
+  // Redis unavailable → Postgres fallback. Count it so a silent Redis outage is
+  // visible on /api/metrics rather than only inferable from missing allow/block.
+  incr("ratelimit_redis_fallback");
+
   try {
     const rows = await db
       .insert(rateLimits)
@@ -88,8 +106,14 @@ export async function consume(
 
     const count = rows[0]?.count ?? 1;
     maybeSweep(windowSeconds);
-    return count <= limit;
+    const allowed = count <= limit;
+    incr(allowed ? "ratelimit_allow" : "ratelimit_block");
+    return allowed;
   } catch (err) {
+    // Fail open so a limiter outage never takes the feature down — but emit a
+    // counter, because a security control that stops enforcing under load (e.g.
+    // a correlated Redis+DB outage) must not do so without a signal.
+    incr("ratelimit_fail_open");
     console.error("Rate limiter error (failing open):", err);
     return true;
   }

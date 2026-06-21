@@ -7,14 +7,22 @@ import {
 import { NextRequest } from "next/server";
 
 // ─── DB mock — requireUser does db.select().from().where().limit() ────────────
-const { mockLimit, mockSelect } = vi.hoisted(() => {
+const { mockLimit, mockSelect, mockRedisGet, mockRedisSet } = vi.hoisted(() => {
   const mockLimit = vi.fn();
   const mockWhere = vi.fn(() => ({ limit: mockLimit }));
   const mockFrom = vi.fn(() => ({ where: mockWhere }));
   const mockSelect = vi.fn(() => ({ from: mockFrom }));
-  return { mockLimit, mockSelect };
+  // Default: L2 cache miss → existing tests exercise the JWT/userinfo path.
+  const mockRedisGet = vi.fn().mockResolvedValue(null);
+  const mockRedisSet = vi.fn().mockResolvedValue(undefined);
+  return { mockLimit, mockSelect, mockRedisGet, mockRedisSet };
 });
 vi.mock("@/lib/db", () => ({ db: { select: mockSelect } }));
+vi.mock("@/lib/redis", () => ({
+  redisGet: mockRedisGet,
+  redisSet: mockRedisSet,
+  redisDel: vi.fn(),
+}));
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -55,6 +63,9 @@ beforeEach(() => {
   mockLimit.mockReset();
   mockFetch.mockReset();
   mockSelect.mockClear();
+  mockRedisGet.mockReset();
+  mockRedisGet.mockResolvedValue(null); // default: L2 miss
+  mockRedisSet.mockClear();
   tokenCache.clear();
   process.env.QF_AUTH_BASE = "https://auth.example.test";
   // Default: JWKS endpoint returns our test key; userinfo is unreachable.
@@ -106,6 +117,47 @@ describe("requireUser — JWT signature verification", () => {
   it("returns 401 when no token is supplied", async () => {
     const res = await requireUser(reqWith(null));
     expect("status" in res && (res as Response).status).toBe(401);
+  });
+});
+
+describe("requireUser — Redis L2 token cache", () => {
+  it("L2 hit resolves the user by id without any JWT/userinfo round-trip", async () => {
+    mockRedisGet.mockResolvedValue("7"); // token→userId cached in Redis
+    mockLimit.mockResolvedValue([user]);
+    // Opaque token + userinfo unreachable: if we reached the network path this
+    // would 401, so a 7 here proves the L2 cache short-circuited it.
+    mockFetch.mockResolvedValue({ ok: false, status: 404 });
+    const res = await requireUser(reqWith("opaque-token-no-dots"));
+    expect("userId" in res && res.userId).toBe(7);
+  });
+
+  it("L2 value that isn't an integer falls through (401 when nothing else resolves)", async () => {
+    mockRedisGet.mockResolvedValue("garbage");
+    mockLimit.mockResolvedValue([user]);
+    mockFetch.mockResolvedValue({ ok: false, status: 404 }); // userinfo unreachable
+    const res = await requireUser(reqWith("opaque-token-no-dots"));
+    expect("status" in res && (res as Response).status).toBe(401);
+  });
+
+  it("L2 id that no longer exists falls through to the JWT path", async () => {
+    mockRedisGet.mockResolvedValue("999"); // stale id
+    // First select (L2 lookup by id 999) → empty; second (JWT qfId) → the user.
+    mockLimit.mockResolvedValueOnce([]).mockResolvedValue([user]);
+    const token = makeJwt({ sub: "qf-sub-123", exp: farFuture });
+    const res = await requireUser(reqWith(token));
+    expect("userId" in res && res.userId).toBe(7);
+  });
+
+  it("populates the L2 cache on a miss (write-back) so the next request hits it", async () => {
+    mockLimit.mockResolvedValue([user]); // resolved via the JWT path (L2 miss)
+    const token = makeJwt({ sub: "qf-sub-123", exp: farFuture });
+    await requireUser(reqWith(token));
+    // token→id written to Redis under the hashed key for next time.
+    expect(mockRedisSet).toHaveBeenCalledWith(
+      expect.stringMatching(/^auth:tok:/),
+      "7",
+      expect.any(Number)
+    );
   });
 });
 

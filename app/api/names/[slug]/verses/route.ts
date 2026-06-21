@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { unstable_cache } from "next/cache";
 import { callAI } from "@/lib/ai";
 import { getNameBySlug } from "@/lib/divine-names";
 import { getSurahName } from "@/lib/surah-names";
+import { getOrGenerateNameContent } from "@/lib/name-content";
 import sanitizeHtml from "sanitize-html";
 import type { VerseRef } from "@/types/quran";
+
+// Bump to force regeneration after a prompt/search change.
+const VERSES_VERSION = 2;
 
 interface NameVerse {
   ref: VerseRef;
@@ -87,7 +90,10 @@ Output format:
     if (!match) return new Map();
     const obj = JSON.parse(match[0]) as Record<string, string>;
     return new Map(Object.entries(obj));
-  } catch {
+  } catch (err) {
+    // Reasons are best-effort (a default reason is used per verse if missing) —
+    // log so a persistently malformed AI response is visible, not silent.
+    console.error(`Name verses: failed to parse AI reasons for ${transliteration}:`, err);
     return new Map();
   }
 }
@@ -108,7 +114,10 @@ Return ONLY a JSON array:
     const match = text.match(/\[[\s\S]*\]/);
     if (!match) return [];
     return JSON.parse(match[0]) as Array<{ ref: string; reason: string }>;
-  } catch {
+  } catch (err) {
+    // Empty result is not cached (it retries), but log the parse failure so a
+    // broken prompt surfaces instead of silently re-invoking the AI forever.
+    console.error(`Name verses: AI fallback failed for ${transliteration}:`, err);
     return [];
   }
 }
@@ -117,53 +126,57 @@ function stripHtml(text: string): string {
   return sanitizeHtml(text, { allowedTags: [], allowedAttributes: {} });
 }
 
-const getVersesBySlug = unstable_cache(
-  async (slug: string): Promise<NameVerse[]> => {
-    const name = getNameBySlug(slug);
-    if (!name) return [];
+async function getVersesBySlug(slug: string): Promise<NameVerse[]> {
+  const name = getNameBySlug(slug);
+  if (!name) return [];
 
-    // Try actual quran.com search first
-    const refs = await searchVerseRefs(name.arabic);
+  return getOrGenerateNameContent(
+    slug,
+    "verses",
+    VERSES_VERSION,
+    async (): Promise<NameVerse[]> => {
+      // Try actual quran.com search first
+      const refs = await searchVerseRefs(name.arabic);
 
-    // If search found results, fetch verse data + AI reasons
-    if (refs.length > 0) {
-      const [verseDataResults, reasonMap] = await Promise.all([
-        Promise.all(refs.map((ref) => fetchVerseData(ref))),
-        buildReasons(refs, name.transliteration, name.meaning),
-      ]);
+      // If search found results, fetch verse data + AI reasons
+      if (refs.length > 0) {
+        const [verseDataResults, reasonMap] = await Promise.all([
+          Promise.all(refs.map((ref) => fetchVerseData(ref))),
+          buildReasons(refs, name.transliteration, name.meaning),
+        ]);
 
-      const verses: NameVerse[] = refs
-        .map((ref, i) => {
+        const verses: NameVerse[] = refs
+          .map((ref, i) => {
+            const vd = verseDataResults[i];
+            if (!vd) return null;
+            return {
+              ...vd,
+              translation: stripHtml(vd.translation),
+              reason: reasonMap.get(ref) ?? `Contains a form of ${name.transliteration}.`,
+            } as NameVerse;
+          })
+          .filter((v): v is NameVerse => v !== null);
+
+        if (verses.length > 0) return verses;
+      }
+
+      // Fallback: pure AI verse selection
+      const aiItems = await fallbackAIVerses(name.arabic, name.transliteration, name.meaning, name.description);
+      if (aiItems.length === 0) return [];
+
+      const verseDataResults = await Promise.all(aiItems.slice(0, 5).map((item) => fetchVerseData(item.ref)));
+      return aiItems
+        .slice(0, 5)
+        .map((item, i) => {
           const vd = verseDataResults[i];
           if (!vd) return null;
-          return {
-            ...vd,
-            translation: stripHtml(vd.translation),
-            reason: reasonMap.get(ref) ?? `Contains a form of ${name.transliteration}.`,
-          } as NameVerse;
+          return { ...vd, reason: item.reason } as NameVerse;
         })
         .filter((v): v is NameVerse => v !== null);
-
-      if (verses.length > 0) return verses;
-    }
-
-    // Fallback: pure AI verse selection
-    const aiItems = await fallbackAIVerses(name.arabic, name.transliteration, name.meaning, name.description);
-    if (aiItems.length === 0) return [];
-
-    const verseDataResults = await Promise.all(aiItems.slice(0, 5).map((item) => fetchVerseData(item.ref)));
-    return aiItems
-      .slice(0, 5)
-      .map((item, i) => {
-        const vd = verseDataResults[i];
-        if (!vd) return null;
-        return { ...vd, reason: item.reason } as NameVerse;
-      })
-      .filter((v): v is NameVerse => v !== null);
-  },
-  ["name-verses-v2"],
-  { revalidate: 86400 * 7 }
-);
+    },
+    (v) => v.length === 0
+  );
+}
 
 export async function GET(
   _req: NextRequest,

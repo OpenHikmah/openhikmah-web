@@ -1,16 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const { mockReturning, mockValues, mockInsert, mockDeleteWhere, mockDelete } = vi.hoisted(() => {
+const { mockReturning, mockValues, mockInsert, mockDeleteWhere, mockDelete, mockRedisIncr, mockIncr } = vi.hoisted(() => {
   const mockReturning = vi.fn();
   const mockOnConflict = vi.fn(() => ({ returning: mockReturning }));
   const mockValues = vi.fn((..._args: unknown[]) => ({ onConflictDoUpdate: mockOnConflict }));
   const mockInsert = vi.fn(() => ({ values: mockValues }));
   const mockDeleteWhere = vi.fn().mockResolvedValue(undefined);
   const mockDelete = vi.fn(() => ({ where: mockDeleteWhere }));
-  return { mockReturning, mockValues, mockInsert, mockDeleteWhere, mockDelete };
+  // Default: Redis unavailable (returns null) → existing tests exercise the
+  // Postgres fallback path unchanged.
+  const mockRedisIncr = vi.fn().mockResolvedValue(null);
+  const mockIncr = vi.fn();
+  return { mockReturning, mockValues, mockInsert, mockDeleteWhere, mockDelete, mockRedisIncr, mockIncr };
 });
 
 vi.mock("@/lib/db", () => ({ db: { insert: mockInsert, delete: mockDelete } }));
+vi.mock("@/lib/redis", () => ({ redisIncrWithTtl: mockRedisIncr }));
+vi.mock("@/lib/metrics", () => ({ incr: mockIncr }));
 
 import { consume, sweepRateLimits, RateLimitError, positiveIntEnv } from "@/lib/rate-limit";
 
@@ -19,6 +25,9 @@ describe("rate-limit consume", () => {
     mockReturning.mockReset();
     mockInsert.mockClear();
     mockValues.mockClear();
+    mockRedisIncr.mockReset();
+    mockRedisIncr.mockResolvedValue(null); // default: Postgres fallback path
+    mockIncr.mockClear();
   });
 
   it("allows when count is within the limit", async () => {
@@ -50,6 +59,40 @@ describe("rate-limit consume", () => {
 
   it("RateLimitError carries a name", () => {
     expect(new RateLimitError().name).toBe("RateLimitError");
+  });
+
+  // ─── Redis-primary path (new) ───────────────────────────────────────────────
+
+  it("uses Redis when available: under the limit allows, without touching Postgres", async () => {
+    mockRedisIncr.mockResolvedValue(5);
+    expect(await consume("ip:1", 20, 60)).toBe(true);
+    expect(mockInsert).not.toHaveBeenCalled(); // Redis short-circuits the DB
+  });
+
+  it("Redis path allows exactly at the limit boundary (parity with Postgres)", async () => {
+    mockRedisIncr.mockResolvedValue(20);
+    expect(await consume("ip:1", 20, 60)).toBe(true);
+  });
+
+  it("Redis path blocks over the limit", async () => {
+    mockRedisIncr.mockResolvedValue(21);
+    expect(await consume("ip:1", 20, 60)).toBe(false);
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("falls through to Postgres when Redis returns null", async () => {
+    mockRedisIncr.mockResolvedValue(null);
+    mockReturning.mockResolvedValue([{ count: 3 }]);
+    expect(await consume("ip:1", 20, 60)).toBe(true);
+    expect(mockInsert).toHaveBeenCalledOnce();
+  });
+
+  it("records a metric when Redis is down so the fallback is observable", async () => {
+    mockRedisIncr.mockResolvedValue(null); // Redis unavailable
+    mockReturning.mockResolvedValue([{ count: 3 }]);
+    await consume("ip:1", 20, 60);
+    expect(mockIncr).toHaveBeenCalledWith("ratelimit_redis_fallback");
+    expect(mockIncr).toHaveBeenCalledWith("ratelimit_allow");
   });
 });
 

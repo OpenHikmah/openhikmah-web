@@ -4,6 +4,7 @@ import {
   date,
   integer,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
@@ -297,6 +298,32 @@ export const wordMorphology = pgTable(
   ]
 );
 
+// ─── Name Content (AI-generated 99-Names content cache) ───────────────────────
+// Durable write-once/read-many cache for the per-name AI output (verses,
+// reflection, pairings). Replaces Next's non-durable `unstable_cache` so Claude
+// (and the quran.com search) runs at most once per name per prompt `version`,
+// instead of re-running after every redeploy. Same pattern as `connections`.
+// `data` is the JSON-encoded payload for that (slug, kind); `version` lets a
+// prompt change force regeneration by bumping the per-kind constant in code.
+
+/** The kinds of AI content cached per name. Single source of truth for the
+ *  `name_content.kind` column and the `lib/name-content.ts` helper. */
+export type NameContentKind = "verses" | "reflection" | "pairings";
+
+export const nameContent = pgTable(
+  "name_content",
+  {
+    slug: text("slug").notNull(),
+    kind: text("kind").$type<NameContentKind>().notNull(),
+    data: text("data").notNull(),
+    model: text("model"),
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.slug, t.kind] })]
+);
+
 // ─── Exported types ───────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
@@ -323,3 +350,5 @@ export type VerseEmbedding = typeof verseEmbeddings.$inferSelect;
 export type NewVerseEmbedding = typeof verseEmbeddings.$inferInsert;
 export type WordMorphology = typeof wordMorphology.$inferSelect;
 export type NewWordMorphology = typeof wordMorphology.$inferInsert;
+export type NameContent = typeof nameContent.$inferSelect;
+export type NewNameContent = typeof nameContent.$inferInsert;

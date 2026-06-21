@@ -56,7 +56,12 @@ export function AccountMenu() {
 
   const signOut = async () => {
     setOpen(false);
-    await fetch("/api/auth/signout", { method: "POST" }).catch(() => {});
+    // Send the access token so the server can drop its token cache (L1 + Redis),
+    // otherwise the signed-out token stays accepted until the cache TTL expires.
+    await fetch("/api/auth/signout", {
+      method: "POST",
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    }).catch(() => {});
     clearAuth();
   };
 

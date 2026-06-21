@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { unstable_cache } from "next/cache";
 import { callAI } from "@/lib/ai";
 import { getNameBySlug, DIVINE_NAMES } from "@/lib/divine-names";
+import { getOrGenerateNameContent } from "@/lib/name-content";
+
+// Bump to force regeneration after a prompt change.
+const PAIRINGS_VERSION = 1;
 
 interface Pairing {
   name: string;
@@ -29,38 +32,48 @@ Return ONLY a JSON array:
 ]`;
 }
 
-const getPairings = unstable_cache(
-  async (slug: string): Promise<Pairing[]> => {
-    const name = getNameBySlug(slug);
-    if (!name) return [];
+async function getPairings(slug: string): Promise<Pairing[]> {
+  const name = getNameBySlug(slug);
+  if (!name) return [];
 
-    const text = await callAI(buildPrompt(name.transliteration, name.arabic, name.meaning));
+  return getOrGenerateNameContent(
+    slug,
+    "pairings",
+    PAIRINGS_VERSION,
+    async () => {
+      const text = await callAI(buildPrompt(name.transliteration, name.arabic, name.meaning));
 
-    let raw: Array<{ transliteration: string; arabic: string; explanation: string }>;
-    try {
-      const match = text.match(/\[[\s\S]*\]/);
-      if (!match) return [];
-      raw = JSON.parse(match[0]);
-    } catch {
-      return [];
-    }
+      let raw: Array<{ transliteration: string; arabic: string; explanation: string }>;
+      try {
+        const match = text.match(/\[[\s\S]*\]/);
+        if (!match) {
+          console.error(`Pairings: no JSON array in AI response for ${slug}`);
+          return [];
+        }
+        raw = JSON.parse(match[0]);
+      } catch (err) {
+        // Malformed AI JSON returns empty (not cached, so it retries) — but log it
+        // so a persistently broken response is visible instead of a silent cost sink.
+        console.error(`Pairings: failed to parse AI response for ${slug}:`, err);
+        return [];
+      }
 
-    return raw.slice(0, 3).map((p) => {
-      const match = DIVINE_NAMES.find(
-        (n) => n.transliteration.toLowerCase() === p.transliteration.toLowerCase() ||
-               n.arabic === p.arabic
-      );
-      return {
-        name: match?.slug ?? "",
-        transliteration: p.transliteration,
-        arabic: p.arabic,
-        explanation: p.explanation,
-      };
-    });
-  },
-  ["name-pairings-v1"],
-  { revalidate: 86400 * 30 }
-);
+      return raw.slice(0, 3).map((p) => {
+        const match = DIVINE_NAMES.find(
+          (n) => n.transliteration.toLowerCase() === p.transliteration.toLowerCase() ||
+                 n.arabic === p.arabic
+        );
+        return {
+          name: match?.slug ?? "",
+          transliteration: p.transliteration,
+          arabic: p.arabic,
+          explanation: p.explanation,
+        };
+      });
+    },
+    (v) => v.length === 0
+  );
+}
 
 export async function GET(
   _req: NextRequest,

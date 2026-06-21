@@ -1,20 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createPublicKey, verify as verifySignature } from "node:crypto";
+import { createHash, createPublicKey, verify as verifySignature } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { users, type User } from "./db/schema";
+import { redisGet, redisSet, redisDel } from "./redis";
+import { incr } from "./metrics";
 
 export interface AuthedUser {
   userId: number;
   user: User;
 }
 
-// Simple in-process cache: token → user  (clears on server restart, good enough)
+// Two-tier token cache: an in-process L1 Map (fastest, per-instance) backed by a
+// Redis L2 (shared across instances, survives restarts). The L1 keeps the hot
+// path zero-round-trip; the L2 means a deploy/restart no longer logs everyone out
+// and a re-auth storm doesn't hammer the QF userinfo endpoint. When Redis is
+// disabled this degrades to exactly the previous in-process-only behavior.
 export const tokenCache = new Map<string, { user: User; expiresAt: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL_SECONDS = CACHE_TTL_MS / 1000;
+
+// Tokens are secrets, so the Redis key is a hash of the token, never the token
+// itself. The value is just the user id — the full user is re-read from Postgres
+// by primary key (cheap) to avoid Date-serialization pitfalls of caching the row.
+function tokenRedisKey(token: string): string {
+  return `auth:tok:${createHash("sha256").update(token).digest("hex")}`;
+}
 
 export function invalidateTokenCache(token: string): void {
   tokenCache.delete(token);
+  void redisDel(tokenRedisKey(token));
 }
 
 // ─── JWT signature verification ───────────────────────────────────────────────
@@ -36,6 +51,7 @@ interface Jwk {
 
 let jwksCache: { keys: Jwk[]; expiresAt: number } | null = null;
 const JWKS_TTL_MS = 60 * 60 * 1000; // 1 hour
+const JWKS_REDIS_KEY = "auth:jwks";
 
 /** Candidate JWKS URLs. `QF_JWKS_URL` overrides; otherwise derive from the auth base. */
 function jwksUrls(): string[] {
@@ -48,13 +64,38 @@ function jwksUrls(): string[] {
 
 async function fetchJwks(): Promise<Jwk[]> {
   if (jwksCache && jwksCache.expiresAt > Date.now()) return jwksCache.keys;
+
+  // L2 — Redis, so a restart doesn't refetch QF's keys for every instance. The
+  // absolute `expiresAt` is stored alongside the keys (not just relied on via the
+  // Redis TTL) so a reader can't re-stamp its in-process cache to a fresh full hour
+  // off an already-aged Redis copy — total staleness stays bounded by JWKS_TTL_MS.
+  const cached = await redisGet(JWKS_REDIS_KEY);
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached) as { keys?: Jwk[]; expiresAt?: number };
+      if (
+        Array.isArray(parsed.keys) &&
+        parsed.keys.length > 0 &&
+        typeof parsed.expiresAt === "number" &&
+        parsed.expiresAt > Date.now()
+      ) {
+        jwksCache = { keys: parsed.keys, expiresAt: parsed.expiresAt };
+        return parsed.keys;
+      }
+    } catch {
+      // Corrupt/legacy cache entry — fall through to a fresh network fetch.
+    }
+  }
+
   for (const url of jwksUrls()) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
       if (!res.ok) continue;
       const data = (await res.json()) as { keys?: Jwk[] };
       if (Array.isArray(data.keys) && data.keys.length > 0) {
-        jwksCache = { keys: data.keys, expiresAt: Date.now() + JWKS_TTL_MS };
+        const expiresAt = Date.now() + JWKS_TTL_MS;
+        jwksCache = { keys: data.keys, expiresAt };
+        void redisSet(JWKS_REDIS_KEY, JSON.stringify({ keys: data.keys, expiresAt }), JWKS_TTL_MS / 1000);
         return data.keys;
       }
     } catch {
@@ -140,10 +181,26 @@ export async function requireUser(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Check in-process cache first to avoid any round-trip
+  // L1 — in-process cache, zero round-trip.
   const cached = tokenCache.get(token);
   if (cached && cached.expiresAt > Date.now()) {
+    incr("auth_l1_hit");
     return { userId: cached.user.id, user: cached.user };
+  }
+
+  // L2 — Redis: shared across instances and survives restarts. Holds token→id;
+  // the row is re-read by primary key (cheap, indexed) to keep it current.
+  const cachedUserId = await redisGet(tokenRedisKey(token));
+  if (cachedUserId) {
+    const id = Number(cachedUserId);
+    if (Number.isInteger(id)) {
+      const [u] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+      if (u) {
+        incr("auth_l2_hit");
+        tokenCache.set(token, { user: u, expiresAt: Date.now() + CACHE_TTL_MS });
+        return { userId: u.id, user: u };
+      }
+    }
   }
 
   // Stage 1 — verified-JWT fast path (no userinfo round-trip)
@@ -173,7 +230,9 @@ export async function requireUser(
       if (v.expiresAt <= now) tokenCache.delete(t);
     }
   }
+  incr("auth_cache_miss");
   tokenCache.set(token, { user, expiresAt: Date.now() + CACHE_TTL_MS });
+  void redisSet(tokenRedisKey(token), String(user.id), CACHE_TTL_SECONDS);
   return { userId: user.id, user };
 }
 

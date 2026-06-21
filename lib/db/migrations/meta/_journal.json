@@ -64,6 +64,13 @@
       "when": 1748000006000,
       "tag": "0008_semantic_and_morphology",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1781861399908,
+      "tag": "0009_third_shaman",
+      "breakpoints": true
     }
   ]
 }

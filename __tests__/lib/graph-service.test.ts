@@ -206,3 +206,70 @@ describe("getConnections", () => {
     expect(out.map((c) => c.ref)).toEqual(["2:255"]);
   });
 });
+
+describe("getConnections — single-flight de-duplication", () => {
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  let releaseGen: (v: ConnectionResult[]) => void;
+
+  beforeEach(() => {
+    mockSelect.mockReset().mockReturnValue(makeSelectChain([])); // always a cache miss
+    mockInsert.mockClear();
+    mockValues.mockClear();
+    mockOnConflict.mockClear();
+    mockDiscover.mockReset().mockResolvedValue([]); // no grounding → legacy generate path
+    mockResolveVerse.mockReset().mockImplementation(async (ref: string) => verse(ref));
+    mockConsume.mockReset().mockResolvedValue(true);
+    mockGenerateGrounded.mockReset();
+    // Hold generation "in flight" until a test releases it.
+    mockGenerate.mockReset().mockImplementation(
+      () => new Promise<ConnectionResult[]>((res) => { releaseGen = res; })
+    );
+  });
+
+  it("coalesces concurrent identical misses into ONE generation", async () => {
+    const all = Promise.all([
+      getConnections("1:1", "thematic", source),
+      getConnections("1:1", "thematic", source),
+      getConnections("1:1", "thematic", source),
+    ]);
+
+    // Leader reaches generation; the two followers join the in-flight promise.
+    await tick();
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
+
+    releaseGen([result("2:255")]);
+    const [a, b, c] = await all;
+    expect(a).toHaveLength(1);
+    expect(b).toBe(a); // followers receive the very same resolved array
+    expect(c).toBe(a);
+    expect(mockInsert).toHaveBeenCalledTimes(1); // persisted once, not per-caller
+  });
+
+  it("does NOT coalesce different verse+kind keys", async () => {
+    mockGenerate.mockImplementation(async () => [result("2:255")]); // resolve immediately
+    await Promise.all([
+      getConnections("1:1", "thematic", source),
+      getConnections("1:1", "root", source), // different kind → different key
+      getConnections("2:1", "thematic", source), // different ref → different key
+    ]);
+    expect(mockGenerate).toHaveBeenCalledTimes(3);
+  });
+
+  it("releases the lock so a later sequential miss generates again", async () => {
+    mockGenerate.mockImplementation(async () => [result("2:255")]);
+    await getConnections("1:1", "thematic", source);
+    await getConnections("1:1", "thematic", source);
+    expect(mockGenerate).toHaveBeenCalledTimes(2);
+  });
+
+  it("surfaces a generation error and clears the lock so the next call retries", async () => {
+    mockGenerate
+      .mockRejectedValueOnce(new Error("ai down"))
+      .mockImplementation(async () => [result("2:255")]);
+    await expect(getConnections("1:1", "thematic", source)).rejects.toThrow("ai down");
+    // finally{} cleared the in-flight entry → a fresh call generates again
+    const out = await getConnections("1:1", "thematic", source);
+    expect(out).toHaveLength(1);
+    expect(mockGenerate).toHaveBeenCalledTimes(2);
+  });
+});

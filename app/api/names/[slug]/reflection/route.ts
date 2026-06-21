@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { unstable_cache } from "next/cache";
 import { callAI } from "@/lib/ai";
 import { getNameBySlug } from "@/lib/divine-names";
+import { getOrGenerateNameContent } from "@/lib/name-content";
+
+// Bump to force regeneration after a prompt change.
+const REFLECTION_VERSION = 1;
 
 function buildPrompt(arabic: string, transliteration: string, meaning: string, description: string): string {
   return `You are a classical Islamic scholar grounded in the Maturidi/Hanafi tradition (Ahl al-Sunnah wal-Jama'ah).
@@ -22,15 +25,17 @@ Critical rules:
 Example for Al-Razzaq: "The believer's realisation of Al-Razzaq is not to claim any power over provision, but to strive with full effort in lawful means while maintaining absolute certainty in the heart that the outcome belongs solely to Allah. The servant plants, waters, and labours — yet knows that it is Allah who causes the grain to grow."`;
 }
 
-const getReflection = unstable_cache(
-  async (slug: string): Promise<string> => {
-    const name = getNameBySlug(slug);
-    if (!name) return "";
-    return callAI(buildPrompt(name.arabic, name.transliteration, name.meaning, name.description));
-  },
-  ["name-reflection-v1"],
-  { revalidate: 86400 * 30 }
-);
+async function getReflection(slug: string): Promise<string> {
+  const name = getNameBySlug(slug);
+  if (!name) return "";
+  return getOrGenerateNameContent(
+    slug,
+    "reflection",
+    REFLECTION_VERSION,
+    () => callAI(buildPrompt(name.arabic, name.transliteration, name.meaning, name.description)),
+    (s) => s.trim() === ""
+  );
+}
 
 export async function GET(
   _req: NextRequest,

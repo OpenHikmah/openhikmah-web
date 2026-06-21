@@ -8,6 +8,7 @@ import {
 import { discoverCandidates } from "@/lib/connection-discovery";
 import { resolveVerse } from "@/lib/verse-resolver";
 import { consume, RateLimitError } from "@/lib/rate-limit";
+import { incr } from "@/lib/metrics";
 import type { ConnectionResult, EdgeKind } from "@/types/quran";
 
 /**
@@ -15,6 +16,15 @@ import type { ConnectionResult, EdgeKind } from "@/types/quran";
  * miss does it call the AI, then writes the result back so every later reader
  * gets it for free. This is what makes AI cost trend toward zero.
  */
+
+/**
+ * Single-flight registry: concurrent cache misses for the SAME verse+kind share
+ * one in-flight generation instead of each firing its own (expensive) AI call.
+ * Per-process — full coverage on the single box; a multi-instance deployment
+ * would need a Redis lock to coalesce across processes (deferred). Keyed by
+ * `${fromRef}:${kind}`; entries are removed as soon as the generation settles.
+ */
+const inFlight = new Map<string, Promise<ConnectionResult[]>>();
 
 interface SourceVerse {
   arabicText: string;
@@ -77,15 +87,46 @@ export async function getConnections(
     return hydrate(existing, kind);
   }
 
-  // Cache miss — this is the expensive path, so rate-limit it.
+  // Cache miss — this is the expensive path, so rate-limit it (per client, as
+  // before: the limiter runs for every caller, so the budget semantics are
+  // unchanged — only the AI call itself is de-duplicated below).
   if (options.clientKey) {
     const allowed = await consume(`gen:${options.clientKey}`);
     if (!allowed) throw new RateLimitError();
   }
 
-  // Generate, persist, return. Prefer grounded discovery (data discovers, AI
-  // articulates); fall back to legacy memory-based generation only when no
-  // grounding data is available for this verse (e.g. corpus not yet seeded).
+  // Single-flight: if an identical generation is already running, join it rather
+  // than starting a second AI call. The get→set below MUST stay synchronous (no
+  // await between them) or two concurrent callers could both become the leader.
+  const key = `${fromRef}:${kind}`;
+  const pending = inFlight.get(key);
+  if (pending) {
+    incr("gen_coalesced");
+    return pending;
+  }
+
+  incr("gen_started");
+  const work = generateAndPersist(fromRef, kind, source);
+  inFlight.set(key, work);
+  try {
+    return await work;
+  } finally {
+    inFlight.delete(key);
+  }
+}
+
+/**
+ * The cache-miss body: discover candidates, generate connections, persist them.
+ * Prefers grounded discovery (data discovers, AI articulates); falls back to
+ * legacy memory-based generation only when no grounding data is available for
+ * this verse (e.g. corpus not yet seeded). Extracted so `getConnections` can run
+ * exactly one instance of it per verse+kind under the single-flight lock.
+ */
+async function generateAndPersist(
+  fromRef: string,
+  kind: EdgeKind,
+  source: SourceVerse
+): Promise<ConnectionResult[]> {
   const candidates = await discoverCandidates(fromRef, kind);
   const generated =
     candidates.length > 0

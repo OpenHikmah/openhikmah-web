@@ -127,6 +127,20 @@ try {
   await sql`CREATE INDEX IF NOT EXISTS word_morphology_ref_idx ON word_morphology (ref)`;
   await sql`CREATE INDEX IF NOT EXISTS word_morphology_root_idx ON word_morphology (root)`;
 
+  // ─── 99-Names AI content cache (durable, write-once/read-many) ──────────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS name_content (
+      slug       text NOT NULL,
+      kind       text NOT NULL,
+      data       text NOT NULL,
+      model      text,
+      version    integer NOT NULL DEFAULT 1,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (slug, kind)
+    )
+  `;
+
   console.log("Tables ensured successfully");
 } finally {
   await sql.end();
