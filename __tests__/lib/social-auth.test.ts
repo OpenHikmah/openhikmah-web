@@ -7,19 +7,20 @@ import {
 import { NextRequest } from "next/server";
 
 // ─── DB mock — requireUser does db.select().from().where().limit() ────────────
-const { mockLimit, mockSelect, mockRedisGet } = vi.hoisted(() => {
+const { mockLimit, mockSelect, mockRedisGet, mockRedisSet } = vi.hoisted(() => {
   const mockLimit = vi.fn();
   const mockWhere = vi.fn(() => ({ limit: mockLimit }));
   const mockFrom = vi.fn(() => ({ where: mockWhere }));
   const mockSelect = vi.fn(() => ({ from: mockFrom }));
   // Default: L2 cache miss → existing tests exercise the JWT/userinfo path.
   const mockRedisGet = vi.fn().mockResolvedValue(null);
-  return { mockLimit, mockSelect, mockRedisGet };
+  const mockRedisSet = vi.fn().mockResolvedValue(undefined);
+  return { mockLimit, mockSelect, mockRedisGet, mockRedisSet };
 });
 vi.mock("@/lib/db", () => ({ db: { select: mockSelect } }));
 vi.mock("@/lib/redis", () => ({
   redisGet: mockRedisGet,
-  redisSet: vi.fn().mockResolvedValue(undefined),
+  redisSet: mockRedisSet,
   redisDel: vi.fn(),
 }));
 
@@ -64,6 +65,7 @@ beforeEach(() => {
   mockSelect.mockClear();
   mockRedisGet.mockReset();
   mockRedisGet.mockResolvedValue(null); // default: L2 miss
+  mockRedisSet.mockClear();
   tokenCache.clear();
   process.env.QF_AUTH_BASE = "https://auth.example.test";
   // Default: JWKS endpoint returns our test key; userinfo is unreachable.
@@ -144,6 +146,18 @@ describe("requireUser — Redis L2 token cache", () => {
     const token = makeJwt({ sub: "qf-sub-123", exp: farFuture });
     const res = await requireUser(reqWith(token));
     expect("userId" in res && res.userId).toBe(7);
+  });
+
+  it("populates the L2 cache on a miss (write-back) so the next request hits it", async () => {
+    mockLimit.mockResolvedValue([user]); // resolved via the JWT path (L2 miss)
+    const token = makeJwt({ sub: "qf-sub-123", exp: farFuture });
+    await requireUser(reqWith(token));
+    // token→id written to Redis under the hashed key for next time.
+    expect(mockRedisSet).toHaveBeenCalledWith(
+      expect.stringMatching(/^auth:tok:/),
+      "7",
+      expect.any(Number)
+    );
   });
 });
 

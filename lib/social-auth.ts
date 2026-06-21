@@ -65,17 +65,25 @@ function jwksUrls(): string[] {
 async function fetchJwks(): Promise<Jwk[]> {
   if (jwksCache && jwksCache.expiresAt > Date.now()) return jwksCache.keys;
 
-  // L2 — Redis, so a restart doesn't refetch QF's keys for every instance.
+  // L2 — Redis, so a restart doesn't refetch QF's keys for every instance. The
+  // absolute `expiresAt` is stored alongside the keys (not just relied on via the
+  // Redis TTL) so a reader can't re-stamp its in-process cache to a fresh full hour
+  // off an already-aged Redis copy — total staleness stays bounded by JWKS_TTL_MS.
   const cached = await redisGet(JWKS_REDIS_KEY);
   if (cached) {
     try {
-      const keys = JSON.parse(cached) as Jwk[];
-      if (Array.isArray(keys) && keys.length > 0) {
-        jwksCache = { keys, expiresAt: Date.now() + JWKS_TTL_MS };
-        return keys;
+      const parsed = JSON.parse(cached) as { keys?: Jwk[]; expiresAt?: number };
+      if (
+        Array.isArray(parsed.keys) &&
+        parsed.keys.length > 0 &&
+        typeof parsed.expiresAt === "number" &&
+        parsed.expiresAt > Date.now()
+      ) {
+        jwksCache = { keys: parsed.keys, expiresAt: parsed.expiresAt };
+        return parsed.keys;
       }
     } catch {
-      // Corrupt cache entry — fall through to a fresh network fetch.
+      // Corrupt/legacy cache entry — fall through to a fresh network fetch.
     }
   }
 
@@ -85,8 +93,9 @@ async function fetchJwks(): Promise<Jwk[]> {
       if (!res.ok) continue;
       const data = (await res.json()) as { keys?: Jwk[] };
       if (Array.isArray(data.keys) && data.keys.length > 0) {
-        jwksCache = { keys: data.keys, expiresAt: Date.now() + JWKS_TTL_MS };
-        void redisSet(JWKS_REDIS_KEY, JSON.stringify(data.keys), JWKS_TTL_MS / 1000);
+        const expiresAt = Date.now() + JWKS_TTL_MS;
+        jwksCache = { keys: data.keys, expiresAt };
+        void redisSet(JWKS_REDIS_KEY, JSON.stringify({ keys: data.keys, expiresAt }), JWKS_TTL_MS / 1000);
         return data.keys;
       }
     } catch {

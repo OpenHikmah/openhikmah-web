@@ -102,10 +102,20 @@ describe("lib/redis — enabled, but every call errors (fail-open)", () => {
     await expect(r.redisSet("k", "v", 60)).resolves.toBeUndefined();
     await expect(r.redisDel("k")).resolves.toBeUndefined();
     expect(await r.redisIncrWithTtl("k", 60)).toBeNull();
+    // The Redis path was genuinely entered (then swallowed) — not short-circuited:
+    expect(behavior.get).toHaveBeenCalledOnce();
+    expect(behavior.set).toHaveBeenCalledOnce();
+    expect(behavior.del).toHaveBeenCalledOnce();
   });
 
-  it("redisIncrWithTtl returns null when the exec result is malformed", async () => {
+  it("redisIncrWithTtl returns null when exec() reports an INCR error", async () => {
     behavior.multiExec.mockResolvedValue([[new Error("partial"), undefined]]);
+    const r = await import("@/lib/redis");
+    expect(await r.redisIncrWithTtl("k", 60)).toBeNull();
+  });
+
+  it("redisIncrWithTtl returns null when exec() yields no result", async () => {
+    behavior.multiExec.mockResolvedValue(undefined);
     const r = await import("@/lib/redis");
     expect(await r.redisIncrWithTtl("k", 60)).toBeNull();
   });

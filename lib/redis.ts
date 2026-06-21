@@ -116,8 +116,14 @@ export async function redisIncrWithTtl(key: string, ttlSeconds: number): Promise
   if (!r) return null;
   try {
     const results = await r.multi().incr(key).expire(key, ttlSeconds).exec();
+    // exec() resolves even on per-command failure: results is [[err, value], ...].
+    // Only trust the count when the INCR itself succeeded — otherwise fall back to
+    // the Postgres limiter. (An EXPIRE-only failure still yields a correct count;
+    // the limit decision is unaffected, and the next increment re-applies the TTL.)
+    const incrErr = results?.[0]?.[0];
     const count = results?.[0]?.[1];
-    return typeof count === "number" ? count : null;
+    if (incrErr != null || typeof count !== "number") return null;
+    return count;
   } catch {
     return null;
   }

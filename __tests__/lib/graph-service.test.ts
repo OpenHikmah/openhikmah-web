@@ -242,6 +242,7 @@ describe("getConnections — single-flight de-duplication", () => {
     expect(a).toHaveLength(1);
     expect(b).toBe(a); // followers receive the very same resolved array
     expect(c).toBe(a);
+    expect(mockInsert).toHaveBeenCalledTimes(1); // persisted once, not per-caller
   });
 
   it("does NOT coalesce different verse+kind keys", async () => {

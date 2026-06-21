@@ -48,8 +48,11 @@ export async function getOrGenerateNameContent<T>(
   if (row && row.version === version) {
     try {
       return JSON.parse(row.data) as T;
-    } catch {
-      // Corrupt cache entry — fall through and regenerate.
+    } catch (err) {
+      // Corrupt cache row — log (it's a genuine anomaly that would otherwise
+      // silently re-trigger AI generation every request) then regenerate, which
+      // overwrites it via the upsert below.
+      console.error(`Corrupt name_content row for ${slug}/${kind}, regenerating:`, err);
     }
   }
 

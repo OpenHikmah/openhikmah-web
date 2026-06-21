@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const { mockReturning, mockValues, mockInsert, mockDeleteWhere, mockDelete, mockRedisIncr } = vi.hoisted(() => {
+const { mockReturning, mockValues, mockInsert, mockDeleteWhere, mockDelete, mockRedisIncr, mockIncr } = vi.hoisted(() => {
   const mockReturning = vi.fn();
   const mockOnConflict = vi.fn(() => ({ returning: mockReturning }));
   const mockValues = vi.fn((..._args: unknown[]) => ({ onConflictDoUpdate: mockOnConflict }));
@@ -10,11 +10,13 @@ const { mockReturning, mockValues, mockInsert, mockDeleteWhere, mockDelete, mock
   // Default: Redis unavailable (returns null) → existing tests exercise the
   // Postgres fallback path unchanged.
   const mockRedisIncr = vi.fn().mockResolvedValue(null);
-  return { mockReturning, mockValues, mockInsert, mockDeleteWhere, mockDelete, mockRedisIncr };
+  const mockIncr = vi.fn();
+  return { mockReturning, mockValues, mockInsert, mockDeleteWhere, mockDelete, mockRedisIncr, mockIncr };
 });
 
 vi.mock("@/lib/db", () => ({ db: { insert: mockInsert, delete: mockDelete } }));
 vi.mock("@/lib/redis", () => ({ redisIncrWithTtl: mockRedisIncr }));
+vi.mock("@/lib/metrics", () => ({ incr: mockIncr }));
 
 import { consume, sweepRateLimits, RateLimitError, positiveIntEnv } from "@/lib/rate-limit";
 
@@ -25,6 +27,7 @@ describe("rate-limit consume", () => {
     mockValues.mockClear();
     mockRedisIncr.mockReset();
     mockRedisIncr.mockResolvedValue(null); // default: Postgres fallback path
+    mockIncr.mockClear();
   });
 
   it("allows when count is within the limit", async () => {
@@ -82,6 +85,14 @@ describe("rate-limit consume", () => {
     mockReturning.mockResolvedValue([{ count: 3 }]);
     expect(await consume("ip:1", 20, 60)).toBe(true);
     expect(mockInsert).toHaveBeenCalledOnce();
+  });
+
+  it("records a metric when Redis is down so the fallback is observable", async () => {
+    mockRedisIncr.mockResolvedValue(null); // Redis unavailable
+    mockReturning.mockResolvedValue([{ count: 3 }]);
+    await consume("ip:1", 20, 60);
+    expect(mockIncr).toHaveBeenCalledWith("ratelimit_redis_fallback");
+    expect(mockIncr).toHaveBeenCalledWith("ratelimit_allow");
   });
 });
 
