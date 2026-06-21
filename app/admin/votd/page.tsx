@@ -38,6 +38,13 @@ export default function VotdPage() {
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [selected, setSelected] = useState<string | null>(null);
 
+  // Changing month clears the selection so the editor can't act on a day from a
+  // different month than the one being viewed.
+  const goToMonth = (next: string) => {
+    setMonth(next);
+    setSelected(null);
+  };
+
   const { data, error, loading, reload } = useAsync<{ entries: Entry[] }>(
     () => api(`/votd?month=${month}`),
     `votd:${month}`
@@ -59,10 +66,10 @@ export default function VotdPage() {
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-medium text-text-primary">{monthLabel(month)}</h2>
             <div className="flex items-center gap-1">
-              <Button size="sm" variant="ghost" onClick={() => setMonth(addMonth(month, -1))} aria-label="Previous month">
+              <Button size="sm" variant="ghost" onClick={() => goToMonth(addMonth(month, -1))} aria-label="Previous month">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setMonth(addMonth(month, 1))} aria-label="Next month">
+              <Button size="sm" variant="ghost" onClick={() => goToMonth(addMonth(month, 1))} aria-label="Next month">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>

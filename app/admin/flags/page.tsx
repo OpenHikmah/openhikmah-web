@@ -48,8 +48,13 @@ export default function FlagsPage() {
   };
 
   const remove = async (k: string) => {
-    await api(`/flags?key=${encodeURIComponent(k)}`, { method: "DELETE" });
-    reload();
+    setMsg(null);
+    try {
+      await api(`/flags?key=${encodeURIComponent(k)}`, { method: "DELETE" });
+      reload();
+    } catch (e) {
+      setMsg(e instanceof AdminApiError ? e.message : "Delete failed.");
+    }
   };
 
   return (

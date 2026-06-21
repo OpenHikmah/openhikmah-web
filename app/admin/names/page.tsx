@@ -48,8 +48,13 @@ export default function NamesPage() {
   };
 
   const invalidate = async (r: Row) => {
-    await api(`/names?slug=${encodeURIComponent(r.slug)}&kind=${r.kind}`, { method: "DELETE" });
-    reload();
+    setMsg(null);
+    try {
+      await api(`/names?slug=${encodeURIComponent(r.slug)}&kind=${r.kind}`, { method: "DELETE" });
+      reload();
+    } catch (e) {
+      setMsg(e instanceof AdminApiError ? e.message : "Invalidate failed.");
+    }
   };
 
   return (
@@ -60,6 +65,7 @@ export default function NamesPage() {
       />
       <div className="space-y-4 p-7">
         {error && <StateNote tone="error">{error}</StateNote>}
+        {msg && <StateNote tone="error">{msg}</StateNote>}
         {loading && <StateNote>Loading…</StateNote>}
         {data && data.rows.length === 0 && <StateNote>No cached name content yet.</StateNote>}
 
@@ -114,7 +120,6 @@ export default function NamesPage() {
                             <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
                               Cancel
                             </Button>
-                            {msg && <span className="text-xs text-error">{msg}</span>}
                           </div>
                         </td>
                       </tr>

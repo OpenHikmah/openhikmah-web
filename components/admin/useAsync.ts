@@ -38,6 +38,7 @@ export function useAsync<T>(loader: () => Promise<T>, cacheKey: string): AsyncSt
       .then((d) => active && setData(d))
       .catch((e: unknown) => {
         if (!active) return;
+        setData(null); // drop stale data so we never render "error + old rows"
         setError(e instanceof AdminApiError ? e.message : "Something went wrong");
       })
       .finally(() => active && setLoading(false));

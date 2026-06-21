@@ -69,6 +69,11 @@ export async function PATCH(req: NextRequest) {
     .where(eq(users.id, id as number))
     .returning();
 
+  // The row could have been deleted between the select and the update.
+  if (!updated) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
   await logAdminAction({
     adminQfId: auth.user.qfId,
     action: disabled ? "user.disable" : "user.enable",

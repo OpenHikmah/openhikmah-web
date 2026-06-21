@@ -225,8 +225,9 @@ export async function requireUser(
       const [u] = await db.select().from(users).where(eq(users.id, id)).limit(1);
       if (u) {
         incr("auth_l2_hit");
-        tokenCache.set(token, { user: u, expiresAt: Date.now() + CACHE_TTL_MS });
+        // Reject (and don't cache) a disabled account before populating L1.
         if (u.disabledAt) return disabledResponse();
+        tokenCache.set(token, { user: u, expiresAt: Date.now() + CACHE_TTL_MS });
         return { userId: u.id, user: u };
       }
     }
@@ -260,9 +261,10 @@ export async function requireUser(
     }
   }
   incr("auth_cache_miss");
+  // Reject (and don't cache) a disabled account before populating L1/L2.
+  if (user.disabledAt) return disabledResponse();
   tokenCache.set(token, { user, expiresAt: Date.now() + CACHE_TTL_MS });
   void redisSet(tokenRedisKey(token), String(user.id), CACHE_TTL_SECONDS);
-  if (user.disabledAt) return disabledResponse();
   return { userId: user.id, user };
 }
 

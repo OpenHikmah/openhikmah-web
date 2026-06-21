@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, gte, lte, eq } from "drizzle-orm";
+import { and, gte, lt, eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
 import { logAdminAction } from "@/lib/admin-audit";
 import { db } from "@/lib/db";
@@ -9,6 +9,23 @@ import { resolveVerse } from "@/lib/verse-resolver";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** A YYYY-MM-DD that is also a real calendar date (rejects e.g. 2026-02-31,
+ *  which would otherwise blow up at the Postgres `date` layer with a 500). */
+function isRealDay(s: string): boolean {
+  if (!DAY_RE.test(s)) return false;
+  const [y, m, d] = s.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+/** First day of the month after `YYYY-MM`, as `YYYY-MM-DD` — the exclusive upper
+ *  bound for a month range (avoids hardcoding a -31 that's invalid for most months). */
+function nextMonthFirst(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m, 1)); // m is 1-based ⇒ this is the next month
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-01`;
+}
 
 /** List curated overrides for a month: `?month=YYYY-MM` (defaults to current). */
 export async function GET(req: NextRequest) {
@@ -23,7 +40,9 @@ export async function GET(req: NextRequest) {
   const rows = await db
     .select()
     .from(curatedVotd)
-    .where(and(gte(curatedVotd.date, `${month}-01`), lte(curatedVotd.date, `${month}-31`)));
+    .where(
+      and(gte(curatedVotd.date, `${month}-01`), lt(curatedVotd.date, nextMonthFirst(month)))
+    );
 
   return NextResponse.json({
     month,
@@ -49,10 +68,11 @@ export async function PUT(req: NextRequest) {
   }
 
   const { date, verseRef } = body;
-  const reflection = body.reflection?.trim() || null;
+  // Guard the runtime type — a client could send a non-string reflection.
+  const reflection = typeof body.reflection === "string" ? body.reflection.trim() || null : null;
 
-  if (!date || !DAY_RE.test(date)) {
-    return NextResponse.json({ error: "Invalid date (expected YYYY-MM-DD)" }, { status: 400 });
+  if (!date || !isRealDay(date)) {
+    return NextResponse.json({ error: "Invalid date (expected a real YYYY-MM-DD)" }, { status: 400 });
   }
   if (!verseRef || !isValidRef(verseRef)) {
     return NextResponse.json({ error: "Invalid verse reference" }, { status: 400 });
@@ -89,8 +109,8 @@ export async function DELETE(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const date = req.nextUrl.searchParams.get("date");
-  if (!date || !DAY_RE.test(date)) {
-    return NextResponse.json({ error: "Invalid date (expected YYYY-MM-DD)" }, { status: 400 });
+  if (!date || !isRealDay(date)) {
+    return NextResponse.json({ error: "Invalid date (expected a real YYYY-MM-DD)" }, { status: 400 });
   }
 
   await db.delete(curatedVotd).where(eq(curatedVotd.date, date));

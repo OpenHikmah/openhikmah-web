@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, Pill, StateNote } from "@/components/admin/primitives";
-import { useAdminFetch } from "@/components/admin/AdminContext";
+import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +26,7 @@ export default function ConnectionsPage() {
   const api = useAdminFetch();
   const [status, setStatus] = useState<(typeof STATUS_FILTERS)[number]>("all");
   const [kind, setKind] = useState<(typeof KIND_FILTERS)[number]>("all");
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const qs = new URLSearchParams();
   if (status !== "all") qs.set("status", status);
@@ -37,8 +38,13 @@ export default function ConnectionsPage() {
   );
 
   const setStatusOf = async (id: number, next: Connection["status"]) => {
-    await api("/connections", { method: "PATCH", json: { id, status: next } });
-    reload();
+    setActionError(null);
+    try {
+      await api("/connections", { method: "PATCH", json: { id, status: next } });
+      reload();
+    } catch (e) {
+      setActionError(e instanceof AdminApiError ? e.message : "Failed to update connection.");
+    }
   };
 
   return (
@@ -54,6 +60,7 @@ export default function ConnectionsPage() {
         </div>
 
         {error && <StateNote tone="error">{error}</StateNote>}
+        {actionError && <StateNote tone="error">{actionError}</StateNote>}
         {loading && <StateNote>Loading…</StateNote>}
         {data && data.connections.length === 0 && <StateNote>No connections match.</StateNote>}
 

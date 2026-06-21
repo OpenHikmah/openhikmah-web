@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button, Input } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
-import { useAdminFetch } from "@/components/admin/AdminContext";
+import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 
 interface AdminUser {
@@ -23,6 +23,8 @@ export default function UsersPage() {
   const api = useAdminFetch();
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   const { data, error, loading, reload } = useAsync<{ users: AdminUser[] }>(
     () => api(`/users${submitted ? `?q=${encodeURIComponent(submitted)}` : ""}`),
@@ -30,8 +32,16 @@ export default function UsersPage() {
   );
 
   const setDisabled = async (id: number, disabled: boolean) => {
-    await api("/users", { method: "PATCH", json: { id, disabled } });
-    reload();
+    setActionError(null);
+    setBusyId(id);
+    try {
+      await api("/users", { method: "PATCH", json: { id, disabled } });
+      reload();
+    } catch (e) {
+      setActionError(e instanceof AdminApiError ? e.message : "Failed to update user.");
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
@@ -52,6 +62,7 @@ export default function UsersPage() {
         </form>
 
         {error && <StateNote tone="error">{error}</StateNote>}
+        {actionError && <StateNote tone="error">{actionError}</StateNote>}
         {loading && <StateNote>Loading…</StateNote>}
         {data && data.users.length === 0 && <StateNote>No users found.</StateNote>}
 
@@ -90,11 +101,20 @@ export default function UsersPage() {
                       {u.isAdmin ? (
                         <span className="text-xs text-text-muted">—</span>
                       ) : u.disabledAt ? (
-                        <Button size="sm" variant="secondary" onClick={() => setDisabled(u.id, false)}>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={busyId === u.id}
+                          onClick={() => setDisabled(u.id, false)}
+                        >
                           Enable
                         </Button>
                       ) : (
-                        <ConfirmButton onConfirm={() => setDisabled(u.id, true)} confirmLabel="Disable?">
+                        <ConfirmButton
+                          onConfirm={() => setDisabled(u.id, true)}
+                          confirmLabel="Disable?"
+                          disabled={busyId === u.id}
+                        >
                           Disable
                         </ConfirmButton>
                       )}

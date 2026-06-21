@@ -20,13 +20,18 @@ export async function GET(req: NextRequest) {
   const limitParam = Number(sp.get("limit"));
   const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 200) : 100;
 
+  // Reject unknown filter values rather than silently ignoring them, so a
+  // typo'd query surfaces as a 400 instead of unfiltered results.
+  if (status && !(STATUSES as readonly string[]).includes(status)) {
+    return NextResponse.json({ error: "Invalid status filter" }, { status: 400 });
+  }
+  if (kind && !(KINDS as readonly string[]).includes(kind)) {
+    return NextResponse.json({ error: "Invalid kind filter" }, { status: 400 });
+  }
+
   const filters: SQL[] = [];
-  if (status && (STATUSES as readonly string[]).includes(status)) {
-    filters.push(eq(connections.status, status));
-  }
-  if (kind && (KINDS as readonly string[]).includes(kind)) {
-    filters.push(eq(connections.kind, kind));
-  }
+  if (status) filters.push(eq(connections.status, status));
+  if (kind) filters.push(eq(connections.kind, kind));
 
   const rows = await db
     .select()

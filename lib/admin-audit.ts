@@ -2,6 +2,20 @@ import { db } from "./db";
 import { adminAuditLog } from "./db/schema";
 
 /**
+ * Serialize `meta` defensively: a BigInt or circular reference must not throw and
+ * cause the whole audit row to be dropped. Falls back to a marker so the action
+ * is still recorded.
+ */
+function serializeMeta(meta: unknown): string | null {
+  if (meta === undefined) return null;
+  try {
+    return JSON.stringify(meta, (_k, v) => (typeof v === "bigint" ? v.toString() : v));
+  } catch {
+    return JSON.stringify({ serializationError: true });
+  }
+}
+
+/**
  * Append one row to the admin audit log. Every *mutating* admin action calls this
  * so the console polices itself (who did what, when, to which target).
  *
@@ -22,7 +36,7 @@ export async function logAdminAction(entry: {
       action: entry.action,
       targetType: entry.targetType ?? null,
       targetId: entry.targetId ?? null,
-      meta: entry.meta === undefined ? null : JSON.stringify(entry.meta),
+      meta: serializeMeta(entry.meta),
     });
   } catch (err) {
     console.error("Failed to write admin audit log:", entry.action, err);

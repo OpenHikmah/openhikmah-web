@@ -39,8 +39,9 @@ export function isAdminQfId(qfId: string | null | undefined): boolean {
 
 /**
  * Resolves the caller and asserts they are an admin. Returns `{ userId, user }`
- * on success or a `NextResponse` (401 if not signed in, 403 if signed in but not
- * an admin) that the route should return directly. Every `/api/admin/*` route
+ * on success or a `NextResponse` (401 if not signed in, 404 if signed in but not
+ * an admin — we don't reveal the surface) that the route should return directly.
+ * Every `/api/admin/*` route
  * MUST call this — it is the real security boundary, since the admin UI itself is
  * client-rendered and cannot be trusted.
  */

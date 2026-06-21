@@ -59,7 +59,11 @@ export async function GET(req: NextRequest) {
       .orderBy(sql`to_char(${aiGenerations.createdAt}, 'YYYY-MM-DD')`),
   ]);
 
-  const pricePer1k = Number(process.env.AI_USD_PER_1K_TOKENS) || null;
+  // Preserve a configured 0 (free tier) as a real price; only a missing/invalid
+  // value is treated as "unset" (null) — the UI keys on `=== null` to decide.
+  const rawPrice = process.env.AI_USD_PER_1K_TOKENS;
+  const parsed = rawPrice == null || rawPrice.trim() === "" ? NaN : Number(rawPrice);
+  const pricePer1k = Number.isFinite(parsed) ? parsed : null;
   const estCost = (tokens: number) =>
     pricePer1k !== null ? Number(((tokens / 1000) * pricePer1k).toFixed(2)) : null;
 

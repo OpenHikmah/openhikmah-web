@@ -24,15 +24,20 @@ export default function InfraPage() {
   const api = useAdminFetch();
   const { data, error, loading, reload } = useAsync<Infra>(() => api("/infra"), "infra");
   const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const run = async (action: string) => {
+    if (busy) return; // guard against concurrent maintenance operations
     setMsg(null);
+    setBusy(true);
     try {
       const res = await api<Record<string, unknown>>("/infra", { method: "POST", json: { action } });
       setMsg(`Done: ${JSON.stringify(res)}`);
       reload();
     } catch (e) {
       setMsg(e instanceof AdminApiError ? e.message : "Action failed.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -62,13 +67,13 @@ export default function InfraPage() {
             <section className="space-y-3 rounded-lg border border-border bg-surface p-5">
               <h2 className="text-sm font-medium text-text-primary">Maintenance</h2>
               <div className="flex flex-wrap gap-2">
-                <ConfirmButton variant="secondary" onConfirm={() => run("flush-tokens")} confirmLabel="Flush tokens?">
+                <ConfirmButton variant="secondary" disabled={busy} onConfirm={() => run("flush-tokens")} confirmLabel="Flush tokens?">
                   Flush token cache
                 </ConfirmButton>
-                <ConfirmButton variant="secondary" onConfirm={() => run("flush-jwks")} confirmLabel="Flush JWKS?">
+                <ConfirmButton variant="secondary" disabled={busy} onConfirm={() => run("flush-jwks")} confirmLabel="Flush JWKS?">
                   Flush JWKS cache
                 </ConfirmButton>
-                <ConfirmButton variant="danger" onConfirm={() => run("reset-ratelimits")} confirmLabel="Reset limits?">
+                <ConfirmButton variant="danger" disabled={busy} onConfirm={() => run("reset-ratelimits")} confirmLabel="Reset limits?">
                   Reset rate limits
                 </ConfirmButton>
               </div>
