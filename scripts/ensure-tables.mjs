@@ -176,6 +176,31 @@ try {
 
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled_at timestamptz`;
 
+  // ─── Challenge suggestions (admin-curated catalog) + attribution column ─────
+  await sql`
+    CREATE TABLE IF NOT EXISTS challenge_suggestions (
+      id                 serial PRIMARY KEY,
+      title              text NOT NULL,
+      description        text,
+      verse_ref          text,
+      suggested_duration text,
+      activity_type      text NOT NULL DEFAULT 'connection_made',
+      is_active          boolean NOT NULL DEFAULT true,
+      sort_order         integer NOT NULL DEFAULT 0,
+      created_by         text,
+      created_at         timestamptz NOT NULL DEFAULT now(),
+      updated_at         timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS challenge_suggestions_active_idx ON challenge_suggestions (is_active, sort_order)`;
+  await sql`ALTER TABLE challenges ADD COLUMN IF NOT EXISTS suggestion_id integer`;
+  await sql`
+    DO $$ BEGIN
+      ALTER TABLE challenges ADD CONSTRAINT challenges_suggestion_id_challenge_suggestions_id_fk
+        FOREIGN KEY (suggestion_id) REFERENCES challenge_suggestions(id) ON DELETE SET NULL;
+    EXCEPTION WHEN duplicate_object THEN null; END $$;
+  `;
+
   console.log("Tables ensured successfully");
 } finally {
   await sql.end();

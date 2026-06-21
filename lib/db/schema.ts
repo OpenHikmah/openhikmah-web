@@ -1,5 +1,6 @@
 import {
   bigserial,
+  boolean,
   check,
   date,
   integer,
@@ -87,6 +88,31 @@ export const activityLog = pgTable(
   ]
 );
 
+// ─── Challenge Suggestions ────────────────────────────────────────────────────
+// Admin-curated catalog of challenge ideas. Users browse the active ones on the
+// challenges tab and pick one to challenge a friend — the 1v1 mechanics are
+// unchanged; a suggestion just seeds the create flow (like Verse of the Day
+// curation). Only `connection_made` activity is wired today.
+
+export const challengeSuggestions = pgTable(
+  "challenge_suggestions",
+  {
+    id: serial("id").primaryKey(),
+    title: text("title").notNull(),
+    description: text("description"),
+    verseRef: text("verse_ref"),
+    // Suggested '24h' | '48h' | '7d', or null to let the user choose.
+    suggestedDuration: text("suggested_duration"),
+    activityType: text("activity_type").notNull().default("connection_made"),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdBy: text("created_by"), // admin qfId
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("challenge_suggestions_active_idx").on(t.isActive, t.sortOrder)]
+);
+
 // ─── Challenges ───────────────────────────────────────────────────────────────
 
 export const challenges = pgTable(
@@ -101,8 +127,12 @@ export const challenges = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     verseRef: text("verse_ref"),
     activityType: text("activity_type").notNull().default("connection_made"),
-    // 'pending' | 'active' | 'completed' | 'declined'
+    // 'pending' | 'active' | 'completed' | 'declined' | 'cancelled'
     status: text("status").notNull().default("pending"),
+    // Attribution: which curated suggestion (if any) seeded this challenge.
+    suggestionId: integer("suggestion_id").references(() => challengeSuggestions.id, {
+      onDelete: "set null",
+    }),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     winnerId: integer("winner_id").references(() => users.id),
@@ -381,6 +411,9 @@ export type NewUser = typeof users.$inferInsert;
 export type Friendship = typeof friendships.$inferSelect;
 export type ActivityLogEntry = typeof activityLog.$inferSelect;
 export type Challenge = typeof challenges.$inferSelect;
+export type NewChallenge = typeof challenges.$inferInsert;
+export type ChallengeSuggestion = typeof challengeSuggestions.$inferSelect;
+export type NewChallengeSuggestion = typeof challengeSuggestions.$inferInsert;
 export type SharedCanvas = typeof sharedCanvases.$inferSelect;
 export type VerseNote = typeof verseNotes.$inferSelect;
 export type NewVerseNote = typeof verseNotes.$inferInsert;

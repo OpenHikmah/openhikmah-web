@@ -1,31 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, count, eq, gte, lt, lte, or } from "drizzle-orm";
+import { and, eq, lt, or } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { activityLog, challenges, friendships, users } from "@/lib/db/schema";
+import { challenges, friendships, users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
-import type { Challenge } from "@/lib/db/schema";
-
-const DURATIONS: Record<string, number> = {
-  "24h": 24 * 60 * 60 * 1000,
-  "48h": 48 * 60 * 60 * 1000,
-  "7d":  7 * 24 * 60 * 60 * 1000,
-};
-
-async function getScore(userId: number, challenge: Challenge): Promise<number> {
-  const [row] = await db
-    .select({ score: count() })
-    .from(activityLog)
-    .where(
-      and(
-        eq(activityLog.userId, userId),
-        eq(activityLog.activityType, challenge.activityType),
-        gte(activityLog.occurredAt, challenge.startsAt),
-        lte(activityLog.occurredAt, challenge.endsAt)
-      )
-    );
-  // PG returns COUNT as a bigint string via node-postgres; cast to number
-  return Number(row?.score ?? 0);
-}
+import { DURATIONS, scoreChallenge, resolveEndedChallenges } from "@/lib/challenges";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
@@ -44,28 +22,8 @@ export async function GET(req: NextRequest) {
 
   const now = new Date();
 
-  // Lazily resolve expired active challenges; cache scores to avoid a second fetch below.
-  const resolvedScores = new Map<number, { challengerScore: number; challengedScore: number }>();
-
-  for (const c of rows) {
-    if (c.status === "active" && c.endsAt < now) {
-      const [challengerScore, challengedScore] = await Promise.all([
-        getScore(c.challengerId, c),
-        getScore(c.challengedId, c),
-      ]);
-      const winnerId =
-        challengerScore > challengedScore ? c.challengerId :
-        challengedScore > challengerScore ? c.challengedId :
-        null;
-      await db
-        .update(challenges)
-        .set({ status: "completed", winnerId })
-        .where(eq(challenges.id, c.id));
-      c.status = "completed";
-      c.winnerId = winnerId;
-      resolvedScores.set(c.id, { challengerScore, challengedScore });
-    }
-  }
+  // Lazily resolve expired active challenges; reuse the computed scores below.
+  const resolvedScores = await resolveEndedChallenges(rows, now);
 
   // Collect all user IDs to fetch usernames in one query
   const userIds = [...new Set(rows.flatMap((c) => [c.challengerId, c.challengedId]))];
@@ -86,7 +44,7 @@ export async function GET(req: NextRequest) {
       const [challengerScore, challengedScore] = cached
         ? [cached.challengerScore, cached.challengedScore]
         : needsScores
-        ? await Promise.all([getScore(c.challengerId, c), getScore(c.challengedId, c)])
+        ? await Promise.all([scoreChallenge(c.challengerId, c), scoreChallenge(c.challengedId, c)])
         : [0, 0];
       return {
         ...c,
@@ -106,7 +64,7 @@ export async function POST(req: NextRequest) {
   if (authed instanceof NextResponse) return authed;
   const { userId } = authed;
 
-  let body: { challengedUsername?: string; duration?: string; verseRef?: string };
+  let body: { challengedUsername?: string; duration?: string; verseRef?: string; suggestionId?: number };
   try {
     body = await req.json();
   } catch {
@@ -114,6 +72,11 @@ export async function POST(req: NextRequest) {
   }
 
   const { challengedUsername, duration, verseRef } = body;
+  // Optional attribution to a curated suggestion the user picked.
+  const suggestionId =
+    Number.isInteger(body.suggestionId) && (body.suggestionId as number) > 0
+      ? (body.suggestionId as number)
+      : null;
   if (!challengedUsername?.trim()) {
     return NextResponse.json({ error: "Missing challengedUsername" }, { status: 400 });
   }
@@ -181,6 +144,7 @@ export async function POST(req: NextRequest) {
       challengerId: userId,
       challengedId: target.id,
       verseRef: verseRef?.trim() || null,
+      suggestionId,
       startsAt,
       endsAt,
     })
