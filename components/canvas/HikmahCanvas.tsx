@@ -41,7 +41,7 @@ function radialPos(
   };
 }
 
-function CanvasInner() {
+function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
   useActivityTracker();
   useCanvasPersistence();
 
@@ -247,7 +247,7 @@ function CanvasInner() {
         />
         {nodes.length > 0 && (
           <>
-            <CanvasToolbar />
+            <CanvasToolbar onSearchOpen={onSearchOpen} />
             <Panel position="bottom-left">
               <CanvasLegend />
             </Panel>
@@ -272,10 +272,10 @@ function CanvasInner() {
   );
 }
 
-export function HikmahCanvas() {
+export function HikmahCanvas({ onSearchOpen }: { onSearchOpen: () => void }) {
   return (
     <ReactFlowProvider>
-      <CanvasInner />
+      <CanvasInner onSearchOpen={onSearchOpen} />
     </ReactFlowProvider>
   );
 }

@@ -107,7 +107,7 @@ export function CanvasPageClient() {
         {nodes.length === 0 && (
           <EmptyState onSearchOpen={() => setSearchOpen(true)} />
         )}
-        <HikmahCanvas />
+        <HikmahCanvas onSearchOpen={() => setSearchOpen(true)} />
         <ContextSidebar />
         <CanvasTour />
       </main>
