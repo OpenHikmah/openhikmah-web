@@ -13,7 +13,9 @@ export async function resolveVerse(ref: string): Promise<Verse | null> {
     const local = await getVerse(ref);
     if (local) return local;
   } catch (err) {
-    console.error(`Corpus lookup failed for ${ref}, falling back to live fetch:`, err);
+    // `ref` is passed as a data argument, never interpolated into the first
+    // (format) argument — avoids an externally-controlled format string.
+    console.error("Corpus lookup failed for %s, falling back to live fetch:", ref, err);
   }
   return fetchVerseLive(ref);
 }
@@ -54,7 +56,7 @@ async function fetchVerseLive(ref: string): Promise<Verse | null> {
   } catch (err) {
     // Log so an upstream outage is distinguishable from a genuinely missing
     // verse (both surface as null → 404 at the API layer).
-    console.error(`Live verse fetch failed for ${ref}:`, err);
+    console.error("Live verse fetch failed for %s:", ref, err);
     return null;
   }
 }
