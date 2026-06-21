@@ -28,7 +28,7 @@ function makeUser(overrides: Partial<User> = {}): User {
   return {
     id: 1, qfId: "qf-1", username: "me", displayName: null,
     createdAt: new Date(), lastActiveAt: new Date(),
-    currentStreak: 0, longestStreak: 0, lastActivityDate: null, ...overrides,
+    currentStreak: 0, longestStreak: 0, lastActivityDate: null, disabledAt: null, ...overrides,
   };
 }
 

@@ -29,6 +29,10 @@ export const users = pgTable(
     currentStreak: integer("current_streak").notNull().default(0),
     longestStreak: integer("longest_streak").notNull().default(0),
     lastActivityDate: date("last_activity_date"),
+    // Soft-disable seam for admin moderation. Null = active; a timestamp marks
+    // when an admin disabled the account. Disabled users keep their data but are
+    // rejected at the auth boundary (see requireUser / lib/admin-auth.ts).
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
   },
   (t) => [
     uniqueIndex("users_qf_id_idx").on(t.qfId),
@@ -324,6 +328,52 @@ export const nameContent = pgTable(
   (t) => [primaryKey({ columns: [t.slug, t.kind] })]
 );
 
+// ─── Curated Verse of the Day ─────────────────────────────────────────────────
+// Admin override for the daily verse, keyed by UTC date. When a row exists for a
+// day, it wins over the deterministic algorithmic pick (see lib/verse-of-day.ts).
+// `reflection` is optional editorial text rendered in the teal ReflectionNote.
+
+export const curatedVotd = pgTable("curated_votd", {
+  // UTC day, "YYYY-MM-DD". One curated verse per day.
+  date: date("date").primaryKey(),
+  verseRef: text("verse_ref").notNull(),
+  reflection: text("reflection"),
+  // QF id of the admin who set it (audit convenience; full trail in admin_audit_log).
+  updatedBy: text("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Admin Audit Log ──────────────────────────────────────────────────────────
+// Append-only record of every mutating admin action, so the console polices
+// itself. `meta` holds action-specific detail (old/new values, filters, etc.).
+
+export const adminAuditLog = pgTable(
+  "admin_audit_log",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    adminQfId: text("admin_qf_id").notNull(),
+    // e.g. 'votd.set' | 'votd.clear' | 'connection.status' | 'user.disable'
+    action: text("action").notNull(),
+    targetType: text("target_type"),
+    targetId: text("target_id"),
+    meta: text("meta"), // JSON-encoded payload
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("admin_audit_created_idx").on(t.createdAt)]
+);
+
+// ─── Feature Flags / Config ───────────────────────────────────────────────────
+// Key→JSON config the admin can tune at runtime (rate-limit windows, AI model per
+// connection kind, feature toggles). Read by the relevant subsystem; absence of a
+// key means "use the code default", so this never has to be fully populated.
+
+export const featureFlags = pgTable("feature_flags", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(), // JSON-encoded
+  updatedBy: text("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─── Exported types ───────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
@@ -352,3 +402,9 @@ export type WordMorphology = typeof wordMorphology.$inferSelect;
 export type NewWordMorphology = typeof wordMorphology.$inferInsert;
 export type NameContent = typeof nameContent.$inferSelect;
 export type NewNameContent = typeof nameContent.$inferInsert;
+export type CuratedVotd = typeof curatedVotd.$inferSelect;
+export type NewCuratedVotd = typeof curatedVotd.$inferInsert;
+export type AdminAuditEntry = typeof adminAuditLog.$inferSelect;
+export type NewAdminAuditEntry = typeof adminAuditLog.$inferInsert;
+export type FeatureFlag = typeof featureFlags.$inferSelect;
+export type NewFeatureFlag = typeof featureFlags.$inferInsert;

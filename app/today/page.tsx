@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { NavBar } from "@/components/layout/NavBar";
 import { VerseOfDayCard } from "@/components/today/VerseOfDayCard";
-import { getVerseOfDay } from "@/lib/verse-of-day";
+import { getVerseOfDayWithReflection } from "@/lib/verse-of-day";
 
 export const metadata: Metadata = {
   title: "Verse of the Day — Open Hikmah",
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
-  const verse = await getVerseOfDay().catch(() => null);
+  const today = await getVerseOfDayWithReflection().catch(() => null);
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
@@ -25,8 +25,8 @@ export default async function TodayPage() {
       <NavBar />
 
       <main className="mx-auto flex w-full max-w-[1180px] flex-1 flex-col items-center justify-center px-6 py-12 md:px-12">
-        {verse ? (
-          <VerseOfDayCard verse={verse} />
+        {today ? (
+          <VerseOfDayCard verse={today.verse} reflection={today.reflection ?? undefined} />
         ) : (
           <p className="text-sm text-text-muted">
             Couldn&apos;t load today&apos;s verse right now. Please try again later.

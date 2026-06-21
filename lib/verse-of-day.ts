@@ -1,3 +1,6 @@
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { curatedVotd } from "@/lib/db/schema";
 import { resolveVerse } from "@/lib/verse-resolver";
 import type { Verse } from "@/types/quran";
 
@@ -129,14 +132,43 @@ export function verseOfDayRef(date: Date = new Date()): string {
   return POOL[daySeed(date) % POOL.length];
 }
 
+/** The UTC day key ("YYYY-MM-DD") used as the curated_votd primary key. */
+export function votdDateKey(date: Date = new Date()): string {
+  return date.toISOString().slice(0, 10);
+}
+
 /**
- * Admin-curated override for a given day. Returns null until the admin
- * Verse-of-the-Day calendar (roadmap Epic 2 / design.md §6.A) is built — the
- * algorithmic pick below is the always-on fallback. This is the single seam a
- * curated entry will plug into; the card UI is identical either way.
+ * The admin-curated entry for a day, if one exists: the resolved verse plus its
+ * optional editorial reflection. Reads the `curated_votd` table (the seam set by
+ * the admin Verse-of-the-Day calendar). DB failures degrade to null so the
+ * algorithmic pick always remains as the always-on fallback.
  */
-export async function getCuratedVerseOfDay(_date: Date): Promise<Verse | null> {
-  return null;
+export async function getCuratedVerseOfDayEntry(
+  date: Date = new Date()
+): Promise<{ verse: Verse; reflection: string | null } | null> {
+  try {
+    const [row] = await db
+      .select()
+      .from(curatedVotd)
+      .where(eq(curatedVotd.date, votdDateKey(date)))
+      .limit(1);
+    if (!row) return null;
+    const verse = await resolveVerse(row.verseRef);
+    if (!verse) return null;
+    return { verse, reflection: row.reflection ?? null };
+  } catch (err) {
+    console.error("Curated VotD lookup failed; using algorithmic pick:", err);
+    return null;
+  }
+}
+
+/**
+ * Admin-curated override verse for a given day, or null when none is set. The
+ * algorithmic pick is the always-on fallback; the card UI is identical either way.
+ */
+export async function getCuratedVerseOfDay(date: Date = new Date()): Promise<Verse | null> {
+  const entry = await getCuratedVerseOfDayEntry(date);
+  return entry?.verse ?? null;
 }
 
 /** Resolves today's verse (full text). Null only if it can't be resolved at all. */
@@ -144,4 +176,17 @@ export async function getVerseOfDay(date: Date = new Date()): Promise<Verse | nu
   const curated = await getCuratedVerseOfDay(date);
   if (curated) return curated;
   return resolveVerse(verseOfDayRef(date));
+}
+
+/**
+ * Today's verse plus any curated reflection, for the full /today card. Falls back
+ * to the algorithmic pick (with no reflection) when no curated entry exists.
+ */
+export async function getVerseOfDayWithReflection(
+  date: Date = new Date()
+): Promise<{ verse: Verse; reflection: string | null } | null> {
+  const curated = await getCuratedVerseOfDayEntry(date);
+  if (curated) return curated;
+  const verse = await resolveVerse(verseOfDayRef(date));
+  return verse ? { verse, reflection: null } : null;
 }

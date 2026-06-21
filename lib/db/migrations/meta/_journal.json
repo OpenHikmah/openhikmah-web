@@ -71,6 +71,13 @@
       "when": 1781861399908,
       "tag": "0009_third_shaman",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1782030239740,
+      "tag": "0010_admin_panel",
+      "breakpoints": true
     }
   ]
 }

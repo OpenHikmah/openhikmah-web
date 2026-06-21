@@ -33,6 +33,7 @@ function makeUser(): User {
     id: 1, qfId: "qf-1", username: "u", displayName: null,
     createdAt: new Date(), lastActiveAt: new Date(),
     currentStreak: 0, longestStreak: 0, lastActivityDate: null,
+    disabledAt: null,
   };
 }
 function authed() {

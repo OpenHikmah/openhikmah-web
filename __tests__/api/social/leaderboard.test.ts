@@ -55,6 +55,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     currentStreak: 5,
     longestStreak: 10,
     lastActivityDate: null,
+    disabledAt: null,
     ...overrides,
   };
 }

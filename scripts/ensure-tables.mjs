@@ -141,6 +141,41 @@ try {
     )
   `;
 
+  // ─── Admin panel (curated VotD, audit log, feature flags, soft-disable) ─────
+  await sql`
+    CREATE TABLE IF NOT EXISTS curated_votd (
+      date        date PRIMARY KEY,
+      verse_ref   text NOT NULL,
+      reflection  text,
+      updated_by  text,
+      updated_at  timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS admin_audit_log (
+      id          bigserial PRIMARY KEY,
+      admin_qf_id text NOT NULL,
+      action      text NOT NULL,
+      target_type text,
+      target_id   text,
+      meta        text,
+      created_at  timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS admin_audit_created_idx ON admin_audit_log (created_at)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS feature_flags (
+      key        text PRIMARY KEY,
+      value      text NOT NULL,
+      updated_by text,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled_at timestamptz`;
+
   console.log("Tables ensured successfully");
 } finally {
   await sql.end();
