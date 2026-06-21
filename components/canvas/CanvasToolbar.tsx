@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Share2, Save, Maximize2, RotateCcw, ListMusic, Loader2, Check, AlertCircle, LogIn } from "lucide-react";
+import { Search, Share2, Save, Maximize2, RotateCcw, ListMusic, Loader2, Check, AlertCircle, LogIn } from "lucide-react";
 import { Panel, useReactFlow } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { useCanvasStore, serializeCanvas } from "@/store/canvas";
@@ -47,7 +47,7 @@ function ToolbarBtn({
 
 const divider = <span className="mx-0.5 h-4 w-px shrink-0 bg-border" />;
 
-export function CanvasToolbar() {
+export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
   const reactFlow = useReactFlow();
   const { copied, copy } = useCopyFeedback();
 
@@ -140,6 +140,17 @@ export function CanvasToolbar() {
   return (
     <Panel position="top-center" className="hidden md:block">
       <div className="flex items-center gap-0.5 rounded-xl border border-border bg-surface/90 px-2 py-1.5 shadow-floating backdrop-blur-sm">
+        {/* Creation: the primary action, in the brand accent. Mirrors the empty
+            state's centred search so verses can still be added once the canvas
+            is populated (the global header search was removed). See issue #75. */}
+        <ToolbarBtn onClick={onSearchOpen} className="text-gold hover:bg-gold/10 hover:text-gold">
+          <Search className="h-3.5 w-3.5" />
+          Search
+          <kbd className="ml-0.5 rounded bg-gold/10 px-1 font-mono text-[10px] text-text-muted">⌘K</kbd>
+        </ToolbarBtn>
+
+        {divider}
+
         <ToolbarBtn
           onClick={handleShare}
           disabled={sharing}
