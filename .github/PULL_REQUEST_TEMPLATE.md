@@ -36,7 +36,7 @@
 ## Checklist
 
 - [ ] Branch is up to date with `main`
-- [ ] No `Co-Authored-By` lines in commits
+- [ ] Conventional commits
 - [ ] No secrets or real API keys in the diff
 - [ ] `.env.example` updated if new environment variables were added
 - [ ] `README.md` updated if the feature changes the public interface
