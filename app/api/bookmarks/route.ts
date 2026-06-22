@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { bookmarks } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
@@ -11,10 +11,14 @@ export async function GET(req: NextRequest) {
   if (authed instanceof NextResponse) return authed;
 
   try {
+    // Cap the result set: bookmarks are tiny ref strings, but the list is otherwise
+    // unbounded per user. 2000 is far above any realistic library; newest first.
     const rows = await db
       .select({ verseRef: bookmarks.verseRef })
       .from(bookmarks)
-      .where(eq(bookmarks.userId, authed.userId));
+      .where(eq(bookmarks.userId, authed.userId))
+      .orderBy(desc(bookmarks.createdAt))
+      .limit(2000);
 
     return NextResponse.json({ refs: rows.map((r) => r.verseRef) });
   } catch (err) {

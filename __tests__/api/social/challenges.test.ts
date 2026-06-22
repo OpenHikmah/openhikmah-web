@@ -27,6 +27,30 @@ function makeDbChain(resolveWith: unknown = []) {
   return chain;
 }
 
+// Records the args of each chained call so a test can assert the GET query is
+// bounded (orderBy + limit) rather than fetching every row for the user.
+function makeRecordingChain(resolveWith: unknown, calls: Record<string, unknown[][]>) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chain: any = new Proxy(
+    function () { return chain; },
+    {
+      get(_t, prop) {
+        if (prop === "then") return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+          Promise.resolve(resolveWith).then(res, rej);
+        if (prop === "catch") return (rej: (e: unknown) => unknown) =>
+          Promise.resolve(resolveWith).catch(rej);
+        if (prop === Symbol.toStringTag) return "MockChain";
+        return (...args: unknown[]) => {
+          (calls[prop as string] ??= []).push(args);
+          return chain;
+        };
+      },
+      apply() { return chain; },
+    }
+  );
+  return chain;
+}
+
 const { mockSelect, mockInsert, mockUpdate, mockDelete } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
   mockInsert: vi.fn(() => makeDbChain([])),
@@ -218,6 +242,16 @@ describe("GET /api/social/challenges", () => {
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
     expect(body).toHaveLength(0);
+  });
+
+  it("bounds the challenges query with orderBy + limit(200)", async () => {
+    authedAs(makeUser({ id: 1 }));
+    const calls: Record<string, unknown[][]> = {};
+    mockSelect.mockReturnValueOnce(makeRecordingChain([], calls));
+    const res = await GET(makeGetReq());
+    expect(res.status).toBe(200);
+    expect(calls.orderBy).toBeDefined();
+    expect(calls.limit?.[0]).toEqual([200]);
   });
 
   it("returns enriched challenges with usernames and scores", async () => {

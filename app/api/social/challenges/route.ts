@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, lt, or } from "drizzle-orm";
+import { and, desc, eq, lt, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { challenges, challengeSuggestions, friendships, users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
@@ -10,6 +10,8 @@ export async function GET(req: NextRequest) {
   if (authed instanceof NextResponse) return authed;
   const { userId } = authed;
 
+  // Bound the per-user challenge list (newest first). 200 is far above any real
+  // user's volume; recent active/pending rows — the ones that matter — stay in range.
   const rows = await db
     .select()
     .from(challenges)
@@ -18,7 +20,9 @@ export async function GET(req: NextRequest) {
         eq(challenges.challengerId, userId),
         eq(challenges.challengedId, userId)
       )
-    );
+    )
+    .orderBy(desc(challenges.createdAt))
+    .limit(200);
 
   const now = new Date();
 
