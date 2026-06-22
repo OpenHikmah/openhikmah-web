@@ -15,6 +15,22 @@ function SessionRestorer() {
   const bumpStreak = useSocialStore((s) => s.bumpStreak);
   const didRun = useRef(false);
 
+  // Dev-only console helper: `await window.__devLogin('<DEV_AUTH_TOKEN>')` sets the
+  // access token and loads the profile, so the /admin UI works without completing
+  // QF OAuth. Stripped from production builds. Pair with the server DEV_AUTH_* env.
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    (window as unknown as { __devLogin?: (t: string) => Promise<void> }).__devLogin = async (token: string) => {
+      setTokens(token);
+      const res = await fetch("/api/social/me", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const p = (await res.json()) as { id?: number; username?: string };
+        if (p.id && p.username) setProfile({ userId: p.id, username: p.username });
+      }
+      console.warn("dev login set — navigate to /admin");
+    };
+  }, [setTokens, setProfile]);
+
   useEffect(() => {
     if (didRun.current) return;
     didRun.current = true;
