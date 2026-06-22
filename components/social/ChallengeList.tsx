@@ -40,16 +40,13 @@ function formatCountdown(endsAt: string): string {
   return `${m}m ${s}s left`;
 }
 
-/**
- * Live countdown that self-adjusts: ticks every second in the final hour (so it
- * feels alive) and every 30s before that (to avoid needless re-renders on long
- * 7-day windows). State only updates inside the timeout callback, never
- * synchronously in the effect body.
- */
+/** Self-adjusting countdown: ticks per-second in the final hour, every 30s before. */
 function useCountdown(endsAt: string): string {
   const [label, setLabel] = useState(() => formatCountdown(endsAt));
-
   useEffect(() => {
+    // Reflect the new endsAt right away, then schedule subsequent ticks.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLabel(formatCountdown(endsAt));
     let timer: ReturnType<typeof setTimeout>;
     const schedule = () => {
       const diff = new Date(endsAt).getTime() - Date.now();
@@ -62,16 +59,32 @@ function useCountdown(endsAt: string): string {
     schedule();
     return () => clearTimeout(timer);
   }, [endsAt]);
-
   return label;
 }
 
-function StatusBadge({ label, tone }: { label: string; tone: "active" | "gold" | "draw" | "muted" }) {
+type Tone = "teal" | "gold" | "muted";
+
+function Avatar({ name, tone }: { name: string; tone: Tone }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide",
-        tone === "active" && "border-teal/40 bg-teal/10 text-teal",
+        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold uppercase",
+        tone === "teal" && "bg-teal/15 text-teal",
+        tone === "gold" && "bg-gold/15 text-gold",
+        tone === "muted" && "bg-white/5 text-text-secondary"
+      )}
+    >
+      {name?.[0] ?? "?"}
+    </span>
+  );
+}
+
+function StatusBadge({ label, tone }: { label: string; tone: Tone | "draw" }) {
+  return (
+    <span
+      className={cn(
+        "shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide",
+        tone === "teal" && "border-teal/40 bg-teal/10 text-teal",
         tone === "gold" && "border-gold-muted bg-gold/10 text-gold",
         tone === "draw" && "border-teal/30 bg-teal/5 text-text-secondary",
         tone === "muted" && "border-border bg-white/5 text-text-muted"
@@ -94,13 +107,22 @@ function ChallengeCard({
   const accessToken = useAuthStore((s) => s.accessToken);
   const [acting, setActing] = useState<"accept" | "decline" | "cancel" | null>(null);
   const countdown = useCountdown(c.endsAt);
+
   const isChallenger = c.challengerId === myId;
   const myScore = isChallenger ? c.challengerScore : c.challengedScore;
   const theirScore = isChallenger ? c.challengedScore : c.challengerScore;
-  const opponentName = isChallenger ? c.challengedUsername : c.challengerUsername;
+  const opponentName = (isChallenger ? c.challengedUsername : c.challengerUsername) ?? "unknown";
   const iWon = c.winnerId === myId;
   const theyWon = c.winnerId !== null && c.winnerId !== myId;
-  const isDraw = c.status === "completed" && c.winnerId === null;
+  const isActive = c.status === "active";
+  const isCompleted = c.status === "completed";
+  const isDraw = isCompleted && c.winnerId === null;
+  const incoming = c.status === "pending" && !isChallenger;
+  const sent = c.status === "pending" && isChallenger;
+  const faded = c.status === "declined" || c.status === "cancelled";
+
+  const tone: Tone = isActive ? "teal" : iWon ? "gold" : "muted";
+  const borderClass = iWon ? "border-gold" : isActive ? "border-teal" : "border-border";
 
   const handleAction = async (action: "accept" | "decline" | "cancel") => {
     if (!accessToken) return;
@@ -117,77 +139,73 @@ function ChallengeCard({
     }
   };
 
-  const borderClass =
-    c.status === "completed" && iWon ? "border-gold"
-    : c.status === "active" ? "border-teal"
-    : "border-border";
+  const statusBadge = isActive ? <StatusBadge label="Active" tone="teal" />
+    : incoming ? <StatusBadge label="Incoming" tone="gold" />
+    : sent ? <StatusBadge label="Pending" tone="muted" />
+    : iWon ? <StatusBadge label="Won" tone="gold" />
+    : isDraw ? <StatusBadge label="Draw" tone="draw" />
+    : theyWon ? <StatusBadge label="Lost" tone="muted" />
+    : c.status === "cancelled" ? <StatusBadge label="Cancelled" tone="muted" />
+    : <StatusBadge label="Declined" tone="muted" />;
 
   return (
-    <Card
-      className={cn(
-        "space-y-2 p-4",
-        borderClass,
-        (c.status === "declined" || c.status === "cancelled") && "opacity-60"
-      )}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-medium text-text-primary">vs @{opponentName}</span>
-        {c.status === "active" ? <StatusBadge label="Active" tone="active" />
-          : c.status === "pending" && !isChallenger ? <StatusBadge label="Incoming" tone="gold" />
-          : c.status === "pending" ? <StatusBadge label="Pending" tone="muted" />
-          : iWon ? <StatusBadge label="Won" tone="gold" />
-          : isDraw ? <StatusBadge label="Draw" tone="draw" />
-          : theyWon ? <StatusBadge label="Lost" tone="muted" />
-          : c.status === "cancelled" ? <StatusBadge label="Cancelled" tone="muted" />
-          : <StatusBadge label="Declined" tone="muted" />}
+    <Card className={cn("space-y-3 p-4", borderClass, faded && "opacity-60")}>
+      {/* Opponent + status */}
+      <div className="flex items-center gap-3">
+        <Avatar name={opponentName} tone={tone} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium text-text-primary">@{opponentName}</div>
+          {c.verseRef && <div className="font-mono text-[11px] text-teal">{c.verseRef}</div>}
+        </div>
+        {statusBadge}
       </div>
 
-      {c.verseRef && <p className="font-mono text-xs text-teal">{c.verseRef}</p>}
-
-      {(c.status === "active" || c.status === "completed") && (
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="font-mono text-sm tabular-nums text-text-secondary">
-            You <span className={cn("font-semibold", myScore >= theirScore && "text-text-primary")}>{myScore}</span>
-            {" — "}
-            <span className="font-semibold">{theirScore}</span> @{opponentName}
-          </span>
-          {c.status === "active" && (
-            <span className="flex items-center gap-1 text-xs text-text-muted">
-              <Clock className="h-3 w-3" />
-              {countdown}
-            </span>
-          )}
-          {iWon && <Trophy className="h-3.5 w-3.5 text-gold" />}
-          {isDraw && <Minus className="h-3.5 w-3.5 text-text-muted" />}
+      {/* Scoreboard */}
+      {(isActive || isCompleted) && (
+        <div className="flex items-stretch rounded-md border border-border-subtle bg-bg/40">
+          <ScoreCell label="You" score={myScore} lead={myScore >= theirScore} />
+          <div className="flex items-center px-2 font-mono text-[10px] uppercase text-text-muted">vs</div>
+          <ScoreCell label={`@${opponentName}`} score={theirScore} lead={theirScore > myScore} />
         </div>
       )}
 
-      {c.status === "pending" && isChallenger && (
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-text-muted">Waiting for @{opponentName} to respond…</p>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleAction("cancel")}
-            disabled={acting !== null}
-            className="gap-1 text-text-muted hover:text-error"
-          >
-            {acting === "cancel" && <Loader2 className="h-3 w-3 animate-spin" />}
-            Cancel
-          </Button>
-        </div>
+      {/* Status caption */}
+      {isActive && (
+        <p className="flex items-center justify-center gap-1.5 text-xs text-text-muted">
+          <Clock className="h-3.5 w-3.5" /> {countdown}
+        </p>
       )}
+      {iWon && (
+        <p className="flex items-center justify-center gap-1.5 text-xs font-medium text-gold">
+          <Trophy className="h-3.5 w-3.5" /> You won
+        </p>
+      )}
+      {isDraw && (
+        <p className="flex items-center justify-center gap-1.5 text-xs text-text-secondary">
+          <Minus className="h-3.5 w-3.5" /> Draw
+        </p>
+      )}
+      {theyWon && <p className="text-center text-xs text-text-muted">@{opponentName} won</p>}
 
-      {c.status === "pending" && !isChallenger && (
-        <div className="flex items-center gap-2">
-          <Button variant="primary" size="sm" onClick={() => handleAction("accept")} disabled={acting !== null} className="gap-1">
-            {acting === "accept" && <Loader2 className="h-3 w-3 animate-spin" />}
-            <Swords className="h-3.5 w-3.5" />
+      {/* Actions */}
+      {incoming && (
+        <div className="flex gap-2">
+          <Button variant="primary" size="sm" className="flex-1 gap-1.5" onClick={() => handleAction("accept")} disabled={acting !== null}>
+            {acting === "accept" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Swords className="h-3.5 w-3.5" />}
             Accept
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => handleAction("decline")} disabled={acting !== null} className="gap-1">
-            {acting === "decline" && <Loader2 className="h-3 w-3 animate-spin" />}
+          <Button variant="secondary" size="sm" className="flex-1" onClick={() => handleAction("decline")} disabled={acting !== null}>
+            {acting === "decline" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
             Decline
+          </Button>
+        </div>
+      )}
+      {sent && (
+        <div className="flex items-center justify-between gap-2 border-t border-border-subtle pt-2.5">
+          <span className="text-xs text-text-muted">Waiting for @{opponentName}…</span>
+          <Button variant="ghost" size="sm" className="gap-1 text-text-muted hover:text-error" onClick={() => handleAction("cancel")} disabled={acting !== null}>
+            {acting === "cancel" && <Loader2 className="h-3 w-3 animate-spin" />}
+            Cancel
           </Button>
         </div>
       )}
@@ -195,29 +213,67 @@ function ChallengeCard({
   );
 }
 
+function ScoreCell({ label, score, lead }: { label: string; score: number; lead: boolean }) {
+  return (
+    <div className="flex-1 px-3 py-2 text-center">
+      <div className="truncate text-[10px] uppercase tracking-wide text-text-muted">{label}</div>
+      <div className={cn("text-2xl font-semibold tabular-nums", lead ? "text-text-primary" : "text-text-muted")}>
+        {score}
+      </div>
+    </div>
+  );
+}
+
+function Group({
+  label,
+  items,
+  myId,
+  onUpdate,
+}: {
+  label: string;
+  items: EnrichedChallenge[];
+  myId: number;
+  onUpdate: () => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <section className="space-y-2">
+      <h3 className="flex items-center gap-2 px-0.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">
+        {label}
+        <span className="rounded-full bg-white/5 px-1.5 text-[10px] text-text-secondary">{items.length}</span>
+      </h3>
+      {items.map((c) => (
+        <ChallengeCard key={c.id} c={c} myId={myId} onUpdate={onUpdate} />
+      ))}
+    </section>
+  );
+}
+
 export function ChallengeList({ challenges, onUpdate }: Props) {
   const myId = useSocialStore((s) => s.userId);
-
   if (!myId) return null;
 
   if (challenges.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border p-6 text-center">
-        <Swords className="mx-auto mb-2 h-5 w-5 text-text-muted" />
+      <div className="rounded-lg border border-dashed border-border p-8 text-center">
+        <Swords className="mx-auto mb-2 h-6 w-6 text-text-muted" />
         <p className="text-sm text-text-secondary">No challenges yet.</p>
-        <p className="text-xs text-text-muted">Pick a suggestion above or challenge a friend.</p>
+        <p className="mt-0.5 text-xs text-text-muted">Pick a suggestion or challenge a friend above.</p>
       </div>
     );
   }
 
-  const order = ["active", "pending", "completed", "declined", "cancelled"];
-  const sorted = [...challenges].sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status));
+  const incoming = challenges.filter((c) => c.status === "pending" && c.challengedId === myId);
+  const active = challenges.filter((c) => c.status === "active");
+  const sent = challenges.filter((c) => c.status === "pending" && c.challengerId === myId);
+  const past = challenges.filter((c) => ["completed", "declined", "cancelled"].includes(c.status));
 
   return (
-    <div className="space-y-2">
-      {sorted.map((c) => (
-        <ChallengeCard key={c.id} c={c} myId={myId} onUpdate={onUpdate} />
-      ))}
+    <div className="space-y-5">
+      <Group label="Needs your response" items={incoming} myId={myId} onUpdate={onUpdate} />
+      <Group label="Active" items={active} myId={myId} onUpdate={onUpdate} />
+      <Group label="Sent" items={sent} myId={myId} onUpdate={onUpdate} />
+      <Group label="Past" items={past} myId={myId} onUpdate={onUpdate} />
     </div>
   );
 }

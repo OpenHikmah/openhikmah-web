@@ -52,6 +52,9 @@ export async function PATCH(
       .set({ status: "completed", winnerId, endsAt: now })
       .where(eq(challenges.id, challengeId))
       .returning();
+    if (!updated) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
     await logAdminAction({
       adminQfId: auth.user.qfId,
       action: "challenge.end",
@@ -72,6 +75,9 @@ export async function PATCH(
       .set({ status: "completed", winnerId })
       .where(eq(challenges.id, challengeId))
       .returning();
+    if (!updated) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
     await logAdminAction({
       adminQfId: auth.user.qfId,
       action: "challenge.override-winner",

@@ -8,6 +8,10 @@ import { requireUser } from "@/lib/social-auth";
  * Active challenge suggestions for the user-facing challenges tab. Users pick one
  * to seed a challenge to a friend. Only `is_active` rows are exposed, ordered for
  * display; admin-only fields (createdBy) are dropped.
+ *
+ * Lives at `/api/social/challenge-suggestions` (not under `challenges/`) to avoid
+ * the static-vs-dynamic sibling collision with `challenges/[id]`, which the dev
+ * router resolves to the not-found page.
  */
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);

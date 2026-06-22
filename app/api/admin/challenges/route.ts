@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 import { challenges, users } from "@/lib/db/schema";
@@ -23,6 +23,15 @@ export async function GET(req: NextRequest) {
   }
   const limitParam = Number(sp.get("limit"));
   const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 200) : 50;
+
+  // Finalize any ended active challenges FIRST, so both the stats aggregation and
+  // the returned list reflect the same (post-finalization) state.
+  const now = new Date();
+  const ended = await db
+    .select()
+    .from(challenges)
+    .where(and(eq(challenges.status, "active"), lt(challenges.endsAt, now)));
+  await resolveEndedChallenges(ended, now);
 
   // Stats: counts per status + suggestion-attributed total.
   const statusCounts = await db

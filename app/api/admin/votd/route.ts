@@ -33,8 +33,9 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const month = req.nextUrl.searchParams.get("month") ?? new Date().toISOString().slice(0, 7);
-  if (!MONTH_RE.test(month)) {
-    return NextResponse.json({ error: "Invalid month (expected YYYY-MM)" }, { status: 400 });
+  const monthNum = Number(month.slice(5, 7));
+  if (!MONTH_RE.test(month) || monthNum < 1 || monthNum > 12) {
+    return NextResponse.json({ error: "Invalid month (expected YYYY-MM, 01–12)" }, { status: 400 });
   }
 
   const rows = await db

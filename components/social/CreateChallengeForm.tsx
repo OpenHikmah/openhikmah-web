@@ -90,74 +90,84 @@ export function CreateChallengeForm({ friends, loadingFriends, onCreated, prefil
   }
 
   if (friends.length === 0) {
-    return <p className="text-sm text-text-muted">Add friends first to challenge them.</p>;
+    return (
+      <div className="rounded-lg border border-dashed border-border p-5 text-center text-sm text-text-muted">
+        Add friends first to challenge them.
+      </div>
+    );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-surface p-4">
-      {prefill?.title && (
-        <div className="flex items-center justify-between gap-2 rounded-md border-l-2 border-teal bg-teal/[0.06] px-3 py-1.5">
-          <span className="text-xs text-text-secondary">
-            From suggestion: <span className="text-teal">{prefill.title}</span>
-          </span>
-          {onClearPrefill && (
-            <button type="button" onClick={onClearPrefill} aria-label="Clear suggestion" className="text-text-muted hover:text-text-primary">
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-      )}
-
-      <select
-        value={selectedFriend}
-        onChange={(e) => { setSelectedFriend(e.target.value); setError(null); setSuccess(null); }}
-        className={cn(
-          "w-full cursor-pointer appearance-none rounded-md border border-border bg-surface px-3 py-2 text-sm transition-colors focus:border-gold-muted",
-          selectedFriend ? "text-text-primary" : "text-text-muted"
-        )}
-      >
-        <option value="" disabled className="bg-surface">Choose a friend to challenge…</option>
-        {friends.map((f) => (
-          <option key={f.id} value={f.username} className="bg-surface">@{f.username}</option>
-        ))}
-      </select>
-
-      <div className="flex gap-2">
-        {DURATIONS.map((d) => (
-          <button
-            key={d}
-            type="button"
-            onClick={() => setDuration(d)}
-            className={cn(
-              "flex-1 cursor-pointer rounded-md border py-1.5 text-xs font-medium transition-colors",
-              duration === d
-                ? "border-gold-muted bg-gold/10 text-gold"
-                : "border-border text-text-muted hover:border-gold-muted"
+    <section className="space-y-2">
+      <h3 className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">New challenge</h3>
+      <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-surface p-4">
+        {prefill?.title && (
+          <div className="flex items-center justify-between gap-2 rounded-md border-l-2 border-teal bg-teal/[0.06] px-3 py-1.5">
+            <span className="truncate text-xs text-text-secondary">
+              From: <span className="text-teal">{prefill.title}</span>
+            </span>
+            {onClearPrefill && (
+              <button type="button" onClick={onClearPrefill} aria-label="Clear suggestion" className="shrink-0 text-text-muted hover:text-text-primary">
+                <X className="h-3.5 w-3.5" />
+              </button>
             )}
-          >
-            {d}
-          </button>
-        ))}
-      </div>
+          </div>
+        )}
 
-      <Input
-        type="text"
-        value={verseRef}
-        onChange={(e) => setVerseRef(e.target.value)}
-        placeholder="Verse context (optional, e.g. 2:255)"
-        maxLength={20}
-        autoComplete="off"
-        spellCheck={false}
-      />
+        <select
+          value={selectedFriend}
+          onChange={(e) => { setSelectedFriend(e.target.value); setError(null); setSuccess(null); }}
+          className={cn(
+            "w-full cursor-pointer appearance-none rounded-md border border-border bg-surface px-3 py-2 text-sm transition-colors focus:border-gold-muted",
+            selectedFriend ? "text-text-primary" : "text-text-muted"
+          )}
+        >
+          <option value="" disabled className="bg-surface">Choose a friend…</option>
+          {friends.map((f) => (
+            <option key={f.id} value={f.username} className="bg-surface">@{f.username}</option>
+          ))}
+        </select>
 
-      <div className="flex items-center gap-3">
-        <Button type="submit" variant="primary" size="sm" disabled={sending || !selectedFriend} className="gap-1.5">
-          {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Swords className="h-3.5 w-3.5" />}
-          Challenge
-        </Button>
-        {error && <p className="text-xs text-error">{error}</p>}
-        {success && <p className="text-xs text-teal">{success}</p>}
-      </div>
-    </form>
+        <div className="space-y-1.5">
+          <span className="block text-[11px] uppercase tracking-wide text-text-muted">Duration</span>
+          <div className="flex gap-2">
+            {DURATIONS.map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDuration(d)}
+                className={cn(
+                  "flex-1 cursor-pointer rounded-md border py-1.5 text-xs font-medium transition-colors",
+                  duration === d
+                    ? "border-gold-muted bg-gold/10 text-gold"
+                    : "border-border text-text-muted hover:border-gold-muted"
+                )}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <Input
+          type="text"
+          value={verseRef}
+          onChange={(e) => setVerseRef(e.target.value)}
+          placeholder="Verse context (optional, e.g. 2:255)"
+          maxLength={20}
+          autoComplete="off"
+          spellCheck={false}
+        />
+
+        <div className="flex items-center justify-between gap-3 pt-0.5">
+          <Button type="submit" variant="primary" size="sm" disabled={sending || !selectedFriend} className="gap-1.5">
+            {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Swords className="h-3.5 w-3.5" />}
+            Send challenge
+          </Button>
+          {error && <p className="text-xs text-error">{error}</p>}
+          {success && <p className="text-xs text-teal">{success}</p>}
+        </div>
+      </form>
+    </section>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button, type ButtonProps } from "@/components/ui";
 
@@ -123,18 +123,25 @@ export function ConfirmButton({
   confirmLabel?: string;
 } & Omit<ButtonProps, "onClick">) {
   const [armed, setArmed] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear any pending disarm timer on unmount.
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
 
   return (
     <Button
       variant={armed ? "danger" : variant}
       size={size}
       onClick={() => {
+        if (timerRef.current) clearTimeout(timerRef.current);
         if (armed) {
           setArmed(false);
           onConfirm();
         } else {
           setArmed(true);
-          window.setTimeout(() => setArmed(false), 3000);
+          timerRef.current = setTimeout(() => setArmed(false), 3000);
         }
       }}
       {...props}

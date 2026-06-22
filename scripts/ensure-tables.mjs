@@ -200,6 +200,7 @@ try {
         FOREIGN KEY (suggestion_id) REFERENCES challenge_suggestions(id) ON DELETE SET NULL;
     EXCEPTION WHEN duplicate_object THEN null; END $$;
   `;
+  await sql`CREATE INDEX IF NOT EXISTS challenges_suggestion_id_idx ON challenges (suggestion_id)`;
 
   console.log("Tables ensured successfully");
 } finally {

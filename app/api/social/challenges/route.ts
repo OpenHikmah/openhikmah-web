@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, lt, or } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { challenges, friendships, users } from "@/lib/db/schema";
+import { challenges, challengeSuggestions, friendships, users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
 import { DURATIONS, scoreChallenge, resolveEndedChallenges } from "@/lib/challenges";
 
@@ -72,8 +72,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { challengedUsername, duration, verseRef } = body;
-  // Optional attribution to a curated suggestion the user picked.
-  const suggestionId =
+  const suggestionCandidate =
     Number.isInteger(body.suggestionId) && (body.suggestionId as number) > 0
       ? (body.suggestionId as number)
       : null;
@@ -133,6 +132,18 @@ export async function POST(req: NextRequest) {
 
   if (existing) {
     return NextResponse.json({ error: "A challenge already exists between you" }, { status: 409 });
+  }
+
+  // Only attribute to a suggestion that actually exists and is active — an
+  // arbitrary/stale id would otherwise fail the FK insert (or mis-attribute).
+  let suggestionId: number | null = null;
+  if (suggestionCandidate !== null) {
+    const [s] = await db
+      .select({ id: challengeSuggestions.id })
+      .from(challengeSuggestions)
+      .where(and(eq(challengeSuggestions.id, suggestionCandidate), eq(challengeSuggestions.isActive, true)))
+      .limit(1);
+    suggestionId = s?.id ?? null;
   }
 
   const startsAt = new Date();

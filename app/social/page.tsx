@@ -125,7 +125,7 @@ export default function SocialPage() {
   const fetchSuggestions = useCallback(async () => {
     if (!accessToken) return;
     try {
-      const res = await fetch("/api/social/challenges/suggestions", {
+      const res = await fetch("/api/social/challenge-suggestions", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (res.ok) {
@@ -178,7 +178,7 @@ export default function SocialPage() {
       .catch(() => {})
       .finally(() => setLoadingChallenges(false));
 
-    fetch("/api/social/challenges/suggestions", { headers: { Authorization: `Bearer ${accessToken}` }, signal })
+    fetch("/api/social/challenge-suggestions", { headers: { Authorization: `Bearer ${accessToken}` }, signal })
       .then((r) => (r.ok ? r.json() : { suggestions: [] }))
       .then((data: { suggestions: Suggestion[] }) => setSuggestions(data.suggestions))
       .catch(() => {});
@@ -284,7 +284,7 @@ export default function SocialPage() {
             )}
 
             {tab === "challenges" && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <ChallengeSuggestions suggestions={suggestions} onPick={pickSuggestion} />
                 <CreateChallengeForm
                   key={prefillKey}
@@ -296,13 +296,18 @@ export default function SocialPage() {
                   prefill={prefill}
                   onClearPrefill={clearPrefill}
                 />
-                {loadingChallenges ? (
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="h-4 w-4 animate-spin text-teal" />
-                  </div>
-                ) : (
-                  <ChallengeList challenges={challengesList} onUpdate={fetchChallenges} />
-                )}
+                <section className="space-y-2">
+                  <h3 className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">
+                    Your challenges
+                  </h3>
+                  {loadingChallenges ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="h-4 w-4 animate-spin text-teal" />
+                    </div>
+                  ) : (
+                    <ChallengeList challenges={challengesList} onUpdate={fetchChallenges} />
+                  )}
+                </section>
               </div>
             )}
 

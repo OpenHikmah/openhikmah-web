@@ -49,14 +49,14 @@ export async function GET(req: NextRequest) {
       .groupBy(aiGenerations.kind),
     db
       .select({
-        day: sql<string>`to_char(${aiGenerations.createdAt}, 'YYYY-MM-DD')`,
+        day: sql<string>`to_char(${aiGenerations.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
         gens: sql<number>`count(*)::int`,
         tokens: sql<number>`coalesce(sum(${aiGenerations.tokens}),0)::int`,
       })
       .from(aiGenerations)
       .where(gte(aiGenerations.createdAt, since30))
-      .groupBy(sql`to_char(${aiGenerations.createdAt}, 'YYYY-MM-DD')`)
-      .orderBy(sql`to_char(${aiGenerations.createdAt}, 'YYYY-MM-DD')`),
+      .groupBy(sql`to_char(${aiGenerations.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`)
+      .orderBy(sql`to_char(${aiGenerations.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`),
   ]);
 
   // Preserve a configured 0 (free tier) as a real price; only a missing/invalid

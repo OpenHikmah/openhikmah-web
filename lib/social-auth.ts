@@ -83,10 +83,13 @@ export function clearTokenCache(): number {
 }
 
 /** Drops the cached JWKS (in-process + Redis) so the next verify refetches QF's
- *  signing keys — used after a key rotation from the admin Infra panel. */
-export function clearJwksCache(): void {
+ *  signing keys — used after a key rotation from the admin Infra panel. Awaits the
+ *  Redis eviction so the flush is fully complete before the caller reports success
+ *  (otherwise an immediate verify could repopulate the in-process cache from the
+ *  still-present Redis copy). */
+export async function clearJwksCache(): Promise<void> {
   jwksCache = null;
-  void redisDel(JWKS_REDIS_KEY);
+  await redisDel(JWKS_REDIS_KEY);
 }
 
 // ─── JWT signature verification ───────────────────────────────────────────────

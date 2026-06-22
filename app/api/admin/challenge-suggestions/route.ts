@@ -12,6 +12,7 @@ function validate(body: {
   title?: unknown;
   verseRef?: unknown;
   suggestedDuration?: unknown;
+  isActive?: unknown;
 }): string | null {
   if (typeof body.title !== "string" || !body.title.trim()) return "Title is required";
   if (body.verseRef != null && (typeof body.verseRef !== "string" || !isValidRef(body.verseRef)))
@@ -21,6 +22,8 @@ function validate(body: {
     (typeof body.suggestedDuration !== "string" || !isDuration(body.suggestedDuration))
   )
     return "Duration must be 24h, 48h, 7d, or empty";
+  if (body.isActive !== undefined && typeof body.isActive !== "boolean")
+    return "isActive must be a boolean";
   return null;
 }
 
@@ -58,7 +61,7 @@ export async function POST(req: NextRequest) {
       description: typeof body.description === "string" ? body.description.trim() || null : null,
       verseRef: typeof body.verseRef === "string" ? body.verseRef : null,
       suggestedDuration: typeof body.suggestedDuration === "string" ? body.suggestedDuration : null,
-      isActive: body.isActive === undefined ? true : Boolean(body.isActive),
+      isActive: body.isActive === undefined ? true : (body.isActive as boolean),
       sortOrder: Number.isInteger(body.sortOrder) ? (body.sortOrder as number) : 0,
       createdBy: auth.user.qfId,
     })
@@ -98,7 +101,7 @@ export async function PUT(req: NextRequest) {
       description: typeof body.description === "string" ? body.description.trim() || null : null,
       verseRef: typeof body.verseRef === "string" ? body.verseRef : null,
       suggestedDuration: typeof body.suggestedDuration === "string" ? body.suggestedDuration : null,
-      isActive: body.isActive === undefined ? true : Boolean(body.isActive),
+      isActive: body.isActive === undefined ? true : (body.isActive as boolean),
       sortOrder: Number.isInteger(body.sortOrder) ? (body.sortOrder as number) : 0,
       updatedAt: new Date(),
     })

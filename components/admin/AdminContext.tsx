@@ -44,13 +44,13 @@ export function useAdminFetch() {
 
   return useCallback(
     async <T,>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> => {
-      const headers: Record<string, string> = {
-        ...(init?.headers as Record<string, string> | undefined),
-        Authorization: `Bearer ${token ?? ""}`,
-      };
+      // Use the Headers constructor so any caller-supplied headers (object, array,
+      // or Headers instance) are merged correctly rather than lost by a spread.
+      const headers = new Headers(init?.headers);
+      headers.set("Authorization", `Bearer ${token ?? ""}`);
       let body = init?.body;
       if (init?.json !== undefined) {
-        headers["Content-Type"] = "application/json";
+        headers.set("Content-Type", "application/json");
         body = JSON.stringify(init.json);
       }
       const res = await fetch(`/api/admin${path}`, { ...init, headers, body });

@@ -142,6 +142,7 @@ export const challenges = pgTable(
     index("challenges_challenger_status_idx").on(t.challengerId, t.status),
     index("challenges_challenged_status_idx").on(t.challengedId, t.status),
     index("challenges_ends_at_idx").on(t.endsAt),
+    index("challenges_suggestion_id_idx").on(t.suggestionId),
     check("no_self_challenge", sql`${t.challengerId} != ${t.challengedId}`),
   ]
 );

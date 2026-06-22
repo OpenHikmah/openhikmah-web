@@ -84,6 +84,11 @@ describe("admin challenges [id]", () => {
     expect((await PATCH(req("PATCH", { action: "nope" }), params)).status).toBe(400);
   });
 
+  it("404s when the row is deleted before the end-update lands", async () => {
+    mockUpdate.mockReturnValue(makeDbChain([])); // update matched nothing
+    expect((await PATCH(req("PATCH", { action: "end" }), params)).status).toBe(404);
+  });
+
   it("voids a challenge (204)", async () => {
     expect((await DELETE(req("DELETE"), params)).status).toBe(204);
   });

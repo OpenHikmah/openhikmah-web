@@ -18,9 +18,10 @@ export const DURATIONS: Record<string, number> = {
 
 export type DurationKey = "24h" | "48h" | "7d";
 
-/** Whether a string is a valid duration token. */
+/** Whether a string is a valid duration token. Uses an explicit check rather
+ *  than `in`/`hasOwnProperty` so inherited keys (e.g. "toString") never pass. */
 export function isDuration(d: string): d is DurationKey {
-  return d in DURATIONS;
+  return d === "24h" || d === "48h" || d === "7d";
 }
 
 /**
