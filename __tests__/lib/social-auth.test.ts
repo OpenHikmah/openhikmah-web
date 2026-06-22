@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   generateKeyPairSync,
   sign as cryptoSign,
@@ -158,6 +158,47 @@ describe("requireUser — Redis L2 token cache", () => {
       "7",
       expect.any(Number)
     );
+  });
+});
+
+describe("requireUser — dev/test login bypass", () => {
+  const devUser = { id: 42, qfId: "dev-admin", username: "devadmin", disabledAt: null } as never;
+
+  afterEach(() => {
+    delete process.env.DEV_AUTH_TOKEN;
+    delete process.env.DEV_AUTH_QF_ID;
+    vi.unstubAllEnvs();
+  });
+
+  it("is inert when DEV_AUTH_* env is not set (the magic token gets normal handling)", async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 404 }); // userinfo unreachable
+    const res = await requireUser(reqWith("dev-secret"));
+    expect("status" in res && (res as Response).status).toBe(401);
+  });
+
+  it("resolves the fixed dev user when configured and the token matches", async () => {
+    process.env.DEV_AUTH_TOKEN = "dev-secret";
+    process.env.DEV_AUTH_QF_ID = "dev-admin";
+    mockLimit.mockResolvedValue([devUser]);
+    const res = await requireUser(reqWith("dev-secret"));
+    expect("userId" in res && res.userId).toBe(42);
+  });
+
+  it("ignores a non-matching token even when configured", async () => {
+    process.env.DEV_AUTH_TOKEN = "dev-secret";
+    process.env.DEV_AUTH_QF_ID = "dev-admin";
+    mockFetch.mockResolvedValue({ ok: false, status: 404 });
+    const res = await requireUser(reqWith("wrong-token"));
+    expect("status" in res && (res as Response).status).toBe(401);
+  });
+
+  it("is hard-disabled under NODE_ENV=production (no override)", async () => {
+    process.env.DEV_AUTH_TOKEN = "dev-secret";
+    process.env.DEV_AUTH_QF_ID = "dev-admin";
+    vi.stubEnv("NODE_ENV", "production");
+    mockFetch.mockResolvedValue({ ok: false, status: 404 });
+    const res = await requireUser(reqWith("dev-secret"));
+    expect("status" in res && (res as Response).status).toBe(401);
   });
 });
 

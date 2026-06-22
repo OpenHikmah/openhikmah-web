@@ -374,4 +374,21 @@ describe("PATCH /api/social/challenges/[id]", () => {
     const body = await res.json();
     expect(body.status).toBe("declined");
   });
+
+  it("returns 200 and cancels a pending challenge as the challenger", async () => {
+    authedAs(makeUser({ id: 1 })); // challengerId
+    mockSelect.mockReturnValue(makeDbChain([makeChallenge({ status: "pending" })]));
+    mockUpdate.mockReturnValue(makeDbChain([makeChallenge({ status: "cancelled" })]));
+    const res = await PATCH(makePatchReq("1", { action: "cancel" }), { params: Promise.resolve({ id: "1" }) });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("cancelled");
+  });
+
+  it("returns 404 when a non-challenger tries to cancel", async () => {
+    authedAs(makeUser({ id: 2 })); // the challenged party cannot cancel
+    mockSelect.mockReturnValue(makeDbChain([makeChallenge({ status: "pending" })]));
+    const res = await PATCH(makePatchReq("1", { action: "cancel" }), { params: Promise.resolve({ id: "1" }) });
+    expect(res.status).toBe(404);
+  });
 });

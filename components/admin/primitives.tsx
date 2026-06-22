@@ -1,25 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button, type ButtonProps } from "@/components/ui";
+import { InfoHint } from "./InfoHint";
 
-/** A compact dashboard stat: a label, a large gold value, and optional hint. */
+/** A compact dashboard stat: a label, a large gold value, and optional hint. An
+ *  `info` string adds a hover "i" explanation in the top-right corner. */
 export function StatTile({
   label,
   value,
   hint,
   tone = "gold",
+  info,
 }: {
   label: string;
   value: React.ReactNode;
   hint?: string;
   tone?: "gold" | "teal" | "plain";
+  info?: string;
 }) {
   return (
     <div className="rounded-lg border border-border bg-surface px-4 py-3.5">
-      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
-        {label}
+      <div className="flex items-start justify-between gap-2">
+        <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
+          {label}
+        </div>
+        {info && <InfoHint text={info} />}
       </div>
       <div
         className={cn(
@@ -123,18 +130,25 @@ export function ConfirmButton({
   confirmLabel?: string;
 } & Omit<ButtonProps, "onClick">) {
   const [armed, setArmed] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear any pending disarm timer on unmount.
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
 
   return (
     <Button
       variant={armed ? "danger" : variant}
       size={size}
       onClick={() => {
+        if (timerRef.current) clearTimeout(timerRef.current);
         if (armed) {
           setArmed(false);
           onConfirm();
         } else {
           setArmed(true);
-          window.setTimeout(() => setArmed(false), 3000);
+          timerRef.current = setTimeout(() => setArmed(false), 3000);
         }
       }}
       {...props}

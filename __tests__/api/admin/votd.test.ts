@@ -64,6 +64,10 @@ describe("GET /api/admin/votd", () => {
     expect((await GET(get("2026-13-01"))).status).toBe(400);
   });
 
+  it("rejects an impossible month number (YYYY-13)", async () => {
+    expect((await GET(get("2026-13"))).status).toBe(400);
+  });
+
   it("does not 500 on a short month (half-open range, not a hardcoded -31)", async () => {
     // Regression: the old `${month}-31` upper bound produced an invalid date for
     // February and could fail the DB comparison.

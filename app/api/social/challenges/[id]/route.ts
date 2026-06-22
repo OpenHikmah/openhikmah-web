@@ -26,8 +26,8 @@ export async function PATCH(
   }
 
   const { action } = body;
-  if (action !== "accept" && action !== "decline") {
-    return NextResponse.json({ error: "action must be accept or decline" }, { status: 400 });
+  if (action !== "accept" && action !== "decline" && action !== "cancel") {
+    return NextResponse.json({ error: "action must be accept, decline, or cancel" }, { status: 400 });
   }
 
   const [challenge] = await db
@@ -39,21 +39,25 @@ export async function PATCH(
   if (!challenge) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (challenge.challengedId !== userId) {
+  // accept/decline are the challenged party's; cancel is the challenger's (withdraw).
+  const requiredUser = action === "cancel" ? challenge.challengerId : challenge.challengedId;
+  if (requiredUser !== userId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   if (challenge.status !== "pending") {
     return NextResponse.json({ error: "Challenge is no longer pending" }, { status: 409 });
   }
 
-  // On accept, reset the clock from acceptance time so both parties compete the same window.
-  // On decline, just flip the status.
+  // On accept, reset the clock from acceptance time so both parties compete the same
+  // window. Decline/cancel just flip the status (cancelled = challenger withdrew).
   const now = new Date();
   const durationMs = challenge.endsAt.getTime() - challenge.startsAt.getTime();
   const setFields =
     action === "accept"
       ? { status: "active" as const, startsAt: now, endsAt: new Date(now.getTime() + durationMs) }
-      : { status: "declined" as const };
+      : action === "decline"
+        ? { status: "declined" as const }
+        : { status: "cancelled" as const };
 
   const [updated] = await db
     .update(challenges)

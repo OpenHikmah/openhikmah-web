@@ -78,6 +78,13 @@
       "when": 1782030239740,
       "tag": "0010_admin_panel",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1782054408485,
+      "tag": "0011_challenges",
+      "breakpoints": true
     }
   ]
 }

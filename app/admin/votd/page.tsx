@@ -14,6 +14,7 @@ interface Entry {
   date: string;
   verseRef: string;
   reflection: string | null;
+  updatedAt: string;
 }
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -114,7 +115,9 @@ export default function VotdPage() {
         </div>
 
         <DayEditor
-          key={selected ?? "none"}
+          // Re-key on the entry's content too, so the editor re-initialises when an
+          // async reload changes the curated entry for the same selected day.
+          key={`${selected ?? "none"}:${selected ? (byDate.get(selected)?.updatedAt ?? "new") : ""}`}
           date={selected}
           existing={selected ? (byDate.get(selected) ?? null) : null}
           onSaved={reload}

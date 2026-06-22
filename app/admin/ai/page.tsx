@@ -42,13 +42,28 @@ export default function AiPage() {
         {data && (
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatTile label="Gens (all time)" value={data.total.gens} />
-              <StatTile label="Tokens (all time)" value={data.total.tokens.toLocaleString()} tone="plain" />
-              <StatTile label="Gens (MTD)" value={data.monthToDate.gens} tone="teal" />
+              <StatTile
+                label="Gens (all time)"
+                value={data.total.gens}
+                info="Total AI generations ever — one row per actual model call (a cache miss). Cache hits don't count, so this grows slowly as the graph fills."
+              />
+              <StatTile
+                label="Tokens (all time)"
+                value={data.total.tokens.toLocaleString()}
+                tone="plain"
+                info="Total tokens consumed across all AI generations ever. Tokens are the real cost driver."
+              />
+              <StatTile
+                label="Gens (MTD)"
+                value={data.monthToDate.gens}
+                tone="teal"
+                info="AI generations so far this calendar month (UTC)."
+              />
               <StatTile
                 label="Est. cost (MTD)"
                 value={cost(data.monthToDate.estCostUsd)}
                 hint={data.pricePer1k === null ? "set AI_USD_PER_1K_TOKENS" : `@ $${data.pricePer1k}/1k`}
+                info="Estimated USD cost this month from token usage. Shows a figure only if AI_USD_PER_1K_TOKENS is set in the env; otherwise it's a dash."
               />
             </div>
 

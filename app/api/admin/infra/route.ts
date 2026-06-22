@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
       break;
     }
     case "flush-jwks": {
-      clearJwksCache();
+      await clearJwksCache();
       result = { ok: true };
       break;
     }

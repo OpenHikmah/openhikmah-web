@@ -19,6 +19,36 @@ function disabledResponse(): NextResponse {
   return NextResponse.json({ error: "Account disabled" }, { status: 403 });
 }
 
+/**
+ * Dev/test login bypass. When `DEV_AUTH_TOKEN` and `DEV_AUTH_QF_ID` are set, a
+ * request whose Bearer token equals `DEV_AUTH_TOKEN` is resolved to a fixed dev
+ * user (created on first use) — letting the admin console and other authed
+ * features be exercised WITHOUT completing the QF OAuth flow (useful when your
+ * `redirect_uri` isn't registered with QF yet).
+ *
+ * FAIL-CLOSED and triple-gated:
+ *   1. NODE_ENV must NOT be "production" — there is no override, so this bypass
+ *      can never be enabled in a production build, AND
+ *   2. both env vars must be set, AND
+ *   3. the token must match exactly.
+ * To make the dev user an admin, add the same `DEV_AUTH_QF_ID` to `ADMIN_QF_IDS`.
+ */
+async function resolveDevUser(token: string): Promise<User | null> {
+  // Hard off in production — dev/test only, no escape hatch.
+  if (process.env.NODE_ENV === "production") return null;
+  const secret = process.env.DEV_AUTH_TOKEN;
+  const qfId = process.env.DEV_AUTH_QF_ID;
+  if (!secret || !qfId || token !== secret) return null;
+
+  const [existing] = await db.select().from(users).where(eq(users.qfId, qfId)).limit(1);
+  if (existing) return existing;
+
+  const username = (process.env.DEV_AUTH_USERNAME ?? "devadmin").trim();
+  await db.insert(users).values({ qfId, username }).onConflictDoNothing();
+  const [created] = await db.select().from(users).where(eq(users.qfId, qfId)).limit(1);
+  return created ?? null;
+}
+
 // Two-tier token cache: an in-process L1 Map (fastest, per-instance) backed by a
 // Redis L2 (shared across instances, survives restarts). The L1 keeps the hot
 // path zero-round-trip; the L2 means a deploy/restart no longer logs everyone out
@@ -53,10 +83,13 @@ export function clearTokenCache(): number {
 }
 
 /** Drops the cached JWKS (in-process + Redis) so the next verify refetches QF's
- *  signing keys — used after a key rotation from the admin Infra panel. */
-export function clearJwksCache(): void {
+ *  signing keys — used after a key rotation from the admin Infra panel. Awaits the
+ *  Redis eviction so the flush is fully complete before the caller reports success
+ *  (otherwise an immediate verify could repopulate the in-process cache from the
+ *  still-present Redis copy). */
+export async function clearJwksCache(): Promise<void> {
   jwksCache = null;
-  void redisDel(JWKS_REDIS_KEY);
+  await redisDel(JWKS_REDIS_KEY);
 }
 
 // ─── JWT signature verification ───────────────────────────────────────────────
@@ -206,6 +239,13 @@ export async function requireUser(
 
   if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Dev/test bypass (inert unless DEV_AUTH_* env is configured — see resolveDevUser).
+  const devUser = await resolveDevUser(token);
+  if (devUser) {
+    if (devUser.disabledAt) return disabledResponse();
+    return { userId: devUser.id, user: devUser };
   }
 
   // L1 — in-process cache, zero round-trip.

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { desc, eq, ilike } from "drizzle-orm";
 import { requireAdmin, isAdminQfId } from "@/lib/admin-auth";
 import { logAdminAction } from "@/lib/admin-audit";
+import { clearTokenCache } from "@/lib/social-auth";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 
@@ -73,6 +74,12 @@ export async function PATCH(req: NextRequest) {
   if (!updated) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
+
+  // Cached auth entries hold the pre-toggle user snapshot (≤5 min), so a freshly
+  // disabled user could keep authorising until expiry. Flush the in-process token
+  // cache so the change takes effect on the next request (the L2/DB re-read picks
+  // up the new disabledAt).
+  clearTokenCache();
 
   await logAdminAction({
     adminQfId: auth.user.qfId,

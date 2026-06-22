@@ -7,19 +7,28 @@ import { AddFriendForm } from "@/components/social/AddFriendForm";
 import { FriendList } from "@/components/social/FriendList";
 import { LeaderboardTable } from "@/components/social/LeaderboardTable";
 import { CreateChallengeForm } from "@/components/social/CreateChallengeForm";
+import type { ChallengePrefill } from "@/components/social/CreateChallengeForm";
 import { ChallengeList } from "@/components/social/ChallengeList";
 import type { EnrichedChallenge } from "@/components/social/ChallengeList";
+import { ChallengeSuggestions } from "@/components/social/ChallengeSuggestions";
+import type { Suggestion } from "@/components/social/ChallengeSuggestions";
 import { Loader2, Users, Trophy, Swords } from "lucide-react";
 import Link from "next/link";
 import { AuthShell } from "@/components/layout/AuthShell";
 
 type Tab = "friends" | "leaderboard" | "challenges";
 
-/** Count of incoming pending requests — drives the header badge. */
+/** Count of incoming pending friend requests — drives the friends badge. */
 function countPendingReceived(friends: unknown[]): number {
   return (friends as { status?: string; direction?: string }[]).filter(
     (f) => f.status === "pending" && f.direction === "received"
   ).length;
+}
+
+/** Count of incoming challenges awaiting my response — drives the challenges badge. */
+function countIncomingChallenges(list: EnrichedChallenge[], myId: number | null): number {
+  if (!myId) return 0;
+  return list.filter((c) => c.status === "pending" && c.challengedId === myId).length;
 }
 
 export default function SocialPage() {
@@ -27,16 +36,31 @@ export default function SocialPage() {
   const userId = useSocialStore((s) => s.userId);
   const username = useSocialStore((s) => s.username);
   const setPendingFriendCount = useSocialStore((s) => s.setPendingFriendCount);
+  const setPendingChallengeCount = useSocialStore((s) => s.setPendingChallengeCount);
+  const pendingChallengeCount = useSocialStore((s) => s.pendingChallengeCount);
 
   const [tab, setTab] = useState<Tab>("leaderboard");
   const [friends, setFriends] = useState<unknown[]>([]);
   const [leaderboard, setLeaderboard] = useState<unknown[]>([]);
   const [challengesList, setChallengesList] = useState<EnrichedChallenge[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [prefill, setPrefill] = useState<ChallengePrefill | null>(null);
+  const [prefillKey, setPrefillKey] = useState(0);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
   const [loadingChallenges, setLoadingChallenges] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [profileTimedOut, setProfileTimedOut] = useState(false);
+
+  // Picking a suggestion seeds the create form (remounted via key) and clears on send.
+  const pickSuggestion = (s: Suggestion) => {
+    setPrefill({ duration: s.suggestedDuration, verseRef: s.verseRef, suggestionId: s.id, title: s.title });
+    setPrefillKey((k) => k + 1);
+  };
+  const clearPrefill = () => {
+    setPrefill(null);
+    setPrefillKey((k) => k + 1);
+  };
 
   const fetchFriends = useCallback(async () => {
     if (!accessToken) return;
@@ -88,9 +112,28 @@ export default function SocialPage() {
       const res = await fetch("/api/social/challenges", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      if (res.ok) setChallengesList(await res.json());
+      if (res.ok) {
+        const data: EnrichedChallenge[] = await res.json();
+        setChallengesList(data);
+        setPendingChallengeCount(countIncomingChallenges(data, userId));
+      }
     } finally {
       setLoadingChallenges(false);
+    }
+  }, [accessToken, userId, setPendingChallengeCount]);
+
+  const fetchSuggestions = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      const res = await fetch("/api/social/challenge-suggestions", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { suggestions: Suggestion[] };
+        setSuggestions(data.suggestions);
+      }
+    } catch {
+      /* non-fatal — suggestions are optional */
     }
   }, [accessToken]);
 
@@ -128,16 +171,24 @@ export default function SocialPage() {
     setLoadingChallenges(true);
     fetch("/api/social/challenges", { headers: { Authorization: `Bearer ${accessToken}` }, signal })
       .then((r) => (r.ok ? r.json() : []))
-      .then((data: EnrichedChallenge[]) => setChallengesList(data))
+      .then((data: EnrichedChallenge[]) => {
+        setChallengesList(data);
+        setPendingChallengeCount(countIncomingChallenges(data, userId));
+      })
       .catch(() => {})
       .finally(() => setLoadingChallenges(false));
 
+    fetch("/api/social/challenge-suggestions", { headers: { Authorization: `Bearer ${accessToken}` }, signal })
+      .then((r) => (r.ok ? r.json() : { suggestions: [] }))
+      .then((data: { suggestions: Suggestion[] }) => setSuggestions(data.suggestions))
+      .catch(() => {});
+
     return () => ctrl.abort();
-  }, [accessToken, userId, setPendingFriendCount]);
+  }, [accessToken, userId, setPendingFriendCount, setPendingChallengeCount]);
 
   return (
     <AuthShell>
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-8">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 md:px-6">
         {/* Profile still loading */}
         {!userId && !profileTimedOut ? (
           <div className="flex justify-center py-20">
@@ -182,6 +233,11 @@ export default function SocialPage() {
                     <Swords className="h-4 w-4" />
                   )}
                   {t === "leaderboard" ? "Leaderboard" : t === "friends" ? "Friends" : "Challenges"}
+                  {t === "challenges" && pendingChallengeCount > 0 && (
+                    <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-semibold text-ink">
+                      {pendingChallengeCount}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -194,6 +250,7 @@ export default function SocialPage() {
                     fetchFriends();
                     fetchLeaderboard();
                     fetchChallenges();
+                    fetchSuggestions();
                   }}
                   className="cursor-pointer underline"
                 >
@@ -203,7 +260,7 @@ export default function SocialPage() {
             )}
 
             {tab === "friends" && (
-              <div className="space-y-4">
+              <div className="mx-auto max-w-2xl space-y-4">
                 <AddFriendForm
                   onAdded={() => {
                     fetchFriends();
@@ -227,26 +284,36 @@ export default function SocialPage() {
             )}
 
             {tab === "challenges" && (
-              <div className="space-y-4">
+              <div className="space-y-6">
+                <ChallengeSuggestions suggestions={suggestions} onPick={pickSuggestion} />
                 <CreateChallengeForm
+                  key={prefillKey}
                   friends={(friends as { status: string; friend: { id: number; username: string } | null }[])
                     .filter((f) => f.status === "accepted" && f.friend)
                     .map((f) => f.friend!)}
                   loadingFriends={loadingFriends}
                   onCreated={fetchChallenges}
+                  prefill={prefill}
+                  onClearPrefill={clearPrefill}
+                  compact
                 />
-                {loadingChallenges ? (
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="h-4 w-4 animate-spin text-teal" />
-                  </div>
-                ) : (
-                  <ChallengeList challenges={challengesList} onUpdate={fetchChallenges} />
-                )}
+                <section className="space-y-2">
+                  <h3 className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">
+                    Your challenges
+                  </h3>
+                  {loadingChallenges ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="h-4 w-4 animate-spin text-teal" />
+                    </div>
+                  ) : (
+                    <ChallengeList challenges={challengesList} onUpdate={fetchChallenges} layout="grid" />
+                  )}
+                </section>
               </div>
             )}
 
             {tab === "leaderboard" && (
-              <div className="space-y-2">
+              <div className="mx-auto max-w-2xl space-y-2">
                 {loadingLeaderboard ? (
                   <div className="flex justify-center py-4">
                     <Loader2 className="h-4 w-4 animate-spin text-teal" />
