@@ -10,57 +10,63 @@ export async function GET(req: NextRequest) {
   if (authed instanceof NextResponse) return authed;
   const { userId } = authed;
 
-  // Bound the per-user challenge list (newest first). 200 is far above any real
-  // user's volume; recent active/pending rows — the ones that matter — stay in range.
-  const rows = await db
-    .select()
-    .from(challenges)
-    .where(
-      or(
-        eq(challenges.challengerId, userId),
-        eq(challenges.challengedId, userId)
+  try {
+    // Bound the per-user challenge list (newest first). 200 is far above any real
+    // user's volume; recent active/pending rows — the ones that matter — stay in range.
+    const rows = await db
+      .select()
+      .from(challenges)
+      .where(
+        or(
+          eq(challenges.challengerId, userId),
+          eq(challenges.challengedId, userId)
+        )
       )
-    )
-    .orderBy(desc(challenges.createdAt))
-    .limit(200);
+      .orderBy(desc(challenges.createdAt))
+      .limit(200);
 
-  const now = new Date();
+    const now = new Date();
 
-  // Lazily resolve expired active challenges; reuse the computed scores below.
-  const resolvedScores = await resolveEndedChallenges(rows, now);
+    // Lazily resolve expired active challenges; reuse the computed scores below.
+    const resolvedScores = await resolveEndedChallenges(rows, now);
 
-  // Collect all user IDs to fetch usernames in one query
-  const userIds = [...new Set(rows.flatMap((c) => [c.challengerId, c.challengedId]))];
-  const userRows =
-    userIds.length > 0
-      ? await db
-          .select({ id: users.id, username: users.username })
-          .from(users)
-          .where(or(...userIds.map((id) => eq(users.id, id))))
-      : [];
-  const userMap = new Map(userRows.map((u) => [u.id, u.username]));
+    // Collect all user IDs to fetch usernames in one query
+    const userIds = [...new Set(rows.flatMap((c) => [c.challengerId, c.challengedId]))];
+    const userRows =
+      userIds.length > 0
+        ? await db
+            .select({ id: users.id, username: users.username })
+            .from(users)
+            .where(or(...userIds.map((id) => eq(users.id, id))))
+        : [];
+    const userMap = new Map(userRows.map((u) => [u.id, u.username]));
 
-  // Enrich with scores for active + completed challenges; reuse cached scores where available.
-  const enriched = await Promise.all(
-    rows.map(async (c) => {
-      const needsScores = c.status === "active" || c.status === "completed";
-      const cached = resolvedScores.get(c.id);
-      const [challengerScore, challengedScore] = cached
-        ? [cached.challengerScore, cached.challengedScore]
-        : needsScores
-        ? await Promise.all([scoreChallenge(c.challengerId, c), scoreChallenge(c.challengedId, c)])
-        : [0, 0];
-      return {
-        ...c,
-        challengerUsername: userMap.get(c.challengerId) ?? null,
-        challengedUsername: userMap.get(c.challengedId) ?? null,
-        challengerScore,
-        challengedScore,
-      };
-    })
-  );
+    // Enrich with scores for active + completed challenges; reuse cached scores where available.
+    const enriched = await Promise.all(
+      rows.map(async (c) => {
+        const needsScores = c.status === "active" || c.status === "completed";
+        const cached = resolvedScores.get(c.id);
+        const [challengerScore, challengedScore] = cached
+          ? [cached.challengerScore, cached.challengedScore]
+          : needsScores
+          ? await Promise.all([scoreChallenge(c.challengerId, c), scoreChallenge(c.challengedId, c)])
+          : [0, 0];
+        return {
+          ...c,
+          challengerUsername: userMap.get(c.challengerId) ?? null,
+          challengedUsername: userMap.get(c.challengedId) ?? null,
+          challengerScore,
+          challengedScore,
+        };
+      })
+    );
 
-  return NextResponse.json(enriched);
+    return NextResponse.json(enriched);
+  } catch (err) {
+    // Match the sibling list routes (bookmarks/workspace): never leak a stack trace.
+    console.error("challenges GET db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {

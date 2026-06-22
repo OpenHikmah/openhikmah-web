@@ -245,13 +245,23 @@ describe("GET /api/social/challenges", () => {
   });
 
   it("bounds the challenges query with orderBy + limit(200)", async () => {
+    // NOTE: the bounded list is the FIRST db.select() the route issues, so the
+    // recording chain is wired with mockReturnValueOnce. If the route is ever
+    // reordered so another select runs first, update this accordingly.
     authedAs(makeUser({ id: 1 }));
     const calls: Record<string, unknown[][]> = {};
     mockSelect.mockReturnValueOnce(makeRecordingChain([], calls));
     const res = await GET(makeGetReq());
     expect(res.status).toBe(200);
-    expect(calls.orderBy).toBeDefined();
+    expect(calls.orderBy?.[0]).toHaveLength(1); // ordered (by desc(createdAt)), not just capped
     expect(calls.limit?.[0]).toEqual([200]);
+  });
+
+  it("returns 500 when the challenges query throws", async () => {
+    authedAs(makeUser({ id: 1 }));
+    mockSelect.mockReturnValue(makeDbChain(Promise.reject(new Error("boom"))));
+    const res = await GET(makeGetReq());
+    expect(res.status).toBe(500);
   });
 
   it("returns enriched challenges with usernames and scores", async () => {

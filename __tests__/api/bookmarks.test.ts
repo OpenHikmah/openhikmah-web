@@ -148,7 +148,7 @@ describe("GET /api/bookmarks", () => {
     mockSelect.mockReturnValue(makeRecordingChain([], calls));
     const res = await GET(req());
     expect(res.status).toBe(200);
-    expect(calls.orderBy).toBeDefined();
+    expect(calls.orderBy?.[0]).toHaveLength(1); // ordered (by desc(createdAt)), not just capped
     expect(calls.limit?.[0]).toEqual([2000]);
   });
 });
