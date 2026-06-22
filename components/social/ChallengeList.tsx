@@ -25,6 +25,8 @@ export interface EnrichedChallenge {
 interface Props {
   challenges: EnrichedChallenge[];
   onUpdate: () => void;
+  /** "list" = grouped sections (default); "grid" = flat responsive card grid. */
+  layout?: "list" | "grid";
 }
 
 function formatCountdown(endsAt: string): string {
@@ -249,7 +251,7 @@ function Group({
   );
 }
 
-export function ChallengeList({ challenges, onUpdate }: Props) {
+export function ChallengeList({ challenges, onUpdate, layout = "list" }: Props) {
   const myId = useSocialStore((s) => s.userId);
   if (!myId) return null;
 
@@ -267,6 +269,18 @@ export function ChallengeList({ challenges, onUpdate }: Props) {
   const active = challenges.filter((c) => c.status === "active");
   const sent = challenges.filter((c) => c.status === "pending" && c.challengerId === myId);
   const past = challenges.filter((c) => ["completed", "declined", "cancelled"].includes(c.status));
+
+  if (layout === "grid") {
+    // Flat, priority-ordered grid (incoming first), cards keep their natural height.
+    const ordered = [...incoming, ...active, ...sent, ...past];
+    return (
+      <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {ordered.map((c) => (
+          <ChallengeCard key={c.id} c={c} myId={myId} onUpdate={onUpdate} />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

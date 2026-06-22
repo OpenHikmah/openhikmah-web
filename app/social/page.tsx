@@ -188,7 +188,7 @@ export default function SocialPage() {
 
   return (
     <AuthShell>
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-8">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 md:px-6">
         {/* Profile still loading */}
         {!userId && !profileTimedOut ? (
           <div className="flex justify-center py-20">
@@ -260,7 +260,7 @@ export default function SocialPage() {
             )}
 
             {tab === "friends" && (
-              <div className="space-y-4">
+              <div className="mx-auto max-w-2xl space-y-4">
                 <AddFriendForm
                   onAdded={() => {
                     fetchFriends();
@@ -295,6 +295,7 @@ export default function SocialPage() {
                   onCreated={fetchChallenges}
                   prefill={prefill}
                   onClearPrefill={clearPrefill}
+                  compact
                 />
                 <section className="space-y-2">
                   <h3 className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">
@@ -305,14 +306,14 @@ export default function SocialPage() {
                       <Loader2 className="h-4 w-4 animate-spin text-teal" />
                     </div>
                   ) : (
-                    <ChallengeList challenges={challengesList} onUpdate={fetchChallenges} />
+                    <ChallengeList challenges={challengesList} onUpdate={fetchChallenges} layout="grid" />
                   )}
                 </section>
               </div>
             )}
 
             {tab === "leaderboard" && (
-              <div className="space-y-2">
+              <div className="mx-auto max-w-2xl space-y-2">
                 {loadingLeaderboard ? (
                   <div className="flex justify-center py-4">
                     <Loader2 className="h-4 w-4 animate-spin text-teal" />
