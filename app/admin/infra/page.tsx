@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { StatTile, Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
+import { InfoHint } from "@/components/admin/InfoHint";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 
@@ -51,11 +52,29 @@ export default function InfraPage() {
         {data && (
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatTile label="Uptime" value={uptime(data.uptimeSeconds)} tone="plain" />
-              <StatTile label="Token cache" value={data.tokenCacheSize} hint="in-process entries" />
-              <StatTile label="Rate-limit rows" value={data.rateLimitRows} tone="plain" />
+              <StatTile
+                label="Uptime"
+                value={uptime(data.uptimeSeconds)}
+                tone="plain"
+                info="How long this app server process has been running. Resets to 0 on every deploy/restart."
+              />
+              <StatTile
+                label="Token cache"
+                value={data.tokenCacheSize}
+                hint="in-process entries"
+                info="Number of access tokens cached in memory on this server to skip re-verifying every request. Cleared by 'Flush token cache' below."
+              />
+              <StatTile
+                label="Rate-limit rows"
+                value={data.rateLimitRows}
+                tone="plain"
+                info="Active rate-limit counters in the database (one per key + time window) guarding the AI endpoints. 'Reset rate limits' clears them."
+              />
               <div className="rounded-lg border border-border bg-surface px-4 py-3.5">
-                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">Redis</div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">Redis</div>
+                  <InfoHint text="Optional cache/accelerator. 'up' = connected, 'down' = configured but unreachable, 'disabled' = not configured (the app falls back to in-process/Postgres)." />
+                </div>
                 <div className="mt-2">
                   <Pill tone={data.redis === "up" ? "active" : data.redis === "down" ? "flagged" : "neutral"}>
                     {data.redis}

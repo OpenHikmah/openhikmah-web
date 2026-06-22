@@ -70,12 +70,12 @@ export function ChallengesModeration() {
     <div className="space-y-4">
       {data && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-          <StatTile label="Total" value={data.stats.total} tone="plain" />
-          <StatTile label="Active" value={data.stats.byStatus.active ?? 0} tone="teal" />
-          <StatTile label="Pending" value={data.stats.byStatus.pending ?? 0} />
-          <StatTile label="Completed" value={data.stats.byStatus.completed ?? 0} tone="plain" />
-          <StatTile label="Declined" value={data.stats.byStatus.declined ?? 0} tone="plain" />
-          <StatTile label="From suggestions" value={data.stats.fromSuggestions} tone="teal" />
+          <StatTile label="Total" value={data.stats.total} tone="plain" info="All 1v1 challenges ever created, across every status." />
+          <StatTile label="Active" value={data.stats.byStatus.active ?? 0} tone="teal" info="Challenges that have been accepted and are currently being competed (within their time window)." />
+          <StatTile label="Pending" value={data.stats.byStatus.pending ?? 0} info="Challenges sent but not yet accepted or declined by the recipient." />
+          <StatTile label="Completed" value={data.stats.byStatus.completed ?? 0} tone="plain" info="Challenges whose window has ended and a winner (or draw) has been resolved." />
+          <StatTile label="Declined" value={data.stats.byStatus.declined ?? 0} tone="plain" info="Challenges the recipient declined. (Withdrawn ones show as 'cancelled'.)" />
+          <StatTile label="From suggestions" value={data.stats.fromSuggestions} tone="teal" info="How many challenges were started from an admin-curated suggestion, rather than created from scratch." />
         </div>
       )}
 
