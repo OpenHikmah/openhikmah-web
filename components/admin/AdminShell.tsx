@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -96,7 +97,16 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Branded letterhead — logo + project name, top-right of every admin page. */}
+        <div className="flex h-12 shrink-0 items-center justify-end gap-2.5 border-b border-border px-7">
+          <Image src="/logo-mark.png" alt="" width={20} height={20} className="size-5" />
+          <span className="font-arabic text-[19px] leading-none tracking-wide text-text-primary">
+            Open <span className="text-gold">Hikmah</span>
+          </span>
+        </div>
+        {children}
+      </div>
     </div>
   );
 }
