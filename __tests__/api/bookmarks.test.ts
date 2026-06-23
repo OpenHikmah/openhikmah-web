@@ -27,6 +27,30 @@ function makeDbChain(resolveWith: unknown = []) {
   return chain;
 }
 
+// Like makeDbChain, but records the args of each chained call so a test can assert
+// e.g. that `.limit(2000)` and `.orderBy(...)` were applied to bound the query.
+function makeRecordingChain(resolveWith: unknown, calls: Record<string, unknown[][]>) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chain: any = new Proxy(
+    function () { return chain; },
+    {
+      get(_t, prop) {
+        if (prop === "then") return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+          Promise.resolve(resolveWith).then(res, rej);
+        if (prop === "catch") return (rej: (e: unknown) => unknown) =>
+          Promise.resolve(resolveWith).catch(rej);
+        if (prop === Symbol.toStringTag) return "MockChain";
+        return (...args: unknown[]) => {
+          (calls[prop as string] ??= []).push(args);
+          return chain;
+        };
+      },
+      apply() { return chain; },
+    }
+  );
+  return chain;
+}
+
 const { mockSelect, mockInsert, mockDelete } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
   mockInsert: vi.fn(() => makeDbChain([])),
@@ -116,6 +140,16 @@ describe("GET /api/bookmarks", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.refs).toEqual([]);
+  });
+
+  it("bounds the query with orderBy + limit(2000)", async () => {
+    authedUser();
+    const calls: Record<string, unknown[][]> = {};
+    mockSelect.mockReturnValue(makeRecordingChain([], calls));
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+    expect(calls.orderBy?.[0]).toHaveLength(1); // ordered (by desc(createdAt)), not just capped
+    expect(calls.limit?.[0]).toEqual([2000]);
   });
 });
 

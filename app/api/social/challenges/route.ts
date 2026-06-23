@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, lt, or } from "drizzle-orm";
+import { and, desc, eq, lt, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { challenges, challengeSuggestions, friendships, users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
@@ -10,53 +10,79 @@ export async function GET(req: NextRequest) {
   if (authed instanceof NextResponse) return authed;
   const { userId } = authed;
 
-  const rows = await db
-    .select()
-    .from(challenges)
-    .where(
-      or(
-        eq(challenges.challengerId, userId),
-        eq(challenges.challengedId, userId)
+  try {
+    const now = new Date();
+
+    // Resolve EVERY ended-but-still-active challenge for this user first, unbounded
+    // by the display cap below — otherwise a stale one sitting beyond the newest 200
+    // rows would never be finalized. This self-heals on read, like the admin
+    // "finalize ended" route. Returns the scores it computed so we can reuse them.
+    const endedActive = await db
+      .select()
+      .from(challenges)
+      .where(
+        and(
+          or(
+            eq(challenges.challengerId, userId),
+            eq(challenges.challengedId, userId)
+          ),
+          eq(challenges.status, "active"),
+          lt(challenges.endsAt, now)
+        )
+      );
+    const resolvedScores = await resolveEndedChallenges(endedActive, now);
+
+    // Bound the per-user challenge list for the response (newest first). 200 is far
+    // above any real user's volume; statuses are current after the resolution above.
+    const rows = await db
+      .select()
+      .from(challenges)
+      .where(
+        or(
+          eq(challenges.challengerId, userId),
+          eq(challenges.challengedId, userId)
+        )
       )
+      .orderBy(desc(challenges.createdAt))
+      .limit(200);
+
+    // Collect all user IDs to fetch usernames in one query
+    const userIds = [...new Set(rows.flatMap((c) => [c.challengerId, c.challengedId]))];
+    const userRows =
+      userIds.length > 0
+        ? await db
+            .select({ id: users.id, username: users.username })
+            .from(users)
+            .where(or(...userIds.map((id) => eq(users.id, id))))
+        : [];
+    const userMap = new Map(userRows.map((u) => [u.id, u.username]));
+
+    // Enrich with scores for active + completed challenges; reuse cached scores where available.
+    const enriched = await Promise.all(
+      rows.map(async (c) => {
+        const needsScores = c.status === "active" || c.status === "completed";
+        const cached = resolvedScores.get(c.id);
+        const [challengerScore, challengedScore] = cached
+          ? [cached.challengerScore, cached.challengedScore]
+          : needsScores
+          ? await Promise.all([scoreChallenge(c.challengerId, c), scoreChallenge(c.challengedId, c)])
+          : [0, 0];
+        return {
+          ...c,
+          challengerUsername: userMap.get(c.challengerId) ?? null,
+          challengedUsername: userMap.get(c.challengedId) ?? null,
+          challengerScore,
+          challengedScore,
+        };
+      })
     );
 
-  const now = new Date();
-
-  // Lazily resolve expired active challenges; reuse the computed scores below.
-  const resolvedScores = await resolveEndedChallenges(rows, now);
-
-  // Collect all user IDs to fetch usernames in one query
-  const userIds = [...new Set(rows.flatMap((c) => [c.challengerId, c.challengedId]))];
-  const userRows =
-    userIds.length > 0
-      ? await db
-          .select({ id: users.id, username: users.username })
-          .from(users)
-          .where(or(...userIds.map((id) => eq(users.id, id))))
-      : [];
-  const userMap = new Map(userRows.map((u) => [u.id, u.username]));
-
-  // Enrich with scores for active + completed challenges; reuse cached scores where available.
-  const enriched = await Promise.all(
-    rows.map(async (c) => {
-      const needsScores = c.status === "active" || c.status === "completed";
-      const cached = resolvedScores.get(c.id);
-      const [challengerScore, challengedScore] = cached
-        ? [cached.challengerScore, cached.challengedScore]
-        : needsScores
-        ? await Promise.all([scoreChallenge(c.challengerId, c), scoreChallenge(c.challengedId, c)])
-        : [0, 0];
-      return {
-        ...c,
-        challengerUsername: userMap.get(c.challengerId) ?? null,
-        challengedUsername: userMap.get(c.challengedId) ?? null,
-        challengerScore,
-        challengedScore,
-      };
-    })
-  );
-
-  return NextResponse.json(enriched);
+    return NextResponse.json(enriched);
+  } catch (err) {
+    // Match the sibling list routes (bookmarks/workspace): never leak a stack trace.
+    console.error("challenges GET db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {

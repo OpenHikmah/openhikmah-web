@@ -19,7 +19,9 @@ export async function GET(req: NextRequest) {
       })
       .from(savedWorkspaces)
       .where(eq(savedWorkspaces.userId, authed.userId))
-      .orderBy(desc(savedWorkspaces.updatedAt));
+      .orderBy(desc(savedWorkspaces.updatedAt))
+      // Bound the list: most recently updated first, capped well above realistic use.
+      .limit(500);
 
     return NextResponse.json(rows);
   } catch (err) {
