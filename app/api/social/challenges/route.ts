@@ -11,8 +11,29 @@ export async function GET(req: NextRequest) {
   const { userId } = authed;
 
   try {
-    // Bound the per-user challenge list (newest first). 200 is far above any real
-    // user's volume; recent active/pending rows — the ones that matter — stay in range.
+    const now = new Date();
+
+    // Resolve EVERY ended-but-still-active challenge for this user first, unbounded
+    // by the display cap below — otherwise a stale one sitting beyond the newest 200
+    // rows would never be finalized. This self-heals on read, like the admin
+    // "finalize ended" route. Returns the scores it computed so we can reuse them.
+    const endedActive = await db
+      .select()
+      .from(challenges)
+      .where(
+        and(
+          or(
+            eq(challenges.challengerId, userId),
+            eq(challenges.challengedId, userId)
+          ),
+          eq(challenges.status, "active"),
+          lt(challenges.endsAt, now)
+        )
+      );
+    const resolvedScores = await resolveEndedChallenges(endedActive, now);
+
+    // Bound the per-user challenge list for the response (newest first). 200 is far
+    // above any real user's volume; statuses are current after the resolution above.
     const rows = await db
       .select()
       .from(challenges)
@@ -24,11 +45,6 @@ export async function GET(req: NextRequest) {
       )
       .orderBy(desc(challenges.createdAt))
       .limit(200);
-
-    const now = new Date();
-
-    // Lazily resolve expired active challenges; reuse the computed scores below.
-    const resolvedScores = await resolveEndedChallenges(rows, now);
 
     // Collect all user IDs to fetch usernames in one query
     const userIds = [...new Set(rows.flatMap((c) => [c.challengerId, c.challengedId]))];
