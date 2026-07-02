@@ -84,9 +84,9 @@ describe("admin challenges [id]", () => {
     expect((await PATCH(req("PATCH", { action: "nope" }), params)).status).toBe(400);
   });
 
-  it("404s when the row is deleted before the end-update lands", async () => {
-    mockUpdate.mockReturnValue(makeDbChain([])); // update matched nothing
-    expect((await PATCH(req("PATCH", { action: "end" }), params)).status).toBe(404);
+  it("409s when a concurrent request already ended the challenge before this update lands", async () => {
+    mockUpdate.mockReturnValue(makeDbChain([])); // scoped update matched nothing (status changed underneath us)
+    expect((await PATCH(req("PATCH", { action: "end" }), params)).status).toBe(409);
   });
 
   it("voids a challenge (204)", async () => {

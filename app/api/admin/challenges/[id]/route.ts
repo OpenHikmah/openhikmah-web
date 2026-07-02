@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
 import { logAdminAction } from "@/lib/admin-audit";
 import { db } from "@/lib/db";
@@ -47,13 +47,16 @@ export async function PATCH(
       scoreChallenge(challenge.challengedId, ended),
     ]);
     const winnerId = pickWinner(challenge, challengerScore, challengedScore);
+    // Scope the WHERE to the state we just checked, so a concurrent "end" (or
+    // the lazy expiry resolver) that already completed this challenge loses
+    // the race cleanly instead of silently clobbering the other write.
     const [updated] = await db
       .update(challenges)
       .set({ status: "completed", winnerId, endsAt: now })
-      .where(eq(challenges.id, challengeId))
+      .where(and(eq(challenges.id, challengeId), eq(challenges.status, "active")))
       .returning();
     if (!updated) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json({ error: "Challenge was already ended by a concurrent request" }, { status: 409 });
     }
     await logAdminAction({
       adminQfId: auth.user.qfId,
