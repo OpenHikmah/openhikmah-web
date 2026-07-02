@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { FolderOpen, Loader2, Trash2, Upload, Network } from "lucide-react";
+import { FolderOpen, Loader2, Trash2, Upload, Network, TriangleAlert } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { useCanvasStore, type SavedCanvas } from "@/store/canvas";
 import { Card, IconButton, Tooltip } from "@/components/ui";
@@ -24,6 +24,7 @@ export default function WorkspacesPage() {
 
   const [workspaces, setWorkspaces] = useState<WorkspaceMeta[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -34,7 +35,14 @@ export default function WorkspacesPage() {
       const res = await fetch("/api/workspace", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      if (res.ok) setWorkspaces(await res.json());
+      if (res.ok) {
+        setWorkspaces(await res.json());
+        setLoadError(false);
+      } else {
+        setLoadError(true);
+      }
+    } catch {
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -97,6 +105,17 @@ export default function WorkspacesPage() {
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-4 w-4 animate-spin text-teal" />
+          </div>
+        ) : loadError ? (
+          <div className="py-20 text-center">
+            <TriangleAlert className="mx-auto mb-4 h-8 w-8 text-error/60" />
+            <p className="text-sm text-text-muted">Couldn&apos;t load your saved canvases.</p>
+            <button
+              onClick={() => fetchWorkspaces()}
+              className="mt-4 cursor-pointer text-xs text-teal underline"
+            >
+              Retry
+            </button>
           </div>
         ) : workspaces.length === 0 ? (
           <div className="py-20 text-center">

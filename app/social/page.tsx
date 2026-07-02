@@ -116,7 +116,12 @@ export default function SocialPage() {
         const data: EnrichedChallenge[] = await res.json();
         setChallengesList(data);
         setPendingChallengeCount(countIncomingChallenges(data, userId));
+        setLoadError(false);
+      } else {
+        setLoadError(true);
       }
+    } catch {
+      setLoadError(true);
     } finally {
       setLoadingChallenges(false);
     }
@@ -242,7 +247,7 @@ export default function SocialPage() {
               ))}
             </div>
 
-            {loadError && !loadingFriends && !loadingLeaderboard && (
+            {loadError && !loadingFriends && !loadingLeaderboard && !loadingChallenges && (
               <p className="mb-3 text-center text-xs text-error">
                 Couldn&apos;t load.{" "}
                 <button
