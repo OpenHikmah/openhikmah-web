@@ -37,55 +37,60 @@ export async function POST(req: NextRequest) {
   const today = todayUTC();
   const yesterday = yesterdayUTC();
 
-  // Insert the activity event
-  await db.insert(activityLog).values({
-    userId,
-    activityType: body.type,
-    verseRef: body.verse_ref ?? null,
-    activityDate: today,
-  });
+  try {
+    // Insert the activity event
+    await db.insert(activityLog).values({
+      userId,
+      activityType: body.type,
+      verseRef: body.verse_ref ?? null,
+      activityDate: today,
+    });
 
-  // Compute new streak
-  const lastDate = user.lastActivityDate; // "YYYY-MM-DD" or null
-  let newStreak = user.currentStreak;
-  let newLongest = user.longestStreak;
-  let isNewDay = false;
+    // Compute new streak
+    const lastDate = user.lastActivityDate; // "YYYY-MM-DD" or null
+    let newStreak = user.currentStreak;
+    let newLongest = user.longestStreak;
+    let isNewDay = false;
 
-  if (lastDate === today) {
-    // Already counted today — no streak change
-  } else {
-    isNewDay = true;
-    if (lastDate === yesterday) {
-      // Consecutive day — extend streak
-      newStreak = user.currentStreak + 1;
+    if (lastDate === today) {
+      // Already counted today — no streak change
     } else {
-      // Gap or first ever — reset
-      newStreak = 1;
+      isNewDay = true;
+      if (lastDate === yesterday) {
+        // Consecutive day — extend streak
+        newStreak = user.currentStreak + 1;
+      } else {
+        // Gap or first ever — reset
+        newStreak = 1;
+      }
+      newLongest = Math.max(newStreak, newLongest);
+
+      await db
+        .update(users)
+        .set({
+          currentStreak: newStreak,
+          longestStreak: newLongest,
+          lastActivityDate: today,
+          lastActiveAt: sql`now()`,
+        })
+        .where(eq(users.id, userId));
+
+      // Invalidate cache so next request re-reads fresh streak from DB
+      const rawAuth = req.headers.get("authorization");
+      const token = rawAuth?.startsWith("Bearer ") ? rawAuth.slice(7) : null;
+      if (token) invalidateTokenCache(token);
     }
-    newLongest = Math.max(newStreak, newLongest);
 
-    await db
-      .update(users)
-      .set({
-        currentStreak: newStreak,
-        longestStreak: newLongest,
-        lastActivityDate: today,
-        lastActiveAt: sql`now()`,
-      })
-      .where(eq(users.id, userId));
-
-    // Invalidate cache so next request re-reads fresh streak from DB
-    const rawAuth = req.headers.get("authorization");
-    const token = rawAuth?.startsWith("Bearer ") ? rawAuth.slice(7) : null;
-    if (token) invalidateTokenCache(token);
+    return NextResponse.json({
+      streak: newStreak,
+      longestStreak: newLongest,
+      isNewDay,
+      streakBroken: isNewDay && lastDate !== null && lastDate !== yesterday,
+    });
+  } catch (err) {
+    console.error("social/activity POST db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  return NextResponse.json({
-    streak: newStreak,
-    longestStreak: newLongest,
-    isNewDay,
-    streakBroken: isNewDay && lastDate !== null && lastDate !== yesterday,
-  });
 }
 
 // GET: current streak for the logged-in user (used on page load to hydrate store)

@@ -13,15 +13,24 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const rows = await db
-    .select()
-    .from(sharedCanvases)
-    .where(eq(sharedCanvases.id, id))
-    .limit(1);
+  try {
+    const rows = await db
+      .select()
+      .from(sharedCanvases)
+      .where(eq(sharedCanvases.id, id))
+      .limit(1);
 
-  if (rows.length === 0) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (rows.length === 0) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    try {
+      return NextResponse.json(JSON.parse(rows[0].data));
+    } catch {
+      return NextResponse.json({ error: "Corrupted canvas data" }, { status: 500 });
+    }
+  } catch (err) {
+    console.error("share GET db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  return NextResponse.json(JSON.parse(rows[0].data));
 }

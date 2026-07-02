@@ -81,7 +81,12 @@ export async function getConnections(
         eq(connections.kind, kind),
         eq(connections.status, "active")
       )
-    );
+    )
+    // A single generation inserts ~12 edges (see discoverCandidates), but this
+    // has no upper bound enforced at write time — cap defensively so a future
+    // code path that inserts more edges per source ref can't turn this into an
+    // unbounded per-key list query, the same shape hardened elsewhere.
+    .limit(200);
 
   if (existing.length > 0) {
     return hydrate(existing, kind);

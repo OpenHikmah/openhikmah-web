@@ -4,12 +4,7 @@ import { db } from "@/lib/db";
 import { friendships, users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
 import { consume, MUTATION_LIMIT, MUTATION_WINDOW_SECONDS } from "@/lib/rate-limit";
-
-/** Postgres unique-violation, possibly wrapped by the driver under `cause`. */
-function isUniqueViolation(err: unknown): boolean {
-  const code = (err as { code?: string })?.code ?? (err as { cause?: { code?: string } })?.cause?.code;
-  return code === "23505";
-}
+import { isUniqueViolation } from "@/lib/http";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);

@@ -50,6 +50,13 @@ describe("quran-corpus", () => {
       expect(isValidRef("abc")).toBe(false);
       expect(isValidRef("2:255:3")).toBe(false);
     });
+    it("accepts the longest surah's last ayah but rejects past it", () => {
+      expect(isValidRef("2:286")).toBe(true); // Al-Baqarah, longest surah
+      expect(isValidRef("2:287")).toBe(false);
+    });
+    it("rejects an absurdly large ayah number regardless of surah", () => {
+      expect(isValidRef("114:99999")).toBe(false); // An-Nas has only 6 ayahs
+    });
   });
 
   describe("getVerse", () => {
