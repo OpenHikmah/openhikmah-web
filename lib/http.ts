@@ -34,14 +34,23 @@ export async function parseJson<T>(req: NextRequest): Promise<T | null> {
 const IP_PATTERN = /^[0-9a-fA-F:.]{1,45}$/;
 
 /**
- * Best-effort client identifier for rate-limit bucketing, taken from
- * `x-forwarded-for` (first hop) or `x-real-ip`. Falls back to a single shared
- * "unknown" bucket rather than omitting the key: a paid path must always be
- * rate-limited, even when no usable IP is present.
+ * Best-effort client identifier for rate-limit bucketing. `x-real-ip` is set
+ * by our nginx from `$remote_addr` (the actual TCP peer) and is always
+ * overwritten by the proxy, so a client cannot forge it. `x-forwarded-for` is
+ * built with `$proxy_add_x_forwarded_for`, which *appends* our proxy's view
+ * of the client to whatever the client already sent — so the trustworthy
+ * value is the *last* entry, not the first (the first entry is fully
+ * attacker-controlled and would let a caller mint a fresh rate-limit bucket
+ * on every request). Falls back to a single shared "unknown" bucket rather
+ * than omitting the key: a paid path must always be rate-limited, even when
+ * no usable IP is present.
  */
 export function clientKey(req: Request): string {
+  const realIp = req.headers.get("x-real-ip")?.trim() || "";
+  if (IP_PATTERN.test(realIp)) return realIp;
+
   const fwd = req.headers.get("x-forwarded-for");
-  const candidate =
-    fwd?.split(",")[0]?.trim() || req.headers.get("x-real-ip")?.trim() || "";
+  const parts = fwd?.split(",").map((p) => p.trim()) ?? [];
+  const candidate = parts[parts.length - 1] || "";
   return IP_PATTERN.test(candidate) ? candidate : "unknown";
 }
