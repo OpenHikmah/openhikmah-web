@@ -15,23 +15,28 @@ export async function POST(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
 
-  const now = new Date();
-  const ended = await db
-    .select()
-    .from(challenges)
-    .where(and(eq(challenges.status, "active"), lt(challenges.endsAt, now)));
+  try {
+    const now = new Date();
+    const ended = await db
+      .select()
+      .from(challenges)
+      .where(and(eq(challenges.status, "active"), lt(challenges.endsAt, now)));
 
-  const resolved = await resolveEndedChallenges(ended, now);
-  const count = resolved.size;
+    const resolved = await resolveEndedChallenges(ended, now);
+    const count = resolved.size;
 
-  if (count > 0) {
-    await logAdminAction({
-      adminQfId: auth.user.qfId,
-      action: "challenge.finalize",
-      targetType: "challenge",
-      meta: { resolved: count },
-    });
+    if (count > 0) {
+      await logAdminAction({
+        adminQfId: auth.user.qfId,
+        action: "challenge.finalize",
+        targetType: "challenge",
+        meta: { resolved: count },
+      });
+    }
+
+    return NextResponse.json({ resolved: count });
+  } catch (err) {
+    console.error("admin challenges finalize POST db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  return NextResponse.json({ resolved: count });
 }
