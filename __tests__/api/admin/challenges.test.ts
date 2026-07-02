@@ -8,6 +8,7 @@ vi.mock("@/lib/challenges", () => ({
   scoreChallenge: vi.fn(async () => 0),
   pickWinner: vi.fn(() => 1),
   resolveEndedChallenges: vi.fn(async () => new Map([[1, { challengerScore: 1, challengedScore: 0 }]])),
+  resolveExpiredPending: vi.fn(async () => 0),
 }));
 
 function makeDbChain(resolveWith: unknown = []) {

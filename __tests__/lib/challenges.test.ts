@@ -21,7 +21,7 @@ const { mockSelect, mockUpdate } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db", () => ({ db: { select: mockSelect, update: mockUpdate } }));
 
-import { pickWinner, resolveEndedChallenges, isDuration, DURATIONS } from "@/lib/challenges";
+import { pickWinner, resolveEndedChallenges, resolveExpiredPending, isDuration, DURATIONS } from "@/lib/challenges";
 
 function makeChallenge(overrides: Partial<Challenge> = {}): Challenge {
   return {
@@ -97,5 +97,35 @@ describe("resolveEndedChallenges", () => {
     const resolved = await resolveEndedChallenges(rows, new Date());
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(resolved.size).toBe(0);
+  });
+});
+
+describe("resolveExpiredPending", () => {
+  beforeEach(() => {
+    mockUpdate.mockReset();
+    mockUpdate.mockReturnValue(makeDbChain([]));
+  });
+
+  it("declines a pending invite past its endsAt", async () => {
+    const rows = [makeChallenge({ id: 10, status: "pending", endsAt: new Date(Date.now() - 1000) })];
+    const count = await resolveExpiredPending(rows, new Date());
+    expect(mockUpdate).toHaveBeenCalledOnce();
+    expect(rows[0].status).toBe("declined");
+    expect(count).toBe(1);
+  });
+
+  it("ignores pending invites that have not expired", async () => {
+    const rows = [makeChallenge({ id: 11, status: "pending", endsAt: new Date(Date.now() + 3_600_000) })];
+    const count = await resolveExpiredPending(rows, new Date());
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(rows[0].status).toBe("pending");
+    expect(count).toBe(0);
+  });
+
+  it("ignores non-pending challenges even past their endsAt", async () => {
+    const rows = [makeChallenge({ id: 12, status: "active", endsAt: new Date(Date.now() - 1000) })];
+    const count = await resolveExpiredPending(rows, new Date());
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(count).toBe(0);
   });
 });

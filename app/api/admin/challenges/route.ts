@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 import { challenges, users } from "@/lib/db/schema";
-import { scoreChallenge, resolveEndedChallenges } from "@/lib/challenges";
+import { scoreChallenge, resolveEndedChallenges, resolveExpiredPending } from "@/lib/challenges";
 
 const STATUSES = ["pending", "active", "completed", "declined", "cancelled"] as const;
 
@@ -33,6 +33,13 @@ export async function GET(req: NextRequest) {
       .from(challenges)
       .where(and(eq(challenges.status, "active"), lt(challenges.endsAt, now)));
     await resolveEndedChallenges(ended, now);
+
+    // Same self-heal for `pending` invites nobody acted on.
+    const expiredPending = await db
+      .select()
+      .from(challenges)
+      .where(and(eq(challenges.status, "pending"), lt(challenges.endsAt, now)));
+    await resolveExpiredPending(expiredPending, now);
 
     // Stats: counts per status + suggestion-attributed total.
     const statusCounts = await db

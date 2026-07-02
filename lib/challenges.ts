@@ -88,3 +88,28 @@ export async function resolveEndedChallenges(
   }
   return resolved;
 }
+
+/**
+ * Auto-expire `pending` invites nobody acted on. A pending challenge's
+ * `endsAt` is stamped at creation time (before the competition window even
+ * starts), so it doubles as the invite's expiry — past that point it's
+ * declined automatically. Without this, an ignored invite blocks the pair
+ * from ever creating a new challenge (see the "already exists between you"
+ * check in POST), the same lazy-expiry gap `resolveEndedChallenges` closes
+ * for `active` challenges. Mutates the passed rows in place (like its
+ * sibling above) so callers see up-to-date status without re-querying.
+ */
+export async function resolveExpiredPending(
+  rows: Challenge[],
+  now: Date = new Date()
+): Promise<number> {
+  let resolvedCount = 0;
+  for (const c of rows) {
+    if (c.status === "pending" && c.endsAt < now) {
+      await db.update(challenges).set({ status: "declined" }).where(eq(challenges.id, c.id));
+      c.status = "declined";
+      resolvedCount++;
+    }
+  }
+  return resolvedCount;
+}
