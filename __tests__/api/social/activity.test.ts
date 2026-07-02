@@ -30,9 +30,10 @@ function makeDbChain(resolveWith: unknown = undefined) {
 }
 
 // Use vi.hoisted so mock fns are defined before vi.mock factories run
-const { mockInsert, mockUpdate } = vi.hoisted(() => ({
+const { mockInsert, mockUpdate, mockConsume } = vi.hoisted(() => ({
   mockInsert: vi.fn(() => makeDbChain()),
   mockUpdate: vi.fn(() => makeDbChain()),
+  mockConsume: vi.fn(async () => true),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -41,6 +42,11 @@ vi.mock("@/lib/db", () => ({
     update: mockUpdate,
     select: vi.fn(() => makeDbChain([])),
   },
+}));
+vi.mock("@/lib/rate-limit", () => ({
+  consume: mockConsume,
+  MUTATION_LIMIT: 60,
+  MUTATION_WINDOW_SECONDS: 600,
 }));
 
 import { POST, GET } from "@/app/api/social/activity/route";
@@ -107,6 +113,8 @@ describe("POST /api/social/activity", () => {
     vi.mocked(requireUser).mockReset();
     mockInsert.mockReturnValue(makeDbChain());
     mockUpdate.mockReturnValue(makeDbChain());
+    mockConsume.mockReset();
+    mockConsume.mockResolvedValue(true);
   });
 
   it("returns 401 when requireUser returns 401 response", async () => {
@@ -115,6 +123,13 @@ describe("POST /api/social/activity", () => {
     );
     const res = await POST(makeReq({ type: "verse_added" }));
     expect(res.status).toBe(401);
+  });
+
+  it("returns 429 when the per-user activity rate limit is exceeded", async () => {
+    authedAs(makeUser());
+    mockConsume.mockResolvedValue(false);
+    const res = await POST(makeReq({ type: "verse_added" }));
+    expect(res.status).toBe(429);
   });
 
   it("returns 400 for missing activity type", async () => {

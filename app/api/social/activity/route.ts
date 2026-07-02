@@ -4,12 +4,23 @@ import { db } from "@/lib/db";
 import { activityLog, users } from "@/lib/db/schema";
 import { requireUser, invalidateTokenCache } from "@/lib/social-auth";
 import { todayUTC, yesterdayUTC, effectiveStreak } from "@/lib/streak";
+import { consume, MUTATION_WINDOW_SECONDS } from "@/lib/rate-limit";
+
+// Activity pings fire on ordinary reading (each verse/connection), so a genuinely
+// engaged session can log far more than a typical "create a row" mutation —
+// budget this route separately and higher than MUTATION_LIMIT.
+const ACTIVITY_LIMIT = 300;
 
 const VALID_TYPES = new Set(["verse_added", "connection_made", "hadith_read"]);
 
 export async function POST(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
+
+  const allowed = await consume(`activity:${authed.userId}`, ACTIVITY_LIMIT, MUTATION_WINDOW_SECONDS);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many activity events — try again later" }, { status: 429 });
+  }
 
   let body: { type?: string; verse_ref?: string };
   try {

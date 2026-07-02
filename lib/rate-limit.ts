@@ -38,6 +38,16 @@ export function positiveIntEnv(name: string, fallback: number): number {
 export const AI_GEN_LIMIT = positiveIntEnv("AI_GEN_RATE_LIMIT", 20);
 export const AI_GEN_WINDOW_SECONDS = positiveIntEnv("AI_GEN_RATE_WINDOW", 60);
 
+/**
+ * Default budget for cheap-but-abusable authenticated mutations (friend
+ * requests, notes, saved canvases, activity pings, challenge invites) — these
+ * have no per-generation cost like the AI path, but an authenticated user
+ * with no volume cap can still spam rows or degrade the DB. Generous enough
+ * that no real usage pattern hits it.
+ */
+export const MUTATION_LIMIT = positiveIntEnv("MUTATION_RATE_LIMIT", 60);
+export const MUTATION_WINDOW_SECONDS = positiveIntEnv("MUTATION_RATE_WINDOW", 600);
+
 /** Probability that a given `consume` call also prunes expired buckets. */
 const SWEEP_PROBABILITY = 0.01;
 /** Keep this many windows of history before a bucket is eligible for pruning. */

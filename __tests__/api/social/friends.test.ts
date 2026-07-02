@@ -27,10 +27,11 @@ function makeDbChain(resolveWith: unknown = []) {
   return chain;
 }
 
-const { mockSelect, mockInsert, mockUpdate } = vi.hoisted(() => ({
+const { mockSelect, mockInsert, mockUpdate, mockConsume } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
   mockInsert: vi.fn(() => makeDbChain([])),
   mockUpdate: vi.fn(() => makeDbChain([])),
+  mockConsume: vi.fn(async () => true),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -39,6 +40,11 @@ vi.mock("@/lib/db", () => ({
     insert: mockInsert,
     update: mockUpdate,
   },
+}));
+vi.mock("@/lib/rate-limit", () => ({
+  consume: mockConsume,
+  MUTATION_LIMIT: 60,
+  MUTATION_WINDOW_SECONDS: 600,
 }));
 
 import { GET, POST } from "@/app/api/social/friends/route";
@@ -118,6 +124,8 @@ describe("POST /api/social/friends", () => {
       makeDbChain([{ id: 10, status: "pending", requesterId: 1, addresseeId: 2 }])
     );
     mockUpdate.mockReturnValue(makeDbChain([]));
+    mockConsume.mockReset();
+    mockConsume.mockResolvedValue(true);
   });
 
   it("returns 401 when unauthorized", async () => {
@@ -126,6 +134,13 @@ describe("POST /api/social/friends", () => {
     );
     const res = await POST(makePostReq({ username: "friend99" }));
     expect(res.status).toBe(401);
+  });
+
+  it("returns 429 when the per-user friend-request rate limit is exceeded", async () => {
+    authedAs(makeUser());
+    mockConsume.mockResolvedValue(false);
+    const res = await POST(makePostReq({ username: "friend99" }));
+    expect(res.status).toBe(429);
   });
 
   it("returns 400 when username is missing", async () => {

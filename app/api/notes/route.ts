@@ -5,6 +5,7 @@ import { verseNotes } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
 import { isValidRef } from "@/lib/quran-corpus";
 import { jsonError, parseJson } from "@/lib/http";
+import { consume, MUTATION_LIMIT, MUTATION_WINDOW_SECONDS } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
@@ -31,6 +32,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
+
+  const allowed = await consume(`notes:${authed.userId}`, MUTATION_LIMIT, MUTATION_WINDOW_SECONDS);
+  if (!allowed) {
+    return jsonError("Too many notes created — try again later", 429);
+  }
 
   const body = await parseJson<{ ref?: string; note?: string }>(req);
   if (!body) return jsonError("Invalid request body", 400);

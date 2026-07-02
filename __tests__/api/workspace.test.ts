@@ -50,10 +50,11 @@ function makeRecordingChain(resolveWith: unknown, calls: Record<string, unknown[
   return chain;
 }
 
-const { mockSelect, mockInsert, mockDelete } = vi.hoisted(() => ({
+const { mockSelect, mockInsert, mockDelete, mockConsume } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
   mockInsert: vi.fn(() => makeDbChain([])),
   mockDelete: vi.fn(() => makeDbChain([])),
+  mockConsume: vi.fn(async () => true),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -62,6 +63,11 @@ vi.mock("@/lib/db", () => ({
     insert: mockInsert,
     delete: mockDelete,
   },
+}));
+vi.mock("@/lib/rate-limit", () => ({
+  consume: mockConsume,
+  MUTATION_LIMIT: 60,
+  MUTATION_WINDOW_SECONDS: 600,
 }));
 
 import { GET, POST } from "@/app/api/workspace/route";
@@ -156,12 +162,21 @@ describe("POST /api/workspace", () => {
     vi.mocked(requireUser).mockReset();
     mockInsert.mockReset();
     mockInsert.mockReturnValue(makeDbChain([{ id: 1, name: "Untitled canvas", createdAt: new Date() }]));
+    mockConsume.mockReset();
+    mockConsume.mockResolvedValue(true);
   });
 
   it("returns 401 when not authenticated", async () => {
     unauthed();
     const res = await POST(req("POST", { data: { nodes: [] } }));
     expect(res.status).toBe(401);
+  });
+
+  it("returns 429 when the per-user canvas-save rate limit is exceeded", async () => {
+    authed();
+    mockConsume.mockResolvedValue(false);
+    const res = await POST(req("POST", { data: { nodes: [] } }));
+    expect(res.status).toBe(429);
   });
 
   it("returns 400 for malformed JSON body", async () => {
