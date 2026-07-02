@@ -40,6 +40,7 @@ const OPTIONS: Array<{
 
 export function ExpandMenu({ onSelect, onClose }: ExpandMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const firstOptionRef = useRef<HTMLButtonElement>(null);
   const [openUp, setOpenUp] = useState(false);
 
   useEffect(() => {
@@ -50,6 +51,21 @@ export function ExpandMenu({ onSelect, onClose }: ExpandMenuProps) {
     }
   }, []);
 
+  useEffect(() => {
+    firstOptionRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
     <div
       ref={menuRef}
@@ -58,14 +74,15 @@ export function ExpandMenu({ onSelect, onClose }: ExpandMenuProps) {
       onClick={(e) => e.stopPropagation()}
     >
       <div className="rounded-md border border-border overflow-hidden bg-surface-overlay shadow-sm">
-        {OPTIONS.map((opt) => (
+        {OPTIONS.map((opt, i) => (
           <button
             key={opt.kind}
+            ref={i === 0 ? firstOptionRef : undefined}
             onClick={() => {
               onSelect(opt.kind);
               onClose();
             }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors cursor-pointer hover:bg-white/5"
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors cursor-pointer hover:bg-white/5 focus-visible:outline-none focus-visible:bg-white/5"
           >
             <span
               className="w-5 h-5 rounded flex items-center justify-center text-xs font-mono shrink-0"
