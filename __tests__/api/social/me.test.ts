@@ -238,4 +238,16 @@ describe("PATCH /api/social/me", () => {
     const res = await PATCH(makePatchReq({ username: "anyname" }));
     expect(res.status).toBe(500);
   });
+
+  it("returns 409 when the unique-violation code is nested under err.cause (driver-wrapped)", async () => {
+    authedAs(makeUser({ id: 1 }));
+    mockSelect.mockReturnValue(makeDbChain([]));
+    const wrapped = new Error("duplicate key");
+    (wrapped as Error & { cause?: unknown }).cause = { code: "23505" };
+    mockUpdate.mockReturnValue(makeDbChain(Promise.reject(wrapped)));
+    const res = await PATCH(makePatchReq({ username: "racedname2" }));
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toMatch(/already taken/i);
+  });
 });

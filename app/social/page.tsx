@@ -49,7 +49,13 @@ export default function SocialPage() {
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
   const [loadingChallenges, setLoadingChallenges] = useState(false);
-  const [loadError, setLoadError] = useState(false);
+  // Tracked per section (not one shared flag) — otherwise a later-resolving
+  // fetch that succeeds would clear the banner even though a different
+  // section actually failed and is showing stale/missing data.
+  const [friendsError, setFriendsError] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState(false);
+  const [challengesError, setChallengesError] = useState(false);
+  const loadError = friendsError || leaderboardError || challengesError;
   const [profileTimedOut, setProfileTimedOut] = useState(false);
 
   // Picking a suggestion seeds the create form (remounted via key) and clears on send.
@@ -74,12 +80,12 @@ export default function SocialPage() {
         setFriends(data);
         // Keep the header badge in sync immediately after any friend action.
         setPendingFriendCount(countPendingReceived(data));
-        setLoadError(false);
+        setFriendsError(false);
       } else {
-        setLoadError(true);
+        setFriendsError(true);
       }
     } catch {
-      setLoadError(true);
+      setFriendsError(true);
     } finally {
       setLoadingFriends(false);
     }
@@ -94,12 +100,12 @@ export default function SocialPage() {
       });
       if (res.ok) {
         setLeaderboard(await res.json());
-        setLoadError(false);
+        setLeaderboardError(false);
       } else {
-        setLoadError(true);
+        setLeaderboardError(true);
       }
     } catch {
-      setLoadError(true);
+      setLeaderboardError(true);
     } finally {
       setLoadingLeaderboard(false);
     }
@@ -116,12 +122,12 @@ export default function SocialPage() {
         const data: EnrichedChallenge[] = await res.json();
         setChallengesList(data);
         setPendingChallengeCount(countIncomingChallenges(data, userId));
-        setLoadError(false);
+        setChallengesError(false);
       } else {
-        setLoadError(true);
+        setChallengesError(true);
       }
     } catch {
-      setLoadError(true);
+      setChallengesError(true);
     } finally {
       setLoadingChallenges(false);
     }

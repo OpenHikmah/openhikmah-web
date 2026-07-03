@@ -49,6 +49,7 @@ hosting.md
 
 # Playwright scratch dir (console logs, page snapshots, review screenshots) — local only
 /.playwright-mcp/
+/graphify-out
 .mcp.json
 
 # Claude Code personal/local settings (machine-specific; shared config lives in .claude/settings.json)

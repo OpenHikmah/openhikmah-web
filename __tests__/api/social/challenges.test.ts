@@ -217,6 +217,35 @@ describe("POST /api/social/challenges", () => {
     expect(body.error).toMatch(/already exists/i);
   });
 
+  it("returns 409 when a still-live pending challenge already exists", async () => {
+    authedAs(makeUser({ id: 1 }));
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([{ id: 2, username: "bob" }]))
+      .mockReturnValueOnce(makeDbChain([{ id: 5, status: "accepted" }])) // friendship
+      // existing-challenge query: a pending invite whose endsAt is still in the
+      // future satisfies the route's `gte(challenges.endsAt, now)` guard, so the
+      // block query matches it (mirrors what the real WHERE clause would return).
+      .mockReturnValueOnce(makeDbChain([makeChallenge({ status: "pending" })]));
+    const res = await POST(makePostReq({ challengedUsername: "bob", duration: "24h" }));
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toMatch(/already exists/i);
+  });
+
+  it("allows creating a new challenge when the only existing one is an expired pending invite", async () => {
+    authedAs(makeUser({ id: 1 }));
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([{ id: 2, username: "bob" }]))
+      .mockReturnValueOnce(makeDbChain([{ id: 5, status: "accepted" }])) // friendship
+      // existing-challenge query: an expired pending invite fails the route's
+      // `gte(challenges.endsAt, now)` guard, so the real WHERE clause excludes
+      // it — represented here by the block query finding no match.
+      .mockReturnValueOnce(makeDbChain([]));
+    mockInsert.mockReturnValue(makeDbChain([makeChallenge({ status: "pending" })]));
+    const res = await POST(makePostReq({ challengedUsername: "bob", duration: "24h" }));
+    expect(res.status).toBe(201);
+  });
+
   it("returns 201 on success", async () => {
     authedAs(makeUser({ id: 1 }));
     mockSelect
