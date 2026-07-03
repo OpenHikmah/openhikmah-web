@@ -27,11 +27,11 @@ function makeDbChain(resolveWith: unknown = []) {
   return chain;
 }
 
-const { mockSelect, mockInsert, mockUpdate, mockConsume } = vi.hoisted(() => ({
+const { mockSelect, mockInsert, mockUpdate, mockRateLimitOrNull } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
   mockInsert: vi.fn(() => makeDbChain([])),
   mockUpdate: vi.fn(() => makeDbChain([])),
-  mockConsume: vi.fn(async () => true),
+  mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -42,9 +42,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 vi.mock("@/lib/rate-limit", () => ({
-  consume: mockConsume,
-  MUTATION_LIMIT: 60,
-  MUTATION_WINDOW_SECONDS: 600,
+  rateLimitOrNull: mockRateLimitOrNull,
 }));
 
 import { GET, POST } from "@/app/api/social/friends/route";
@@ -124,8 +122,8 @@ describe("POST /api/social/friends", () => {
       makeDbChain([{ id: 10, status: "pending", requesterId: 1, addresseeId: 2 }])
     );
     mockUpdate.mockReturnValue(makeDbChain([]));
-    mockConsume.mockReset();
-    mockConsume.mockResolvedValue(true);
+    mockRateLimitOrNull.mockReset();
+    mockRateLimitOrNull.mockResolvedValue(null);
   });
 
   it("returns 401 when unauthorized", async () => {
@@ -138,7 +136,7 @@ describe("POST /api/social/friends", () => {
 
   it("returns 429 when the per-user friend-request rate limit is exceeded", async () => {
     authedAs(makeUser());
-    mockConsume.mockResolvedValue(false);
+    mockRateLimitOrNull.mockResolvedValue(NextResponse.json({ error: "Too many" }, { status: 429 }));
     const res = await POST(makePostReq({ username: "friend99" }));
     expect(res.status).toBe(429);
   });

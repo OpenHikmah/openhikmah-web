@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { savedWorkspaces } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
-import { consume, MUTATION_LIMIT, MUTATION_WINDOW_SECONDS } from "@/lib/rate-limit";
+import { rateLimitOrNull } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
@@ -35,10 +35,8 @@ export async function POST(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 
-  const allowed = await consume(`workspace:${authed.userId}`, MUTATION_LIMIT, MUTATION_WINDOW_SECONDS);
-  if (!allowed) {
-    return NextResponse.json({ error: "Too many canvases saved — try again later" }, { status: 429 });
-  }
+  const limited = await rateLimitOrNull(`workspace:${authed.userId}`, "Too many canvases saved — try again later");
+  if (limited) return limited;
 
   let body: { name?: string; data?: unknown; nodeCount?: number };
   try {

@@ -26,7 +26,8 @@ export async function GET(
 
     try {
       return NextResponse.json(JSON.parse(rows[0].data));
-    } catch {
+    } catch (err) {
+      console.error("share GET parse error:", err);
       return NextResponse.json({ error: "Corrupted canvas data" }, { status: 500 });
     }
   } catch (err) {

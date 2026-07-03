@@ -50,11 +50,11 @@ function makeRecordingChain(resolveWith: unknown, calls: Record<string, unknown[
   return chain;
 }
 
-const { mockSelect, mockInsert, mockDelete, mockConsume } = vi.hoisted(() => ({
+const { mockSelect, mockInsert, mockDelete, mockRateLimitOrNull } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
   mockInsert: vi.fn(() => makeDbChain([])),
   mockDelete: vi.fn(() => makeDbChain([])),
-  mockConsume: vi.fn(async () => true),
+  mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -65,9 +65,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 vi.mock("@/lib/rate-limit", () => ({
-  consume: mockConsume,
-  MUTATION_LIMIT: 60,
-  MUTATION_WINDOW_SECONDS: 600,
+  rateLimitOrNull: mockRateLimitOrNull,
 }));
 
 import { GET, POST } from "@/app/api/workspace/route";
@@ -162,8 +160,8 @@ describe("POST /api/workspace", () => {
     vi.mocked(requireUser).mockReset();
     mockInsert.mockReset();
     mockInsert.mockReturnValue(makeDbChain([{ id: 1, name: "Untitled canvas", createdAt: new Date() }]));
-    mockConsume.mockReset();
-    mockConsume.mockResolvedValue(true);
+    mockRateLimitOrNull.mockReset();
+    mockRateLimitOrNull.mockResolvedValue(null);
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -174,7 +172,7 @@ describe("POST /api/workspace", () => {
 
   it("returns 429 when the per-user canvas-save rate limit is exceeded", async () => {
     authed();
-    mockConsume.mockResolvedValue(false);
+    mockRateLimitOrNull.mockResolvedValue(NextResponse.json({ error: "Too many" }, { status: 429 }));
     const res = await POST(req("POST", { data: { nodes: [] } }));
     expect(res.status).toBe(429);
   });

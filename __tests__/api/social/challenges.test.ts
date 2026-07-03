@@ -51,12 +51,12 @@ function makeRecordingChain(resolveWith: unknown, calls: Record<string, unknown[
   return chain;
 }
 
-const { mockSelect, mockInsert, mockUpdate, mockDelete, mockConsume } = vi.hoisted(() => ({
+const { mockSelect, mockInsert, mockUpdate, mockDelete, mockRateLimitOrNull } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
   mockInsert: vi.fn(() => makeDbChain([])),
   mockUpdate: vi.fn(() => makeDbChain([])),
   mockDelete: vi.fn(() => makeDbChain([])),
-  mockConsume: vi.fn(async () => true),
+  mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -68,9 +68,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 vi.mock("@/lib/rate-limit", () => ({
-  consume: mockConsume,
-  MUTATION_LIMIT: 60,
-  MUTATION_WINDOW_SECONDS: 600,
+  rateLimitOrNull: mockRateLimitOrNull,
 }));
 
 import { GET, POST } from "@/app/api/social/challenges/route";
@@ -145,8 +143,8 @@ describe("POST /api/social/challenges", () => {
     mockSelect.mockReturnValue(makeDbChain([]));
     mockInsert.mockReturnValue(makeDbChain([makeChallenge()]));
     mockDelete.mockReturnValue(makeDbChain([]));
-    mockConsume.mockReset();
-    mockConsume.mockResolvedValue(true);
+    mockRateLimitOrNull.mockReset();
+    mockRateLimitOrNull.mockResolvedValue(null);
   });
 
   it("returns 401 when unauthorized", async () => {
@@ -159,7 +157,7 @@ describe("POST /api/social/challenges", () => {
 
   it("returns 429 when the per-user challenge rate limit is exceeded", async () => {
     authedAs(makeUser());
-    mockConsume.mockResolvedValue(false);
+    mockRateLimitOrNull.mockResolvedValue(NextResponse.json({ error: "Too many" }, { status: 429 }));
     const res = await POST(makePostReq({ challengedUsername: "bob", duration: "24h" }));
     expect(res.status).toBe(429);
   });

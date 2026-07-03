@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { challenges, challengeSuggestions, friendships, users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
 import { DURATIONS, scoreChallenge, resolveEndedChallenges, resolveExpiredPending } from "@/lib/challenges";
-import { consume, MUTATION_LIMIT, MUTATION_WINDOW_SECONDS } from "@/lib/rate-limit";
+import { rateLimitOrNull } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
@@ -108,10 +108,8 @@ export async function POST(req: NextRequest) {
   if (authed instanceof NextResponse) return authed;
   const { userId } = authed;
 
-  const allowed = await consume(`challenge:${userId}`, MUTATION_LIMIT, MUTATION_WINDOW_SECONDS);
-  if (!allowed) {
-    return NextResponse.json({ error: "Too many challenges created — try again later" }, { status: 429 });
-  }
+  const limited = await rateLimitOrNull(`challenge:${userId}`, "Too many challenges created — try again later");
+  if (limited) return limited;
 
   let body: { challengedUsername?: string; duration?: string; verseRef?: string; suggestionId?: number };
   try {

@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { rateLimits } from "@/lib/db/schema";
@@ -127,4 +128,21 @@ export async function consume(
     console.error("Rate limiter error (failing open):", err);
     return true;
   }
+}
+
+/**
+ * `consume` + "return a 429" was repeated near-identically across every
+ * mutation route (notes, friends, workspace, activity, challenges). Centralizes
+ * the limit/window pairing and the 429 envelope so future changes (Retry-After,
+ * per-route metrics) are a one-file edit. Returns `null` when the request is
+ * allowed, or the `NextResponse` the caller should return immediately.
+ */
+export async function rateLimitOrNull(
+  key: string,
+  message: string,
+  limit: number = MUTATION_LIMIT,
+  windowSeconds: number = MUTATION_WINDOW_SECONDS
+): Promise<NextResponse | null> {
+  const allowed = await consume(key, limit, windowSeconds);
+  return allowed ? null : NextResponse.json({ error: message }, { status: 429 });
 }

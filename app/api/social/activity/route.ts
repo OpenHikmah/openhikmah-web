@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { activityLog, users } from "@/lib/db/schema";
 import { requireUser, invalidateTokenCache } from "@/lib/social-auth";
 import { todayUTC, yesterdayUTC, effectiveStreak } from "@/lib/streak";
-import { consume, MUTATION_WINDOW_SECONDS } from "@/lib/rate-limit";
+import { rateLimitOrNull, MUTATION_WINDOW_SECONDS } from "@/lib/rate-limit";
 
 // Activity pings fire on ordinary reading (each verse/connection), so a genuinely
 // engaged session can log far more than a typical "create a row" mutation —
@@ -17,10 +17,13 @@ export async function POST(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 
-  const allowed = await consume(`activity:${authed.userId}`, ACTIVITY_LIMIT, MUTATION_WINDOW_SECONDS);
-  if (!allowed) {
-    return NextResponse.json({ error: "Too many activity events — try again later" }, { status: 429 });
-  }
+  const limited = await rateLimitOrNull(
+    `activity:${authed.userId}`,
+    "Too many activity events — try again later",
+    ACTIVITY_LIMIT,
+    MUTATION_WINDOW_SECONDS
+  );
+  if (limited) return limited;
 
   let body: { type?: string; verse_ref?: string };
   try {

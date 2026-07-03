@@ -30,7 +30,7 @@ function makeDbChain(resolveWith: unknown = undefined) {
 }
 
 // Use vi.hoisted so mock fns are defined before vi.mock factories run
-const { mockInsert, mockUpdate, mockTxSelect, mockTransaction, mockConsume } = vi.hoisted(() => {
+const { mockInsert, mockUpdate, mockTxSelect, mockTransaction, mockRateLimitOrNull } = vi.hoisted(() => {
   const insert = vi.fn(() => makeDbChain());
   const update = vi.fn(() => makeDbChain());
   const txSelect = vi.fn(() => makeDbChain([]));
@@ -46,7 +46,7 @@ const { mockInsert, mockUpdate, mockTxSelect, mockTransaction, mockConsume } = v
     mockUpdate: update,
     mockTxSelect: txSelect,
     mockTransaction: transaction,
-    mockConsume: vi.fn(async () => true),
+    mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
   };
 });
 
@@ -59,8 +59,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 vi.mock("@/lib/rate-limit", () => ({
-  consume: mockConsume,
-  MUTATION_LIMIT: 60,
+  rateLimitOrNull: mockRateLimitOrNull,
   MUTATION_WINDOW_SECONDS: 600,
 }));
 
@@ -134,8 +133,8 @@ describe("POST /api/social/activity", () => {
     mockUpdate.mockReturnValue(makeDbChain());
     mockTxSelect.mockReturnValue(makeDbChain([]));
     mockTransaction.mockClear();
-    mockConsume.mockReset();
-    mockConsume.mockResolvedValue(true);
+    mockRateLimitOrNull.mockReset();
+    mockRateLimitOrNull.mockResolvedValue(null);
   });
 
   it("returns 401 when requireUser returns 401 response", async () => {
@@ -148,7 +147,7 @@ describe("POST /api/social/activity", () => {
 
   it("returns 429 when the per-user activity rate limit is exceeded", async () => {
     authedAs(makeUser());
-    mockConsume.mockResolvedValue(false);
+    mockRateLimitOrNull.mockResolvedValue(NextResponse.json({ error: "Too many" }, { status: 429 }));
     const res = await POST(makeReq({ type: "verse_added" }));
     expect(res.status).toBe(429);
   });
