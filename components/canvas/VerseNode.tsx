@@ -57,6 +57,11 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
       aria-pressed={selected}
       onClick={toggleSelected}
       onKeyDown={(e) => {
+        // Guard against bubbled keydowns from nested buttons (play/bookmark/
+        // expand) — those only stopPropagation on click/mousedown, so without
+        // this check, activating one of them via keyboard would also toggle
+        // node selection.
+        if (e.target !== e.currentTarget) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           toggleSelected();
