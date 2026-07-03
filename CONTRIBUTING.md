@@ -14,9 +14,7 @@ Thank you for your interest in contributing. Open Hikmah is a theological sensem
 - [Feature Requests](#feature-requests)
 
 ---
-
 ## Getting Started
-
 ```bash
 git clone https://github.com/Nazm-AI/open-hikmah
 cd open-hikmah
@@ -30,7 +28,10 @@ Open [http://localhost:3000](http://localhost:3000).
 
 **Required environment variables** — see [`.env.example`](.env.example). At minimum you need `ANTHROPIC_API_KEY` to test AI connections. The Quran Foundation OAuth variables are only needed to test bookmarks.
 
+**Docker (required for pushing):** `.husky/pre-push` runs integration tests via [Testcontainers](https://testcontainers.com/), which spin up a real Postgres instance in Docker. Docker must be installed and running before you run `git push`, or the hook will fail with an unclear error. Install Docker Desktop (or Docker Engine on Linux) from the [official docs](https://docs.docker.com/get-docker/), and make sure the daemon is running (`docker ps` should succeed) before pushing.
+
 ---
+
 
 ## Branch and Commit Conventions
 
