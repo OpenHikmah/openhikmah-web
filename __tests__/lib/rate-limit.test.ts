@@ -18,7 +18,7 @@ vi.mock("@/lib/db", () => ({ db: { insert: mockInsert, delete: mockDelete } }));
 vi.mock("@/lib/redis", () => ({ redisIncrWithTtl: mockRedisIncr }));
 vi.mock("@/lib/metrics", () => ({ incr: mockIncr }));
 
-import { consume, sweepRateLimits, RateLimitError, positiveIntEnv } from "@/lib/rate-limit";
+import { consume, rateLimitOrNull, sweepRateLimits, RateLimitError, positiveIntEnv } from "@/lib/rate-limit";
 
 describe("rate-limit consume", () => {
   beforeEach(() => {
@@ -93,6 +93,27 @@ describe("rate-limit consume", () => {
     await consume("ip:1", 20, 60);
     expect(mockIncr).toHaveBeenCalledWith("ratelimit_redis_fallback");
     expect(mockIncr).toHaveBeenCalledWith("ratelimit_allow");
+  });
+});
+
+describe("rateLimitOrNull", () => {
+  beforeEach(() => {
+    mockReturning.mockReset();
+    mockRedisIncr.mockReset();
+  });
+
+  it("returns null (allowed) when under the limit", async () => {
+    mockRedisIncr.mockResolvedValue(5);
+    expect(await rateLimitOrNull("ip:1", "Too many", 20, 60)).toBeNull();
+  });
+
+  it("returns a 429 NextResponse with the given message when over the limit", async () => {
+    mockRedisIncr.mockResolvedValue(21);
+    const res = await rateLimitOrNull("ip:1", "Too many widgets", 20, 60);
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(429);
+    const body = await res!.json();
+    expect(body.error).toBe("Too many widgets");
   });
 });
 

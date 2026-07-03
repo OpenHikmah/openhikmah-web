@@ -17,14 +17,19 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const deleted = await db
-    .delete(verseNotes)
-    .where(and(eq(verseNotes.id, noteId), eq(verseNotes.userId, authed.userId)))
-    .returning();
+  try {
+    const deleted = await db
+      .delete(verseNotes)
+      .where(and(eq(verseNotes.id, noteId), eq(verseNotes.userId, authed.userId)))
+      .returning();
 
-  if (deleted.length === 0) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (deleted.length === 0) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    return new NextResponse(null, { status: 204 });
+  } catch (err) {
+    console.error("notes DELETE db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  return new NextResponse(null, { status: 204 });
 }

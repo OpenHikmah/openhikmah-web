@@ -23,13 +23,21 @@ function rowToVerse(row: VerseRow): Verse {
   };
 }
 
+// The longest surah (2, Al-Baqarah) has 286 ayahs — no surah exceeds this, so
+// it's a safe generous upper bound without needing a full per-surah table.
+// isValidRef intentionally doesn't validate the exact per-surah count; refs
+// that pass this but don't exist (e.g. "114:200") simply fail to resolve
+// downstream (getVerse/getVerses return null/absent), same as any other
+// not-found ref.
+const MAX_AYAH = 286;
+
 /** A syntactically valid verse reference within Quran bounds (surah 1–114). */
 export function isValidRef(ref: string): boolean {
   const match = /^(\d+):(\d+)$/.exec(ref);
   if (!match) return false;
   const surah = parseInt(match[1], 10);
   const ayah = parseInt(match[2], 10);
-  return surah >= 1 && surah <= 114 && ayah >= 1;
+  return surah >= 1 && surah <= 114 && ayah >= 1 && ayah <= MAX_AYAH;
 }
 
 /** Returns the verse for a `"surah:ayah"` ref, or null if not in the corpus. */

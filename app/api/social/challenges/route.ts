@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq, lt, or } from "drizzle-orm";
+import { and, desc, eq, gte, lt, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { challenges, challengeSuggestions, friendships, users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
-import { DURATIONS, scoreChallenge, resolveEndedChallenges } from "@/lib/challenges";
+import { DURATIONS, scoreChallenge, resolveEndedChallenges, resolveExpiredPending } from "@/lib/challenges";
+import { rateLimitOrNull } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
@@ -31,6 +32,23 @@ export async function GET(req: NextRequest) {
         )
       );
     const resolvedScores = await resolveEndedChallenges(endedActive, now);
+
+    // Same self-heal for `pending` invites nobody acted on — otherwise an
+    // ignored invite permanently blocks the pair from a new challenge.
+    const expiredPending = await db
+      .select()
+      .from(challenges)
+      .where(
+        and(
+          or(
+            eq(challenges.challengerId, userId),
+            eq(challenges.challengedId, userId)
+          ),
+          eq(challenges.status, "pending"),
+          lt(challenges.endsAt, now)
+        )
+      );
+    await resolveExpiredPending(expiredPending, now);
 
     // Bound the per-user challenge list for the response (newest first). 200 is far
     // above any real user's volume; statuses are current after the resolution above.
@@ -90,6 +108,9 @@ export async function POST(req: NextRequest) {
   if (authed instanceof NextResponse) return authed;
   const { userId } = authed;
 
+  const limited = await rateLimitOrNull(`challenge:${userId}`, "Too many challenges created — try again later");
+  if (limited) return limited;
+
   let body: { challengedUsername?: string; duration?: string; verseRef?: string; suggestionId?: number };
   try {
     body = await req.json();
@@ -141,7 +162,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "You must be friends to send a challenge" }, { status: 409 });
   }
 
-  // Block if an active or pending challenge already exists between them
+  // Block if an active or still-live pending challenge already exists between
+  // them. A pending row whose endsAt has passed is a stale, un-actioned
+  // invite — treat it as already expired here too, even if the lazy resolver
+  // (GET) hasn't written the "declined" status back yet.
+  const now = new Date();
   const [existing] = await db
     .select({ id: challenges.id })
     .from(challenges)
@@ -151,7 +176,7 @@ export async function POST(req: NextRequest) {
           and(eq(challenges.challengerId, userId), eq(challenges.challengedId, target.id)),
           and(eq(challenges.challengerId, target.id), eq(challenges.challengedId, userId))
         ),
-        or(eq(challenges.status, "pending"), eq(challenges.status, "active"))
+        or(eq(challenges.status, "active"), and(eq(challenges.status, "pending"), gte(challenges.endsAt, now)))
       )
     )
     .limit(1);

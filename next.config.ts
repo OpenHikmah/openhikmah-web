@@ -15,7 +15,38 @@ const nextConfig: NextConfig = {
   // edge. The extension-anchored source only matches asset files — never HTML
   // routes (which have no extension) or API routes — so pages are never cached.
   async headers() {
+    // Baseline security headers on every response. CSP starts in report-only
+    // mode: the app uses inline `style={{...}}` throughout the canvas UI (so
+    // style-src needs 'unsafe-inline' regardless), and we don't yet have a
+    // deployed report endpoint to validate script-src against real traffic —
+    // enforcing untested would risk breaking the OAuth/canvas flows in prod.
+    const securityHeaders = [
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+      { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+      {
+        key: "Content-Security-Policy-Report-Only",
+        value: [
+          "default-src 'self'",
+          "script-src 'self'",
+          "style-src 'self' 'unsafe-inline'",
+          "img-src 'self' data: blob:",
+          "font-src 'self' data:",
+          "connect-src 'self'",
+          "object-src 'none'",
+          "frame-ancestors 'none'",
+          "base-uri 'self'",
+          "form-action 'self' https://*.quran.foundation",
+        ].join("; "),
+      },
+    ];
     return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
       {
         source: "/:path*.(ico|png|jpg|jpeg|gif|svg|webp|avif|woff|woff2)",
         headers: [

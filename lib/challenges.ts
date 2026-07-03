@@ -77,14 +77,56 @@ export async function resolveEndedChallenges(
         scoreChallenge(c.challengedId, c),
       ]);
       const winnerId = pickWinner(c, challengerScore, challengedScore);
-      await db
+      // Scope the write to the state just checked — a concurrent admin "end"
+      // (or a second caller racing this same self-heal) may have already
+      // transitioned this row; only count/mutate on an actual match instead
+      // of unconditionally overwriting whatever it raced against.
+      const [updated] = await db
         .update(challenges)
         .set({ status: "completed", winnerId })
-        .where(eq(challenges.id, c.id));
-      c.status = "completed";
-      c.winnerId = winnerId;
-      resolved.set(c.id, { challengerScore, challengedScore });
+        .where(and(eq(challenges.id, c.id), eq(challenges.status, "active")))
+        .returning();
+      if (updated) {
+        c.status = "completed";
+        c.winnerId = winnerId;
+        resolved.set(c.id, { challengerScore, challengedScore });
+      }
     }
   }
   return resolved;
+}
+
+/**
+ * Auto-expire `pending` invites nobody acted on. A pending challenge's
+ * `endsAt` is stamped at creation time (before the competition window even
+ * starts), so it doubles as the invite's expiry — past that point it's
+ * declined automatically. Without this, an ignored invite blocks the pair
+ * from ever creating a new challenge (see the "already exists between you"
+ * check in POST), the same lazy-expiry gap `resolveEndedChallenges` closes
+ * for `active` challenges. Mutates the passed rows in place (like its
+ * sibling above) so callers see up-to-date status without re-querying.
+ */
+export async function resolveExpiredPending(
+  rows: Challenge[],
+  now: Date = new Date()
+): Promise<number> {
+  let resolvedCount = 0;
+  for (const c of rows) {
+    if (c.status === "pending" && c.endsAt < now) {
+      // Scope the write the same way as resolveEndedChallenges above — if the
+      // pair accepted/declined/cancelled this invite via the (already-guarded)
+      // PATCH route in the window between our SELECT and this UPDATE, only a
+      // still-pending row should be clobbered back to "declined".
+      const [updated] = await db
+        .update(challenges)
+        .set({ status: "declined" })
+        .where(and(eq(challenges.id, c.id), eq(challenges.status, "pending")))
+        .returning();
+      if (updated) {
+        c.status = "declined";
+        resolvedCount++;
+      }
+    }
+  }
+  return resolvedCount;
 }

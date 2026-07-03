@@ -188,7 +188,7 @@ describe("POST /api/connections", () => {
     }
   });
 
-  it("rate-limits under the client IP from x-forwarded-for", async () => {
+  it("rate-limits under the last (proxy-appended) hop of x-forwarded-for", async () => {
     mockFetch.mockImplementation(async (url: string) => {
       if (typeof url !== "string") return { ok: false };
       if (url.includes("ar.alafasy")) return arabicResp();
@@ -200,7 +200,7 @@ describe("POST /api/connections", () => {
       { "x-forwarded-for": "203.0.113.7, 70.41.3.18" }
     );
     await POST(req);
-    expect(mockConsume).toHaveBeenCalledWith("gen:203.0.113.7");
+    expect(mockConsume).toHaveBeenCalledWith("gen:70.41.3.18");
   });
 
   it("buckets requests with a malformed/oversized x-forwarded-for under 'unknown'", async () => {

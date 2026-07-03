@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { challenges } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
@@ -59,11 +59,18 @@ export async function PATCH(
         ? { status: "declined" as const }
         : { status: "cancelled" as const };
 
+  // Scope the WHERE to "still pending" — otherwise two concurrent calls (e.g.
+  // accept racing cancel) both pass the check above and the second write
+  // silently clobbers the first.
   const [updated] = await db
     .update(challenges)
     .set(setFields)
-    .where(eq(challenges.id, challengeId))
+    .where(and(eq(challenges.id, challengeId), eq(challenges.status, "pending")))
     .returning();
+
+  if (!updated) {
+    return NextResponse.json({ error: "Challenge is no longer pending" }, { status: 409 });
+  }
 
   return NextResponse.json(updated);
 }

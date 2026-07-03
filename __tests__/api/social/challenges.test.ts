@@ -51,11 +51,12 @@ function makeRecordingChain(resolveWith: unknown, calls: Record<string, unknown[
   return chain;
 }
 
-const { mockSelect, mockInsert, mockUpdate, mockDelete } = vi.hoisted(() => ({
+const { mockSelect, mockInsert, mockUpdate, mockDelete, mockRateLimitOrNull } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
   mockInsert: vi.fn(() => makeDbChain([])),
   mockUpdate: vi.fn(() => makeDbChain([])),
   mockDelete: vi.fn(() => makeDbChain([])),
+  mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -65,6 +66,9 @@ vi.mock("@/lib/db", () => ({
     update: mockUpdate,
     delete: mockDelete,
   },
+}));
+vi.mock("@/lib/rate-limit", () => ({
+  rateLimitOrNull: mockRateLimitOrNull,
 }));
 
 import { GET, POST } from "@/app/api/social/challenges/route";
@@ -139,6 +143,8 @@ describe("POST /api/social/challenges", () => {
     mockSelect.mockReturnValue(makeDbChain([]));
     mockInsert.mockReturnValue(makeDbChain([makeChallenge()]));
     mockDelete.mockReturnValue(makeDbChain([]));
+    mockRateLimitOrNull.mockReset();
+    mockRateLimitOrNull.mockResolvedValue(null);
   });
 
   it("returns 401 when unauthorized", async () => {
@@ -147,6 +153,13 @@ describe("POST /api/social/challenges", () => {
     );
     const res = await POST(makePostReq({ challengedUsername: "bob", duration: "24h" }));
     expect(res.status).toBe(401);
+  });
+
+  it("returns 429 when the per-user challenge rate limit is exceeded", async () => {
+    authedAs(makeUser());
+    mockRateLimitOrNull.mockResolvedValue(NextResponse.json({ error: "Too many" }, { status: 429 }));
+    const res = await POST(makePostReq({ challengedUsername: "bob", duration: "24h" }));
+    expect(res.status).toBe(429);
   });
 
   it("returns 400 when challengedUsername is missing", async () => {
@@ -204,6 +217,35 @@ describe("POST /api/social/challenges", () => {
     expect(body.error).toMatch(/already exists/i);
   });
 
+  it("returns 409 when a still-live pending challenge already exists", async () => {
+    authedAs(makeUser({ id: 1 }));
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([{ id: 2, username: "bob" }]))
+      .mockReturnValueOnce(makeDbChain([{ id: 5, status: "accepted" }])) // friendship
+      // existing-challenge query: a pending invite whose endsAt is still in the
+      // future satisfies the route's `gte(challenges.endsAt, now)` guard, so the
+      // block query matches it (mirrors what the real WHERE clause would return).
+      .mockReturnValueOnce(makeDbChain([makeChallenge({ status: "pending" })]));
+    const res = await POST(makePostReq({ challengedUsername: "bob", duration: "24h" }));
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toMatch(/already exists/i);
+  });
+
+  it("allows creating a new challenge when the only existing one is an expired pending invite", async () => {
+    authedAs(makeUser({ id: 1 }));
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([{ id: 2, username: "bob" }]))
+      .mockReturnValueOnce(makeDbChain([{ id: 5, status: "accepted" }])) // friendship
+      // existing-challenge query: an expired pending invite fails the route's
+      // `gte(challenges.endsAt, now)` guard, so the real WHERE clause excludes
+      // it — represented here by the block query finding no match.
+      .mockReturnValueOnce(makeDbChain([]));
+    mockInsert.mockReturnValue(makeDbChain([makeChallenge({ status: "pending" })]));
+    const res = await POST(makePostReq({ challengedUsername: "bob", duration: "24h" }));
+    expect(res.status).toBe(201);
+  });
+
   it("returns 201 on success", async () => {
     authedAs(makeUser({ id: 1 }));
     mockSelect
@@ -245,13 +287,15 @@ describe("GET /api/social/challenges", () => {
   });
 
   it("bounds the challenges query with orderBy + limit(200)", async () => {
-    // NOTE: the route issues the unbounded resolution select FIRST, then the capped
-    // display select. The recording chain is wired to that second select. If the
-    // route is reordered, update which Once() carries the recording chain.
+    // NOTE: the route issues the unbounded active-resolution select, then the
+    // unbounded pending-expiry select, then the capped display select. The
+    // recording chain is wired to that third select. If the route is
+    // reordered, update which Once() carries the recording chain.
     authedAs(makeUser({ id: 1 }));
     const calls: Record<string, unknown[][]> = {};
     mockSelect
       .mockReturnValueOnce(makeDbChain([]))                // resolution query (no ended-active)
+      .mockReturnValueOnce(makeDbChain([]))                // pending-expiry query (none expired)
       .mockReturnValueOnce(makeRecordingChain([], calls)); // capped display query
     const res = await GET(makeGetReq());
     expect(res.status).toBe(200);
@@ -271,6 +315,7 @@ describe("GET /api/social/challenges", () => {
     const challenge = makeChallenge({ status: "pending" });
     mockSelect
       .mockReturnValueOnce(makeDbChain([]))                     // resolution query (none ended-active)
+      .mockReturnValueOnce(makeDbChain([]))                     // pending-expiry query (none expired)
       .mockReturnValueOnce(makeDbChain([challenge]))            // capped display query
       .mockReturnValueOnce(makeDbChain([                        // users query
         { id: 1, username: "alice" },
@@ -295,6 +340,7 @@ describe("GET /api/social/challenges", () => {
       .mockReturnValueOnce(makeDbChain([expired]))             // resolution query (the ended-active row)
       .mockReturnValueOnce(makeDbChain([{ score: 3 }]))        // challengerScore (resolution)
       .mockReturnValueOnce(makeDbChain([{ score: 1 }]))        // challengedScore (resolution)
+      .mockReturnValueOnce(makeDbChain([]))                     // pending-expiry query (none expired)
       .mockReturnValueOnce(makeDbChain([                        // capped display query — re-reads the
         makeChallenge({ status: "completed", winnerId: 1 }),    // now-finalized row
       ]))
@@ -302,8 +348,10 @@ describe("GET /api/social/challenges", () => {
         { id: 1, username: "alice" },
         { id: 2, username: "bob" },
       ]));
-    // No further score queries expected — cached scores are reused in enrichment
-    mockUpdate.mockReturnValue(makeDbChain([]));
+    // No further score queries expected — cached scores are reused in enrichment.
+    // The guarded update must return the row (simulating no concurrent writer)
+    // for resolveEndedChallenges to populate its resolved-scores cache.
+    mockUpdate.mockReturnValue(makeDbChain([{ id: expired.id }]));
     const res = await GET(makeGetReq());
     expect(res.status).toBe(200);
     expect(mockUpdate).toHaveBeenCalled();
@@ -322,6 +370,7 @@ describe("GET /api/social/challenges", () => {
     });
     mockSelect
       .mockReturnValueOnce(makeDbChain([]))                     // resolution query (not ended → none)
+      .mockReturnValueOnce(makeDbChain([]))                     // pending-expiry query (none expired)
       .mockReturnValueOnce(makeDbChain([active]))               // capped display query
       .mockReturnValueOnce(makeDbChain([                        // users
         { id: 1, username: "alice" },
@@ -342,6 +391,7 @@ describe("GET /api/social/challenges", () => {
     const pending = makeChallenge({ status: "pending" });
     mockSelect
       .mockReturnValueOnce(makeDbChain([]))                     // resolution query (none ended-active)
+      .mockReturnValueOnce(makeDbChain([]))                     // pending-expiry query (none expired)
       .mockReturnValueOnce(makeDbChain([pending]))              // capped display query
       .mockReturnValueOnce(makeDbChain([                        // users
         { id: 1, username: "alice" },

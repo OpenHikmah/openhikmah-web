@@ -199,10 +199,10 @@ describe("GET /api/search", () => {
     expect((await res.json())[0].ref).toBe("1:1");
   });
 
-  it("mode=meaning rate-limits under the client IP from x-forwarded-for", async () => {
+  it("mode=meaning rate-limits under the last (proxy-appended) hop of x-forwarded-for", async () => {
     mockSearchByMeaning.mockResolvedValueOnce([]);
     await GET(makeMeaningReq("mercy", { "x-forwarded-for": "203.0.113.7, 70.41.3.18" }));
-    expect(mockConsume).toHaveBeenCalledWith("search:203.0.113.7");
+    expect(mockConsume).toHaveBeenCalledWith("search:70.41.3.18");
   });
 
   it("mode=meaning buckets a malformed x-forwarded-for under 'unknown'", async () => {

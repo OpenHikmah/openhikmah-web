@@ -5,6 +5,7 @@ import { verseNotes } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
 import { isValidRef } from "@/lib/quran-corpus";
 import { jsonError, parseJson } from "@/lib/http";
+import { rateLimitOrNull } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
@@ -31,6 +32,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
+
+  const limited = await rateLimitOrNull(`notes:${authed.userId}`, "Too many notes created — try again later");
+  if (limited) return limited;
 
   const body = await parseJson<{ ref?: string; note?: string }>(req);
   if (!body) return jsonError("Invalid request body", 400);

@@ -198,7 +198,10 @@ export function ChallengeSuggestionsManager() {
                 <Td className="font-mono text-xs text-text-muted">{s.verseRef ?? "—"}</Td>
                 <Td className="text-xs text-text-secondary">{s.suggestedDuration ?? "any"}</Td>
                 <Td>
-                  <button onClick={() => toggleActive(s)} title="Toggle active">
+                  <button
+                    onClick={() => toggleActive(s)}
+                    aria-label={`${s.isActive ? "Deactivate" : "Activate"} suggestion "${s.title}"`}
+                  >
                     <Pill tone={s.isActive ? "active" : "retired"}>{s.isActive ? "on" : "off"}</Pill>
                   </button>
                 </Td>

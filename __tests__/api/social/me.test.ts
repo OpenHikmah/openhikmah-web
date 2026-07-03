@@ -215,4 +215,39 @@ describe("PATCH /api/social/me", () => {
       expect(res.status).toBe(200);
     }
   });
+
+  it("returns 409 (not 500) when a concurrent PATCH wins the username race", async () => {
+    authedAs(makeUser({ id: 1 }));
+    // The collision pre-check passes (no row found yet)...
+    mockSelect.mockReturnValue(makeDbChain([]));
+    // ...but the UPDATE itself hits the DB's unique constraint because another
+    // request grabbed the same username in between.
+    mockUpdate.mockReturnValue(
+      makeDbChain(Promise.reject(Object.assign(new Error("duplicate key"), { code: "23505" })))
+    );
+    const res = await PATCH(makePatchReq({ username: "racedname" }));
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toMatch(/already taken/i);
+  });
+
+  it("returns 500 on an unrelated db error during update", async () => {
+    authedAs(makeUser({ id: 1 }));
+    mockSelect.mockReturnValue(makeDbChain([]));
+    mockUpdate.mockReturnValue(makeDbChain(Promise.reject(new Error("connection lost"))));
+    const res = await PATCH(makePatchReq({ username: "anyname" }));
+    expect(res.status).toBe(500);
+  });
+
+  it("returns 409 when the unique-violation code is nested under err.cause (driver-wrapped)", async () => {
+    authedAs(makeUser({ id: 1 }));
+    mockSelect.mockReturnValue(makeDbChain([]));
+    const wrapped = new Error("duplicate key");
+    (wrapped as Error & { cause?: unknown }).cause = { code: "23505" };
+    mockUpdate.mockReturnValue(makeDbChain(Promise.reject(wrapped)));
+    const res = await PATCH(makePatchReq({ username: "racedname2" }));
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toMatch(/already taken/i);
+  });
 });

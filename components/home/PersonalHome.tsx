@@ -50,6 +50,7 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
 
   const [continueCount, setContinueCount] = useState<number | null>(null);
   const [savedCount, setSavedCount] = useState<number | null>(null);
+  const [savedCountError, setSavedCountError] = useState(false);
 
   useEffect(() => {
     try {
@@ -66,9 +67,12 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
   useEffect(() => {
     if (!accessToken) return;
     fetch("/api/workspace", { headers: { Authorization: `Bearer ${accessToken}` } })
-      .then((r) => (r.ok ? r.json() : []))
+      .then((r) => {
+        if (!r.ok) throw new Error("workspace fetch failed");
+        return r.json();
+      })
       .then((ws: unknown[]) => setSavedCount(Array.isArray(ws) ? ws.length : 0))
-      .catch(() => {});
+      .catch(() => setSavedCountError(true));
   }, [accessToken]);
 
   const hasContinue = continueCount !== null && continueCount > 0;
@@ -120,7 +124,9 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
             subtitle={
               savedCount !== null
                 ? `${savedCount} saved canvas${savedCount === 1 ? "" : "es"}`
-                : "Your saved graphs"
+                : savedCountError
+                  ? "Couldn't load your saved canvases"
+                  : "Your saved graphs"
             }
           />
           <QuickLink

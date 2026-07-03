@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
 import { effectiveStreak } from "@/lib/streak";
+import { isUniqueViolation } from "@/lib/http";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
@@ -63,15 +64,26 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
   }
 
-  const [updated] = await db
-    .update(users)
-    .set(updates)
-    .where(eq(users.id, authed.userId))
-    .returning();
+  try {
+    const [updated] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, authed.userId))
+      .returning();
 
-  return NextResponse.json({
-    id: updated.id,
-    username: updated.username,
-    displayName: updated.displayName,
-  });
+    return NextResponse.json({
+      id: updated.id,
+      username: updated.username,
+      displayName: updated.displayName,
+    });
+  } catch (err) {
+    // The collision check above has a TOCTOU window: two concurrent PATCHes
+    // picking the same free username can both pass it, then race the UPDATE
+    // itself — catch that at the DB's unique constraint instead of 500ing.
+    if (isUniqueViolation(err)) {
+      return NextResponse.json({ error: "Username already taken" }, { status: 409 });
+    }
+    console.error("social/me PATCH db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

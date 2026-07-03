@@ -3,12 +3,8 @@ import { and, eq, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { friendships, users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
-
-/** Postgres unique-violation, possibly wrapped by the driver under `cause`. */
-function isUniqueViolation(err: unknown): boolean {
-  const code = (err as { code?: string })?.code ?? (err as { cause?: { code?: string } })?.cause?.code;
-  return code === "23505";
-}
+import { rateLimitOrNull } from "@/lib/rate-limit";
+import { isUniqueViolation } from "@/lib/http";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
@@ -74,6 +70,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
+
+  const limited = await rateLimitOrNull(`friend-req:${authed.userId}`, "Too many friend requests — try again later");
+  if (limited) return limited;
 
   let body: { username?: string };
   try {

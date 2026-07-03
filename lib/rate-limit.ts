@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { rateLimits } from "@/lib/db/schema";
@@ -37,6 +38,16 @@ export function positiveIntEnv(name: string, fallback: number): number {
 /** Default generation budget per client, per window (overridable via env). */
 export const AI_GEN_LIMIT = positiveIntEnv("AI_GEN_RATE_LIMIT", 20);
 export const AI_GEN_WINDOW_SECONDS = positiveIntEnv("AI_GEN_RATE_WINDOW", 60);
+
+/**
+ * Default budget for cheap-but-abusable authenticated mutations (friend
+ * requests, notes, saved canvases, activity pings, challenge invites) — these
+ * have no per-generation cost like the AI path, but an authenticated user
+ * with no volume cap can still spam rows or degrade the DB. Generous enough
+ * that no real usage pattern hits it.
+ */
+export const MUTATION_LIMIT = positiveIntEnv("MUTATION_RATE_LIMIT", 60);
+export const MUTATION_WINDOW_SECONDS = positiveIntEnv("MUTATION_RATE_WINDOW", 600);
 
 /** Probability that a given `consume` call also prunes expired buckets. */
 const SWEEP_PROBABILITY = 0.01;
@@ -117,4 +128,21 @@ export async function consume(
     console.error("Rate limiter error (failing open):", err);
     return true;
   }
+}
+
+/**
+ * `consume` + "return a 429" was repeated near-identically across every
+ * mutation route (notes, friends, workspace, activity, challenges). Centralizes
+ * the limit/window pairing and the 429 envelope so future changes (Retry-After,
+ * per-route metrics) are a one-file edit. Returns `null` when the request is
+ * allowed, or the `NextResponse` the caller should return immediately.
+ */
+export async function rateLimitOrNull(
+  key: string,
+  message: string,
+  limit: number = MUTATION_LIMIT,
+  windowSeconds: number = MUTATION_WINDOW_SECONDS
+): Promise<NextResponse | null> {
+  const allowed = await consume(key, limit, windowSeconds);
+  return allowed ? null : NextResponse.json({ error: message }, { status: 429 });
 }

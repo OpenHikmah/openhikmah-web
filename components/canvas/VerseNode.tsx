@@ -40,20 +40,37 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
     setPendingExpand({ nodeId: id, ref: verse.ref, kind });
   };
 
+  const toggleSelected = () => {
+    if (selected) {
+      setSidebarContent(null);
+      setSelectedNode(null);
+    } else {
+      setSidebarContent({ type: "node", verse: verse as Verse });
+      setSelectedNode(id);
+    }
+  };
+
   return (
     <div
-      onClick={() => {
-        if (selected) {
-          setSidebarContent(null);
-          setSelectedNode(null);
-        } else {
-          setSidebarContent({ type: "node", verse: verse as Verse });
-          setSelectedNode(id);
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      onClick={toggleSelected}
+      onKeyDown={(e) => {
+        // Guard against bubbled keydowns from nested buttons (play/bookmark/
+        // expand) — those only stopPropagation on click/mousedown, so without
+        // this check, activating one of them via keyboard would also toggle
+        // node selection.
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          toggleSelected();
         }
       }}
       className={cn(
         "relative w-72 rounded-lg border transition-colors duration-150 cursor-pointer select-none node-entrance",
         "bg-surface-raised border-border",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal focus-visible:ring-offset-2 focus-visible:ring-offset-bg",
         selected && "node-selected",
         isExpanding && "node-expanding",
         !selected && !isExpanding && "hover:border-text-muted"

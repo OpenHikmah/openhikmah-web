@@ -18,12 +18,16 @@ function makeDbChain(resolveWith: unknown = []) {
   return chain;
 }
 
-const { mockSelect, mockInsert } = vi.hoisted(() => ({
+const { mockSelect, mockInsert, mockRateLimitOrNull } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
   mockInsert: vi.fn(() => makeDbChain([])),
+  mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
 }));
 
 vi.mock("@/lib/db", () => ({ db: { select: mockSelect, insert: mockInsert } }));
+vi.mock("@/lib/rate-limit", () => ({
+  rateLimitOrNull: mockRateLimitOrNull,
+}));
 
 import { GET, POST } from "@/app/api/notes/route";
 import { requireUser } from "@/lib/social-auth";
@@ -86,11 +90,19 @@ describe("POST /api/notes", () => {
   beforeEach(() => {
     mockInsert.mockReset();
     mockInsert.mockReturnValue(makeDbChain([{ id: 1, verseRef: "2:255", note: "hi" }]));
+    mockRateLimitOrNull.mockReset();
+    mockRateLimitOrNull.mockResolvedValue(null);
   });
 
   it("401 when unauthenticated", async () => {
     unauthed();
     expect((await POST(req("POST", { ref: "2:255", note: "x" }))).status).toBe(401);
+  });
+
+  it("429 when the per-user notes rate limit is exceeded", async () => {
+    authed();
+    mockRateLimitOrNull.mockResolvedValue(NextResponse.json({ error: "Too many" }, { status: 429 }));
+    expect((await POST(req("POST", { ref: "2:255", note: "x" }))).status).toBe(429);
   });
 
   it("400 for malformed JSON body", async () => {
