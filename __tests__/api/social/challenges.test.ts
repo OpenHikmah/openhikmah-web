@@ -321,8 +321,10 @@ describe("GET /api/social/challenges", () => {
         { id: 1, username: "alice" },
         { id: 2, username: "bob" },
       ]));
-    // No further score queries expected — cached scores are reused in enrichment
-    mockUpdate.mockReturnValue(makeDbChain([]));
+    // No further score queries expected — cached scores are reused in enrichment.
+    // The guarded update must return the row (simulating no concurrent writer)
+    // for resolveEndedChallenges to populate its resolved-scores cache.
+    mockUpdate.mockReturnValue(makeDbChain([{ id: expired.id }]));
     const res = await GET(makeGetReq());
     expect(res.status).toBe(200);
     expect(mockUpdate).toHaveBeenCalled();

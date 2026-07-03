@@ -69,7 +69,8 @@ describe("resolveEndedChallenges", () => {
     mockSelect.mockReset();
     mockUpdate.mockReset();
     mockSelect.mockReturnValue(makeDbChain([{ score: 0 }]));
-    mockUpdate.mockReturnValue(makeDbChain([]));
+    // Default: the guarded update matches (simulates no concurrent writer).
+    mockUpdate.mockReturnValue(makeDbChain([{ id: 0 }]));
   });
 
   it("finalizes an ended active challenge, sets winner, and mutates the row", async () => {
@@ -98,12 +99,24 @@ describe("resolveEndedChallenges", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(resolved.size).toBe(0);
   });
+
+  it("does not mutate the row or count it when a concurrent writer already changed its status (lost race)", async () => {
+    // The guarded UPDATE (WHERE id AND status='active') matches nothing
+    // because another writer (admin "end", or a second resolver call) already
+    // transitioned this row first.
+    mockUpdate.mockReturnValue(makeDbChain([]));
+    const rows = [makeChallenge({ id: 13 })];
+    const resolved = await resolveEndedChallenges(rows, new Date());
+    expect(rows[0].status).toBe("active"); // left untouched, not clobbered
+    expect(resolved.size).toBe(0);
+  });
 });
 
 describe("resolveExpiredPending", () => {
   beforeEach(() => {
     mockUpdate.mockReset();
-    mockUpdate.mockReturnValue(makeDbChain([]));
+    // Default: the guarded update matches (simulates no concurrent writer).
+    mockUpdate.mockReturnValue(makeDbChain([{ id: 0 }]));
   });
 
   it("declines a pending invite past its endsAt", async () => {
@@ -126,6 +139,17 @@ describe("resolveExpiredPending", () => {
     const rows = [makeChallenge({ id: 12, status: "active", endsAt: new Date(Date.now() - 1000) })];
     const count = await resolveExpiredPending(rows, new Date());
     expect(mockUpdate).not.toHaveBeenCalled();
+    expect(count).toBe(0);
+  });
+
+  it("does not mutate the row or count it when the pair already accepted/declined/cancelled it (lost race)", async () => {
+    // The guarded UPDATE (WHERE id AND status='pending') matches nothing
+    // because the pair actioned this invite via the (already-guarded) PATCH
+    // route in the window between the caller's SELECT and this UPDATE.
+    mockUpdate.mockReturnValue(makeDbChain([]));
+    const rows = [makeChallenge({ id: 14, status: "pending", endsAt: new Date(Date.now() - 1000) })];
+    const count = await resolveExpiredPending(rows, new Date());
+    expect(rows[0].status).toBe("pending"); // left untouched, not clobbered
     expect(count).toBe(0);
   });
 });

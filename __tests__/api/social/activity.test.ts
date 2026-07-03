@@ -30,17 +30,32 @@ function makeDbChain(resolveWith: unknown = undefined) {
 }
 
 // Use vi.hoisted so mock fns are defined before vi.mock factories run
-const { mockInsert, mockUpdate, mockConsume } = vi.hoisted(() => ({
-  mockInsert: vi.fn(() => makeDbChain()),
-  mockUpdate: vi.fn(() => makeDbChain()),
-  mockConsume: vi.fn(async () => true),
-}));
+const { mockInsert, mockUpdate, mockTxSelect, mockTransaction, mockConsume } = vi.hoisted(() => {
+  const insert = vi.fn(() => makeDbChain());
+  const update = vi.fn(() => makeDbChain());
+  const txSelect = vi.fn(() => makeDbChain([]));
+  // The route does insert + streak read/compute/write inside a
+  // db.transaction(async (tx) => ...) — the tx object exposes the same
+  // insert/update/select surface, reusing the same mocks so existing test
+  // expectations (mockInsert/mockUpdate called, etc.) still hold.
+  const transaction = vi.fn(async (cb: (tx: unknown) => unknown) =>
+    cb({ insert, update, select: txSelect })
+  );
+  return {
+    mockInsert: insert,
+    mockUpdate: update,
+    mockTxSelect: txSelect,
+    mockTransaction: transaction,
+    mockConsume: vi.fn(async () => true),
+  };
+});
 
 vi.mock("@/lib/db", () => ({
   db: {
     insert: mockInsert,
     update: mockUpdate,
     select: vi.fn(() => makeDbChain([])),
+    transaction: mockTransaction,
   },
 }));
 vi.mock("@/lib/rate-limit", () => ({
@@ -86,6 +101,10 @@ function makeUser(overrides: Partial<User> = {}): User {
 
 function authedAs(user: User) {
   vi.mocked(requireUser).mockResolvedValue({ userId: user.id, user });
+  // The route re-reads the user row inside the transaction (row lock) instead
+  // of trusting the cached `authed.user` snapshot — keep the two in sync for
+  // tests that don't care about the staleness race itself.
+  mockTxSelect.mockReturnValue(makeDbChain([user]));
 }
 
 function makeReq(body: object, token = "valid-token") {
@@ -113,6 +132,8 @@ describe("POST /api/social/activity", () => {
     vi.mocked(requireUser).mockReset();
     mockInsert.mockReturnValue(makeDbChain());
     mockUpdate.mockReturnValue(makeDbChain());
+    mockTxSelect.mockReturnValue(makeDbChain([]));
+    mockTransaction.mockClear();
     mockConsume.mockReset();
     mockConsume.mockResolvedValue(true);
   });
@@ -209,6 +230,26 @@ describe("POST /api/social/activity", () => {
       const res = await POST(makeReq({ type }));
       expect(res.status).toBe(200);
     }
+  });
+
+  it("computes the streak from the freshly re-read (locked) user row, not the cached snapshot", async () => {
+    // authed.user (from requireUser, possibly a stale cache) says streak=3,
+    // but a concurrent request already bumped it to 9 in the DB — the fix
+    // must use the fresh row, not the stale cached one.
+    authedAs(makeUser({ currentStreak: 3, longestStreak: 3, lastActivityDate: yesterdayStr() }));
+    mockTxSelect.mockReturnValue(
+      makeDbChain([makeUser({ currentStreak: 9, longestStreak: 9, lastActivityDate: yesterdayStr() })])
+    );
+    const res = await POST(makeReq({ type: "verse_added" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.streak).toBe(10);
+  });
+
+  it("runs the insert and streak update inside a single transaction", async () => {
+    authedAs(makeUser({ currentStreak: 1, lastActivityDate: yesterdayStr() }));
+    await POST(makeReq({ type: "verse_added" }));
+    expect(mockTransaction).toHaveBeenCalledOnce();
   });
 });
 

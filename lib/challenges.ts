@@ -77,13 +77,20 @@ export async function resolveEndedChallenges(
         scoreChallenge(c.challengedId, c),
       ]);
       const winnerId = pickWinner(c, challengerScore, challengedScore);
-      await db
+      // Scope the write to the state just checked — a concurrent admin "end"
+      // (or a second caller racing this same self-heal) may have already
+      // transitioned this row; only count/mutate on an actual match instead
+      // of unconditionally overwriting whatever it raced against.
+      const [updated] = await db
         .update(challenges)
         .set({ status: "completed", winnerId })
-        .where(eq(challenges.id, c.id));
-      c.status = "completed";
-      c.winnerId = winnerId;
-      resolved.set(c.id, { challengerScore, challengedScore });
+        .where(and(eq(challenges.id, c.id), eq(challenges.status, "active")))
+        .returning();
+      if (updated) {
+        c.status = "completed";
+        c.winnerId = winnerId;
+        resolved.set(c.id, { challengerScore, challengedScore });
+      }
     }
   }
   return resolved;
@@ -106,9 +113,19 @@ export async function resolveExpiredPending(
   let resolvedCount = 0;
   for (const c of rows) {
     if (c.status === "pending" && c.endsAt < now) {
-      await db.update(challenges).set({ status: "declined" }).where(eq(challenges.id, c.id));
-      c.status = "declined";
-      resolvedCount++;
+      // Scope the write the same way as resolveEndedChallenges above — if the
+      // pair accepted/declined/cancelled this invite via the (already-guarded)
+      // PATCH route in the window between our SELECT and this UPDATE, only a
+      // still-pending row should be clobbered back to "declined".
+      const [updated] = await db
+        .update(challenges)
+        .set({ status: "declined" })
+        .where(and(eq(challenges.id, c.id), eq(challenges.status, "pending")))
+        .returning();
+      if (updated) {
+        c.status = "declined";
+        resolvedCount++;
+      }
     }
   }
   return resolvedCount;
