@@ -56,3 +56,6 @@ hosting.md
 
 # Claude Code managed skills (tooling-synced duplicate; tracked under .agents/skills)
 /.claude/skills/
+
+# Ad hoc local screenshots/reference images (not app assets)
+/pics/
