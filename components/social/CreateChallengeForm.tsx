@@ -36,12 +36,21 @@ function isDuration(d: string | null | undefined): d is Duration {
   return d === "24h" || d === "48h" || d === "7d";
 }
 
-export function CreateChallengeForm({ friends, loadingFriends, onCreated, prefill, onClearPrefill, compact }: Props) {
+export function CreateChallengeForm({
+  friends,
+  loadingFriends,
+  onCreated,
+  prefill,
+  onClearPrefill,
+  compact,
+}: Props) {
   const accessToken = useAuthStore((s) => s.accessToken);
   // Initial values seed from a picked suggestion (the form is remounted via `key`
   // when a new suggestion is chosen, so these initializers re-run).
   const [selectedFriend, setSelectedFriend] = useState("");
-  const [duration, setDuration] = useState<Duration>(isDuration(prefill?.duration) ? prefill!.duration : "24h");
+  const [duration, setDuration] = useState<Duration>(
+    isDuration(prefill?.duration) ? prefill!.duration : "24h"
+  );
   const [verseRef, setVerseRef] = useState(prefill?.verseRef ?? "");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -105,7 +114,12 @@ export function CreateChallengeForm({ friends, loadingFriends, onCreated, prefil
         From: <span className="text-teal">{prefill.title}</span>
       </span>
       {onClearPrefill && (
-        <button type="button" onClick={onClearPrefill} aria-label="Clear suggestion" className="shrink-0 text-text-muted hover:text-text-primary">
+        <button
+          type="button"
+          onClick={onClearPrefill}
+          aria-label="Clear suggestion"
+          className="shrink-0 text-text-muted hover:text-text-primary"
+        >
           <X className="h-3.5 w-3.5" />
         </button>
       )}
@@ -132,21 +146,31 @@ export function CreateChallengeForm({ friends, loadingFriends, onCreated, prefil
   if (compact) {
     return (
       <section className="space-y-2">
-        <h3 className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">New challenge</h3>
+        <h3 className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">
+          New challenge
+        </h3>
         <div className="space-y-2 rounded-lg border border-border bg-surface p-3">
           {prefillChip}
           <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2">
             <select
               value={selectedFriend}
-              onChange={(e) => { setSelectedFriend(e.target.value); setError(null); setSuccess(null); }}
+              onChange={(e) => {
+                setSelectedFriend(e.target.value);
+                setError(null);
+                setSuccess(null);
+              }}
               className={cn(
                 "min-w-[180px] flex-1 cursor-pointer appearance-none rounded-md border border-border bg-surface px-3 py-2 text-sm transition-colors focus:border-gold-muted",
                 selectedFriend ? "text-text-primary" : "text-text-muted"
               )}
             >
-              <option value="" disabled className="bg-surface">Choose a friend…</option>
+              <option value="" disabled className="bg-surface">
+                Choose a friend…
+              </option>
               {friends.map((f) => (
-                <option key={f.id} value={f.username} className="bg-surface">@{f.username}</option>
+                <option key={f.id} value={f.username} className="bg-surface">
+                  @{f.username}
+                </option>
               ))}
             </select>
             <div className="flex gap-1.5">{durationButtons}</div>
@@ -160,8 +184,18 @@ export function CreateChallengeForm({ friends, loadingFriends, onCreated, prefil
               spellCheck={false}
               className="w-auto min-w-[150px] flex-1"
             />
-            <Button type="submit" variant="primary" size="sm" disabled={sending || !selectedFriend} className="shrink-0 gap-1.5">
-              {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Swords className="h-3.5 w-3.5" />}
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              disabled={sending || !selectedFriend}
+              className="shrink-0 gap-1.5"
+            >
+              {sending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Swords className="h-3.5 w-3.5" />
+              )}
               Send
             </Button>
           </form>
@@ -174,26 +208,41 @@ export function CreateChallengeForm({ friends, loadingFriends, onCreated, prefil
 
   return (
     <section className="space-y-2">
-      <h3 className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">New challenge</h3>
-      <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-surface p-4">
+      <h3 className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">
+        New challenge
+      </h3>
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-3 rounded-lg border border-border bg-surface p-4"
+      >
         {prefillChip}
 
         <select
           value={selectedFriend}
-          onChange={(e) => { setSelectedFriend(e.target.value); setError(null); setSuccess(null); }}
+          onChange={(e) => {
+            setSelectedFriend(e.target.value);
+            setError(null);
+            setSuccess(null);
+          }}
           className={cn(
             "w-full cursor-pointer appearance-none rounded-md border border-border bg-surface px-3 py-2 text-sm transition-colors focus:border-gold-muted",
             selectedFriend ? "text-text-primary" : "text-text-muted"
           )}
         >
-          <option value="" disabled className="bg-surface">Choose a friend…</option>
+          <option value="" disabled className="bg-surface">
+            Choose a friend…
+          </option>
           {friends.map((f) => (
-            <option key={f.id} value={f.username} className="bg-surface">@{f.username}</option>
+            <option key={f.id} value={f.username} className="bg-surface">
+              @{f.username}
+            </option>
           ))}
         </select>
 
         <div className="space-y-1.5">
-          <span className="block text-[11px] uppercase tracking-wide text-text-muted">Duration</span>
+          <span className="block text-[11px] uppercase tracking-wide text-text-muted">
+            Duration
+          </span>
           <div className="flex gap-2">{durationButtons}</div>
         </div>
 
@@ -208,8 +257,18 @@ export function CreateChallengeForm({ friends, loadingFriends, onCreated, prefil
         />
 
         <div className="flex items-center justify-between gap-3 pt-0.5">
-          <Button type="submit" variant="primary" size="sm" disabled={sending || !selectedFriend} className="gap-1.5">
-            {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Swords className="h-3.5 w-3.5" />}
+          <Button
+            type="submit"
+            variant="primary"
+            size="sm"
+            disabled={sending || !selectedFriend}
+            className="gap-1.5"
+          >
+            {sending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Swords className="h-3.5 w-3.5" />
+            )}
             Send challenge
           </Button>
           {error && <p className="text-xs text-error">{error}</p>}

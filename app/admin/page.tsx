@@ -60,7 +60,11 @@ export default function OverviewPage() {
                 <InfoHint text="Optional cache/accelerator. 'up' = connected, 'down' = configured but unreachable, 'disabled' = not configured (the app falls back to in-process/Postgres)." />
               </div>
               <div className="mt-2">
-                <Pill tone={data.redis === "up" ? "active" : data.redis === "down" ? "flagged" : "neutral"}>
+                <Pill
+                  tone={
+                    data.redis === "up" ? "active" : data.redis === "down" ? "flagged" : "neutral"
+                  }
+                >
                   {data.redis}
                 </Pill>
               </div>
@@ -70,11 +74,12 @@ export default function OverviewPage() {
 
         {/* Tiny deploy-config reminder (always visible). */}
         <p className="mt-8 border-t border-border-subtle pt-3 text-[11px] leading-relaxed text-text-muted">
-          Deploy note: set <code className="text-text-secondary">ADMIN_QF_IDS</code> in the env
-          (see <code className="text-text-secondary">.env.example</code>) — without it the panel is
-          locked to everyone. Optional <code className="text-text-secondary">AI_USD_PER_1K_TOKENS</code>{" "}
-          enables the cost estimate. Migration <code className="text-text-secondary">0010</code> runs
-          via <code className="text-text-secondary">scripts/migrate.mjs</code> on deploy.
+          Deploy note: set <code className="text-text-secondary">ADMIN_QF_IDS</code> in the env (see{" "}
+          <code className="text-text-secondary">.env.example</code>) — without it the panel is
+          locked to everyone. Optional{" "}
+          <code className="text-text-secondary">AI_USD_PER_1K_TOKENS</code> enables the cost
+          estimate. Migration <code className="text-text-secondary">0010</code> runs via{" "}
+          <code className="text-text-secondary">scripts/migrate.mjs</code> on deploy.
         </p>
       </div>
     </>

@@ -53,10 +53,13 @@ function useCountdown(endsAt: string): string {
     const schedule = () => {
       const diff = new Date(endsAt).getTime() - Date.now();
       if (diff <= 0) return;
-      timer = setTimeout(() => {
-        setLabel(formatCountdown(endsAt));
-        schedule();
-      }, diff < 3_600_000 ? 1000 : 30_000);
+      timer = setTimeout(
+        () => {
+          setLabel(formatCountdown(endsAt));
+          schedule();
+        },
+        diff < 3_600_000 ? 1000 : 30_000
+      );
     };
     schedule();
     return () => clearTimeout(timer);
@@ -141,14 +144,23 @@ function ChallengeCard({
     }
   };
 
-  const statusBadge = isActive ? <StatusBadge label="Active" tone="teal" />
-    : incoming ? <StatusBadge label="Incoming" tone="gold" />
-    : sent ? <StatusBadge label="Pending" tone="muted" />
-    : iWon ? <StatusBadge label="Won" tone="gold" />
-    : isDraw ? <StatusBadge label="Draw" tone="draw" />
-    : theyWon ? <StatusBadge label="Lost" tone="muted" />
-    : c.status === "cancelled" ? <StatusBadge label="Cancelled" tone="muted" />
-    : <StatusBadge label="Declined" tone="muted" />;
+  const statusBadge = isActive ? (
+    <StatusBadge label="Active" tone="teal" />
+  ) : incoming ? (
+    <StatusBadge label="Incoming" tone="gold" />
+  ) : sent ? (
+    <StatusBadge label="Pending" tone="muted" />
+  ) : iWon ? (
+    <StatusBadge label="Won" tone="gold" />
+  ) : isDraw ? (
+    <StatusBadge label="Draw" tone="draw" />
+  ) : theyWon ? (
+    <StatusBadge label="Lost" tone="muted" />
+  ) : c.status === "cancelled" ? (
+    <StatusBadge label="Cancelled" tone="muted" />
+  ) : (
+    <StatusBadge label="Declined" tone="muted" />
+  );
 
   return (
     <Card className={cn("space-y-3 p-4", borderClass, faded && "opacity-60")}>
@@ -166,7 +178,9 @@ function ChallengeCard({
       {(isActive || isCompleted) && (
         <div className="flex items-stretch rounded-md border border-border-subtle bg-bg/40">
           <ScoreCell label="You" score={myScore} lead={myScore >= theirScore} />
-          <div className="flex items-center px-2 font-mono text-[10px] uppercase text-text-muted">vs</div>
+          <div className="flex items-center px-2 font-mono text-[10px] uppercase text-text-muted">
+            vs
+          </div>
           <ScoreCell label={`@${opponentName}`} score={theirScore} lead={theirScore > myScore} />
         </div>
       )}
@@ -192,11 +206,27 @@ function ChallengeCard({
       {/* Actions */}
       {incoming && (
         <div className="flex gap-2">
-          <Button variant="primary" size="sm" className="flex-1 gap-1.5" onClick={() => handleAction("accept")} disabled={acting !== null}>
-            {acting === "accept" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Swords className="h-3.5 w-3.5" />}
+          <Button
+            variant="primary"
+            size="sm"
+            className="flex-1 gap-1.5"
+            onClick={() => handleAction("accept")}
+            disabled={acting !== null}
+          >
+            {acting === "accept" ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Swords className="h-3.5 w-3.5" />
+            )}
             Accept
           </Button>
-          <Button variant="secondary" size="sm" className="flex-1" onClick={() => handleAction("decline")} disabled={acting !== null}>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="flex-1"
+            onClick={() => handleAction("decline")}
+            disabled={acting !== null}
+          >
             {acting === "decline" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
             Decline
           </Button>
@@ -205,7 +235,13 @@ function ChallengeCard({
       {sent && (
         <div className="flex items-center justify-between gap-2 border-t border-border-subtle pt-2.5">
           <span className="text-xs text-text-muted">Waiting for @{opponentName}…</span>
-          <Button variant="ghost" size="sm" className="gap-1 text-text-muted hover:text-error" onClick={() => handleAction("cancel")} disabled={acting !== null}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1 text-text-muted hover:text-error"
+            onClick={() => handleAction("cancel")}
+            disabled={acting !== null}
+          >
             {acting === "cancel" && <Loader2 className="h-3 w-3 animate-spin" />}
             Cancel
           </Button>
@@ -219,7 +255,12 @@ function ScoreCell({ label, score, lead }: { label: string; score: number; lead:
   return (
     <div className="flex-1 px-3 py-2 text-center">
       <div className="truncate text-[10px] uppercase tracking-wide text-text-muted">{label}</div>
-      <div className={cn("text-2xl font-semibold tabular-nums", lead ? "text-text-primary" : "text-text-muted")}>
+      <div
+        className={cn(
+          "text-2xl font-semibold tabular-nums",
+          lead ? "text-text-primary" : "text-text-muted"
+        )}
+      >
         {score}
       </div>
     </div>
@@ -242,7 +283,9 @@ function Group({
     <section className="space-y-2">
       <h3 className="flex items-center gap-2 px-0.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">
         {label}
-        <span className="rounded-full bg-white/5 px-1.5 text-[10px] text-text-secondary">{items.length}</span>
+        <span className="rounded-full bg-white/5 px-1.5 text-[10px] text-text-secondary">
+          {items.length}
+        </span>
       </h3>
       {items.map((c) => (
         <ChallengeCard key={c.id} c={c} myId={myId} onUpdate={onUpdate} />
@@ -260,7 +303,9 @@ export function ChallengeList({ challenges, onUpdate, layout = "list" }: Props) 
       <div className="rounded-lg border border-dashed border-border p-8 text-center">
         <Swords className="mx-auto mb-2 h-6 w-6 text-text-muted" />
         <p className="text-sm text-text-secondary">No challenges yet.</p>
-        <p className="mt-0.5 text-xs text-text-muted">Pick a suggestion or challenge a friend above.</p>
+        <p className="mt-0.5 text-xs text-text-muted">
+          Pick a suggestion or challenge a friend above.
+        </p>
       </div>
     );
   }

@@ -86,7 +86,10 @@ export function ExpandMenu({ onSelect, onClose }: ExpandMenuProps) {
           >
             <span
               className="w-5 h-5 rounded flex items-center justify-center text-xs font-mono shrink-0"
-              style={{ background: `color-mix(in srgb, ${opt.color} 12%, transparent)`, color: opt.color }}
+              style={{
+                background: `color-mix(in srgb, ${opt.color} 12%, transparent)`,
+                color: opt.color,
+              }}
             >
               {opt.icon}
             </span>

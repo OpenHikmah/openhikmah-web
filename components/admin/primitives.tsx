@@ -79,13 +79,7 @@ export function Table({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Th({
-  children,
-  className,
-}: {
-  children?: React.ReactNode;
-  className?: string;
-}) {
+export function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
   return (
     <th
       className={cn(
@@ -98,13 +92,7 @@ export function Th({
   );
 }
 
-export function Td({
-  children,
-  className,
-}: {
-  children?: React.ReactNode;
-  className?: string;
-}) {
+export function Td({ children, className }: { children?: React.ReactNode; className?: string }) {
   return (
     <td className={cn("border-b border-border-subtle px-3.5 py-2.5 align-middle", className)}>
       {children}
@@ -133,9 +121,12 @@ export function ConfirmButton({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clear any pending disarm timer on unmount.
-  useEffect(() => () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    []
+  );
 
   return (
     <Button

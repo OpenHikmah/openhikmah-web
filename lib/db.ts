@@ -10,10 +10,13 @@ if (!connectionString && process.env.NODE_ENV === "production") {
   throw new Error("DATABASE_URL environment variable is not set");
 }
 
-const client = postgres(connectionString ?? "postgresql://openh:placeholder@localhost:5432/open_hikmah", {
-  max: 10,
-  idle_timeout: 30,
-  connect_timeout: 10,
-});
+const client = postgres(
+  connectionString ?? "postgresql://openh:placeholder@localhost:5432/open_hikmah",
+  {
+    max: 10,
+    idle_timeout: 30,
+    connect_timeout: 10,
+  }
+);
 
 export const db = drizzle(client, { schema });

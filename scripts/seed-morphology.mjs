@@ -81,7 +81,9 @@ try {
 
   const [{ count }] = await sql`SELECT count(*)::int AS count FROM word_morphology`;
   const [{ verses }] = await sql`SELECT count(distinct ref)::int AS verses FROM word_morphology`;
-  console.log(`Done. word_morphology holds ${count} words across ${verses} verses (this run: ${total}).`);
+  console.log(
+    `Done. word_morphology holds ${count} words across ${verses} verses (this run: ${total}).`
+  );
 } finally {
   await sql.end();
 }

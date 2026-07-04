@@ -34,7 +34,9 @@ export function NameVerses({ slug, accent }: Props) {
       .catch(() => {
         if (!cancelled) setError(true);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [slug]);
 
   if (error) {
@@ -90,10 +92,7 @@ export function NameVerses({ slug, accent }: Props) {
         >
           {/* Verse number + ref */}
           <div className="flex items-center justify-between mb-3">
-            <span
-              className="text-xs font-mono"
-              style={{ color: "var(--color-text-muted)" }}
-            >
+            <span className="text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>
               {i + 1}
             </span>
             <div className="flex items-center gap-2">

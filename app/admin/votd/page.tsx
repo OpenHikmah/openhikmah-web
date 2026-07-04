@@ -67,10 +67,20 @@ export default function VotdPage() {
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-medium text-text-primary">{monthLabel(month)}</h2>
             <div className="flex items-center gap-1">
-              <Button size="sm" variant="ghost" onClick={() => goToMonth(addMonth(month, -1))} aria-label="Previous month">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => goToMonth(addMonth(month, -1))}
+                aria-label="Previous month"
+              >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => goToMonth(addMonth(month, 1))} aria-label="Next month">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => goToMonth(addMonth(month, 1))}
+                aria-label="Next month"
+              >
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -80,7 +90,10 @@ export default function VotdPage() {
 
           <div className="grid grid-cols-7 gap-1.5">
             {WEEKDAYS.map((d, i) => (
-              <div key={i} className="pb-1 text-center font-mono text-[10px] uppercase text-text-muted">
+              <div
+                key={i}
+                className="pb-1 text-center font-mono text-[10px] uppercase text-text-muted"
+              >
                 {d}
               </div>
             ))}
@@ -106,7 +119,9 @@ export default function VotdPage() {
                   )}
                 >
                   <span className="tabular-nums">{day}</span>
-                  {entry && <span className="mt-0.5 font-mono text-[9px] text-teal">{entry.verseRef}</span>}
+                  {entry && (
+                    <span className="mt-0.5 font-mono text-[9px] text-teal">{entry.verseRef}</span>
+                  )}
                 </button>
               );
             })}
@@ -202,14 +217,20 @@ function DayEditor({
   return (
     <div className="space-y-4 rounded-lg border border-border bg-surface p-5">
       <div>
-        <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">Editing</div>
+        <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
+          Editing
+        </div>
         <div className="text-sm text-text-primary">{date}</div>
       </div>
 
       <label className="block space-y-1.5">
         <span className="text-xs text-text-secondary">Verse reference</span>
         <div className="flex gap-2">
-          <Input value={verseRef} onChange={(e) => setVerseRef(e.target.value)} placeholder="e.g. 2:255" />
+          <Input
+            value={verseRef}
+            onChange={(e) => setVerseRef(e.target.value)}
+            placeholder="e.g. 2:255"
+          />
           <Button size="md" variant="secondary" onClick={doPreview}>
             Preview
           </Button>

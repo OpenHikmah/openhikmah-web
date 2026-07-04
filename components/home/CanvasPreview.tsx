@@ -83,7 +83,8 @@ const NODES: PreviewNode[] = [
     ref: "27:30",
     surahName: "An-Naml",
     arabic: "إِنَّهُ مِن سُلَيْمَانَ وَإِنَّهُ بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
-    translation: "It is from Solomon, and it says, “In the name of God, the Lord of Mercy, the Giver of Mercy,",
+    translation:
+      "It is from Solomon, and it says, “In the name of God, the Lord of Mercy, the Giver of Mercy,",
     ...N_NAML,
   },
   {
@@ -137,7 +138,9 @@ function PreviewCard({ node, delay }: { node: PreviewNode; delay: string }) {
     >
       <div className="space-y-2 p-2.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="min-w-0 truncate font-mono text-[10px] text-text-muted">{node.surahName}</span>
+          <span className="min-w-0 truncate font-mono text-[10px] text-text-muted">
+            {node.surahName}
+          </span>
           <div className="flex shrink-0 items-center gap-1">
             <span
               className={cn(
@@ -157,11 +160,15 @@ function PreviewCard({ node, delay }: { node: PreviewNode; delay: string }) {
         </div>
 
         {/* The ayah is shown in full — never clamped, never covered. */}
-        <p className="text-right font-arabic text-[14px] leading-loose text-text-primary">{node.arabic}</p>
+        <p className="text-right font-arabic text-[14px] leading-loose text-text-primary">
+          {node.arabic}
+        </p>
 
         {/* The translation (not scripture) is clamped so a long verse can't grow
             the card tall enough to overlap a neighbour and cover its ayah. */}
-        <p className="line-clamp-2 text-[10.5px] leading-relaxed text-text-secondary">{node.translation}</p>
+        <p className="line-clamp-2 text-[10.5px] leading-relaxed text-text-secondary">
+          {node.translation}
+        </p>
       </div>
 
       <div className="flex justify-center pb-2">
@@ -231,7 +238,12 @@ export function CanvasPreview({ className }: { className?: string }) {
         <span
           key={i}
           className="absolute hidden max-w-[112px] -translate-x-1/2 -translate-y-1/2 whitespace-normal rounded-full border bg-surface-raised px-2.5 py-1 text-center font-mono text-[10px] leading-tight shadow-sm sm:inline-block"
-          style={{ left: `${e.lx}%`, top: `${e.ly}%`, color: EDGE_COLOR[e.kind], borderColor: EDGE_COLOR[e.kind] }}
+          style={{
+            left: `${e.lx}%`,
+            top: `${e.ly}%`,
+            color: EDGE_COLOR[e.kind],
+            borderColor: EDGE_COLOR[e.kind],
+          }}
         >
           {e.label}
         </span>

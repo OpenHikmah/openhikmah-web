@@ -29,7 +29,12 @@ async function keywordSearch(q: string): Promise<SearchResult[]> {
           allowedTags: [],
           allowedAttributes: {},
         }).slice(0, 140);
-        return { ref: r.verse_key as VerseRef, surahName, surahNameArabic, snippet } satisfies SearchResult;
+        return {
+          ref: r.verse_key as VerseRef,
+          surahName,
+          surahNameArabic,
+          snippet,
+        } satisfies SearchResult;
       });
   } catch (err) {
     console.error("Keyword search error:", err);

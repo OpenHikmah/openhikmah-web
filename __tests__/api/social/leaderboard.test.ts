@@ -11,17 +11,22 @@ vi.mock("@/lib/social-auth", () => ({
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
-    function () { return chain; },
+    function () {
+      return chain;
+    },
     {
       get(_t, prop) {
-        if (prop === "then") return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-        if (prop === "catch") return (rej: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).catch(rej);
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        if (prop === "catch")
+          return (rej: (e: unknown) => unknown) => Promise.resolve(resolveWith).catch(rej);
         if (prop === Symbol.toStringTag) return "MockChain";
         return () => chain;
       },
-      apply() { return chain; },
+      apply() {
+        return chain;
+      },
     }
   );
   return chain;
@@ -92,9 +97,11 @@ describe("GET /api/social/leaderboard", () => {
     authedAs(makeUser({ id: 1 }));
     mockSelect
       .mockReturnValueOnce(makeDbChain([]))
-      .mockReturnValueOnce(makeDbChain([
-        { id: 1, username: "testuser", displayName: null, currentStreak: 5, longestStreak: 10 },
-      ]));
+      .mockReturnValueOnce(
+        makeDbChain([
+          { id: 1, username: "testuser", displayName: null, currentStreak: 5, longestStreak: 10 },
+        ])
+      );
     const res = await GET(makeReq());
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -105,9 +112,11 @@ describe("GET /api/social/leaderboard", () => {
     authedAs(makeUser({ id: 1, username: "testuser" }));
     mockSelect
       .mockReturnValueOnce(makeDbChain([]))
-      .mockReturnValueOnce(makeDbChain([
-        { id: 1, username: "testuser", displayName: null, currentStreak: 5, longestStreak: 10 },
-      ]));
+      .mockReturnValueOnce(
+        makeDbChain([
+          { id: 1, username: "testuser", displayName: null, currentStreak: 5, longestStreak: 10 },
+        ])
+      );
     const res = await GET(makeReq());
     const body = await res.json();
     const selfRow = body.find((r: { id: number }) => r.id === 1);
@@ -117,11 +126,18 @@ describe("GET /api/social/leaderboard", () => {
 
   it("includes rank, streak, and longestStreak fields", async () => {
     authedAs(makeUser({ id: 1 }));
-    mockSelect
-      .mockReturnValueOnce(makeDbChain([]))
-      .mockReturnValueOnce(makeDbChain([
-        { id: 1, username: "testuser", displayName: null, currentStreak: 7, longestStreak: 12, lastActivityDate: today },
-      ]));
+    mockSelect.mockReturnValueOnce(makeDbChain([])).mockReturnValueOnce(
+      makeDbChain([
+        {
+          id: 1,
+          username: "testuser",
+          displayName: null,
+          currentStreak: 7,
+          longestStreak: 12,
+          lastActivityDate: today,
+        },
+      ])
+    );
     const res = await GET(makeReq());
     const body = await res.json();
     expect(body[0]).toMatchObject({
@@ -136,12 +152,28 @@ describe("GET /api/social/leaderboard", () => {
     authedAs(makeUser({ id: 1 }));
     mockSelect
       .mockReturnValueOnce(makeDbChain([{ requesterId: 1, addresseeId: 2 }]))
-      .mockReturnValueOnce(makeDbChain([
-        // Friend's stored streak is 30 but last activity was long ago → effective 0.
-        { id: 2, username: "stale", displayName: null, currentStreak: 30, longestStreak: 30, lastActivityDate: "2000-01-01" },
-        // Self is active today with a smaller streak → should rank first.
-        { id: 1, username: "testuser", displayName: null, currentStreak: 3, longestStreak: 3, lastActivityDate: today },
-      ]));
+      .mockReturnValueOnce(
+        makeDbChain([
+          // Friend's stored streak is 30 but last activity was long ago → effective 0.
+          {
+            id: 2,
+            username: "stale",
+            displayName: null,
+            currentStreak: 30,
+            longestStreak: 30,
+            lastActivityDate: "2000-01-01",
+          },
+          // Self is active today with a smaller streak → should rank first.
+          {
+            id: 1,
+            username: "testuser",
+            displayName: null,
+            currentStreak: 3,
+            longestStreak: 3,
+            lastActivityDate: today,
+          },
+        ])
+      );
     const res = await GET(makeReq());
     const body = await res.json();
     expect(body[0]).toMatchObject({ id: 1, rank: 1, streak: 3 });
@@ -152,10 +184,26 @@ describe("GET /api/social/leaderboard", () => {
     authedAs(makeUser({ id: 1 }));
     mockSelect
       .mockReturnValueOnce(makeDbChain([{ requesterId: 1, addresseeId: 2 }]))
-      .mockReturnValueOnce(makeDbChain([
-        { id: 1, username: "zoe", displayName: null, currentStreak: 5, longestStreak: 5, lastActivityDate: today },
-        { id: 2, username: "amy", displayName: null, currentStreak: 5, longestStreak: 9, lastActivityDate: today },
-      ]));
+      .mockReturnValueOnce(
+        makeDbChain([
+          {
+            id: 1,
+            username: "zoe",
+            displayName: null,
+            currentStreak: 5,
+            longestStreak: 5,
+            lastActivityDate: today,
+          },
+          {
+            id: 2,
+            username: "amy",
+            displayName: null,
+            currentStreak: 5,
+            longestStreak: 9,
+            lastActivityDate: today,
+          },
+        ])
+      );
     const res = await GET(makeReq());
     const body = await res.json();
     // Equal current streak → higher longest streak wins.
@@ -167,10 +215,12 @@ describe("GET /api/social/leaderboard", () => {
     authedAs(makeUser({ id: 1 }));
     mockSelect
       .mockReturnValueOnce(makeDbChain([{ requesterId: 1, addresseeId: 2 }]))
-      .mockReturnValueOnce(makeDbChain([
-        { id: 2, username: "friend99", displayName: null, currentStreak: 10, longestStreak: 15 },
-        { id: 1, username: "testuser", displayName: null, currentStreak: 5, longestStreak: 10 },
-      ]));
+      .mockReturnValueOnce(
+        makeDbChain([
+          { id: 2, username: "friend99", displayName: null, currentStreak: 10, longestStreak: 15 },
+          { id: 1, username: "testuser", displayName: null, currentStreak: 5, longestStreak: 10 },
+        ])
+      );
     const res = await GET(makeReq());
     const body = await res.json();
     expect(body).toHaveLength(2);

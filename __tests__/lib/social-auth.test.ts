@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  generateKeyPairSync,
-  sign as cryptoSign,
-  type KeyObject,
-} from "node:crypto";
+import { generateKeyPairSync, sign as cryptoSign, type KeyObject } from "node:crypto";
 import { NextRequest } from "next/server";
 
 // ─── DB mock — requireUser does db.select().from().where().limit() ────────────
@@ -42,7 +38,10 @@ function b64url(obj: unknown): string {
   return Buffer.from(JSON.stringify(obj)).toString("base64url");
 }
 
-function makeJwt(payload: object, opts: { kid?: string; alg?: string; sign?: boolean } = {}): string {
+function makeJwt(
+  payload: object,
+  opts: { kid?: string; alg?: string; sign?: boolean } = {}
+): string {
   const header = { alg: opts.alg ?? "RS256", typ: "JWT", kid: opts.kid ?? KID };
   const body = `${b64url(header)}.${b64url(payload)}`;
   if (opts.sign === false) return `${body}.not-a-real-signature`;
@@ -106,7 +105,8 @@ describe("requireUser — JWT signature verification", () => {
 
   it("falls back to the userinfo path for an opaque (non-JWT) token", async () => {
     mockFetch.mockImplementation(async (url: string) => {
-      if (String(url).includes("userinfo")) return { ok: true, json: async () => ({ sub: "qf-sub-123" }) };
+      if (String(url).includes("userinfo"))
+        return { ok: true, json: async () => ({ sub: "qf-sub-123" }) };
       return { ok: false, status: 404 };
     });
     mockLimit.mockResolvedValue([user]);
@@ -210,7 +210,8 @@ describe("resolveQfId", () => {
   it("does not trust an unsigned JWT, falling back to userinfo", async () => {
     mockFetch.mockImplementation(async (url: string) => {
       if (String(url).includes("jwks")) return { ok: true, json: async () => jwks() };
-      if (String(url).includes("userinfo")) return { ok: true, json: async () => ({ sub: "from-userinfo" }) };
+      if (String(url).includes("userinfo"))
+        return { ok: true, json: async () => ({ sub: "from-userinfo" }) };
       return { ok: false, status: 404 };
     });
     expect(await resolveQfId(makeJwt({ sub: "forged" }, { sign: false }))).toBe("from-userinfo");

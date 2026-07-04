@@ -2,7 +2,17 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Flame, Award, Heart, FolderOpen, Trophy, LogOut, LogIn, ChevronDown, Loader2 } from "lucide-react";
+import {
+  Flame,
+  Award,
+  Heart,
+  FolderOpen,
+  Trophy,
+  LogOut,
+  LogIn,
+  ChevronDown,
+  Loader2,
+} from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { buildAuthUrl } from "@/lib/pkce";
@@ -80,11 +90,7 @@ export function AccountMenu() {
         disabled={signingIn}
         className="inline-flex items-center gap-1.5 rounded-md border border-gold px-3.5 py-1.5 text-[13px] font-semibold text-gold transition-colors duration-[120ms] hover:bg-gold/10 disabled:opacity-60"
       >
-        {signingIn ? (
-          <Loader2 className="size-3.5 animate-spin" />
-        ) : (
-          <LogIn className="size-3.5" />
-        )}
+        {signingIn ? <Loader2 className="size-3.5 animate-spin" /> : <LogIn className="size-3.5" />}
         {signingIn ? "Signing in…" : "Sign in"}
       </button>
     );
@@ -121,7 +127,10 @@ export function AccountMenu() {
           </span>
         )}
         <ChevronDown
-          className={cn("hidden size-3.5 text-text-muted transition-transform sm:block", open && "rotate-180")}
+          className={cn(
+            "hidden size-3.5 text-text-muted transition-transform sm:block",
+            open && "rotate-180"
+          )}
         />
       </button>
 
@@ -156,14 +165,20 @@ export function AccountMenu() {
                 <Flame className="size-[15px] text-gold" fill="currentColor" />
                 <span className="text-[18px] font-bold leading-none text-gold">{streak}</span>
               </div>
-              <p className="mt-1 text-[10.5px] uppercase tracking-[0.04em] text-text-muted">Day streak</p>
+              <p className="mt-1 text-[10.5px] uppercase tracking-[0.04em] text-text-muted">
+                Day streak
+              </p>
             </div>
             <div className="flex-1 rounded-[10px] border border-border bg-surface px-2.5 py-2">
               <div className="flex items-center gap-1.5">
                 <Award className="size-[15px] text-gold" />
-                <span className="text-[18px] font-bold leading-none text-text-primary">{longestStreak}</span>
+                <span className="text-[18px] font-bold leading-none text-text-primary">
+                  {longestStreak}
+                </span>
               </div>
-              <p className="mt-1 text-[10.5px] uppercase tracking-[0.04em] text-text-muted">Longest</p>
+              <p className="mt-1 text-[10.5px] uppercase tracking-[0.04em] text-text-muted">
+                Longest
+              </p>
             </div>
           </div>
 

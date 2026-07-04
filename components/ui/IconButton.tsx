@@ -31,8 +31,7 @@ const iconButton = cva(
 );
 
 export interface IconButtonProps
-  extends ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof iconButton> {}
+  extends ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof iconButton> {}
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
   ({ className, tone, size, ...props }, ref) => (

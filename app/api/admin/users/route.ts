@@ -55,7 +55,11 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Expected { id, disabled }" }, { status: 400 });
   }
 
-  const [target] = await db.select().from(users).where(eq(users.id, id as number)).limit(1);
+  const [target] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, id as number))
+    .limit(1);
   if (!target) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }

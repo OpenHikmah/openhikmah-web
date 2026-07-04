@@ -8,6 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:ci": "vitest run",
@@ -16,7 +18,11 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{ts,tsx}": "eslint --max-warnings=0"
+    "*.{js,jsx,mjs,cjs,json,css,md,mdx,yml,yaml}": "prettier --write",
+    "*.{ts,tsx}": [
+      "prettier --write",
+      "eslint --max-warnings=0"
+    ]
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
@@ -62,6 +68,7 @@
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "lint-staged": "^17.0.7",
+    "prettier": "^3.9.4",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vite-tsconfig-paths": "^6.1.1",

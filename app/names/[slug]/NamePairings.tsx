@@ -57,8 +57,14 @@ export function NamePairings({ slug, accent }: Props) {
         <div className="space-y-3">
           {[1, 2].map((i) => (
             <div key={i} className="animate-pulse space-y-1.5">
-              <div className="h-3 rounded w-24" style={{ background: "var(--color-surface-raised)" }} />
-              <div className="h-3 rounded w-full" style={{ background: "var(--color-surface-raised)" }} />
+              <div
+                className="h-3 rounded w-24"
+                style={{ background: "var(--color-surface-raised)" }}
+              />
+              <div
+                className="h-3 rounded w-full"
+                style={{ background: "var(--color-surface-raised)" }}
+              />
             </div>
           ))}
         </div>
@@ -84,7 +90,10 @@ export function NamePairings({ slug, accent }: Props) {
                   {p.arabic}
                 </span>
               </div>
-              <p className="text-xs leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
+              <p
+                className="text-xs leading-relaxed"
+                style={{ color: "var(--color-text-secondary)" }}
+              >
                 {p.explanation}
               </p>
             </div>

@@ -1,13 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type {
-  Verse,
-  CanvasEdge,
-  SidebarContent,
-  PendingExpand,
-  EdgeKind,
-} from "@/types/quran";
+import type { Verse, CanvasEdge, SidebarContent, PendingExpand, EdgeKind } from "@/types/quran";
 import type { Node, Edge, NodeChange, EdgeChange } from "@xyflow/react";
 import { applyNodeChanges, applyEdgeChanges } from "@xyflow/react";
 import { findFreeSlot } from "@/lib/canvas-layout";
@@ -130,11 +124,9 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
 
-  onNodesChange: (changes) =>
-    set((s) => ({ nodes: applyNodeChanges(changes, s.nodes) })),
+  onNodesChange: (changes) => set((s) => ({ nodes: applyNodeChanges(changes, s.nodes) })),
 
-  onEdgesChange: (changes) =>
-    set((s) => ({ edges: applyEdgeChanges(changes, s.edges) })),
+  onEdgesChange: (changes) => set((s) => ({ edges: applyEdgeChanges(changes, s.edges) })),
 
   setViewport: (viewport) => set({ viewport }),
 
@@ -144,12 +136,13 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     // slot around the origin instead of a random point, so it never lands on an
     // existing node. Callers with a meaningful anchor (search, expansion) pass one.
     const pos =
-      position ?? findFreeSlot(get().nodes.map((n) => n.position), { x: 0, y: 0 });
+      position ??
+      findFreeSlot(
+        get().nodes.map((n) => n.position),
+        { x: 0, y: 0 }
+      );
     set((s) => ({
-      nodes: [
-        ...s.nodes,
-        { id, type: "verse", position: pos, data: { ...verse } } as Node,
-      ],
+      nodes: [...s.nodes, { id, type: "verse", position: pos, data: { ...verse } } as Node],
     }));
     return id;
   },
@@ -185,11 +178,9 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setPendingExpand: (action) => set({ pendingExpand: action }),
   setPendingAutoExpand: (nodeId) => set({ pendingAutoExpand: nodeId }),
 
-  hasNode: (ref) =>
-    get().nodes.some((n) => (n.data as unknown as Verse)?.ref === ref),
+  hasNode: (ref) => get().nodes.some((n) => (n.data as unknown as Verse)?.ref === ref),
 
-  getNodeByRef: (ref) =>
-    get().nodes.find((n) => (n.data as unknown as Verse)?.ref === ref),
+  getNodeByRef: (ref) => get().nodes.find((n) => (n.data as unknown as Verse)?.ref === ref),
 
   getNodeById: (id) => get().nodes.find((n) => n.id === id),
 
@@ -239,10 +230,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const idRemap = new Map<string, string>();
 
     for (const node of incoming) {
-      const allPositions = [
-        ...existing.map((n) => n.position),
-        ...placed.map((n) => n.position),
-      ];
+      const allPositions = [...existing.map((n) => n.position), ...placed.map((n) => n.position)];
       const pos = findFreeSlot(allPositions, node.position);
       let id = node.id;
       if (existingIds.has(id)) {

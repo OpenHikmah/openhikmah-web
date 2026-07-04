@@ -80,7 +80,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
         if (data?.streak !== undefined) bumpStreak(data.streak, data.longestStreak);
       })
       .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, userId]);
 
   // Poll for incoming friend requests every 60 s while signed in
@@ -101,7 +101,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
     load();
     const interval = setInterval(load, 60_000);
     return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, userId]);
 
   const handlePlayGraph = () => {
@@ -112,7 +112,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
     const verses: AudioVerse[] = [...nodes]
       .map((n) => n.data as unknown as Verse)
       .filter((v) => v?.surah && v?.ayah)
-      .sort((a, b) => a.surah !== b.surah ? a.surah - b.surah : a.ayah - b.ayah)
+      .sort((a, b) => (a.surah !== b.surah ? a.surah - b.surah : a.ayah - b.ayah))
       .map((v) => ({ ref: v.ref, surah: v.surah, ayah: v.ayah, surahName: v.surahName }));
     if (verses.length > 0) playGraph(verses);
   };

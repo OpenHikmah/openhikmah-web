@@ -4,15 +4,22 @@ import { NextRequest } from "next/server";
 // ── DB mock (chainable + thenable proxy) ────────────────────────────────────────
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chain: any = new Proxy(function () { return chain; }, {
-    get(_t, prop) {
-      if (prop === "then")
-        return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-      return () => chain;
+  const chain: any = new Proxy(
+    function () {
+      return chain;
     },
-    apply() { return chain; },
-  });
+    {
+      get(_t, prop) {
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        return () => chain;
+      },
+      apply() {
+        return chain;
+      },
+    }
+  );
   return chain;
 }
 
@@ -29,24 +36,25 @@ vi.mock("@/lib/quran-corpus", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/quran-corpus")>();
   return {
     ...actual,
-    getVerses: vi.fn(async (refs: string[]) =>
-      new Map(
-        refs.map((r) => {
-          const [s, a] = r.split(":");
-          return [
-            r,
-            {
-              surah: parseInt(s, 10),
-              ayah: parseInt(a, 10),
-              ref: r,
-              arabicText: "نص عربي",
-              translation: "English translation",
-              surahName: "Surah",
-              surahNameArabic: "سورة",
-            },
-          ];
-        })
-      )
+    getVerses: vi.fn(
+      async (refs: string[]) =>
+        new Map(
+          refs.map((r) => {
+            const [s, a] = r.split(":");
+            return [
+              r,
+              {
+                surah: parseInt(s, 10),
+                ayah: parseInt(a, 10),
+                ref: r,
+                arabicText: "نص عربي",
+                translation: "English translation",
+                surahName: "Surah",
+                surahNameArabic: "سورة",
+              },
+            ];
+          })
+        )
     ),
   };
 });
@@ -121,20 +129,35 @@ describe("POST /api/connections", () => {
   });
 
   it("returns 400 for invalid kind", async () => {
-    const req = makeRequest({ fromRef: "1:1", kind: "bogus", arabicText: "text", translation: "trans" });
+    const req = makeRequest({
+      fromRef: "1:1",
+      kind: "bogus",
+      arabicText: "text",
+      translation: "trans",
+    });
     const res = await POST(req);
     expect(res.status).toBe(400);
   });
 
   it("returns 400 for an out-of-bounds fromRef without calling the AI path", async () => {
-    const req = makeRequest({ fromRef: "999:1", kind: "thematic", arabicText: "t", translation: "t" });
+    const req = makeRequest({
+      fromRef: "999:1",
+      kind: "thematic",
+      arabicText: "t",
+      translation: "t",
+    });
     const res = await POST(req);
     expect(res.status).toBe(400);
     expect(mockConsume).not.toHaveBeenCalled();
   });
 
   it("returns 400 for a malformed fromRef", async () => {
-    const req = makeRequest({ fromRef: "garbage", kind: "thematic", arabicText: "t", translation: "t" });
+    const req = makeRequest({
+      fromRef: "garbage",
+      kind: "thematic",
+      arabicText: "t",
+      translation: "t",
+    });
     const res = await POST(req);
     expect(res.status).toBe(400);
   });
@@ -240,7 +263,14 @@ describe("POST /api/connections", () => {
     mockSelect
       .mockReturnValueOnce(
         makeDbChain([
-          { id: 1, fromRef: "2:255", toRef: "3:18", kind: "thematic", reason: "stored", status: "active" },
+          {
+            id: 1,
+            fromRef: "2:255",
+            toRef: "3:18",
+            kind: "thematic",
+            reason: "stored",
+            status: "active",
+          },
         ])
       )
       .mockReturnValue(makeDbChain([]));

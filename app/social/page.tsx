@@ -60,7 +60,12 @@ export default function SocialPage() {
 
   // Picking a suggestion seeds the create form (remounted via key) and clears on send.
   const pickSuggestion = (s: Suggestion) => {
-    setPrefill({ duration: s.suggestedDuration, verseRef: s.verseRef, suggestionId: s.id, title: s.title });
+    setPrefill({
+      duration: s.suggestedDuration,
+      verseRef: s.verseRef,
+      suggestionId: s.id,
+      title: s.title,
+    });
     setPrefillKey((k) => k + 1);
   };
   const clearPrefill = () => {
@@ -173,7 +178,10 @@ export default function SocialPage() {
       .finally(() => setLoadingFriends(false));
 
     setLoadingLeaderboard(true);
-    fetch("/api/social/leaderboard", { headers: { Authorization: `Bearer ${accessToken}` }, signal })
+    fetch("/api/social/leaderboard", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal,
+    })
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => setLeaderboard(data))
       .catch(() => {})
@@ -189,7 +197,10 @@ export default function SocialPage() {
       .catch(() => {})
       .finally(() => setLoadingChallenges(false));
 
-    fetch("/api/social/challenge-suggestions", { headers: { Authorization: `Bearer ${accessToken}` }, signal })
+    fetch("/api/social/challenge-suggestions", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal,
+    })
       .then((r) => (r.ok ? r.json() : { suggestions: [] }))
       .then((data: { suggestions: Suggestion[] }) => setSuggestions(data.suggestions))
       .catch(() => {});
@@ -219,9 +230,7 @@ export default function SocialPage() {
             {/* Page heading */}
             <div className="mb-6 flex items-center justify-between">
               <h1 className="text-lg font-medium text-text-primary">Social</h1>
-              {username && (
-                <span className="font-mono text-xs text-text-muted">@{username}</span>
-              )}
+              {username && <span className="font-mono text-xs text-text-muted">@{username}</span>}
             </div>
 
             {/* Tab bar */}
@@ -299,7 +308,9 @@ export default function SocialPage() {
                 <ChallengeSuggestions suggestions={suggestions} onPick={pickSuggestion} />
                 <CreateChallengeForm
                   key={prefillKey}
-                  friends={(friends as { status: string; friend: { id: number; username: string } | null }[])
+                  friends={(
+                    friends as { status: string; friend: { id: number; username: string } | null }[]
+                  )
                     .filter((f) => f.status === "accepted" && f.friend)
                     .map((f) => f.friend!)}
                   loadingFriends={loadingFriends}
@@ -317,7 +328,11 @@ export default function SocialPage() {
                       <Loader2 className="h-4 w-4 animate-spin text-teal" />
                     </div>
                   ) : (
-                    <ChallengeList challenges={challengesList} onUpdate={fetchChallenges} layout="grid" />
+                    <ChallengeList
+                      challenges={challengesList}
+                      onUpdate={fetchChallenges}
+                      layout="grid"
+                    />
                   )}
                 </section>
               </div>

@@ -10,15 +10,22 @@ vi.mock("@/lib/verse-resolver", () => ({ resolveVerse: vi.fn() }));
 // configured value. Covers select/from/where and insert/values/onConflictDoUpdate.
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chain: any = new Proxy(function () { return chain; }, {
-    get(_t, prop) {
-      if (prop === "then")
-        return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-      return () => chain;
+  const chain: any = new Proxy(
+    function () {
+      return chain;
     },
-    apply() { return chain; },
-  });
+    {
+      get(_t, prop) {
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        return () => chain;
+      },
+      apply() {
+        return chain;
+      },
+    }
+  );
   return chain;
 }
 
@@ -36,7 +43,9 @@ import { resolveVerse } from "@/lib/verse-resolver";
 const admin = { userId: 1, user: { qfId: "qf-admin" } as User };
 
 function get(month?: string) {
-  const url = month ? `http://localhost/api/admin/votd?month=${month}` : "http://localhost/api/admin/votd";
+  const url = month
+    ? `http://localhost/api/admin/votd?month=${month}`
+    : "http://localhost/api/admin/votd";
   return new NextRequest(url, { headers: { Authorization: "Bearer t" } });
 }
 function put(body: unknown) {
@@ -47,7 +56,9 @@ function put(body: unknown) {
   });
 }
 function del(date?: string) {
-  const url = date ? `http://localhost/api/admin/votd?date=${date}` : "http://localhost/api/admin/votd";
+  const url = date
+    ? `http://localhost/api/admin/votd?date=${date}`
+    : "http://localhost/api/admin/votd";
   return new NextRequest(url, { method: "DELETE", headers: { Authorization: "Bearer t" } });
 }
 

@@ -1,12 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import {
-  BaseEdge,
-  EdgeLabelRenderer,
-  getBezierPath,
-  type EdgeProps,
-} from "@xyflow/react";
+import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from "@xyflow/react";
 import type { EdgeKind } from "@/types/quran";
 
 const EDGE_COLORS: Record<EdgeKind, string> = {
@@ -40,11 +35,7 @@ function HikmahEdgeInner({
 
   return (
     <>
-      <BaseEdge
-        id={id}
-        path={edgePath}
-        style={{ stroke: color, strokeWidth: 1.5, opacity: 0.7 }}
-      />
+      <BaseEdge id={id} path={edgePath} style={{ stroke: color, strokeWidth: 1.5, opacity: 0.7 }} />
       {label && (
         <EdgeLabelRenderer>
           <div

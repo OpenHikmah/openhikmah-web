@@ -12,10 +12,7 @@ import { scoreChallenge, pickWinner } from "@/lib/challenges";
  *  - `override-winner`— force the winner (`winnerId`: challenger id, challenged id,
  *                       or null for a draw) and mark it completed.
  */
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
 
@@ -31,7 +28,11 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  const [challenge] = await db.select().from(challenges).where(eq(challenges.id, challengeId)).limit(1);
+  const [challenge] = await db
+    .select()
+    .from(challenges)
+    .where(eq(challenges.id, challengeId))
+    .limit(1);
   if (!challenge) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -56,7 +57,10 @@ export async function PATCH(
       .where(and(eq(challenges.id, challengeId), eq(challenges.status, "active")))
       .returning();
     if (!updated) {
-      return NextResponse.json({ error: "Challenge was already ended by a concurrent request" }, { status: 409 });
+      return NextResponse.json(
+        { error: "Challenge was already ended by a concurrent request" },
+        { status: 409 }
+      );
     }
     await logAdminAction({
       adminQfId: auth.user.qfId,
@@ -70,8 +74,15 @@ export async function PATCH(
 
   if (body.action === "override-winner") {
     const winnerId = body.winnerId ?? null;
-    if (winnerId !== null && winnerId !== challenge.challengerId && winnerId !== challenge.challengedId) {
-      return NextResponse.json({ error: "winnerId must be a participant or null" }, { status: 400 });
+    if (
+      winnerId !== null &&
+      winnerId !== challenge.challengerId &&
+      winnerId !== challenge.challengedId
+    ) {
+      return NextResponse.json(
+        { error: "winnerId must be a participant or null" },
+        { status: 400 }
+      );
     }
     const [updated] = await db
       .update(challenges)
@@ -95,10 +106,7 @@ export async function PATCH(
 }
 
 /** Void (hard-delete) a challenge — for spam/abuse. */
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
 

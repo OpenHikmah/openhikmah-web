@@ -60,8 +60,9 @@ async function getPairings(slug: string): Promise<Pairing[]> {
 
       return raw.slice(0, 3).map((p) => {
         const match = DIVINE_NAMES.find(
-          (n) => n.transliteration.toLowerCase() === p.transliteration.toLowerCase() ||
-                 n.arabic === p.arabic
+          (n) =>
+            n.transliteration.toLowerCase() === p.transliteration.toLowerCase() ||
+            n.arabic === p.arabic
         );
         return {
           name: match?.slug ?? "",
@@ -75,10 +76,7 @@ async function getPairings(slug: string): Promise<Pairing[]> {
   );
 }
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
-) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const name = getNameBySlug(slug);
   if (!name) {

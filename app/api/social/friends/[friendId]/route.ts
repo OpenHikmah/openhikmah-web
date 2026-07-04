@@ -35,9 +35,7 @@ export async function PATCH(
   const [row] = await db
     .select()
     .from(friendships)
-    .where(
-      and(eq(friendships.id, friendshipId), eq(friendships.addresseeId, userId))
-    )
+    .where(and(eq(friendships.id, friendshipId), eq(friendships.addresseeId, userId)))
     .limit(1);
 
   if (!row) {
@@ -79,10 +77,7 @@ export async function DELETE(
     .where(
       and(
         eq(friendships.id, friendshipId),
-        or(
-          eq(friendships.requesterId, userId),
-          eq(friendships.addresseeId, userId)
-        )
+        or(eq(friendships.requesterId, userId), eq(friendships.addresseeId, userId))
       )
     )
     .limit(1);

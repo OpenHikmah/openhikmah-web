@@ -81,7 +81,7 @@ export function CallbackClient({ code, state, error }: Props) {
         console.error("Auth callback failed:", msg);
         setFailReason(msg);
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (failReason) {
@@ -92,10 +92,7 @@ export function CallbackClient({ code, state, error }: Props) {
           <p className="rounded border border-border bg-surface px-3 py-2 font-mono text-xs text-text-muted">
             {failReason}
           </p>
-          <button
-            onClick={() => router.replace("/")}
-            className="text-xs text-teal underline"
-          >
+          <button onClick={() => router.replace("/")} className="text-xs text-teal underline">
             Back to home
           </button>
         </div>

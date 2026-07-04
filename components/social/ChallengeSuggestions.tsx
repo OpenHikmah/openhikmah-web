@@ -44,7 +44,9 @@ export function ChallengeSuggestions({ suggestions, onPick }: Props) {
               )}
             </div>
             {s.description && (
-              <p className="line-clamp-2 text-xs leading-relaxed text-text-muted">{s.description}</p>
+              <p className="line-clamp-2 text-xs leading-relaxed text-text-muted">
+                {s.description}
+              </p>
             )}
             <div className="mt-auto flex items-center justify-between pt-1">
               {s.verseRef ? (

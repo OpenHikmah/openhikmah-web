@@ -134,10 +134,18 @@ function FriendAction({
   onClick: () => void;
 }) {
   if (status === "accepted") {
-    return <span className="flex items-center gap-1 text-xs text-text-muted"><Check className="h-3.5 w-3.5" /> Friends</span>;
+    return (
+      <span className="flex items-center gap-1 text-xs text-text-muted">
+        <Check className="h-3.5 w-3.5" /> Friends
+      </span>
+    );
   }
   if (status === "pending_sent") {
-    return <span className="flex items-center gap-1 text-xs text-text-muted"><Clock className="h-3.5 w-3.5" /> Sent</span>;
+    return (
+      <span className="flex items-center gap-1 text-xs text-text-muted">
+        <Clock className="h-3.5 w-3.5" /> Sent
+      </span>
+    );
   }
   // "none" or "pending_received" — both move the relationship forward (a request
   // back to someone who already invited you is auto-accepted server-side).
@@ -147,7 +155,11 @@ function FriendAction({
       disabled={sending}
       className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded border border-teal px-2.5 py-1 text-xs font-medium text-teal transition-colors hover:bg-teal/10 disabled:cursor-not-allowed disabled:opacity-50"
     >
-      {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}
+      {sending ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <UserPlus className="h-3.5 w-3.5" />
+      )}
       {status === "pending_received" ? "Accept" : "Add"}
     </button>
   );

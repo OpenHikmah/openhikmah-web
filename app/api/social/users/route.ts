@@ -36,7 +36,9 @@ export async function GET(req: NextRequest) {
     .from(friendships)
     .where(or(eq(friendships.requesterId, userId), eq(friendships.addresseeId, userId)));
 
-  const statusFor = (otherId: number): "none" | "accepted" | "pending_sent" | "pending_received" => {
+  const statusFor = (
+    otherId: number
+  ): "none" | "accepted" | "pending_sent" | "pending_received" => {
     const rel = rels.find(
       (r) =>
         (r.requesterId === userId && r.addresseeId === otherId) ||

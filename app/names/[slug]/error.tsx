@@ -10,5 +10,7 @@ export default function NameError({
   error: Error & { digest?: string };
   unstable_retry: () => void;
 }) {
-  return <RouteError error={error} retry={unstable_retry} homeHref="/names" homeLabel="All names" />;
+  return (
+    <RouteError error={error} retry={unstable_retry} homeHref="/names" homeLabel="All names" />
+  );
 }

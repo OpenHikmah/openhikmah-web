@@ -26,21 +26,27 @@ function SessionRestorer() {
       // leave the app holding an invalid session (and falsely report success).
       const res = await fetch("/api/social/me", { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) {
-        try { sessionStorage.removeItem("__devToken"); } catch {}
+        try {
+          sessionStorage.removeItem("__devToken");
+        } catch {}
         console.warn("dev login failed — token rejected");
         return;
       }
       setTokens(token);
       // Persist for this tab so a reload/hard-nav keeps the dev session (the real
       // access token is in-memory only by design).
-      try { sessionStorage.setItem("__devToken", token); } catch {}
+      try {
+        sessionStorage.setItem("__devToken", token);
+      } catch {}
       const p = (await res.json()) as { id?: number; username?: string };
       if (p.id && p.username) setProfile({ userId: p.id, username: p.username });
       console.warn("dev login set — navigate to /admin");
     };
     // Auto-restore a saved dev session on reload.
     let saved: string | null = null;
-    try { saved = sessionStorage.getItem("__devToken"); } catch {}
+    try {
+      saved = sessionStorage.getItem("__devToken");
+    } catch {}
     if (saved) void w.__devLogin(saved);
   }, [setTokens, setProfile]);
 
@@ -63,7 +69,7 @@ function SessionRestorer() {
     fetch("/api/auth/refresh", { method: "POST", keepalive: true })
       .then(async (res) => {
         if (!res.ok) return;
-        const { accessToken } = await res.json() as { accessToken?: string };
+        const { accessToken } = (await res.json()) as { accessToken?: string };
         if (!accessToken) return;
         setTokens(accessToken);
 
@@ -73,7 +79,12 @@ function SessionRestorer() {
         ]);
 
         if (profileRes.ok) {
-          const p = await profileRes.json() as { id?: number; username?: string; currentStreak?: number; longestStreak?: number };
+          const p = (await profileRes.json()) as {
+            id?: number;
+            username?: string;
+            currentStreak?: number;
+            longestStreak?: number;
+          };
           if (p.id && p.username) {
             setProfile({ userId: p.id, username: p.username });
             if (p.currentStreak !== undefined) bumpStreak(p.currentStreak, p.longestStreak);
@@ -82,7 +93,7 @@ function SessionRestorer() {
       })
       .catch(() => {})
       .finally(() => setSessionLoaded());
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return null;

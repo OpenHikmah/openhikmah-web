@@ -8,16 +8,14 @@ import { cn } from "@/lib/utils";
  */
 export type ChipProps = ButtonHTMLAttributes<HTMLButtonElement>;
 
-export const Chip = forwardRef<HTMLButtonElement, ChipProps>(
-  ({ className, ...props }, ref) => (
-    <button
-      ref={ref}
-      className={cn(
-        "inline-flex items-center rounded-md border border-border bg-surface px-4 py-2 text-sm text-text-primary transition-[color,border-color] duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)] hover:border-gold-muted hover:text-gold",
-        className
-      )}
-      {...props}
-    />
-  )
-);
+export const Chip = forwardRef<HTMLButtonElement, ChipProps>(({ className, ...props }, ref) => (
+  <button
+    ref={ref}
+    className={cn(
+      "inline-flex items-center rounded-md border border-border bg-surface px-4 py-2 text-sm text-text-primary transition-[color,border-color] duration-[120ms] ease-[cubic-bezier(0.2,0,0,1)] hover:border-gold-muted hover:text-gold",
+      className
+    )}
+    {...props}
+  />
+));
 Chip.displayName = "Chip";

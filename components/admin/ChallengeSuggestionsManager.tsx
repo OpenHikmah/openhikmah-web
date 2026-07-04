@@ -113,11 +113,19 @@ export function ChallengeSuggestionsManager() {
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1.5">
             <span className="text-xs text-text-secondary">Title</span>
-            <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. A week of patience" />
+            <Input
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              placeholder="e.g. A week of patience"
+            />
           </label>
           <label className="space-y-1.5">
             <span className="text-xs text-text-secondary">Verse (optional)</span>
-            <Input value={form.verseRef} onChange={(e) => setForm({ ...form, verseRef: e.target.value })} placeholder="e.g. 2:155" />
+            <Input
+              value={form.verseRef}
+              onChange={(e) => setForm({ ...form, verseRef: e.target.value })}
+              placeholder="e.g. 2:155"
+            />
           </label>
         </div>
         <label className="block space-y-1.5">
@@ -202,7 +210,9 @@ export function ChallengeSuggestionsManager() {
                     onClick={() => toggleActive(s)}
                     aria-label={`${s.isActive ? "Deactivate" : "Activate"} suggestion "${s.title}"`}
                   >
-                    <Pill tone={s.isActive ? "active" : "retired"}>{s.isActive ? "on" : "off"}</Pill>
+                    <Pill tone={s.isActive ? "active" : "retired"}>
+                      {s.isActive ? "on" : "off"}
+                    </Pill>
                   </button>
                 </Td>
                 <Td>

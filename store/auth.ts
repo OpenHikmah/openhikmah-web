@@ -43,18 +43,14 @@ export const useAuthStore = create<AuthStore>()(
 
         // Optimistic update
         set({
-          bookmarks: wasBookmarked
-            ? bookmarks.filter((r) => r !== ref)
-            : [...bookmarks, ref],
+          bookmarks: wasBookmarked ? bookmarks.filter((r) => r !== ref) : [...bookmarks, ref],
         });
 
         if (!accessToken) return;
 
         const rollback = () =>
           set((s) => ({
-            bookmarks: wasBookmarked
-              ? [...s.bookmarks, ref]
-              : s.bookmarks.filter((r) => r !== ref),
+            bookmarks: wasBookmarked ? [...s.bookmarks, ref] : s.bookmarks.filter((r) => r !== ref),
           }));
 
         if (wasBookmarked) {
@@ -62,7 +58,9 @@ export const useAuthStore = create<AuthStore>()(
             method: "DELETE",
             headers: { Authorization: `Bearer ${accessToken}` },
           })
-            .then((r) => { if (!r.ok) rollback(); })
+            .then((r) => {
+              if (!r.ok) rollback();
+            })
             .catch(rollback);
         } else {
           fetch("/api/bookmarks", {
@@ -73,7 +71,9 @@ export const useAuthStore = create<AuthStore>()(
             },
             body: JSON.stringify({ ref }),
           })
-            .then((r) => { if (!r.ok) rollback(); })
+            .then((r) => {
+              if (!r.ok) rollback();
+            })
             .catch(rollback);
         }
       },
@@ -86,7 +86,7 @@ export const useAuthStore = create<AuthStore>()(
             headers: { Authorization: `Bearer ${accessToken}` },
           });
           if (!res.ok) return;
-          const { refs } = await res.json() as { refs: string[] };
+          const { refs } = (await res.json()) as { refs: string[] };
           // Merge: DB is authoritative, but sync any local-only bookmarks up to DB
           const local = get().bookmarks;
           const localOnly = local.filter((r) => !refs.includes(r));
@@ -94,7 +94,10 @@ export const useAuthStore = create<AuthStore>()(
           localOnly.forEach((ref) => {
             fetch("/api/bookmarks", {
               method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+              },
               body: JSON.stringify({ ref }),
             }).catch(() => {});
           });

@@ -106,10 +106,9 @@ describe("canvas store", () => {
 
   it("addConnectionEdge does not add duplicate edges", () => {
     const id1 = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
-    const id2 = useCanvasStore.getState().addVerseNode(
-      { ...baseVerse, ref: "1:1" as const, ayah: 1, surah: 1 },
-      { x: 300, y: 0 }
-    );
+    const id2 = useCanvasStore
+      .getState()
+      .addVerseNode({ ...baseVerse, ref: "1:1" as const, ayah: 1, surah: 1 }, { x: 300, y: 0 });
     const edge: CanvasEdge = {
       id: "edge-1",
       source: id1,
@@ -124,10 +123,9 @@ describe("canvas store", () => {
 
   it("addConnectionEdge prevents reversed duplicate", () => {
     const id1 = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
-    const id2 = useCanvasStore.getState().addVerseNode(
-      { ...baseVerse, ref: "1:1" as const, ayah: 1, surah: 1 },
-      { x: 300, y: 0 }
-    );
+    const id2 = useCanvasStore
+      .getState()
+      .addVerseNode({ ...baseVerse, ref: "1:1" as const, ayah: 1, surah: 1 }, { x: 300, y: 0 });
     const edge: CanvasEdge = {
       id: "edge-1",
       source: id1,
@@ -259,7 +257,16 @@ describe("deserializeCanvas", () => {
     const saved = {
       v: 1 as const,
       nodes: [],
-      edges: [{ id: "edge-3", source: "node-1", target: "node-2", kind: "root" as const, label: "root", reason: "shared root" }],
+      edges: [
+        {
+          id: "edge-3",
+          source: "node-1",
+          target: "node-2",
+          kind: "root" as const,
+          label: "root",
+          reason: "shared root",
+        },
+      ],
     };
     const { edges } = deserializeCanvas(saved);
     expect(edges).toHaveLength(1);
@@ -273,7 +280,14 @@ describe("deserializeCanvas", () => {
     store.reset();
     const id1 = store.addVerseNode(baseVerse, { x: 10, y: 20 });
     const id2 = store.addVerseNode(
-      { ...baseVerse, ref: "1:1" as const, surah: 1, ayah: 1, surahName: "Al-Fatihah", surahNameArabic: "الفاتحة" },
+      {
+        ...baseVerse,
+        ref: "1:1" as const,
+        surah: 1,
+        ayah: 1,
+        surahName: "Al-Fatihah",
+        surahNameArabic: "الفاتحة",
+      },
       { x: 300, y: 20 }
     );
     store.addConnectionEdge({

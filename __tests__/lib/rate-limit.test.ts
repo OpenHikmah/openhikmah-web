@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const { mockReturning, mockValues, mockInsert, mockDeleteWhere, mockDelete, mockRedisIncr, mockIncr } = vi.hoisted(() => {
+const {
+  mockReturning,
+  mockValues,
+  mockInsert,
+  mockDeleteWhere,
+  mockDelete,
+  mockRedisIncr,
+  mockIncr,
+} = vi.hoisted(() => {
   const mockReturning = vi.fn();
   const mockOnConflict = vi.fn(() => ({ returning: mockReturning }));
   const mockValues = vi.fn((..._args: unknown[]) => ({ onConflictDoUpdate: mockOnConflict }));
@@ -11,14 +19,28 @@ const { mockReturning, mockValues, mockInsert, mockDeleteWhere, mockDelete, mock
   // Postgres fallback path unchanged.
   const mockRedisIncr = vi.fn().mockResolvedValue(null);
   const mockIncr = vi.fn();
-  return { mockReturning, mockValues, mockInsert, mockDeleteWhere, mockDelete, mockRedisIncr, mockIncr };
+  return {
+    mockReturning,
+    mockValues,
+    mockInsert,
+    mockDeleteWhere,
+    mockDelete,
+    mockRedisIncr,
+    mockIncr,
+  };
 });
 
 vi.mock("@/lib/db", () => ({ db: { insert: mockInsert, delete: mockDelete } }));
 vi.mock("@/lib/redis", () => ({ redisIncrWithTtl: mockRedisIncr }));
 vi.mock("@/lib/metrics", () => ({ incr: mockIncr }));
 
-import { consume, rateLimitOrNull, sweepRateLimits, RateLimitError, positiveIntEnv } from "@/lib/rate-limit";
+import {
+  consume,
+  rateLimitOrNull,
+  sweepRateLimits,
+  RateLimitError,
+  positiveIntEnv,
+} from "@/lib/rate-limit";
 
 describe("rate-limit consume", () => {
   beforeEach(() => {

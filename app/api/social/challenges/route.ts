@@ -3,7 +3,12 @@ import { and, desc, eq, gte, lt, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { challenges, challengeSuggestions, friendships, users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
-import { DURATIONS, scoreChallenge, resolveEndedChallenges, resolveExpiredPending } from "@/lib/challenges";
+import {
+  DURATIONS,
+  scoreChallenge,
+  resolveEndedChallenges,
+  resolveExpiredPending,
+} from "@/lib/challenges";
 import { rateLimitOrNull } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
@@ -23,10 +28,7 @@ export async function GET(req: NextRequest) {
       .from(challenges)
       .where(
         and(
-          or(
-            eq(challenges.challengerId, userId),
-            eq(challenges.challengedId, userId)
-          ),
+          or(eq(challenges.challengerId, userId), eq(challenges.challengedId, userId)),
           eq(challenges.status, "active"),
           lt(challenges.endsAt, now)
         )
@@ -40,10 +42,7 @@ export async function GET(req: NextRequest) {
       .from(challenges)
       .where(
         and(
-          or(
-            eq(challenges.challengerId, userId),
-            eq(challenges.challengedId, userId)
-          ),
+          or(eq(challenges.challengerId, userId), eq(challenges.challengedId, userId)),
           eq(challenges.status, "pending"),
           lt(challenges.endsAt, now)
         )
@@ -55,12 +54,7 @@ export async function GET(req: NextRequest) {
     const rows = await db
       .select()
       .from(challenges)
-      .where(
-        or(
-          eq(challenges.challengerId, userId),
-          eq(challenges.challengedId, userId)
-        )
-      )
+      .where(or(eq(challenges.challengerId, userId), eq(challenges.challengedId, userId)))
       .orderBy(desc(challenges.createdAt))
       .limit(200);
 
@@ -83,8 +77,11 @@ export async function GET(req: NextRequest) {
         const [challengerScore, challengedScore] = cached
           ? [cached.challengerScore, cached.challengedScore]
           : needsScores
-          ? await Promise.all([scoreChallenge(c.challengerId, c), scoreChallenge(c.challengedId, c)])
-          : [0, 0];
+            ? await Promise.all([
+                scoreChallenge(c.challengerId, c),
+                scoreChallenge(c.challengedId, c),
+              ])
+            : [0, 0];
         return {
           ...c,
           challengerUsername: userMap.get(c.challengerId) ?? null,
@@ -108,10 +105,18 @@ export async function POST(req: NextRequest) {
   if (authed instanceof NextResponse) return authed;
   const { userId } = authed;
 
-  const limited = await rateLimitOrNull(`challenge:${userId}`, "Too many challenges created — try again later");
+  const limited = await rateLimitOrNull(
+    `challenge:${userId}`,
+    "Too many challenges created — try again later"
+  );
   if (limited) return limited;
 
-  let body: { challengedUsername?: string; duration?: string; verseRef?: string; suggestionId?: number };
+  let body: {
+    challengedUsername?: string;
+    duration?: string;
+    verseRef?: string;
+    suggestionId?: number;
+  };
   try {
     body = await req.json();
   } catch {
@@ -176,7 +181,10 @@ export async function POST(req: NextRequest) {
           and(eq(challenges.challengerId, userId), eq(challenges.challengedId, target.id)),
           and(eq(challenges.challengerId, target.id), eq(challenges.challengedId, userId))
         ),
-        or(eq(challenges.status, "active"), and(eq(challenges.status, "pending"), gte(challenges.endsAt, now)))
+        or(
+          eq(challenges.status, "active"),
+          and(eq(challenges.status, "pending"), gte(challenges.endsAt, now))
+        )
       )
     )
     .limit(1);
@@ -192,7 +200,12 @@ export async function POST(req: NextRequest) {
     const [s] = await db
       .select({ id: challengeSuggestions.id })
       .from(challengeSuggestions)
-      .where(and(eq(challengeSuggestions.id, suggestionCandidate), eq(challengeSuggestions.isActive, true)))
+      .where(
+        and(
+          eq(challengeSuggestions.id, suggestionCandidate),
+          eq(challengeSuggestions.isActive, true)
+        )
+      )
       .limit(1);
     suggestionId = s?.id ?? null;
   }

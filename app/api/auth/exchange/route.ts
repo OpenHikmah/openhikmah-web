@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Token exchange failed" }, { status: 400 });
     }
 
-    const data = await res.json() as {
+    const data = (await res.json()) as {
       access_token: string;
       refresh_token?: string;
     };
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     if (!refreshToken) {
       console.warn(
         "Auth exchange returned no refresh_token — session will not survive reload. " +
-        "Check the OAuth scope includes 'offline_access' and the client is allowed it."
+          "Check the OAuth scope includes 'offline_access' and the client is allowed it."
       );
     }
 
@@ -86,18 +86,11 @@ export async function POST(req: NextRequest) {
     try {
       const qfId = await resolveQfId(accessToken);
       if (qfId) {
-        const [existing] = await db
-          .select()
-          .from(users)
-          .where(eq(users.qfId, qfId))
-          .limit(1);
+        const [existing] = await db.select().from(users).where(eq(users.qfId, qfId)).limit(1);
 
         if (existing) {
           // Update last seen
-          await db
-            .update(users)
-            .set({ lastActiveAt: new Date() })
-            .where(eq(users.id, existing.id));
+          await db.update(users).set({ lastActiveAt: new Date() }).where(eq(users.id, existing.id));
 
           userId = existing.id;
           username = existing.username;

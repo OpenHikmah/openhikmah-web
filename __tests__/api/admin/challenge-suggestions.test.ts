@@ -7,15 +7,22 @@ vi.mock("@/lib/admin-audit", () => ({ logAdminAction: vi.fn() }));
 
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chain: any = new Proxy(function () { return chain; }, {
-    get(_t, prop) {
-      if (prop === "then")
-        return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-      return () => chain;
+  const chain: any = new Proxy(
+    function () {
+      return chain;
     },
-    apply() { return chain; },
-  });
+    {
+      get(_t, prop) {
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        return () => chain;
+      },
+      apply() {
+        return chain;
+      },
+    }
+  );
   return chain;
 }
 
@@ -33,7 +40,14 @@ import { GET, POST, PUT, DELETE } from "@/app/api/admin/challenge-suggestions/ro
 import { requireAdmin } from "@/lib/admin-auth";
 
 const admin = { userId: 1, user: { qfId: "qf-admin" } as User };
-const row = { id: 3, title: "Patience", verseRef: "2:155", suggestedDuration: "7d", isActive: true, sortOrder: 0 };
+const row = {
+  id: 3,
+  title: "Patience",
+  verseRef: "2:155",
+  suggestedDuration: "7d",
+  isActive: true,
+  sortOrder: 0,
+};
 
 function req(method: string, body?: unknown, qs = "") {
   return new NextRequest(`http://localhost/api/admin/challenge-suggestions${qs}`, {
@@ -53,7 +67,9 @@ beforeEach(() => {
 
 describe("admin challenge-suggestions", () => {
   it("404s for a non-admin", async () => {
-    vi.mocked(requireAdmin).mockResolvedValue(NextResponse.json({ error: "Not found" }, { status: 404 }));
+    vi.mocked(requireAdmin).mockResolvedValue(
+      NextResponse.json({ error: "Not found" }, { status: 404 })
+    );
     expect((await GET(req("GET"))).status).toBe(404);
   });
 
@@ -76,7 +92,9 @@ describe("admin challenge-suggestions", () => {
   });
 
   it("creates a valid suggestion (201)", async () => {
-    const res = await POST(req("POST", { title: "Patience", verseRef: "2:155", suggestedDuration: "7d" }));
+    const res = await POST(
+      req("POST", { title: "Patience", verseRef: "2:155", suggestedDuration: "7d" })
+    );
     expect(res.status).toBe(201);
     expect(mockInsert).toHaveBeenCalled();
   });

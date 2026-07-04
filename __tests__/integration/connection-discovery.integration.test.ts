@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { sql } from "drizzle-orm";
 
 // Real Postgres (Testcontainers). Root discovery is pure SQL over word_morphology.
-vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false })));
+vi.stubGlobal(
+  "fetch",
+  vi.fn(async () => ({ ok: false }))
+);
 
 import { db } from "@/lib/db";
 import { verses, wordMorphology } from "@/lib/db/schema";

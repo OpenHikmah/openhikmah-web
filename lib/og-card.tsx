@@ -88,16 +88,28 @@ export function renderOgCard({
           </div>
 
           {title ? (
-            <span style={{ fontSize: 38, color: PALETTE.textSecondary, marginTop: 22 }}>{title}</span>
+            <span style={{ fontSize: 38, color: PALETTE.textSecondary, marginTop: 22 }}>
+              {title}
+            </span>
           ) : null}
 
-          <span style={{ fontSize: 54, lineHeight: 1.25, color: PALETTE.textPrimary, marginTop: 26 }}>
+          <span
+            style={{ fontSize: 54, lineHeight: 1.25, color: PALETTE.textPrimary, marginTop: 26 }}
+          >
             {body}
           </span>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ display: "flex", width: 14, height: 14, borderRadius: 999, background: PALETTE.teal }} />
+          <div
+            style={{
+              display: "flex",
+              width: 14,
+              height: 14,
+              borderRadius: 999,
+              background: PALETTE.teal,
+            }}
+          />
           <span style={{ fontSize: 26, color: PALETTE.textSecondary }}>{footer}</span>
         </div>
       </div>

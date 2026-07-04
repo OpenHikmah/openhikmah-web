@@ -41,9 +41,7 @@ export async function GET(req: NextRequest) {
   const rows = await db
     .select()
     .from(curatedVotd)
-    .where(
-      and(gte(curatedVotd.date, `${month}-01`), lt(curatedVotd.date, nextMonthFirst(month)))
-    );
+    .where(and(gte(curatedVotd.date, `${month}-01`), lt(curatedVotd.date, nextMonthFirst(month))));
 
   return NextResponse.json({
     month,
@@ -73,7 +71,10 @@ export async function PUT(req: NextRequest) {
   const reflection = typeof body.reflection === "string" ? body.reflection.trim() || null : null;
 
   if (!date || !isRealDay(date)) {
-    return NextResponse.json({ error: "Invalid date (expected a real YYYY-MM-DD)" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid date (expected a real YYYY-MM-DD)" },
+      { status: 400 }
+    );
   }
   if (!verseRef || !isValidRef(verseRef)) {
     return NextResponse.json({ error: "Invalid verse reference" }, { status: 400 });
@@ -111,7 +112,10 @@ export async function DELETE(req: NextRequest) {
 
   const date = req.nextUrl.searchParams.get("date");
   if (!date || !isRealDay(date)) {
-    return NextResponse.json({ error: "Invalid date (expected a real YYYY-MM-DD)" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid date (expected a real YYYY-MM-DD)" },
+      { status: 400 }
+    );
   }
 
   await db.delete(curatedVotd).where(eq(curatedVotd.date, date));

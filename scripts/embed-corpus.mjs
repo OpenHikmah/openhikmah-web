@@ -67,7 +67,9 @@ async function embedBatch(texts) {
       continue;
     }
     if (!res.ok) {
-      throw new Error(`Embedding request failed: ${res.status} ${await res.text().catch(() => "")}`);
+      throw new Error(
+        `Embedding request failed: ${res.status} ${await res.text().catch(() => "")}`
+      );
     }
     const data = await res.json();
     return (data.embeddings ?? []).map((e) => e.values);

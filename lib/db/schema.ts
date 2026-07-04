@@ -170,9 +170,7 @@ export const savedWorkspaces = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [
-    index("saved_workspaces_user_idx").on(t.userId),
-  ]
+  (t) => [index("saved_workspaces_user_idx").on(t.userId)]
 );
 
 // ─── Bookmarks ────────────────────────────────────────────────────────────────
@@ -207,9 +205,7 @@ export const verseNotes = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [
-    index("verse_notes_user_ref_idx").on(t.userId, t.verseRef),
-  ]
+  (t) => [index("verse_notes_user_ref_idx").on(t.userId, t.verseRef)]
 );
 
 // ─── Quran Corpus (local) ─────────────────────────────────────────────────────
@@ -229,9 +225,7 @@ export const verses = pgTable(
     transliteration: text("transliteration"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [
-    uniqueIndex("verses_surah_ayah_idx").on(t.surah, t.ayah),
-  ]
+  (t) => [uniqueIndex("verses_surah_ayah_idx").on(t.surah, t.ayah)]
 );
 
 // ─── Connection Graph (the persistent knowledge graph) ────────────────────────
@@ -274,9 +268,7 @@ export const aiGenerations = pgTable(
     tokens: integer("tokens"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [
-    index("ai_generations_created_idx").on(t.createdAt),
-  ]
+  (t) => [index("ai_generations_created_idx").on(t.createdAt)]
 );
 
 // ─── Rate Limits ──────────────────────────────────────────────────────────────
@@ -303,12 +295,7 @@ export const verseEmbeddings = pgTable(
     model: text("model").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [
-    index("verse_embeddings_hnsw_idx").using(
-      "hnsw",
-      t.embedding.op("vector_cosine_ops")
-    ),
-  ]
+  (t) => [index("verse_embeddings_hnsw_idx").using("hnsw", t.embedding.op("vector_cosine_ops"))]
 );
 
 // ─── Word Morphology (grounded root discovery) ────────────────────────────────

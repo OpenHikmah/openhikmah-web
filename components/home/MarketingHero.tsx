@@ -36,7 +36,10 @@ export function MarketingHero({ verse }: { verse: Verse | null }) {
           </p>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Link href="/canvas" className={`${buttonVariants({ variant: "primary", size: "lg" })} w-full sm:w-auto`}>
+            <Link
+              href="/canvas"
+              className={`${buttonVariants({ variant: "primary", size: "lg" })} w-full sm:w-auto`}
+            >
               Start exploring
             </Link>
           </div>

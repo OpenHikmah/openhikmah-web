@@ -27,8 +27,7 @@ export interface VerseToken {
 
 // Arabic combining marks (tashkeel, Quranic annotation signs, superscript alef)
 // plus tatweel (U+0640) — all dropped for matching.
-const DIACRITICS =
-  /[ؐ-ًؚ-ٰٟۖ-ۜ۟-۪ۨ-ۭـ]/g;
+const DIACRITICS = /[ؐ-ًؚ-ٰٟۖ-ۜ۟-۪ۨ-ۭـ]/g;
 // Alef variants: madda (U+0622), hamza-above (U+0623), hamza-below (U+0625),
 // wasla (U+0671) → bare alef (U+0627).
 const ALEF_VARIANTS = /[آأإٱ]/g;
@@ -43,10 +42,7 @@ export function normalizeArabic(input: string): string {
  * normalized form matches a root-bearing morphology surface. Order and original
  * spelling are preserved; unmatched tokens carry no root.
  */
-export function tokenizeVerse(
-  arabicText: string,
-  words: MorphologyWord[]
-): VerseToken[] {
+export function tokenizeVerse(arabicText: string, words: MorphologyWord[]): VerseToken[] {
   const bySurface = new Map<string, { root: string; lemma: string | null }>();
   for (const w of words) {
     if (!w.root) continue;

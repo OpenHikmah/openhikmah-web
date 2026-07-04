@@ -20,9 +20,7 @@ export async function GET(
 
   try {
     const matches = await similarVerses(ref, 5);
-    return NextResponse.json(
-      matches.map((m) => ({ verse: m.verse, similarity: m.similarity }))
-    );
+    return NextResponse.json(matches.map((m) => ({ verse: m.verse, similarity: m.similarity })));
   } catch (err) {
     console.error("Similar-verses route error:", err);
     return NextResponse.json([], { status: 200 });
