@@ -81,3 +81,6 @@ jobs:
 
       - name: Build
         run: bun run build
+
+      - name: Check bundle size
+        run: bun run size
