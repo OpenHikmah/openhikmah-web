@@ -136,8 +136,27 @@ jobs:
           script: |
             const fs = require('node:fs')
 
-            const current = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/size-current.json`, 'utf8'))[0]
-            const base = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/size-base.json`, 'utf8'))[0]
+            const loadReport = (fileName) => {
+              try {
+                const content = fs.readFileSync(`${process.env.RUNNER_TEMP}/${fileName}`, 'utf8').trim()
+                if (!content) return null
+
+                const report = JSON.parse(content)
+                return Array.isArray(report) && report.length > 0 ? report[0] : null
+              } catch {
+                return null
+              }
+            }
+
+            const currentReport = loadReport('size-current.json')
+            const baseReport = loadReport('size-base.json')
+            const current = currentReport ?? baseReport
+            const base = baseReport ?? currentReport
+
+            if (!current || !base) {
+              throw new Error('No bundle size report was available to comment on')
+            }
+
             const delta = current.size - base.size
             const percent = base.size === 0 ? 0 : (delta / base.size) * 100
             const marker = '<!-- openhikmah-size-limit-report -->'
