@@ -9,6 +9,7 @@ coverage
 
 .agents
 .claude
+.claude.json
 .codegraph
 
 next-env.d.ts
