@@ -44,7 +44,13 @@ export function MiniPlayer() {
       {/* Controls */}
       <div className="flex shrink-0 items-center gap-1">
         {hasPrev && (
-          <IconButton tone="teal" size="xs" onClick={prev} aria-label="Previous verse" className="border-transparent">
+          <IconButton
+            tone="teal"
+            size="xs"
+            onClick={prev}
+            aria-label="Previous verse"
+            className="border-transparent"
+          >
             <SkipBack />
           </IconButton>
         )}
@@ -61,12 +67,24 @@ export function MiniPlayer() {
         </IconButton>
 
         {hasNext && (
-          <IconButton tone="teal" size="xs" onClick={next} aria-label="Next verse" className="border-transparent">
+          <IconButton
+            tone="teal"
+            size="xs"
+            onClick={next}
+            aria-label="Next verse"
+            className="border-transparent"
+          >
             <SkipForward />
           </IconButton>
         )}
 
-        <IconButton tone="danger" size="xs" onClick={stop} aria-label="Stop playback" className="ml-1 border-transparent">
+        <IconButton
+          tone="danger"
+          size="xs"
+          onClick={stop}
+          aria-label="Stop playback"
+          className="ml-1 border-transparent"
+        >
           <X />
         </IconButton>
       </div>

@@ -76,7 +76,10 @@ describe("lib/redis — enabled, healthy", () => {
 
   it("redisGet returns the value and redisIncrWithTtl returns the INCR count", async () => {
     behavior.get.mockResolvedValue("hello");
-    behavior.multiExec.mockResolvedValue([[null, 4], [null, 1]]);
+    behavior.multiExec.mockResolvedValue([
+      [null, 4],
+      [null, 1],
+    ]);
     const r = await import("@/lib/redis");
 
     expect(r.redisEnabled()).toBe(true);

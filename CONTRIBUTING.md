@@ -14,7 +14,9 @@ Thank you for your interest in contributing. Open Hikmah is a theological sensem
 - [Feature Requests](#feature-requests)
 
 ---
+
 ## Getting Started
+
 ```bash
 git clone https://github.com/Nazm-AI/open-hikmah
 cd open-hikmah
@@ -31,7 +33,6 @@ Open [http://localhost:3000](http://localhost:3000).
 **Docker (required for pushing):** `.husky/pre-push` runs integration tests via [Testcontainers](https://testcontainers.com/), which spin up a real Postgres instance in Docker. Docker must be installed and running before you run `git push`, or the hook will fail with an unclear error. Install Docker Desktop (or Docker Engine on Linux) from the [official docs](https://docs.docker.com/get-docker/), and make sure the daemon is running (`docker ps` should succeed) before pushing.
 
 ---
-
 
 ## Branch and Commit Conventions
 
@@ -76,6 +77,7 @@ __tests__/
 CI runs automatically on every push via GitHub Actions (`.github/workflows/ci.yml`). All tests must pass and the TypeScript build must succeed before a PR can be merged.
 
 **When adding a new feature:**
+
 - Add tests in the appropriate `__tests__/` subfolder
 - API routes: mock `global.fetch` with `vi.stubGlobal`; mock `@anthropic-ai/sdk` if the route uses Claude
 - Stores: reset state in `beforeEach`
@@ -85,7 +87,7 @@ CI runs automatically on every push via GitHub Actions (`.github/workflows/ci.ym
 ## Code Style
 
 - **TypeScript strict mode** — no `any`, no `ts-ignore` without a comment explaining why
-- **No comments** unless the *why* is non-obvious (a hidden constraint, a Quran API quirk, a security invariant)
+- **No comments** unless the _why_ is non-obvious (a hidden constraint, a Quran API quirk, a security invariant)
 - **No feature flags or backwards-compatibility shims** — change the code directly
 - **No error handling for impossible scenarios** — trust Next.js and TypeScript guarantees; only validate at system boundaries
 - Run `npm run lint` before pushing; the CI will reject lint failures

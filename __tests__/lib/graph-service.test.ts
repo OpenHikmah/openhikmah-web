@@ -4,21 +4,35 @@ import type { Verse, VerseRef, ConnectionResult } from "@/types/quran";
 // ── DB mock: select() resolves to a configurable result; insert() is chainable ──
 function makeSelectChain(resolveWith: unknown[]) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chain: any = new Proxy(function () { return chain; }, {
-    get(_t, prop) {
-      if (prop === "then")
-        return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-      return () => chain;
+  const chain: any = new Proxy(
+    function () {
+      return chain;
     },
-    apply() { return chain; },
-  });
+    {
+      get(_t, prop) {
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        return () => chain;
+      },
+      apply() {
+        return chain;
+      },
+    }
+  );
   return chain;
 }
 
 const {
-  mockSelect, mockInsert, mockValues, mockOnConflict, mockGenerate, mockGenerateGrounded,
-  mockDiscover, mockResolveVerse, mockConsume,
+  mockSelect,
+  mockInsert,
+  mockValues,
+  mockOnConflict,
+  mockGenerate,
+  mockGenerateGrounded,
+  mockDiscover,
+  mockResolveVerse,
+  mockConsume,
 } = vi.hoisted(() => {
   const mockOnConflict = vi.fn().mockResolvedValue(undefined);
   const mockValues = vi.fn((..._args: unknown[]) => ({ onConflictDoNothing: mockOnConflict }));
@@ -89,7 +103,14 @@ describe("getConnections", () => {
   it("serves from the DB on a hit WITHOUT calling the AI", async () => {
     mockSelect.mockReturnValue(
       makeSelectChain([
-        { id: 1, fromRef: "1:1", toRef: "2:255", kind: "thematic", reason: "stored reason", status: "active" },
+        {
+          id: 1,
+          fromRef: "1:1",
+          toRef: "2:255",
+          kind: "thematic",
+          reason: "stored reason",
+          status: "active",
+        },
       ])
     );
 
@@ -144,7 +165,14 @@ describe("getConnections", () => {
   it("does NOT rate-limit a cache hit even when a clientKey is given", async () => {
     mockSelect.mockReturnValue(
       makeSelectChain([
-        { id: 1, fromRef: "1:1", toRef: "2:255", kind: "thematic", reason: "stored", status: "active" },
+        {
+          id: 1,
+          fromRef: "1:1",
+          toRef: "2:255",
+          kind: "thematic",
+          reason: "stored",
+          status: "active",
+        },
       ])
     );
 
@@ -173,7 +201,10 @@ describe("getConnections", () => {
 
     expect(mockDiscover).toHaveBeenCalledWith("1:1", "thematic");
     expect(mockGenerateGrounded).toHaveBeenCalledTimes(1);
-    expect(mockGenerateGrounded).toHaveBeenCalledWith("1:1", "ar", "tr", "thematic", ["2:255", "3:18"]);
+    expect(mockGenerateGrounded).toHaveBeenCalledWith("1:1", "ar", "tr", "thematic", [
+      "2:255",
+      "3:18",
+    ]);
     expect(mockGenerate).not.toHaveBeenCalled(); // legacy path skipped
     expect(out).toHaveLength(1);
     expect(mockInsert).toHaveBeenCalledTimes(1);
@@ -195,7 +226,14 @@ describe("getConnections", () => {
     mockSelect.mockReturnValue(
       makeSelectChain([
         { id: 1, fromRef: "1:1", toRef: "2:255", kind: "thematic", reason: "ok", status: "active" },
-        { id: 2, fromRef: "1:1", toRef: "9:999", kind: "thematic", reason: "broken", status: "active" },
+        {
+          id: 2,
+          fromRef: "1:1",
+          toRef: "9:999",
+          kind: "thematic",
+          reason: "broken",
+          status: "active",
+        },
       ])
     );
     mockResolveVerse.mockImplementation(async (ref: string) =>
@@ -222,7 +260,10 @@ describe("getConnections — single-flight de-duplication", () => {
     mockGenerateGrounded.mockReset();
     // Hold generation "in flight" until a test releases it.
     mockGenerate.mockReset().mockImplementation(
-      () => new Promise<ConnectionResult[]>((res) => { releaseGen = res; })
+      () =>
+        new Promise<ConnectionResult[]>((res) => {
+          releaseGen = res;
+        })
     );
   });
 

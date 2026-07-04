@@ -16,7 +16,10 @@ interface Flag {
 
 export default function FlagsPage() {
   const api = useAdminFetch();
-  const { data, error, loading, reload } = useAsync<{ flags: Flag[] }>(() => api("/flags"), "flags");
+  const { data, error, loading, reload } = useAsync<{ flags: Flag[] }>(
+    () => api("/flags"),
+    "flags"
+  );
 
   const [key, setKey] = useState("");
   const [value, setValue] = useState("");
@@ -28,7 +31,7 @@ export default function FlagsPage() {
     try {
       parsed = JSON.parse(value);
     } catch {
-      setMsg("Value must be valid JSON (e.g. true, 42, \"text\", {\"a\":1}).");
+      setMsg('Value must be valid JSON (e.g. true, 42, "text", {"a":1}).');
       return;
     }
     try {
@@ -68,11 +71,19 @@ export default function FlagsPage() {
           <div className="grid gap-3 sm:grid-cols-[200px_1fr]">
             <label className="space-y-1.5">
               <span className="text-xs text-text-secondary">Key</span>
-              <Input value={key} onChange={(e) => setKey(e.target.value)} placeholder="rate_limit.window_s" />
+              <Input
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                placeholder="rate_limit.window_s"
+              />
             </label>
             <label className="space-y-1.5">
               <span className="text-xs text-text-secondary">Value (JSON)</span>
-              <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder='e.g. 60 or {"model":"x"}' />
+              <Input
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder='e.g. 60 or {"model":"x"}'
+              />
             </label>
           </div>
           <div className="flex items-center gap-2">

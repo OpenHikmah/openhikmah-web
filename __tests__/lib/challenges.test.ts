@@ -3,15 +3,22 @@ import type { Challenge } from "@/lib/db/schema";
 
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chain: any = new Proxy(function () { return chain; }, {
-    get(_t, prop) {
-      if (prop === "then")
-        return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-      return () => chain;
+  const chain: any = new Proxy(
+    function () {
+      return chain;
     },
-    apply() { return chain; },
-  });
+    {
+      get(_t, prop) {
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        return () => chain;
+      },
+      apply() {
+        return chain;
+      },
+    }
+  );
   return chain;
 }
 
@@ -21,7 +28,13 @@ const { mockSelect, mockUpdate } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db", () => ({ db: { select: mockSelect, update: mockUpdate } }));
 
-import { pickWinner, resolveEndedChallenges, resolveExpiredPending, isDuration, DURATIONS } from "@/lib/challenges";
+import {
+  pickWinner,
+  resolveEndedChallenges,
+  resolveExpiredPending,
+  isDuration,
+  DURATIONS,
+} from "@/lib/challenges";
 
 function makeChallenge(overrides: Partial<Challenge> = {}): Challenge {
   return {
@@ -120,7 +133,9 @@ describe("resolveExpiredPending", () => {
   });
 
   it("declines a pending invite past its endsAt", async () => {
-    const rows = [makeChallenge({ id: 10, status: "pending", endsAt: new Date(Date.now() - 1000) })];
+    const rows = [
+      makeChallenge({ id: 10, status: "pending", endsAt: new Date(Date.now() - 1000) }),
+    ];
     const count = await resolveExpiredPending(rows, new Date());
     expect(mockUpdate).toHaveBeenCalledOnce();
     expect(rows[0].status).toBe("declined");
@@ -128,7 +143,9 @@ describe("resolveExpiredPending", () => {
   });
 
   it("ignores pending invites that have not expired", async () => {
-    const rows = [makeChallenge({ id: 11, status: "pending", endsAt: new Date(Date.now() + 3_600_000) })];
+    const rows = [
+      makeChallenge({ id: 11, status: "pending", endsAt: new Date(Date.now() + 3_600_000) }),
+    ];
     const count = await resolveExpiredPending(rows, new Date());
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(rows[0].status).toBe("pending");
@@ -147,7 +164,9 @@ describe("resolveExpiredPending", () => {
     // because the pair actioned this invite via the (already-guarded) PATCH
     // route in the window between the caller's SELECT and this UPDATE.
     mockUpdate.mockReturnValue(makeDbChain([]));
-    const rows = [makeChallenge({ id: 14, status: "pending", endsAt: new Date(Date.now() - 1000) })];
+    const rows = [
+      makeChallenge({ id: 14, status: "pending", endsAt: new Date(Date.now() - 1000) }),
+    ];
     const count = await resolveExpiredPending(rows, new Date());
     expect(rows[0].status).toBe("pending"); // left untouched, not clobbered
     expect(count).toBe(0);

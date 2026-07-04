@@ -6,15 +6,22 @@ vi.mock("@/lib/social-auth", () => ({ requireUser: vi.fn() }));
 
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chain: any = new Proxy(function () { return chain; }, {
-    get(_t, prop) {
-      if (prop === "then")
-        return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-      return () => chain;
+  const chain: any = new Proxy(
+    function () {
+      return chain;
     },
-    apply() { return chain; },
-  });
+    {
+      get(_t, prop) {
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        return () => chain;
+      },
+      apply() {
+        return chain;
+      },
+    }
+  );
   return chain;
 }
 
@@ -34,9 +41,15 @@ import { requireUser } from "@/lib/social-auth";
 
 function makeUser(): User {
   return {
-    id: 1, qfId: "qf-1", username: "u", displayName: null,
-    createdAt: new Date(), lastActiveAt: new Date(),
-    currentStreak: 0, longestStreak: 0, lastActivityDate: null,
+    id: 1,
+    qfId: "qf-1",
+    username: "u",
+    displayName: null,
+    createdAt: new Date(),
+    lastActiveAt: new Date(),
+    currentStreak: 0,
+    longestStreak: 0,
+    lastActivityDate: null,
     disabledAt: null,
   };
 }
@@ -64,7 +77,9 @@ describe("GET /api/notes", () => {
 
   it("401 when unauthenticated", async () => {
     unauthed();
-    expect((await GET(req("GET", undefined, "http://localhost/api/notes?ref=2:255"))).status).toBe(401);
+    expect((await GET(req("GET", undefined, "http://localhost/api/notes?ref=2:255"))).status).toBe(
+      401
+    );
   });
 
   it("400 when ref is missing", async () => {
@@ -74,7 +89,9 @@ describe("GET /api/notes", () => {
 
   it("400 when ref format is invalid", async () => {
     authed();
-    expect((await GET(req("GET", undefined, "http://localhost/api/notes?ref=nope"))).status).toBe(400);
+    expect((await GET(req("GET", undefined, "http://localhost/api/notes?ref=nope"))).status).toBe(
+      400
+    );
   });
 
   it("returns notes for a valid ref", async () => {
@@ -101,7 +118,9 @@ describe("POST /api/notes", () => {
 
   it("429 when the per-user notes rate limit is exceeded", async () => {
     authed();
-    mockRateLimitOrNull.mockResolvedValue(NextResponse.json({ error: "Too many" }, { status: 429 }));
+    mockRateLimitOrNull.mockResolvedValue(
+      NextResponse.json({ error: "Too many" }, { status: 429 })
+    );
     expect((await POST(req("POST", { ref: "2:255", note: "x" }))).status).toBe(429);
   });
 

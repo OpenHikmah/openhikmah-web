@@ -65,7 +65,7 @@ Type scale (rem): `0.6875 · 0.75 · 0.8125 · 0.875 · 1 · 1.125 · 1.375 · 1
 
 - **Buttons:** flat, no outer glow. **Primary** = filled gold, ink (`#0a0f1a`) text — one per context. **Secondary** = outline, gold on hover. **Ghost** = text-only for low-stakes. Tactile feedback on active (subtle inset, no bounce).
 - **Icon buttons:** 36px visual (32px when nested) with a ≥44px hit area; resting icon `--color-text-secondary` (legible at rest); hover adds the matching wash + border; gold/teal tone for semantic actions.
-- **Cards / nodes:** `rounded-lg` (8–10px); feature cards 14px; separation via **border + surface layer**, not shadow. Shadows are reserved for *floating* things only (dialogs, popovers, tooltips, the Verse-of-the-Day card).
+- **Cards / nodes:** `rounded-lg` (8–10px); feature cards 14px; separation via **border + surface layer**, not shadow. Shadows are reserved for _floating_ things only (dialogs, popovers, tooltips, the Verse-of-the-Day card).
 - **Inputs:** label/eyebrow above, error below; gold `:focus-visible` ring; no floating labels.
 - **Tooltips:** styled (Radix) component, never the native `title`.
 - **Loaders:** skeletal/quiet text matching layout dimensions — no circular spinners.

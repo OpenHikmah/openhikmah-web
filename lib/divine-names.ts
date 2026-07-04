@@ -11,21 +11,27 @@ export interface DivineName {
   description: string;
 }
 
-export const CATEGORY_LABELS: Record<NameCategory, { en: string; ar: string; description: string }> = {
+export const CATEGORY_LABELS: Record<
+  NameCategory,
+  { en: string; ar: string; description: string }
+> = {
   dhat: {
     en: "Sifat al-Dhat",
     ar: "صفات الذات",
-    description: "Attributes of the Divine Essence — necessarily and eternally true of Allah independent of creation",
+    description:
+      "Attributes of the Divine Essence — necessarily and eternally true of Allah independent of creation",
   },
   sifat: {
     en: "Sifat al-Ma'ani",
     ar: "صفات المعاني",
-    description: "Attributes of Meaning — the seven positive qualities (Knowledge, Power, Will, Life, Hearing, Sight, Speech) and names expressing tanzih (transcendence)",
+    description:
+      "Attributes of Meaning — the seven positive qualities (Knowledge, Power, Will, Life, Hearing, Sight, Speech) and names expressing tanzih (transcendence)",
   },
   "af'al": {
     en: "Sifat al-Af'al",
     ar: "صفات الأفعال",
-    description: "Attributes of Act — names that express Allah's sovereign relation to creation: creating, providing, guiding, forgiving",
+    description:
+      "Attributes of Act — names that express Allah's sovereign relation to creation: creating, providing, guiding, forgiving",
   },
 };
 
@@ -38,7 +44,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Most Gracious",
     category: "sifat",
     root: "ر-ح-م",
-    description: "The all-encompassing mercy that pervades existence; a mercy whose vastness is prior to any creature's merit or request.",
+    description:
+      "The all-encompassing mercy that pervades existence; a mercy whose vastness is prior to any creature's merit or request.",
   },
   {
     id: 2,
@@ -48,7 +55,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Most Merciful",
     category: "sifat",
     root: "ر-ح-م",
-    description: "Mercy directed specifically and actively toward the believers; the realised bestowal flowing from the divine attribute of Rahma.",
+    description:
+      "Mercy directed specifically and actively toward the believers; the realised bestowal flowing from the divine attribute of Rahma.",
   },
   {
     id: 3,
@@ -58,7 +66,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Sovereign",
     category: "dhat",
     root: "م-ل-ك",
-    description: "Absolute dominion over all that exists, unconstrained by any partner, predecessor, or limitation — sovereignty that belongs to the Essence itself.",
+    description:
+      "Absolute dominion over all that exists, unconstrained by any partner, predecessor, or limitation — sovereignty that belongs to the Essence itself.",
   },
   {
     id: 4,
@@ -68,7 +77,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Most Holy",
     category: "sifat",
     root: "ق-د-س",
-    description: "Perfect freedom from every imperfection, deficiency, or resemblance to created things; the Maturidi tanzih par excellence.",
+    description:
+      "Perfect freedom from every imperfection, deficiency, or resemblance to created things; the Maturidi tanzih par excellence.",
   },
   {
     id: 5,
@@ -78,7 +88,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Source of Peace",
     category: "sifat",
     root: "س-ل-م",
-    description: "Allah is free from all defect and the source from which every peace and soundness in creation derives.",
+    description:
+      "Allah is free from all defect and the source from which every peace and soundness in creation derives.",
   },
   {
     id: 6,
@@ -88,7 +99,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Guardian of Faith",
     category: "af'al",
     root: "أ-م-ن",
-    description: "He who grants security to His creation and ratifies His own promise — the Originator of all trust and safety.",
+    description:
+      "He who grants security to His creation and ratifies His own promise — the Originator of all trust and safety.",
   },
   {
     id: 7,
@@ -98,7 +110,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Overseer",
     category: "af'al",
     root: "ه-ي-م",
-    description: "The all-watchful guardian who holds sovereign oversight over every affair — nothing transpires outside His encompassing awareness.",
+    description:
+      "The all-watchful guardian who holds sovereign oversight over every affair — nothing transpires outside His encompassing awareness.",
   },
   {
     id: 8,
@@ -108,7 +121,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Almighty",
     category: "sifat",
     root: "ع-ز-ز",
-    description: "Irresistible might that cannot be overcome; the uniqueness of power that has no peer or equal in the divine or created realms.",
+    description:
+      "Irresistible might that cannot be overcome; the uniqueness of power that has no peer or equal in the divine or created realms.",
   },
   {
     id: 9,
@@ -118,7 +132,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Compeller",
     category: "sifat",
     root: "ج-ب-ر",
-    description: "He who repairs what is broken in creation and compels all things according to His will; the overwhelming restorer whose decree none can repel.",
+    description:
+      "He who repairs what is broken in creation and compels all things according to His will; the overwhelming restorer whose decree none can repel.",
   },
   {
     id: 10,
@@ -128,7 +143,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Supreme in Greatness",
     category: "sifat",
     root: "ك-ب-ر",
-    description: "Greatness that belongs exclusively to Allah; all created greatness is borrowed dignity, while His is the attribute of the Essence.",
+    description:
+      "Greatness that belongs exclusively to Allah; all created greatness is borrowed dignity, while His is the attribute of the Essence.",
   },
   {
     id: 11,
@@ -138,7 +154,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Creator",
     category: "af'al",
     root: "خ-ل-ق",
-    description: "The sole originator who brings things into existence by will and command — creation belongs exclusively to His act, not to any secondary cause.",
+    description:
+      "The sole originator who brings things into existence by will and command — creation belongs exclusively to His act, not to any secondary cause.",
   },
   {
     id: 12,
@@ -148,7 +165,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Originator",
     category: "af'al",
     root: "ب-ر-أ",
-    description: "He who distinguishes and separates created things from one another, assigning to each its own nature and form.",
+    description:
+      "He who distinguishes and separates created things from one another, assigning to each its own nature and form.",
   },
   {
     id: 13,
@@ -158,7 +176,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Fashioner of Forms",
     category: "af'al",
     root: "ص-و-ر",
-    description: "He who gives every created thing its unique form and image according to a wisdom that transcends created imagination.",
+    description:
+      "He who gives every created thing its unique form and image according to a wisdom that transcends created imagination.",
   },
   {
     id: 14,
@@ -168,7 +187,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The All-Forgiving",
     category: "af'al",
     root: "غ-ف-ر",
-    description: "The one who repeatedly and abundantly covers sins with His forgiveness — a forgiveness that is an act of pure grace without diminishing His justice.",
+    description:
+      "The one who repeatedly and abundantly covers sins with His forgiveness — a forgiveness that is an act of pure grace without diminishing His justice.",
   },
   {
     id: 15,
@@ -178,7 +198,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The All-Subduing",
     category: "sifat",
     root: "ق-ه-ر",
-    description: "He before whose power all things are utterly subdued; no king, force, or angel has any independence before His overwhelming dominion.",
+    description:
+      "He before whose power all things are utterly subdued; no king, force, or angel has any independence before His overwhelming dominion.",
   },
   {
     id: 16,
@@ -188,7 +209,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Bestower",
     category: "af'al",
     root: "و-ه-ب",
-    description: "The one who gives abundantly without any expectation of return — His bestowal is pure generosity from an essence that has no need.",
+    description:
+      "The one who gives abundantly without any expectation of return — His bestowal is pure generosity from an essence that has no need.",
   },
   {
     id: 17,
@@ -198,7 +220,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The All-Provider",
     category: "af'al",
     root: "ر-ز-ق",
-    description: "The ultimate sustainer of all created things — both outer provision of sustenance and inner provision of spiritual capacity.",
+    description:
+      "The ultimate sustainer of all created things — both outer provision of sustenance and inner provision of spiritual capacity.",
   },
   {
     id: 18,
@@ -208,7 +231,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Opener",
     category: "af'al",
     root: "ف-ت-ح",
-    description: "The one who opens closed matters, grants victory, and decrees judgment between the creation — all doors of mercy and provision open by His leave alone.",
+    description:
+      "The one who opens closed matters, grants victory, and decrees judgment between the creation — all doors of mercy and provision open by His leave alone.",
   },
   {
     id: 19,
@@ -218,7 +242,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The All-Knowing",
     category: "sifat",
     root: "ع-ل-م",
-    description: "Infinite knowledge encompassing all particulars and universals, past and future, manifest and hidden — one of the seven essential Sifat al-Ma'ani in Maturidi theology.",
+    description:
+      "Infinite knowledge encompassing all particulars and universals, past and future, manifest and hidden — one of the seven essential Sifat al-Ma'ani in Maturidi theology.",
   },
   {
     id: 20,
@@ -228,7 +253,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Withholder",
     category: "af'al",
     root: "ق-ب-ض",
-    description: "He who constricts and withholds according to wisdom — trials, scarcity, and contraction of the heart are acts that serve the greater divine order.",
+    description:
+      "He who constricts and withholds according to wisdom — trials, scarcity, and contraction of the heart are acts that serve the greater divine order.",
   },
   {
     id: 21,
@@ -238,7 +264,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Extender",
     category: "af'al",
     root: "ب-س-ط",
-    description: "He who expands provision, ease, and the heart's capacity — always paired with Al-Qabid so that expansion and contraction reveal one sovereign wisdom.",
+    description:
+      "He who expands provision, ease, and the heart's capacity — always paired with Al-Qabid so that expansion and contraction reveal one sovereign wisdom.",
   },
   {
     id: 22,
@@ -248,7 +275,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Abaser",
     category: "af'al",
     root: "خ-ف-ض",
-    description: "He who lowers the arrogant and the unjust; the one in whose hand every station rises or falls according to divine wisdom and justice.",
+    description:
+      "He who lowers the arrogant and the unjust; the one in whose hand every station rises or falls according to divine wisdom and justice.",
   },
   {
     id: 23,
@@ -258,7 +286,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Exalter",
     category: "af'al",
     root: "ر-ف-ع",
-    description: "He who elevates whomever He wills among His creation — raising the believers in this life and the next as an act of pure divine favour.",
+    description:
+      "He who elevates whomever He wills among His creation — raising the believers in this life and the next as an act of pure divine favour.",
   },
   {
     id: 24,
@@ -268,7 +297,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Bestower of Honour",
     category: "af'al",
     root: "ع-ز-ز",
-    description: "He who grants might and dignity to whomever He chooses — all true honour in creation is a reflection of His bestowal, not an intrinsic quality of the creature.",
+    description:
+      "He who grants might and dignity to whomever He chooses — all true honour in creation is a reflection of His bestowal, not an intrinsic quality of the creature.",
   },
   {
     id: 25,
@@ -278,7 +308,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Humiliator",
     category: "af'al",
     root: "ذ-ل-ل",
-    description: "He who brings low the rebellious and the proud — a reminder that no created greatness is self-sustaining, and all dignity depends on divine permission.",
+    description:
+      "He who brings low the rebellious and the proud — a reminder that no created greatness is self-sustaining, and all dignity depends on divine permission.",
   },
   {
     id: 26,
@@ -288,7 +319,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The All-Hearing",
     category: "sifat",
     root: "س-م-ع",
-    description: "Hearing that encompasses every sound, whisper, and secret thought — one of the seven essential Sifat al-Ma'ani; affirmed without likening it to created hearing.",
+    description:
+      "Hearing that encompasses every sound, whisper, and secret thought — one of the seven essential Sifat al-Ma'ani; affirmed without likening it to created hearing.",
   },
   {
     id: 27,
@@ -298,7 +330,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The All-Seeing",
     category: "sifat",
     root: "ب-ص-ر",
-    description: "Vision that encompasses all things simultaneously — one of the seven Sifat al-Ma'ani; affirmed in a manner befitting divine majesty, free from analogy with created sight.",
+    description:
+      "Vision that encompasses all things simultaneously — one of the seven Sifat al-Ma'ani; affirmed in a manner befitting divine majesty, free from analogy with created sight.",
   },
   {
     id: 28,
@@ -308,7 +341,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Arbitrator",
     category: "sifat",
     root: "ح-ك-م",
-    description: "The final judge whose ruling is always just and definitive — no verdict in creation is truly binding except by reference to His judgment.",
+    description:
+      "The final judge whose ruling is always just and definitive — no verdict in creation is truly binding except by reference to His judgment.",
   },
   {
     id: 29,
@@ -318,7 +352,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Just",
     category: "sifat",
     root: "ع-د-ل",
-    description: "Absolute justice that gives every thing its due — the Maturidi school affirms divine justice while holding that Allah is not constrained by creaturely notions of obligation.",
+    description:
+      "Absolute justice that gives every thing its due — the Maturidi school affirms divine justice while holding that Allah is not constrained by creaturely notions of obligation.",
   },
   {
     id: 30,
@@ -328,7 +363,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Subtle",
     category: "sifat",
     root: "ل-ط-ف",
-    description: "Awareness so fine and care so gentle that it reaches what no created perception can access — the hidden providences that weave through every life.",
+    description:
+      "Awareness so fine and care so gentle that it reaches what no created perception can access — the hidden providences that weave through every life.",
   },
   {
     id: 31,
@@ -338,7 +374,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The All-Aware",
     category: "sifat",
     root: "خ-ب-ر",
-    description: "Thorough awareness of the inner realities and hidden dimensions of all things — knowledge of what lies beneath appearances.",
+    description:
+      "Thorough awareness of the inner realities and hidden dimensions of all things — knowledge of what lies beneath appearances.",
   },
   {
     id: 32,
@@ -348,7 +385,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Forbearing",
     category: "sifat",
     root: "ح-ل-م",
-    description: "He who withholds punishment despite the capacity to act and the cause to do so — forebearance that is an expression of wisdom, not weakness.",
+    description:
+      "He who withholds punishment despite the capacity to act and the cause to do so — forebearance that is an expression of wisdom, not weakness.",
   },
   {
     id: 33,
@@ -358,7 +396,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Magnificent",
     category: "dhat",
     root: "ع-ظ-م",
-    description: "A greatness that is beyond all comprehension and comparison — the intellect cannot bound it because it is an attribute of the unlimited Divine Essence.",
+    description:
+      "A greatness that is beyond all comprehension and comparison — the intellect cannot bound it because it is an attribute of the unlimited Divine Essence.",
   },
   {
     id: 34,
@@ -368,7 +407,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Forgiving",
     category: "af'al",
     root: "غ-ف-ر",
-    description: "The depth of forgiveness that completely covers and conceals sins — bestowed as an act of His free will and mercy, not as a debt owed to the sinner.",
+    description:
+      "The depth of forgiveness that completely covers and conceals sins — bestowed as an act of His free will and mercy, not as a debt owed to the sinner.",
   },
   {
     id: 35,
@@ -378,7 +418,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Most Appreciative",
     category: "af'al",
     root: "ش-ك-ر",
-    description: "He who multiplies the reward for small deeds with unbounded generosity — gratitude from the Divine that reflects the limitless nature of His giving.",
+    description:
+      "He who multiplies the reward for small deeds with unbounded generosity — gratitude from the Divine that reflects the limitless nature of His giving.",
   },
   {
     id: 36,
@@ -388,7 +429,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Most High",
     category: "dhat",
     root: "ع-ل-و",
-    description: "Transcendent elevation above every limitation and comparison — height that is of the Essence, not spatial or positional.",
+    description:
+      "Transcendent elevation above every limitation and comparison — height that is of the Essence, not spatial or positional.",
   },
   {
     id: 37,
@@ -398,7 +440,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Most Great",
     category: "dhat",
     root: "ك-ب-ر",
-    description: "Greatness that surpasses all measurement; every created greatness is finite and contingent while His is absolute and essential.",
+    description:
+      "Greatness that surpasses all measurement; every created greatness is finite and contingent while His is absolute and essential.",
   },
   {
     id: 38,
@@ -408,7 +451,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Preserver",
     category: "af'al",
     root: "ح-ف-ظ",
-    description: "He who guards all things from loss and preserves the records of every deed — the entire created order is held in existence only through His preserving act.",
+    description:
+      "He who guards all things from loss and preserves the records of every deed — the entire created order is held in existence only through His preserving act.",
   },
   {
     id: 39,
@@ -418,7 +462,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Sustainer",
     category: "af'al",
     root: "ق-و-ت",
-    description: "He who sustains and nourishes every creature with exactly what it needs — combining perfect knowledge of need with perfect power to fulfil it.",
+    description:
+      "He who sustains and nourishes every creature with exactly what it needs — combining perfect knowledge of need with perfect power to fulfil it.",
   },
   {
     id: 40,
@@ -428,7 +473,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Reckoner",
     category: "af'al",
     root: "ح-س-ب",
-    description: "The all-sufficient reckoner who takes precise account of every atom's weight of deed — the one to whom all returns for final accountability.",
+    description:
+      "The all-sufficient reckoner who takes precise account of every atom's weight of deed — the one to whom all returns for final accountability.",
   },
   {
     id: 41,
@@ -438,7 +484,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Majestic",
     category: "dhat",
     root: "ج-ل-ل",
-    description: "Majesty that generates awe and reverence; the jalal aspect of divinity that is balanced in Islamic spirituality by jamal (beauty).",
+    description:
+      "Majesty that generates awe and reverence; the jalal aspect of divinity that is balanced in Islamic spirituality by jamal (beauty).",
   },
   {
     id: 42,
@@ -448,7 +495,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Most Generous",
     category: "af'al",
     root: "ك-ر-م",
-    description: "Generosity so complete that He gives without need, withholds without injustice, and exceeds every expectation with His gifts.",
+    description:
+      "Generosity so complete that He gives without need, withholds without injustice, and exceeds every expectation with His gifts.",
   },
   {
     id: 43,
@@ -458,7 +506,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Watchful",
     category: "sifat",
     root: "ر-ق-ب",
-    description: "The ever-vigilant witness who observes every intention and act — a divine attribute that is both protection for the sincere and warning for the heedless.",
+    description:
+      "The ever-vigilant witness who observes every intention and act — a divine attribute that is both protection for the sincere and warning for the heedless.",
   },
   {
     id: 44,
@@ -468,7 +517,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Responsive",
     category: "af'al",
     root: "ج-و-ب",
-    description: "He who responds to every supplication — the response may be immediate fulfilment, a better alternative, or stored reward, but no sincere call goes unheard.",
+    description:
+      "He who responds to every supplication — the response may be immediate fulfilment, a better alternative, or stored reward, but no sincere call goes unheard.",
   },
   {
     id: 45,
@@ -478,7 +528,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The All-Encompassing",
     category: "dhat",
     root: "و-س-ع",
-    description: "Boundless in knowledge, mercy, and generosity — an attribute of the Essence that has no border or limit that any created reality can approach.",
+    description:
+      "Boundless in knowledge, mercy, and generosity — an attribute of the Essence that has no border or limit that any created reality can approach.",
   },
   {
     id: 46,
@@ -488,7 +539,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The All-Wise",
     category: "sifat",
     root: "ح-ك-م",
-    description: "Wisdom that places everything in its perfect position — every divine act, decree, and law proceeds from an infinite wisdom that the created intellect can only partially glimpse.",
+    description:
+      "Wisdom that places everything in its perfect position — every divine act, decree, and law proceeds from an infinite wisdom that the created intellect can only partially glimpse.",
   },
   {
     id: 47,
@@ -498,7 +550,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Most Loving",
     category: "sifat",
     root: "و-د-د",
-    description: "Divine love that is the origin of all affection in creation — a love that initiates and does not merely respond, freely given to the sincere servant.",
+    description:
+      "Divine love that is the origin of all affection in creation — a love that initiates and does not merely respond, freely given to the sincere servant.",
   },
   {
     id: 48,
@@ -508,7 +561,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Most Glorious",
     category: "dhat",
     root: "م-ج-د",
-    description: "Glory combining greatness with generosity — a majesty that is not remote or forbidding but radiates outward in gifts and honours upon creation.",
+    description:
+      "Glory combining greatness with generosity — a majesty that is not remote or forbidding but radiates outward in gifts and honours upon creation.",
   },
   {
     id: 49,
@@ -518,7 +572,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Resurrector",
     category: "af'al",
     root: "ب-ع-ث",
-    description: "He who raises the dead and sends prophets — the power of origination reasserted: as He created the first time, so He recreates without the slightest difficulty.",
+    description:
+      "He who raises the dead and sends prophets — the power of origination reasserted: as He created the first time, so He recreates without the slightest difficulty.",
   },
   {
     id: 50,
@@ -528,7 +583,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Witness",
     category: "sifat",
     root: "ش-ه-د",
-    description: "The all-witnessing presence whose testimony is the ultimate ground of truth — nothing is absent from His witnessing, whether in the visible or unseen realms.",
+    description:
+      "The all-witnessing presence whose testimony is the ultimate ground of truth — nothing is absent from His witnessing, whether in the visible or unseen realms.",
   },
   {
     id: 51,
@@ -538,7 +594,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Truth",
     category: "dhat",
     root: "ح-ق-ق",
-    description: "The necessary, self-subsisting reality — the only being whose existence is not contingent; all else is real only insofar as it participates in His truth.",
+    description:
+      "The necessary, self-subsisting reality — the only being whose existence is not contingent; all else is real only insofar as it participates in His truth.",
   },
   {
     id: 52,
@@ -548,7 +605,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Trustee",
     category: "af'al",
     root: "و-ك-ل",
-    description: "The disposer of affairs for all who entrust themselves to Him — tawakkul (reliance) is the creature's response to this divine name.",
+    description:
+      "The disposer of affairs for all who entrust themselves to Him — tawakkul (reliance) is the creature's response to this divine name.",
   },
   {
     id: 53,
@@ -558,7 +616,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The All-Powerful",
     category: "sifat",
     root: "ق-و-ي",
-    description: "Strength that knows no fatigue, depletion, or diminishment — the power of the Essence itself, which no resistance can affect.",
+    description:
+      "Strength that knows no fatigue, depletion, or diminishment — the power of the Essence itself, which no resistance can affect.",
   },
   {
     id: 54,
@@ -568,7 +627,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Firm",
     category: "sifat",
     root: "م-ت-ن",
-    description: "Absolute firmness in power and resolution — divine will and capacity are unshakeable, and no created force can cause the slightest wavering in His decree.",
+    description:
+      "Absolute firmness in power and resolution — divine will and capacity are unshakeable, and no created force can cause the slightest wavering in His decree.",
   },
   {
     id: 55,
@@ -578,7 +638,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Protecting Friend",
     category: "af'al",
     root: "و-ل-ي",
-    description: "The patron and ally who takes the believer under His guardianship — divine friendship that transforms the life of the one who draws near.",
+    description:
+      "The patron and ally who takes the believer under His guardianship — divine friendship that transforms the life of the one who draws near.",
   },
   {
     id: 56,
@@ -588,7 +649,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The All-Praiseworthy",
     category: "dhat",
     root: "ح-م-د",
-    description: "All praise in creation flows toward Him as to its natural source — praise that is not earned but belongs to the Essence as a necessary attribute.",
+    description:
+      "All praise in creation flows toward Him as to its natural source — praise that is not earned but belongs to the Essence as a necessary attribute.",
   },
   {
     id: 57,
@@ -598,7 +660,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The All-Enumerating",
     category: "sifat",
     root: "ح-ص-ي",
-    description: "The knowledge that counts and records every particular without the slightest omission — not a leaf falls, nor a thought arises, outside this precise divine enumeration.",
+    description:
+      "The knowledge that counts and records every particular without the slightest omission — not a leaf falls, nor a thought arises, outside this precise divine enumeration.",
   },
   {
     id: 58,
@@ -608,7 +671,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Originator",
     category: "af'al",
     root: "ب-د-أ",
-    description: "He who begins creation without precedent or model — the initial act of bringing forth that demonstrates unlimited creative power.",
+    description:
+      "He who begins creation without precedent or model — the initial act of bringing forth that demonstrates unlimited creative power.",
   },
   {
     id: 59,
@@ -618,7 +682,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Restorer",
     category: "af'al",
     root: "ع-و-د",
-    description: "He who returns creation to Himself after its passage through time — the resurrection and return that is the completion of the divine originating act.",
+    description:
+      "He who returns creation to Himself after its passage through time — the resurrection and return that is the completion of the divine originating act.",
   },
   {
     id: 60,
@@ -628,7 +693,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Giver of Life",
     category: "af'al",
     root: "ح-ي-ي",
-    description: "The sole originator of life in all its forms — physical life, spiritual vitality, and the life of the resurrection all belong to His act alone.",
+    description:
+      "The sole originator of life in all its forms — physical life, spiritual vitality, and the life of the resurrection all belong to His act alone.",
   },
   {
     id: 61,
@@ -638,7 +704,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Taker of Life",
     category: "af'al",
     root: "م-و-ت",
-    description: "He who decrees the death of every living thing — paired with Al-Muhyi to affirm that life and death are entirely in His hand, neither random nor outside His will.",
+    description:
+      "He who decrees the death of every living thing — paired with Al-Muhyi to affirm that life and death are entirely in His hand, neither random nor outside His will.",
   },
   {
     id: 62,
@@ -648,7 +715,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Ever-Living",
     category: "sifat",
     root: "ح-ي-ي",
-    description: "Life that is not preceded by non-existence and not followed by cessation — the essential divine life that sustains all contingent life; one of the seven Sifat al-Ma'ani.",
+    description:
+      "Life that is not preceded by non-existence and not followed by cessation — the essential divine life that sustains all contingent life; one of the seven Sifat al-Ma'ani.",
   },
   {
     id: 63,
@@ -658,7 +726,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Self-Subsisting",
     category: "dhat",
     root: "ق-و-م",
-    description: "He who subsists of Himself and on whom all else subsists — the Maturidi attribute of Qiyam bi-l-nafs (self-subsistence) embodied in this name.",
+    description:
+      "He who subsists of Himself and on whom all else subsists — the Maturidi attribute of Qiyam bi-l-nafs (self-subsistence) embodied in this name.",
   },
   {
     id: 64,
@@ -668,7 +737,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Finder",
     category: "dhat",
     root: "و-ج-د",
-    description: "He who finds and perceives all things with no searching or seeking — a name of the Essence whose awareness precedes every created event.",
+    description:
+      "He who finds and perceives all things with no searching or seeking — a name of the Essence whose awareness precedes every created event.",
   },
   {
     id: 65,
@@ -678,7 +748,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The One",
     category: "dhat",
     root: "و-ح-د",
-    description: "Oneness in essence, attributes, and acts — the foundation of tawhid; no second being shares in or participates in this oneness.",
+    description:
+      "Oneness in essence, attributes, and acts — the foundation of tawhid; no second being shares in or participates in this oneness.",
   },
   {
     id: 66,
@@ -688,7 +759,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Unique",
     category: "dhat",
     root: "و-ح-د",
-    description: "Absolute singularity that admits no composition, division, or partner — the name that Sura Al-Ikhlas uses to negate every conceivable form of association.",
+    description:
+      "Absolute singularity that admits no composition, division, or partner — the name that Sura Al-Ikhlas uses to negate every conceivable form of association.",
   },
   {
     id: 67,
@@ -698,7 +770,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Eternal",
     category: "dhat",
     root: "ص-م-د",
-    description: "The self-sufficient one to whom all creation turns in need — possessing no need of any kind while being the ultimate object of every creature's need.",
+    description:
+      "The self-sufficient one to whom all creation turns in need — possessing no need of any kind while being the ultimate object of every creature's need.",
   },
   {
     id: 68,
@@ -708,7 +781,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The All-Capable",
     category: "sifat",
     root: "ق-د-ر",
-    description: "Unlimited power over all possible things — one of the seven Sifat al-Ma'ani; the Maturidi school affirms that divine power does not extend to logical impossibilities, but this is a limit of logic, not of power.",
+    description:
+      "Unlimited power over all possible things — one of the seven Sifat al-Ma'ani; the Maturidi school affirms that divine power does not extend to logical impossibilities, but this is a limit of logic, not of power.",
   },
   {
     id: 69,
@@ -718,7 +792,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The All-Determining",
     category: "sifat",
     root: "ق-د-ر",
-    description: "He who exercises His power with decisive authority — a name that emphasises the active, sovereign exercise of the divine power.",
+    description:
+      "He who exercises His power with decisive authority — a name that emphasises the active, sovereign exercise of the divine power.",
   },
   {
     id: 70,
@@ -728,7 +803,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Expediter",
     category: "af'al",
     root: "ق-د-م",
-    description: "He who brings forward whomever and whatever He wills — advancing the believers, the prophets, and the causes that serve His purpose.",
+    description:
+      "He who brings forward whomever and whatever He wills — advancing the believers, the prophets, and the causes that serve His purpose.",
   },
   {
     id: 71,
@@ -738,7 +814,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Delayer",
     category: "af'al",
     root: "أ-خ-ر",
-    description: "He who postpones and delays according to wisdom — paired with Al-Muqaddim to show that all timing belongs to the divine will, not to chance.",
+    description:
+      "He who postpones and delays according to wisdom — paired with Al-Muqaddim to show that all timing belongs to the divine will, not to chance.",
   },
   {
     id: 72,
@@ -748,7 +825,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The First",
     category: "dhat",
     root: "أ-و-ل",
-    description: "He who precedes all things with no beginning — existence prior to time and before any created reality; the Qidam (eternity a parte ante) of the Essence.",
+    description:
+      "He who precedes all things with no beginning — existence prior to time and before any created reality; the Qidam (eternity a parte ante) of the Essence.",
   },
   {
     id: 73,
@@ -758,7 +836,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Last",
     category: "dhat",
     root: "أ-خ-ر",
-    description: "He who remains after all things — Baqa (eternal permanence); when all created things pass away, only the Divine Essence persists.",
+    description:
+      "He who remains after all things — Baqa (eternal permanence); when all created things pass away, only the Divine Essence persists.",
   },
   {
     id: 74,
@@ -768,7 +847,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Manifest",
     category: "dhat",
     root: "ظ-ه-ر",
-    description: "He who is manifest through His signs, effects, and clear proofs — more evident than any created thing, though not grasped by direct sensory perception.",
+    description:
+      "He who is manifest through His signs, effects, and clear proofs — more evident than any created thing, though not grasped by direct sensory perception.",
   },
   {
     id: 75,
@@ -778,7 +858,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Hidden",
     category: "dhat",
     root: "ب-ط-ن",
-    description: "He who is hidden from direct comprehension — transcendence so complete that the Essence itself is beyond the reach of any created faculty.",
+    description:
+      "He who is hidden from direct comprehension — transcendence so complete that the Essence itself is beyond the reach of any created faculty.",
   },
   {
     id: 76,
@@ -788,7 +869,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Governor",
     category: "af'al",
     root: "و-ل-ي",
-    description: "He who governs and administers the entire created order — the sovereign management of the cosmos that proceeds from His unlimited knowledge and will.",
+    description:
+      "He who governs and administers the entire created order — the sovereign management of the cosmos that proceeds from His unlimited knowledge and will.",
   },
   {
     id: 77,
@@ -798,7 +880,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Most Exalted",
     category: "sifat",
     root: "ع-ل-و",
-    description: "He who is supremely exalted above every comparison, attribution, or limitation — the ultimate expression of tanzih (transcendence) in divine names.",
+    description:
+      "He who is supremely exalted above every comparison, attribution, or limitation — the ultimate expression of tanzih (transcendence) in divine names.",
   },
   {
     id: 78,
@@ -808,7 +891,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Source of Goodness",
     category: "af'al",
     root: "ب-ر-ر",
-    description: "The origin of every form of goodness and beneficence — all that is good in creation is a trace of the divine al-Birr radiating outward.",
+    description:
+      "The origin of every form of goodness and beneficence — all that is good in creation is a trace of the divine al-Birr radiating outward.",
   },
   {
     id: 79,
@@ -818,7 +902,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Acceptor of Repentance",
     category: "af'al",
     root: "ت-و-ب",
-    description: "He who ceaselessly turns toward the repentant with acceptance — the divine turning precedes, enables, and completes the human turning; both the initiator and receiver of tawba.",
+    description:
+      "He who ceaselessly turns toward the repentant with acceptance — the divine turning precedes, enables, and completes the human turning; both the initiator and receiver of tawba.",
   },
   {
     id: 80,
@@ -828,7 +913,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Avenger",
     category: "af'al",
     root: "ن-ق-م",
-    description: "He who executes justice against the unjust — divine retribution that is not rage but the measured correction of the cosmic moral order.",
+    description:
+      "He who executes justice against the unjust — divine retribution that is not rage but the measured correction of the cosmic moral order.",
   },
   {
     id: 81,
@@ -838,7 +924,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Pardoner",
     category: "af'al",
     root: "ع-ف-و",
-    description: "He who erases sins completely — not merely covering them as Al-Ghafur does but effacing them entirely so they leave no trace in the divine record.",
+    description:
+      "He who erases sins completely — not merely covering them as Al-Ghafur does but effacing them entirely so they leave no trace in the divine record.",
   },
   {
     id: 82,
@@ -848,7 +935,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Most Compassionate",
     category: "sifat",
     root: "ر-أ-ف",
-    description: "A compassion more intense than mercy — the tenderness of the divine care that acts to remove hardship before it overwhelms the beloved creature.",
+    description:
+      "A compassion more intense than mercy — the tenderness of the divine care that acts to remove hardship before it overwhelms the beloved creature.",
   },
   {
     id: 83,
@@ -858,7 +946,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "Owner of All Sovereignty",
     category: "dhat",
     root: "م-ل-ك",
-    description: "Absolute ownership of every realm, domain, and kingdom — no sovereignty exists independently; all thrones are merely given in trust and retrieved at will.",
+    description:
+      "Absolute ownership of every realm, domain, and kingdom — no sovereignty exists independently; all thrones are merely given in trust and retrieved at will.",
   },
   {
     id: 84,
@@ -868,7 +957,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "Lord of Majesty and Bounty",
     category: "dhat",
     root: "ج-ل-ل",
-    description: "The pairing of transcendent awe-inspiring majesty (jalal) with active honouring generosity (ikram) — the complete divine character toward which all worship is directed.",
+    description:
+      "The pairing of transcendent awe-inspiring majesty (jalal) with active honouring generosity (ikram) — the complete divine character toward which all worship is directed.",
   },
   {
     id: 85,
@@ -878,7 +968,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Equitable",
     category: "af'al",
     root: "ق-س-ط",
-    description: "He who deals with perfect fairness — equity in judgment, proportion in reward and recompense, and the source of all just dealings in the social order.",
+    description:
+      "He who deals with perfect fairness — equity in judgment, proportion in reward and recompense, and the source of all just dealings in the social order.",
   },
   {
     id: 86,
@@ -888,7 +979,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Gatherer",
     category: "af'al",
     root: "ج-م-ع",
-    description: "He who gathers all things for the Day of Assembly — the gathering of dispersed realities into one moment of accountability and completion.",
+    description:
+      "He who gathers all things for the Day of Assembly — the gathering of dispersed realities into one moment of accountability and completion.",
   },
   {
     id: 87,
@@ -898,7 +990,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Self-Sufficient",
     category: "dhat",
     root: "غ-ن-ي",
-    description: "Absolute richness and independence — needing nothing from creation while being the source from which all created needs are satisfied.",
+    description:
+      "Absolute richness and independence — needing nothing from creation while being the source from which all created needs are satisfied.",
   },
   {
     id: 88,
@@ -908,7 +1001,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Enricher",
     category: "af'al",
     root: "غ-ن-ي",
-    description: "He who removes need and bestows sufficiency upon whomever He wills — enrichment of the body, spirit, and heart all flow from this divine act.",
+    description:
+      "He who removes need and bestows sufficiency upon whomever He wills — enrichment of the body, spirit, and heart all flow from this divine act.",
   },
   {
     id: 89,
@@ -918,7 +1012,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Preventer",
     category: "af'al",
     root: "م-ن-ع",
-    description: "He who withholds what would harm and prevents what is not due — the prevention that is itself a mercy, though the creature may not perceive it as such.",
+    description:
+      "He who withholds what would harm and prevents what is not due — the prevention that is itself a mercy, though the creature may not perceive it as such.",
   },
   {
     id: 90,
@@ -928,7 +1023,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Distresser",
     category: "af'al",
     root: "ض-ر-ر",
-    description: "He who sends trial and hardship by His will — in Maturidi thought, harm as well as benefit originates solely from the divine act, affirming tawhid in all circumstances.",
+    description:
+      "He who sends trial and hardship by His will — in Maturidi thought, harm as well as benefit originates solely from the divine act, affirming tawhid in all circumstances.",
   },
   {
     id: 91,
@@ -938,7 +1034,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Benefiter",
     category: "af'al",
     root: "ن-ف-ع",
-    description: "He who creates and directs all benefit — paired with Ad-Darr to affirm that both benefit and harm come from the same divine will that is entirely wise and just.",
+    description:
+      "He who creates and directs all benefit — paired with Ad-Darr to affirm that both benefit and harm come from the same divine will that is entirely wise and just.",
   },
   {
     id: 92,
@@ -948,7 +1045,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Light",
     category: "dhat",
     root: "ن-و-ر",
-    description: "The light of the heavens and the earth — not physical light but the ontological illumination by which anything can be known, seen, or guided.",
+    description:
+      "The light of the heavens and the earth — not physical light but the ontological illumination by which anything can be known, seen, or guided.",
   },
   {
     id: 93,
@@ -958,7 +1056,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Guide",
     category: "af'al",
     root: "ه-د-ي",
-    description: "The sovereign guide who directs whomever He wills to the straight path — divine guidance (tawfiq) is an act from Him, while human choice operates within this framework.",
+    description:
+      "The sovereign guide who directs whomever He wills to the straight path — divine guidance (tawfiq) is an act from Him, while human choice operates within this framework.",
   },
   {
     id: 94,
@@ -968,7 +1067,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Incomparable Originator",
     category: "af'al",
     root: "ب-د-ع",
-    description: "He who creates in ways that have no precedent or parallel — every act of creation is unprecedented because it flows from an essence that is itself incomparable.",
+    description:
+      "He who creates in ways that have no precedent or parallel — every act of creation is unprecedented because it flows from an essence that is itself incomparable.",
   },
   {
     id: 95,
@@ -978,7 +1078,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Everlasting",
     category: "dhat",
     root: "ب-ق-ي",
-    description: "Eternal permanence with no end — the Baqa attribute of the divine Essence; all created existence is borrowed and temporary while His is necessary and permanent.",
+    description:
+      "Eternal permanence with no end — the Baqa attribute of the divine Essence; all created existence is borrowed and temporary while His is necessary and permanent.",
   },
   {
     id: 96,
@@ -988,7 +1089,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Inheritor",
     category: "af'al",
     root: "و-ر-ث",
-    description: "He to whom all returns after the passing of every created owner — the final and only enduring possessor when all created claims have expired.",
+    description:
+      "He to whom all returns after the passing of every created owner — the final and only enduring possessor when all created claims have expired.",
   },
   {
     id: 97,
@@ -998,7 +1100,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Guide to the Right Path",
     category: "sifat",
     root: "ر-ش-د",
-    description: "He whose every act is perfectly well-directed and guided — wisdom so complete that nothing He does is wasteful, misdirected, or improvised.",
+    description:
+      "He whose every act is perfectly well-directed and guided — wisdom so complete that nothing He does is wasteful, misdirected, or improvised.",
   },
   {
     id: 98,
@@ -1008,7 +1111,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The Most Patient",
     category: "sifat",
     root: "ص-ب-ر",
-    description: "He who does not hasten punishment despite transgression — divine patience that gives creatures time to return, and that should inspire the believer's own sabr.",
+    description:
+      "He who does not hasten punishment despite transgression — divine patience that gives creatures time to return, and that should inspire the believer's own sabr.",
   },
   {
     id: 99,
@@ -1018,7 +1122,8 @@ export const DIVINE_NAMES: DivineName[] = [
     meaning: "The God",
     category: "dhat",
     root: "أ-ل-ه",
-    description: "The supreme proper name — Al-Ism al-A'zam (the Greatest Name) that encompasses all divine attributes; the name to which all other names are adjectives.",
+    description:
+      "The supreme proper name — Al-Ism al-A'zam (the Greatest Name) that encompasses all divine attributes; the name to which all other names are adjectives.",
   },
 ];
 

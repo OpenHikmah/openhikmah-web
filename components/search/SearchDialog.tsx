@@ -135,11 +135,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
       if (isFirst) {
         position = { x: 0, y: 0 };
       } else {
-        const anchorCenter = viewportCenter(
-          viewport,
-          window.innerWidth,
-          window.innerHeight
-        );
+        const anchorCenter = viewportCenter(viewport, window.innerWidth, window.innerHeight);
         const anchor = {
           x: anchorCenter.x - NODE_WIDTH / 2,
           y: anchorCenter.y - NODE_HEIGHT / 2,
@@ -330,9 +326,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
               {!showSeedVerses && !showPreview && !showResults && !busy && !previewError && (
                 <div className="px-4 py-8 text-center">
                   <p className="text-sm text-text-muted">
-                    {mode === "meaning"
-                      ? "No verses matched that meaning."
-                      : "No results found"}
+                    {mode === "meaning" ? "No verses matched that meaning." : "No results found"}
                   </p>
                 </div>
               )}

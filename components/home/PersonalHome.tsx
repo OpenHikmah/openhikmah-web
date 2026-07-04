@@ -25,10 +25,7 @@ function QuickLink({
 }) {
   return (
     <Link href={href} className="group block">
-      <Card
-        interactive
-        className="flex items-center gap-3.5 rounded-xl p-4 active:scale-[0.99]"
-      >
+      <Card interactive className="flex items-center gap-3.5 rounded-xl p-4 active:scale-[0.99]">
         <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-surface-raised text-text-secondary transition-colors group-hover:border-gold-muted group-hover:text-gold">
           <Icon className="size-[18px]" />
         </span>
@@ -87,7 +84,9 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
           </p>
           <h1 className="mt-1.5 text-[clamp(1.5rem,3.5vw,2.1rem)] font-semibold tracking-[-0.02em] text-text-primary">
             {username ? (
-              <>Welcome back, <span className="text-gold">{username}</span></>
+              <>
+                Welcome back, <span className="text-gold">{username}</span>
+              </>
             ) : (
               "Welcome back"
             )}

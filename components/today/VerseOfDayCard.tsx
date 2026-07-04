@@ -18,13 +18,7 @@ import { useCopyFeedback } from "@/hooks/useCopyFeedback";
  * source carries no reflection yet; the `reflection` prop is here for the future
  * admin-curated override (design.md §6.A).
  */
-export function VerseOfDayCard({
-  verse,
-  reflection,
-}: {
-  verse: Verse;
-  reflection?: string;
-}) {
+export function VerseOfDayCard({ verse, reflection }: { verse: Verse; reflection?: string }) {
   const playVerse = useAudioStore((s) => s.playVerse);
   const pauseAudio = useAudioStore((s) => s.pause);
   const resumeAudio = useAudioStore((s) => s.resume);
@@ -50,7 +44,13 @@ export function VerseOfDayCard({
   const handleListen = () => {
     if (isThisPlaying) pauseAudio();
     else if (isThisCurrent) resumeAudio();
-    else playVerse({ ref: verse.ref, surah: verse.surah, ayah: verse.ayah, surahName: verse.surahName });
+    else
+      playVerse({
+        ref: verse.ref,
+        surah: verse.surah,
+        ayah: verse.ayah,
+        surahName: verse.surahName,
+      });
   };
 
   const handleShare = () => {
@@ -79,7 +79,10 @@ export function VerseOfDayCard({
           )}
         </div>
 
-        <p dir="rtl" className="font-arabic text-right text-[22px] leading-[2.05] text-text-primary">
+        <p
+          dir="rtl"
+          className="font-arabic text-right text-[22px] leading-[2.05] text-text-primary"
+        >
           {verse.arabicText}
         </p>
 

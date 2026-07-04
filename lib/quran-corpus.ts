@@ -56,9 +56,6 @@ export async function getVerses(refs: string[]): Promise<Map<string, Verse>> {
 /** Subset of `refs` that exist in the corpus — used to reject hallucinated refs. */
 export async function existingRefs(refs: string[]): Promise<Set<string>> {
   if (refs.length === 0) return new Set();
-  const rows = await db
-    .select({ ref: verses.ref })
-    .from(verses)
-    .where(inArray(verses.ref, refs));
+  const rows = await db.select({ ref: verses.ref }).from(verses).where(inArray(verses.ref, refs));
   return new Set(rows.map((r) => r.ref));
 }

@@ -3,17 +3,24 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ── Mock the drizzle db ──────────────────────────────────────────────────────
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chain: any = new Proxy(function () { return chain; }, {
-    get(_t, prop) {
-      if (prop === "then")
-        return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-      if (prop === "catch")
-        return (rej: (e: unknown) => unknown) => Promise.resolve(resolveWith).catch(rej);
-      return () => chain;
+  const chain: any = new Proxy(
+    function () {
+      return chain;
     },
-    apply() { return chain; },
-  });
+    {
+      get(_t, prop) {
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        if (prop === "catch")
+          return (rej: (e: unknown) => unknown) => Promise.resolve(resolveWith).catch(rej);
+        return () => chain;
+      },
+      apply() {
+        return chain;
+      },
+    }
+  );
   return chain;
 }
 

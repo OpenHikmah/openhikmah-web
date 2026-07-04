@@ -37,10 +37,7 @@ export function NameReflection({ slug, accent }: Props) {
       }}
     >
       <div className="flex items-center gap-2">
-        <span
-          className="text-xs font-mono uppercase tracking-widest"
-          style={{ color: accent }}
-        >
+        <span className="text-xs font-mono uppercase tracking-widest" style={{ color: accent }}>
           Believer&apos;s Reflection
         </span>
         <span className="text-xs font-arabic" style={{ color: "var(--color-text-muted)" }}>

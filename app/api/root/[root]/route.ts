@@ -12,10 +12,7 @@ import { getVerses } from "@/lib/quran-corpus";
  */
 const MAX_VERSES = 24;
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ root: string }> }
-) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ root: string }> }) {
   const { root: rawRoot } = await params;
   const root = decodeURIComponent(rawRoot ?? "").trim();
 

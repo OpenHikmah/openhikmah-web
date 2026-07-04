@@ -3,15 +3,22 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ── Chainable + thenable DB proxy (mirrors __tests__/lib/graph-service.test.ts) ──
 function makeSelectChain(resolveWith: unknown[]) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chain: any = new Proxy(function () { return chain; }, {
-    get(_t, prop) {
-      if (prop === "then")
-        return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-      return () => chain;
+  const chain: any = new Proxy(
+    function () {
+      return chain;
     },
-    apply() { return chain; },
-  });
+    {
+      get(_t, prop) {
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        return () => chain;
+      },
+      apply() {
+        return chain;
+      },
+    }
+  );
   return chain;
 }
 
@@ -41,9 +48,7 @@ describe("getOrGenerateNameContent", () => {
   });
 
   it("returns the cached value on a hit WITHOUT generating", async () => {
-    mockSelect.mockReturnValue(
-      makeSelectChain([{ data: JSON.stringify(["cached"]), version: 1 }])
-    );
+    mockSelect.mockReturnValue(makeSelectChain([{ data: JSON.stringify(["cached"]), version: 1 }]));
     const generate = vi.fn();
 
     const out = await getOrGenerateNameContent("as-salam", "verses", 1, generate, isEmptyArr);
@@ -68,9 +73,7 @@ describe("getOrGenerateNameContent", () => {
   });
 
   it("regenerates when the stored version is older than the current version", async () => {
-    mockSelect.mockReturnValue(
-      makeSelectChain([{ data: JSON.stringify(["old"]), version: 1 }])
-    );
+    mockSelect.mockReturnValue(makeSelectChain([{ data: JSON.stringify(["old"]), version: 1 }]));
     const generate = vi.fn().mockResolvedValue(["new"]);
 
     const out = await getOrGenerateNameContent("al-malik", "verses", 2, generate, isEmptyArr);
@@ -102,11 +105,17 @@ describe("getOrGenerateNameContent", () => {
   });
 
   it("round-trips a string payload (reflection)", async () => {
-    mockSelect.mockReturnValue(makeSelectChain([{ data: JSON.stringify("a reflection"), version: 1 }]));
+    mockSelect.mockReturnValue(
+      makeSelectChain([{ data: JSON.stringify("a reflection"), version: 1 }])
+    );
     const generate = vi.fn();
 
     const out = await getOrGenerateNameContent(
-      "ar-rahman", "reflection", 1, generate, (s: string) => s.trim() === ""
+      "ar-rahman",
+      "reflection",
+      1,
+      generate,
+      (s: string) => s.trim() === ""
     );
 
     expect(out).toBe("a reflection");
@@ -116,7 +125,12 @@ describe("getOrGenerateNameContent", () => {
   it("coalesces concurrent identical first-loads into ONE generation", async () => {
     mockSelect.mockReturnValue(makeSelectChain([])); // always a miss
     let release!: (v: string[]) => void;
-    const generate = vi.fn(() => new Promise<string[]>((res) => { release = res; }));
+    const generate = vi.fn(
+      () =>
+        new Promise<string[]>((res) => {
+          release = res;
+        })
+    );
 
     const all = Promise.all([
       getOrGenerateNameContent("al-malik", "verses", 1, generate, isEmptyArr),
@@ -136,10 +150,7 @@ describe("getOrGenerateNameContent", () => {
 
   it("surfaces a generate() rejection and clears the lock so the next call retries", async () => {
     mockSelect.mockReturnValue(makeSelectChain([])); // miss
-    const generate = vi
-      .fn()
-      .mockRejectedValueOnce(new Error("boom"))
-      .mockResolvedValue(["ok"]);
+    const generate = vi.fn().mockRejectedValueOnce(new Error("boom")).mockResolvedValue(["ok"]);
 
     await expect(
       getOrGenerateNameContent("al-malik", "verses", 1, generate, isEmptyArr)

@@ -24,9 +24,7 @@ const card = cva("rounded-lg border border-border", {
   defaultVariants: { variant: "base", interactive: false },
 });
 
-export interface CardProps
-  extends HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof card> {}
+export interface CardProps extends HTMLAttributes<HTMLDivElement>, VariantProps<typeof card> {}
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(
   ({ className, variant, interactive, ...props }, ref) => (

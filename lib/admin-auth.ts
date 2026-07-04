@@ -45,9 +45,7 @@ export function isAdminQfId(qfId: string | null | undefined): boolean {
  * MUST call this — it is the real security boundary, since the admin UI itself is
  * client-rendered and cannot be trusted.
  */
-export async function requireAdmin(
-  req: NextRequest
-): Promise<AuthedUser | NextResponse> {
+export async function requireAdmin(req: NextRequest): Promise<AuthedUser | NextResponse> {
   const result = await requireUser(req);
   if (result instanceof NextResponse) return result; // 401 / disabled
 

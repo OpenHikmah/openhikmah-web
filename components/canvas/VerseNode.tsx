@@ -84,16 +84,12 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
 
       <div className="p-3 space-y-2.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-mono truncate text-text-muted">
-            {verse.surahName}
-          </span>
+          <span className="text-xs font-mono truncate text-text-muted">{verse.surahName}</span>
           <div className="flex items-center gap-1.5 shrink-0">
             <span
               className={cn(
                 "text-xs font-mono px-1.5 py-0.5 rounded border",
-                verse.isRoot
-                  ? "text-gold border-gold bg-gold/10"
-                  : "text-text-muted border-border"
+                verse.isRoot ? "text-gold border-gold bg-gold/10" : "text-text-muted border-border"
               )}
             >
               {verse.ref}
@@ -110,11 +106,19 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
                   } else if (currentRef === verse.ref) {
                     resumeAudio();
                   } else {
-                    playVerse({ ref: verse.ref, surah: verse.surah, ayah: verse.ayah, surahName: verse.surahName });
+                    playVerse({
+                      ref: verse.ref,
+                      surah: verse.surah,
+                      ayah: verse.ayah,
+                      surahName: verse.surahName,
+                    });
                   }
                 }}
                 aria-label={isThisPlaying ? "Pause recitation" : "Play recitation"}
-                className={cn("max-md:size-11 max-md:[&_svg]:size-5", currentRef === verse.ref && "border-teal text-teal")}
+                className={cn(
+                  "max-md:size-11 max-md:[&_svg]:size-5",
+                  currentRef === verse.ref && "border-teal text-teal"
+                )}
               >
                 <Volume2 />
               </IconButton>
@@ -129,7 +133,10 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
                   toggleBookmark(verse.ref);
                 }}
                 aria-label={isBookmarked ? "Remove bookmark" : "Bookmark verse"}
-                className={cn("max-md:size-11 max-md:[&_svg]:size-5", isBookmarked && "border-gold-muted text-gold")}
+                className={cn(
+                  "max-md:size-11 max-md:[&_svg]:size-5",
+                  isBookmarked && "border-gold-muted text-gold"
+                )}
               >
                 <Heart fill={isBookmarked ? "currentColor" : "none"} />
               </IconButton>
@@ -163,7 +170,10 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
             }}
             disabled={isExpanding}
             aria-label="Expand connections"
-            className={cn("max-md:size-11 max-md:[&_svg]:size-5", expandMenuOpen && "border-teal text-teal")}
+            className={cn(
+              "max-md:size-11 max-md:[&_svg]:size-5",
+              expandMenuOpen && "border-teal text-teal"
+            )}
           >
             <Plus />
           </IconButton>
@@ -171,10 +181,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
       </div>
 
       {expandMenuOpen && (
-        <ExpandMenu
-          onSelect={handleExpandSelect}
-          onClose={() => setOpenExpandNodeId(null)}
-        />
+        <ExpandMenu onSelect={handleExpandSelect} onClose={() => setOpenExpandNodeId(null)} />
       )}
 
       {isExpanding && (

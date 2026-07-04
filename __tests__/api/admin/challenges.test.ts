@@ -7,21 +7,30 @@ vi.mock("@/lib/admin-audit", () => ({ logAdminAction: vi.fn() }));
 vi.mock("@/lib/challenges", () => ({
   scoreChallenge: vi.fn(async () => 0),
   pickWinner: vi.fn(() => 1),
-  resolveEndedChallenges: vi.fn(async () => new Map([[1, { challengerScore: 1, challengedScore: 0 }]])),
+  resolveEndedChallenges: vi.fn(
+    async () => new Map([[1, { challengerScore: 1, challengedScore: 0 }]])
+  ),
   resolveExpiredPending: vi.fn(async () => 0),
 }));
 
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chain: any = new Proxy(function () { return chain; }, {
-    get(_t, prop) {
-      if (prop === "then")
-        return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-      return () => chain;
+  const chain: any = new Proxy(
+    function () {
+      return chain;
     },
-    apply() { return chain; },
-  });
+    {
+      get(_t, prop) {
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        return () => chain;
+      },
+      apply() {
+        return chain;
+      },
+    }
+  );
   return chain;
 }
 
@@ -57,7 +66,9 @@ beforeEach(() => {
 
 describe("admin challenges [id]", () => {
   it("404s for a non-admin", async () => {
-    vi.mocked(requireAdmin).mockResolvedValue(NextResponse.json({ error: "Not found" }, { status: 404 }));
+    vi.mocked(requireAdmin).mockResolvedValue(
+      NextResponse.json({ error: "Not found" }, { status: 404 })
+    );
     expect((await PATCH(req("PATCH", { action: "end" }), params)).status).toBe(404);
   });
 
@@ -73,7 +84,9 @@ describe("admin challenges [id]", () => {
   });
 
   it("rejects override-winner with a non-participant id", async () => {
-    expect((await PATCH(req("PATCH", { action: "override-winner", winnerId: 999 }), params)).status).toBe(400);
+    expect(
+      (await PATCH(req("PATCH", { action: "override-winner", winnerId: 999 }), params)).status
+    ).toBe(400);
   });
 
   it("accepts override-winner with null (draw)", async () => {

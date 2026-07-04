@@ -3,10 +3,7 @@ import { db } from "@/lib/db";
 import { sharedCanvases } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-export async function GET(
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) {
@@ -14,11 +11,7 @@ export async function GET(
   }
 
   try {
-    const rows = await db
-      .select()
-      .from(sharedCanvases)
-      .where(eq(sharedCanvases.id, id))
-      .limit(1);
+    const rows = await db.select().from(sharedCanvases).where(eq(sharedCanvases.id, id)).limit(1);
 
     if (rows.length === 0) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });

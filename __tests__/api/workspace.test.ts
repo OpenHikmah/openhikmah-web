@@ -11,17 +11,22 @@ vi.mock("@/lib/social-auth", () => ({
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
-    function () { return chain; },
+    function () {
+      return chain;
+    },
     {
       get(_t, prop) {
-        if (prop === "then") return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-        if (prop === "catch") return (rej: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).catch(rej);
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        if (prop === "catch")
+          return (rej: (e: unknown) => unknown) => Promise.resolve(resolveWith).catch(rej);
         if (prop === Symbol.toStringTag) return "MockChain";
         return () => chain;
       },
-      apply() { return chain; },
+      apply() {
+        return chain;
+      },
     }
   );
   return chain;
@@ -31,20 +36,25 @@ function makeDbChain(resolveWith: unknown = []) {
 function makeRecordingChain(resolveWith: unknown, calls: Record<string, unknown[][]>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
-    function () { return chain; },
+    function () {
+      return chain;
+    },
     {
       get(_t, prop) {
-        if (prop === "then") return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-        if (prop === "catch") return (rej: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).catch(rej);
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        if (prop === "catch")
+          return (rej: (e: unknown) => unknown) => Promise.resolve(resolveWith).catch(rej);
         if (prop === Symbol.toStringTag) return "MockChain";
         return (...args: unknown[]) => {
           (calls[prop as string] ??= []).push(args);
           return chain;
         };
       },
-      apply() { return chain; },
+      apply() {
+        return chain;
+      },
     }
   );
   return chain;
@@ -126,7 +136,10 @@ describe("GET /api/workspace", () => {
   it("returns the user's workspaces", async () => {
     authed();
     mockSelect.mockReturnValue(
-      makeDbChain([{ id: 2, name: "B" }, { id: 1, name: "A" }])
+      makeDbChain([
+        { id: 2, name: "B" },
+        { id: 1, name: "A" },
+      ])
     );
     const res = await GET(req());
     expect(res.status).toBe(200);
@@ -159,7 +172,9 @@ describe("POST /api/workspace", () => {
   beforeEach(() => {
     vi.mocked(requireUser).mockReset();
     mockInsert.mockReset();
-    mockInsert.mockReturnValue(makeDbChain([{ id: 1, name: "Untitled canvas", createdAt: new Date() }]));
+    mockInsert.mockReturnValue(
+      makeDbChain([{ id: 1, name: "Untitled canvas", createdAt: new Date() }])
+    );
     mockRateLimitOrNull.mockReset();
     mockRateLimitOrNull.mockResolvedValue(null);
   });
@@ -172,7 +187,9 @@ describe("POST /api/workspace", () => {
 
   it("returns 429 when the per-user canvas-save rate limit is exceeded", async () => {
     authed();
-    mockRateLimitOrNull.mockResolvedValue(NextResponse.json({ error: "Too many" }, { status: 429 }));
+    mockRateLimitOrNull.mockResolvedValue(
+      NextResponse.json({ error: "Too many" }, { status: 429 })
+    );
     const res = await POST(req("POST", { data: { nodes: [] } }));
     expect(res.status).toBe(429);
   });

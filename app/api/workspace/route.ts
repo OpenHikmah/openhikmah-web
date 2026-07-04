@@ -35,7 +35,10 @@ export async function POST(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 
-  const limited = await rateLimitOrNull(`workspace:${authed.userId}`, "Too many canvases saved — try again later");
+  const limited = await rateLimitOrNull(
+    `workspace:${authed.userId}`,
+    "Too many canvases saved — try again later"
+  );
   if (limited) return limited;
 
   let body: { name?: string; data?: unknown; nodeCount?: number };
@@ -54,7 +57,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Canvas too large" }, { status: 413 });
   }
 
-  const name = ((body.name?.trim()) || "Untitled canvas").slice(0, 120);
+  const name = (body.name?.trim() || "Untitled canvas").slice(0, 120);
   const nodeCount = Math.max(
     0,
     Math.min(typeof body.nodeCount === "number" ? body.nodeCount : 0, 50000)
@@ -69,7 +72,11 @@ export async function POST(req: NextRequest) {
         data,
         nodeCount,
       })
-      .returning({ id: savedWorkspaces.id, name: savedWorkspaces.name, createdAt: savedWorkspaces.createdAt });
+      .returning({
+        id: savedWorkspaces.id,
+        name: savedWorkspaces.name,
+        createdAt: savedWorkspaces.createdAt,
+      });
 
     return NextResponse.json(inserted, { status: 201 });
   } catch (err) {

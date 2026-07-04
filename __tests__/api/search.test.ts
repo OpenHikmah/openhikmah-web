@@ -18,10 +18,9 @@ function makeSearchReq(q: string) {
 }
 
 function makeMeaningReq(q: string, headers: Record<string, string> = {}) {
-  return new NextRequest(
-    `http://localhost/api/search?q=${encodeURIComponent(q)}&mode=meaning`,
-    { headers }
-  );
+  return new NextRequest(`http://localhost/api/search?q=${encodeURIComponent(q)}&mode=meaning`, {
+    headers,
+  });
 }
 
 function semanticMatch(ref: string, translation: string) {

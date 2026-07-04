@@ -155,7 +155,11 @@ async function fetchJwks(): Promise<Jwk[]> {
       if (Array.isArray(data.keys) && data.keys.length > 0) {
         const expiresAt = Date.now() + JWKS_TTL_MS;
         jwksCache = { keys: data.keys, expiresAt };
-        void redisSet(JWKS_REDIS_KEY, JSON.stringify({ keys: data.keys, expiresAt }), JWKS_TTL_MS / 1000);
+        void redisSet(
+          JWKS_REDIS_KEY,
+          JSON.stringify({ keys: data.keys, expiresAt }),
+          JWKS_TTL_MS / 1000
+        );
         return data.keys;
       }
     } catch {
@@ -231,9 +235,7 @@ async function verifiedJwtSub(token: string): Promise<string | null> {
  * endpoint before the JWT fast-path was reliable) are still found even when the
  * JWT sub claim is present but has a different string representation.
  */
-export async function requireUser(
-  req: NextRequest
-): Promise<AuthedUser | NextResponse> {
+export async function requireUser(req: NextRequest): Promise<AuthedUser | NextResponse> {
   const auth = req.headers.get("authorization");
   const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
 
@@ -328,10 +330,7 @@ async function resolveQfIdFromUserinfo(accessToken: string): Promise<string | nu
   const qfAuthBase = process.env.QF_AUTH_BASE ?? "";
   if (!qfAuthBase) return null;
 
-  const endpoints = [
-    `${qfAuthBase}/oauth2/userinfo`,
-    `${qfAuthBase}/auth/v1/me`,
-  ];
+  const endpoints = [`${qfAuthBase}/oauth2/userinfo`, `${qfAuthBase}/auth/v1/me`];
 
   for (const url of endpoints) {
     try {
@@ -340,7 +339,7 @@ async function resolveQfIdFromUserinfo(accessToken: string): Promise<string | nu
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) continue;
-      const data = await res.json() as Record<string, unknown>;
+      const data = (await res.json()) as Record<string, unknown>;
       const sub = (data.sub ?? data.id ?? data.user_id ?? data.userId) as string | undefined;
       if (sub) return String(sub);
     } catch {

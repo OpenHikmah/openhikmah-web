@@ -6,7 +6,12 @@ import { getOrGenerateNameContent } from "@/lib/name-content";
 // Bump to force regeneration after a prompt change.
 const REFLECTION_VERSION = 1;
 
-function buildPrompt(arabic: string, transliteration: string, meaning: string, description: string): string {
+function buildPrompt(
+  arabic: string,
+  transliteration: string,
+  meaning: string,
+  description: string
+): string {
   return `You are a classical Islamic scholar grounded in the Maturidi/Hanafi tradition (Ahl al-Sunnah wal-Jama'ah).
 
 The divine name ${transliteration} (${arabic}) means "${meaning}".
@@ -37,10 +42,7 @@ async function getReflection(slug: string): Promise<string> {
   );
 }
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
-) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const name = getNameBySlug(slug);
   if (!name) {

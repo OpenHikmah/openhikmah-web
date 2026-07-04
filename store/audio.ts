@@ -91,7 +91,8 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
 
   resume: () => {
     if (!_audio) return;
-    _audio.play()
+    _audio
+      .play()
       .then(() => set({ isPlaying: true }))
       .catch(() => {});
   },
@@ -119,7 +120,12 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
       return;
     }
     const verse = queue[nextIdx];
-    set({ currentRef: verse.ref, currentSurahName: verse.surahName, queueIndex: nextIdx, isLoading: true });
+    set({
+      currentRef: verse.ref,
+      currentSurahName: verse.surahName,
+      queueIndex: nextIdx,
+      isLoading: true,
+    });
     loadAndPlay(verse, () => get()._onEnded())
       .then(() => set({ isLoading: false }))
       .catch(() => set({ isPlaying: false, isLoading: false }));
@@ -130,7 +136,12 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
     const prevIdx = queueIndex - 1;
     if (prevIdx < 0) return;
     const verse = queue[prevIdx];
-    set({ currentRef: verse.ref, currentSurahName: verse.surahName, queueIndex: prevIdx, isLoading: true });
+    set({
+      currentRef: verse.ref,
+      currentSurahName: verse.surahName,
+      queueIndex: prevIdx,
+      isLoading: true,
+    });
     loadAndPlay(verse, () => get()._onEnded())
       .then(() => set({ isLoading: false }))
       .catch(() => set({ isPlaying: false, isLoading: false }));

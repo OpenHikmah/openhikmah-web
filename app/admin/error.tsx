@@ -12,5 +12,7 @@ export default function AdminError({
   error: Error & { digest?: string };
   unstable_retry: () => void;
 }) {
-  return <RouteError error={error} retry={unstable_retry} homeHref="/admin" homeLabel="Admin home" />;
+  return (
+    <RouteError error={error} retry={unstable_retry} homeHref="/admin" homeLabel="Admin home" />
+  );
 }

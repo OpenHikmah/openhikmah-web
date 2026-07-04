@@ -17,7 +17,10 @@ function TafsirSection({ surah, ayah }: { surah: number; ayah: number }) {
   const [loading, setLoading] = useState(false);
 
   const handleOpen = async () => {
-    if (open) { setOpen(false); return; }
+    if (open) {
+      setOpen(false);
+      return;
+    }
     setOpen(true);
     if (blocks !== null) return;
     setLoading(true);
@@ -50,7 +53,11 @@ function TafsirSection({ surah, ayah }: { surah: number; ayah: number }) {
           ) : (
             blocks.map((b, i) =>
               b.arabic ? (
-                <p key={i} dir="rtl" className="font-arabic text-right text-sm leading-loose text-text-primary">
+                <p
+                  key={i}
+                  dir="rtl"
+                  className="font-arabic text-right text-sm leading-loose text-text-primary"
+                >
                   {b.text}
                 </p>
               ) : (
@@ -81,7 +88,10 @@ function NotesSection({ verseRef }: { verseRef: string }) {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
       .then((r) => (r.ok ? r.json() : []))
-      .then((data) => { setNotes(data); setLoaded(true); })
+      .then((data) => {
+        setNotes(data);
+        setLoaded(true);
+      })
       .catch(() => {});
   }, [open, verseRef, accessToken, loaded]);
 
@@ -137,10 +147,7 @@ function NotesSection({ verseRef }: { verseRef: string }) {
           ) : (
             <>
               {notes.map((n) => (
-                <div
-                  key={n.id}
-                  className="flex items-start gap-2 rounded border border-border p-2"
-                >
+                <div key={n.id} className="flex items-start gap-2 rounded border border-border p-2">
                   <p className="flex-1 text-xs leading-relaxed text-text-secondary">{n.note}</p>
                   <button
                     onClick={() => remove(n.id)}
@@ -181,7 +188,10 @@ function SimilarSection({ surah, ayah }: { surah: number; ayah: number }) {
   const [loading, setLoading] = useState(false);
 
   const handleOpen = async () => {
-    if (open) { setOpen(false); return; }
+    if (open) {
+      setOpen(false);
+      return;
+    }
     setOpen(true);
     if (refs !== null) return;
     setLoading(true);
@@ -285,16 +295,30 @@ export function ContextSidebar() {
                   </span>
                 </div>
 
-                <InteractiveArabic key={`arabic-${sidebarContent.verse.ref}`} verse={sidebarContent.verse} />
+                <InteractiveArabic
+                  key={`arabic-${sidebarContent.verse.ref}`}
+                  verse={sidebarContent.verse}
+                />
 
                 <p className="text-sm leading-relaxed text-text-secondary">
                   {sidebarContent.verse.translation}
                 </p>
 
-                <TafsirSection key={`tafsir-${sidebarContent.verse.ref}`} surah={sidebarContent.verse.surah} ayah={sidebarContent.verse.ayah} />
+                <TafsirSection
+                  key={`tafsir-${sidebarContent.verse.ref}`}
+                  surah={sidebarContent.verse.surah}
+                  ayah={sidebarContent.verse.ayah}
+                />
 
-                <NotesSection key={`notes-${sidebarContent.verse.ref}`} verseRef={sidebarContent.verse.ref} />
-                <SimilarSection key={`similar-${sidebarContent.verse.ref}`} surah={sidebarContent.verse.surah} ayah={sidebarContent.verse.ayah} />
+                <NotesSection
+                  key={`notes-${sidebarContent.verse.ref}`}
+                  verseRef={sidebarContent.verse.ref}
+                />
+                <SimilarSection
+                  key={`similar-${sidebarContent.verse.ref}`}
+                  surah={sidebarContent.verse.surah}
+                  ayah={sidebarContent.verse.ayah}
+                />
               </>
             )}
 
@@ -310,8 +334,12 @@ export function ContextSidebar() {
                 {/* From verse */}
                 <Card variant="raised" className="space-y-1 rounded-md p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-text-muted">{sidebarContent.fromVerse.surahName}</span>
-                    <span className="font-mono text-xs text-text-muted">{sidebarContent.fromVerse.ref}</span>
+                    <span className="text-xs text-text-muted">
+                      {sidebarContent.fromVerse.surahName}
+                    </span>
+                    <span className="font-mono text-xs text-text-muted">
+                      {sidebarContent.fromVerse.ref}
+                    </span>
                   </div>
                   <p className="text-xs leading-relaxed text-text-secondary">
                     {sidebarContent.fromVerse.translation.length > 100
@@ -323,14 +351,20 @@ export function ContextSidebar() {
                 {/* Reason */}
                 <Card variant="raised" className="rounded-md p-3">
                   <p className="mb-1.5 text-xs text-text-muted">Why connected</p>
-                  <p className="text-xs leading-relaxed text-text-primary">{sidebarContent.reason}</p>
+                  <p className="text-xs leading-relaxed text-text-primary">
+                    {sidebarContent.reason}
+                  </p>
                 </Card>
 
                 {/* To verse */}
                 <Card variant="raised" className="space-y-2 rounded-md p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-text-muted">{sidebarContent.toVerse.surahName}</span>
-                    <span className="font-mono text-xs text-text-muted">{sidebarContent.toVerse.ref}</span>
+                    <span className="text-xs text-text-muted">
+                      {sidebarContent.toVerse.surahName}
+                    </span>
+                    <span className="font-mono text-xs text-text-muted">
+                      {sidebarContent.toVerse.ref}
+                    </span>
                   </div>
                   <p className="font-arabic text-right text-sm leading-loose text-text-primary">
                     {sidebarContent.toVerse.arabicText}

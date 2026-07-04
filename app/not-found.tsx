@@ -9,8 +9,8 @@ export default function NotFound() {
       <Compass className="mb-5 h-10 w-10 text-gold" />
       <h1 className="text-2xl font-semibold text-text-primary">Page not found</h1>
       <p className="mt-2 max-w-sm text-sm text-text-secondary">
-        This path doesn&rsquo;t lead anywhere. The verse, name, or page you&rsquo;re looking for
-        may have moved.
+        This path doesn&rsquo;t lead anywhere. The verse, name, or page you&rsquo;re looking for may
+        have moved.
       </p>
       <Link
         href="/"

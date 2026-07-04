@@ -5,7 +5,8 @@ import { NavBar } from "@/components/layout/NavBar";
 
 export const metadata = {
   title: "Asma-ul-Husna — Open Hikmah",
-  description: "The 99 Beautiful Names of Allah with Maturidi taxonomy, root morphology, and verse connections.",
+  description:
+    "The 99 Beautiful Names of Allah with Maturidi taxonomy, root morphology, and verse connections.",
 };
 
 const CATEGORY_ORDER: NameCategory[] = ["dhat", "sifat", "af'al"];
@@ -46,15 +47,13 @@ export default function NamesPage() {
         <p className="text-xs uppercase tracking-[0.2em] font-mono mb-3 text-text-muted">
           Asmaul Husna
         </p>
-        <h1 className="font-arabic text-5xl mb-2 text-gold">
-          أَسْمَاءُ اللَّه الْحُسْنَى
-        </h1>
+        <h1 className="font-arabic text-5xl mb-2 text-gold">أَسْمَاءُ اللَّه الْحُسْنَى</h1>
         <p className="text-2xl font-light mb-4 text-text-primary">
           The 99 Beautiful Names of Allah
         </p>
         <p className="text-sm max-w-xl mx-auto text-text-secondary">
-          Organised by Maturidi/Hanafi taxonomy — Sifat al-Dhat, Sifat al-Ma&apos;ani, and Sifat al-Af&apos;al.
-          Click any name to explore its verses.
+          Organised by Maturidi/Hanafi taxonomy — Sifat al-Dhat, Sifat al-Ma&apos;ani, and Sifat
+          al-Af&apos;al. Click any name to explore its verses.
         </p>
 
         {/* Legend */}
@@ -104,11 +103,11 @@ export default function NamesPage() {
                     <div className="text-xs text-center font-mono mb-1 text-text-secondary">
                       {name.transliteration}
                     </div>
-                    <div className="text-xs text-center text-text-muted">
-                      {name.meaning}
-                    </div>
+                    <div className="text-xs text-center text-text-muted">{name.meaning}</div>
                     <div className="mt-2 flex justify-center">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${colors.badge}`}>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${colors.badge}`}
+                      >
                         {name.root}
                       </span>
                     </div>

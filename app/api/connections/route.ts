@@ -42,10 +42,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(results);
   } catch (err) {
     if (err instanceof RateLimitError) {
-      return NextResponse.json(
-        { error: "Too many requests — please slow down." },
-        { status: 429 }
-      );
+      return NextResponse.json({ error: "Too many requests — please slow down." }, { status: 429 });
     }
     console.error("Connections route error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

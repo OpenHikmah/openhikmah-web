@@ -68,7 +68,17 @@ services:
     # is down. An empty REDIS_PASSWORD disables auth on both ends.
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-}", "--save", "60", "1", "--appendonly", "no"]
+    command:
+      [
+        "redis-server",
+        "--requirepass",
+        "${REDIS_PASSWORD:-}",
+        "--save",
+        "60",
+        "1",
+        "--appendonly",
+        "no",
+      ]
     volumes:
       - redis_data:/data
     healthcheck:
