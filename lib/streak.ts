@@ -21,10 +21,7 @@ export function yesterdayUTC(): string {
  * (last activity today or yesterday), otherwise 0 (the stored value is stale and
  * the run is broken until the next activity resets it to 1).
  */
-export function effectiveStreak(
-  currentStreak: number,
-  lastActivityDate: string | null
-): number {
+export function effectiveStreak(currentStreak: number, lastActivityDate: string | null): number {
   if (!lastActivityDate) return 0;
   return lastActivityDate >= yesterdayUTC() ? currentStreak : 0;
 }

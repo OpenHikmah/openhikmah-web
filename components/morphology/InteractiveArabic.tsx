@@ -30,9 +30,10 @@ interface ConcordanceVerse {
  */
 export function InteractiveArabic({ verse }: { verse: InteractiveVerse }) {
   // Tag stored morphology with its verse ref so stale callbacks are ignored.
-  const [morphology, setMorphology] = useState<{ ref: string; words: MorphologyWord[] }>(
-    { ref: "", words: [] }
-  );
+  const [morphology, setMorphology] = useState<{ ref: string; words: MorphologyWord[] }>({
+    ref: "",
+    words: [],
+  });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -59,11 +60,7 @@ export function InteractiveArabic({ verse }: { verse: InteractiveVerse }) {
       {tokens.map((token, i) => (
         <span key={i}>
           {i > 0 ? " " : ""}
-          {token.root ? (
-            <WordPopover token={token} currentRef={verse.ref} />
-          ) : (
-            token.text
-          )}
+          {token.root ? <WordPopover token={token} currentRef={verse.ref} /> : token.text}
         </span>
       ))}
     </p>

@@ -6,7 +6,10 @@ const { mockCallAI } = vi.hoisted(() => ({ mockCallAI: vi.fn() }));
 vi.mock("@/lib/ai", () => ({ callAI: mockCallAI }));
 // Guard against accidental network in the resolver fallback — everything must
 // resolve from the seeded corpus.
-vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false })));
+vi.stubGlobal(
+  "fetch",
+  vi.fn(async () => ({ ok: false }))
+);
 
 import { db } from "@/lib/db";
 import { verses, connections, aiGenerations } from "@/lib/db/schema";
@@ -78,7 +81,9 @@ describe("connection graph (integration, real Postgres)", () => {
   });
 
   it("the unique index dedupes duplicate edges", async () => {
-    await db.insert(connections).values({ fromRef: "1:1", toRef: "2:255", kind: "thematic", reason: "a" });
+    await db
+      .insert(connections)
+      .values({ fromRef: "1:1", toRef: "2:255", kind: "thematic", reason: "a" });
     await db
       .insert(connections)
       .values({ fromRef: "1:1", toRef: "2:255", kind: "thematic", reason: "b" })

@@ -33,7 +33,10 @@ export async function POST(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 
-  const limited = await rateLimitOrNull(`notes:${authed.userId}`, "Too many notes created — try again later");
+  const limited = await rateLimitOrNull(
+    `notes:${authed.userId}`,
+    "Too many notes created — try again later"
+  );
   if (limited) return limited;
 
   const body = await parseJson<{ ref?: string; note?: string }>(req);

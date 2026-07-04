@@ -76,9 +76,7 @@ export function FriendList({ friends, onUpdate }: Props) {
 
   if (empty) {
     return (
-      <p className="py-4 text-sm text-text-muted">
-        No friends yet. Add someone by username above.
-      </p>
+      <p className="py-4 text-sm text-text-muted">No friends yet. Add someone by username above.</p>
     );
   }
 

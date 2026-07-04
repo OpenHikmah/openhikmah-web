@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { getNameBySlug, DIVINE_NAMES, CATEGORY_LABELS, type NameCategory } from "@/lib/divine-names";
+import {
+  getNameBySlug,
+  DIVINE_NAMES,
+  CATEGORY_LABELS,
+  type NameCategory,
+} from "@/lib/divine-names";
 import { Wordmark } from "@/components/layout/Wordmark";
 import { NameVerses } from "./NameVerses";
 import { NameReflection } from "./NameReflection";
@@ -121,10 +126,7 @@ export default async function NameDetailPage({ params }: Props) {
           <span />
         )}
 
-        <Link
-          href="/names"
-          className="text-xs text-text-muted transition-opacity hover:opacity-80"
-        >
+        <Link href="/names" className="text-xs text-text-muted transition-opacity hover:opacity-80">
           All 99
         </Link>
 

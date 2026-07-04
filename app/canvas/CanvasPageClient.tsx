@@ -104,18 +104,13 @@ export function CanvasPageClient() {
       <NavBar />
 
       <main className="flex-1 relative overflow-hidden">
-        {nodes.length === 0 && (
-          <EmptyState onSearchOpen={() => setSearchOpen(true)} />
-        )}
+        {nodes.length === 0 && <EmptyState onSearchOpen={() => setSearchOpen(true)} />}
         <HikmahCanvas onSearchOpen={() => setSearchOpen(true)} />
         <ContextSidebar />
         <CanvasTour />
       </main>
 
-      <SearchDialog
-        open={searchOpen}
-        onClose={() => setSearchOpen(false)}
-      />
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 }

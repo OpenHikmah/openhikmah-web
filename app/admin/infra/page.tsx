@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { StatTile, Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
+import {
+  StatTile,
+  Table,
+  Th,
+  Td,
+  Pill,
+  StateNote,
+  ConfirmButton,
+} from "@/components/admin/primitives";
 import { InfoHint } from "@/components/admin/InfoHint";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
@@ -32,7 +40,10 @@ export default function InfraPage() {
     setMsg(null);
     setBusy(true);
     try {
-      const res = await api<Record<string, unknown>>("/infra", { method: "POST", json: { action } });
+      const res = await api<Record<string, unknown>>("/infra", {
+        method: "POST",
+        json: { action },
+      });
       setMsg(`Done: ${JSON.stringify(res)}`);
       reload();
     } catch (e) {
@@ -72,11 +83,17 @@ export default function InfraPage() {
               />
               <div className="rounded-lg border border-border bg-surface px-4 py-3.5">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">Redis</div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
+                    Redis
+                  </div>
                   <InfoHint text="Optional cache/accelerator. 'up' = connected, 'down' = configured but unreachable, 'disabled' = not configured (the app falls back to in-process/Postgres)." />
                 </div>
                 <div className="mt-2">
-                  <Pill tone={data.redis === "up" ? "active" : data.redis === "down" ? "flagged" : "neutral"}>
+                  <Pill
+                    tone={
+                      data.redis === "up" ? "active" : data.redis === "down" ? "flagged" : "neutral"
+                    }
+                  >
                     {data.redis}
                   </Pill>
                 </div>
@@ -86,13 +103,28 @@ export default function InfraPage() {
             <section className="space-y-3 rounded-lg border border-border bg-surface p-5">
               <h2 className="text-sm font-medium text-text-primary">Maintenance</h2>
               <div className="flex flex-wrap gap-2">
-                <ConfirmButton variant="secondary" disabled={busy} onConfirm={() => run("flush-tokens")} confirmLabel="Flush tokens?">
+                <ConfirmButton
+                  variant="secondary"
+                  disabled={busy}
+                  onConfirm={() => run("flush-tokens")}
+                  confirmLabel="Flush tokens?"
+                >
                   Flush token cache
                 </ConfirmButton>
-                <ConfirmButton variant="secondary" disabled={busy} onConfirm={() => run("flush-jwks")} confirmLabel="Flush JWKS?">
+                <ConfirmButton
+                  variant="secondary"
+                  disabled={busy}
+                  onConfirm={() => run("flush-jwks")}
+                  confirmLabel="Flush JWKS?"
+                >
                   Flush JWKS cache
                 </ConfirmButton>
-                <ConfirmButton variant="danger" disabled={busy} onConfirm={() => run("reset-ratelimits")} confirmLabel="Reset limits?">
+                <ConfirmButton
+                  variant="danger"
+                  disabled={busy}
+                  onConfirm={() => run("reset-ratelimits")}
+                  confirmLabel="Reset limits?"
+                >
                   Reset rate limits
                 </ConfirmButton>
               </div>

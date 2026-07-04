@@ -23,18 +23,11 @@ export async function GET(req: NextRequest) {
     })
     .from(friendships)
     .innerJoin(users, eq(users.id, friendships.requesterId))
-    .where(
-      or(
-        eq(friendships.requesterId, userId),
-        eq(friendships.addresseeId, userId)
-      )
-    )
+    .where(or(eq(friendships.requesterId, userId), eq(friendships.addresseeId, userId)))
     .limit(500);
 
   // Enrich with the friend's username (the other side)
-  const friendIds = rows.map((r) =>
-    r.requesterId === userId ? r.addresseeId : r.requesterId
-  );
+  const friendIds = rows.map((r) => (r.requesterId === userId ? r.addresseeId : r.requesterId));
 
   const friendUsers =
     friendIds.length > 0
@@ -71,7 +64,10 @@ export async function POST(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 
-  const limited = await rateLimitOrNull(`friend-req:${authed.userId}`, "Too many friend requests — try again later");
+  const limited = await rateLimitOrNull(
+    `friend-req:${authed.userId}`,
+    "Too many friend requests — try again later"
+  );
   if (limited) return limited;
 
   let body: { username?: string };
@@ -133,14 +129,24 @@ export async function POST(req: NextRequest) {
           .set({ status: "accepted", updatedAt: new Date() })
           .where(eq(friendships.id, existing.id))
           .returning();
-        return NextResponse.json({ id: accepted.id, status: accepted.status, friend, mutual: true });
+        return NextResponse.json({
+          id: accepted.id,
+          status: accepted.status,
+          friend,
+          mutual: true,
+        });
       }
       return NextResponse.json({ error: "Request already sent" }, { status: 409 });
     }
     // A previously declined request — re-open it as a fresh outgoing request.
     const [reopened] = await db
       .update(friendships)
-      .set({ requesterId: userId, addresseeId: target.id, status: "pending", updatedAt: new Date() })
+      .set({
+        requesterId: userId,
+        addresseeId: target.id,
+        status: "pending",
+        updatedAt: new Date(),
+      })
       .where(eq(friendships.id, existing.id))
       .returning();
     return NextResponse.json({ id: reopened.id, status: reopened.status, friend }, { status: 201 });

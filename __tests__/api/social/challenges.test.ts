@@ -11,17 +11,22 @@ vi.mock("@/lib/social-auth", () => ({
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
-    function () { return chain; },
+    function () {
+      return chain;
+    },
     {
       get(_t, prop) {
-        if (prop === "then") return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-        if (prop === "catch") return (fn: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).catch(fn);
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        if (prop === "catch")
+          return (fn: (e: unknown) => unknown) => Promise.resolve(resolveWith).catch(fn);
         if (prop === Symbol.toStringTag) return "MockChain";
         return () => chain;
       },
-      apply() { return chain; },
+      apply() {
+        return chain;
+      },
     }
   );
   return chain;
@@ -32,20 +37,25 @@ function makeDbChain(resolveWith: unknown = []) {
 function makeRecordingChain(resolveWith: unknown, calls: Record<string, unknown[][]>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
-    function () { return chain; },
+    function () {
+      return chain;
+    },
     {
       get(_t, prop) {
-        if (prop === "then") return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-        if (prop === "catch") return (rej: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).catch(rej);
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        if (prop === "catch")
+          return (rej: (e: unknown) => unknown) => Promise.resolve(resolveWith).catch(rej);
         if (prop === Symbol.toStringTag) return "MockChain";
         return (...args: unknown[]) => {
           (calls[prop as string] ??= []).push(args);
           return chain;
         };
       },
-      apply() { return chain; },
+      apply() {
+        return chain;
+      },
     }
   );
   return chain;
@@ -157,7 +167,9 @@ describe("POST /api/social/challenges", () => {
 
   it("returns 429 when the per-user challenge rate limit is exceeded", async () => {
     authedAs(makeUser());
-    mockRateLimitOrNull.mockResolvedValue(NextResponse.json({ error: "Too many" }, { status: 429 }));
+    mockRateLimitOrNull.mockResolvedValue(
+      NextResponse.json({ error: "Too many" }, { status: 429 })
+    );
     const res = await POST(makePostReq({ challengedUsername: "bob", duration: "24h" }));
     expect(res.status).toBe(429);
   });
@@ -294,8 +306,8 @@ describe("GET /api/social/challenges", () => {
     authedAs(makeUser({ id: 1 }));
     const calls: Record<string, unknown[][]> = {};
     mockSelect
-      .mockReturnValueOnce(makeDbChain([]))                // resolution query (no ended-active)
-      .mockReturnValueOnce(makeDbChain([]))                // pending-expiry query (none expired)
+      .mockReturnValueOnce(makeDbChain([])) // resolution query (no ended-active)
+      .mockReturnValueOnce(makeDbChain([])) // pending-expiry query (none expired)
       .mockReturnValueOnce(makeRecordingChain([], calls)); // capped display query
     const res = await GET(makeGetReq());
     expect(res.status).toBe(200);
@@ -314,14 +326,17 @@ describe("GET /api/social/challenges", () => {
     authedAs(makeUser({ id: 1 }));
     const challenge = makeChallenge({ status: "pending" });
     mockSelect
-      .mockReturnValueOnce(makeDbChain([]))                     // resolution query (none ended-active)
-      .mockReturnValueOnce(makeDbChain([]))                     // pending-expiry query (none expired)
-      .mockReturnValueOnce(makeDbChain([challenge]))            // capped display query
-      .mockReturnValueOnce(makeDbChain([                        // users query
-        { id: 1, username: "alice" },
-        { id: 2, username: "bob" },
-      ]))
-      .mockReturnValue(makeDbChain([{ score: 0 }]));            // score queries
+      .mockReturnValueOnce(makeDbChain([])) // resolution query (none ended-active)
+      .mockReturnValueOnce(makeDbChain([])) // pending-expiry query (none expired)
+      .mockReturnValueOnce(makeDbChain([challenge])) // capped display query
+      .mockReturnValueOnce(
+        makeDbChain([
+          // users query
+          { id: 1, username: "alice" },
+          { id: 2, username: "bob" },
+        ])
+      )
+      .mockReturnValue(makeDbChain([{ score: 0 }])); // score queries
     const res = await GET(makeGetReq());
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -337,17 +352,23 @@ describe("GET /api/social/challenges", () => {
       endsAt: new Date(Date.now() - 1000), // already ended
     });
     mockSelect
-      .mockReturnValueOnce(makeDbChain([expired]))             // resolution query (the ended-active row)
-      .mockReturnValueOnce(makeDbChain([{ score: 3 }]))        // challengerScore (resolution)
-      .mockReturnValueOnce(makeDbChain([{ score: 1 }]))        // challengedScore (resolution)
-      .mockReturnValueOnce(makeDbChain([]))                     // pending-expiry query (none expired)
-      .mockReturnValueOnce(makeDbChain([                        // capped display query — re-reads the
-        makeChallenge({ status: "completed", winnerId: 1 }),    // now-finalized row
-      ]))
-      .mockReturnValueOnce(makeDbChain([                        // users
-        { id: 1, username: "alice" },
-        { id: 2, username: "bob" },
-      ]));
+      .mockReturnValueOnce(makeDbChain([expired])) // resolution query (the ended-active row)
+      .mockReturnValueOnce(makeDbChain([{ score: 3 }])) // challengerScore (resolution)
+      .mockReturnValueOnce(makeDbChain([{ score: 1 }])) // challengedScore (resolution)
+      .mockReturnValueOnce(makeDbChain([])) // pending-expiry query (none expired)
+      .mockReturnValueOnce(
+        makeDbChain([
+          // capped display query — re-reads the
+          makeChallenge({ status: "completed", winnerId: 1 }), // now-finalized row
+        ])
+      )
+      .mockReturnValueOnce(
+        makeDbChain([
+          // users
+          { id: 1, username: "alice" },
+          { id: 2, username: "bob" },
+        ])
+      );
     // No further score queries expected — cached scores are reused in enrichment.
     // The guarded update must return the row (simulating no concurrent writer)
     // for resolveEndedChallenges to populate its resolved-scores cache.
@@ -369,15 +390,18 @@ describe("GET /api/social/challenges", () => {
       endsAt: new Date(Date.now() + 3_600_000), // 1 hour from now
     });
     mockSelect
-      .mockReturnValueOnce(makeDbChain([]))                     // resolution query (not ended → none)
-      .mockReturnValueOnce(makeDbChain([]))                     // pending-expiry query (none expired)
-      .mockReturnValueOnce(makeDbChain([active]))               // capped display query
-      .mockReturnValueOnce(makeDbChain([                        // users
-        { id: 1, username: "alice" },
-        { id: 2, username: "bob" },
-      ]))
-      .mockReturnValueOnce(makeDbChain([{ score: 2 }]))         // challengerScore (enrichment)
-      .mockReturnValueOnce(makeDbChain([{ score: 5 }]));        // challengedScore (enrichment)
+      .mockReturnValueOnce(makeDbChain([])) // resolution query (not ended → none)
+      .mockReturnValueOnce(makeDbChain([])) // pending-expiry query (none expired)
+      .mockReturnValueOnce(makeDbChain([active])) // capped display query
+      .mockReturnValueOnce(
+        makeDbChain([
+          // users
+          { id: 1, username: "alice" },
+          { id: 2, username: "bob" },
+        ])
+      )
+      .mockReturnValueOnce(makeDbChain([{ score: 2 }])) // challengerScore (enrichment)
+      .mockReturnValueOnce(makeDbChain([{ score: 5 }])); // challengedScore (enrichment)
     const res = await GET(makeGetReq());
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -390,13 +414,16 @@ describe("GET /api/social/challenges", () => {
     authedAs(makeUser({ id: 1 }));
     const pending = makeChallenge({ status: "pending" });
     mockSelect
-      .mockReturnValueOnce(makeDbChain([]))                     // resolution query (none ended-active)
-      .mockReturnValueOnce(makeDbChain([]))                     // pending-expiry query (none expired)
-      .mockReturnValueOnce(makeDbChain([pending]))              // capped display query
-      .mockReturnValueOnce(makeDbChain([                        // users
-        { id: 1, username: "alice" },
-        { id: 2, username: "bob" },
-      ]));
+      .mockReturnValueOnce(makeDbChain([])) // resolution query (none ended-active)
+      .mockReturnValueOnce(makeDbChain([])) // pending-expiry query (none expired)
+      .mockReturnValueOnce(makeDbChain([pending])) // capped display query
+      .mockReturnValueOnce(
+        makeDbChain([
+          // users
+          { id: 1, username: "alice" },
+          { id: 2, username: "bob" },
+        ])
+      );
     // No additional mockReturnValueOnce — if scores were fetched this would fail
     const res = await GET(makeGetReq());
     expect(res.status).toBe(200);
@@ -419,41 +446,53 @@ describe("PATCH /api/social/challenges/[id]", () => {
     vi.mocked(requireUser).mockResolvedValue(
       NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     );
-    const res = await PATCH(makePatchReq("1", { action: "accept" }), { params: Promise.resolve({ id: "1" }) });
+    const res = await PATCH(makePatchReq("1", { action: "accept" }), {
+      params: Promise.resolve({ id: "1" }),
+    });
     expect(res.status).toBe(401);
   });
 
   it("returns 404 for non-numeric id", async () => {
     authedAs(makeUser());
-    const res = await PATCH(makePatchReq("abc", { action: "accept" }), { params: Promise.resolve({ id: "abc" }) });
+    const res = await PATCH(makePatchReq("abc", { action: "accept" }), {
+      params: Promise.resolve({ id: "abc" }),
+    });
     expect(res.status).toBe(404);
   });
 
   it("returns 400 for invalid action", async () => {
     authedAs(makeUser({ id: 2 }));
     mockSelect.mockReturnValue(makeDbChain([makeChallenge()]));
-    const res = await PATCH(makePatchReq("1", { action: "skip" }), { params: Promise.resolve({ id: "1" }) });
+    const res = await PATCH(makePatchReq("1", { action: "skip" }), {
+      params: Promise.resolve({ id: "1" }),
+    });
     expect(res.status).toBe(400);
   });
 
   it("returns 404 when challenge does not exist", async () => {
     authedAs(makeUser({ id: 2 }));
     mockSelect.mockReturnValue(makeDbChain([]));
-    const res = await PATCH(makePatchReq("99", { action: "accept" }), { params: Promise.resolve({ id: "99" }) });
+    const res = await PATCH(makePatchReq("99", { action: "accept" }), {
+      params: Promise.resolve({ id: "99" }),
+    });
     expect(res.status).toBe(404);
   });
 
   it("returns 404 when user is not the challenged party", async () => {
     authedAs(makeUser({ id: 99 })); // not challengedId=2
     mockSelect.mockReturnValue(makeDbChain([makeChallenge()]));
-    const res = await PATCH(makePatchReq("1", { action: "accept" }), { params: Promise.resolve({ id: "1" }) });
+    const res = await PATCH(makePatchReq("1", { action: "accept" }), {
+      params: Promise.resolve({ id: "1" }),
+    });
     expect(res.status).toBe(404);
   });
 
   it("returns 409 when challenge is no longer pending", async () => {
     authedAs(makeUser({ id: 2 }));
     mockSelect.mockReturnValue(makeDbChain([makeChallenge({ status: "active" })]));
-    const res = await PATCH(makePatchReq("1", { action: "accept" }), { params: Promise.resolve({ id: "1" }) });
+    const res = await PATCH(makePatchReq("1", { action: "accept" }), {
+      params: Promise.resolve({ id: "1" }),
+    });
     expect(res.status).toBe(409);
   });
 
@@ -461,7 +500,9 @@ describe("PATCH /api/social/challenges/[id]", () => {
     authedAs(makeUser({ id: 2 }));
     mockSelect.mockReturnValue(makeDbChain([makeChallenge({ status: "pending" })]));
     mockUpdate.mockReturnValue(makeDbChain([makeChallenge({ status: "active" })]));
-    const res = await PATCH(makePatchReq("1", { action: "accept" }), { params: Promise.resolve({ id: "1" }) });
+    const res = await PATCH(makePatchReq("1", { action: "accept" }), {
+      params: Promise.resolve({ id: "1" }),
+    });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.status).toBe("active");
@@ -471,7 +512,9 @@ describe("PATCH /api/social/challenges/[id]", () => {
     authedAs(makeUser({ id: 2 }));
     mockSelect.mockReturnValue(makeDbChain([makeChallenge({ status: "pending" })]));
     mockUpdate.mockReturnValue(makeDbChain([makeChallenge({ status: "declined" })]));
-    const res = await PATCH(makePatchReq("1", { action: "decline" }), { params: Promise.resolve({ id: "1" }) });
+    const res = await PATCH(makePatchReq("1", { action: "decline" }), {
+      params: Promise.resolve({ id: "1" }),
+    });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.status).toBe("declined");
@@ -481,7 +524,9 @@ describe("PATCH /api/social/challenges/[id]", () => {
     authedAs(makeUser({ id: 1 })); // challengerId
     mockSelect.mockReturnValue(makeDbChain([makeChallenge({ status: "pending" })]));
     mockUpdate.mockReturnValue(makeDbChain([makeChallenge({ status: "cancelled" })]));
-    const res = await PATCH(makePatchReq("1", { action: "cancel" }), { params: Promise.resolve({ id: "1" }) });
+    const res = await PATCH(makePatchReq("1", { action: "cancel" }), {
+      params: Promise.resolve({ id: "1" }),
+    });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.status).toBe("cancelled");
@@ -490,7 +535,9 @@ describe("PATCH /api/social/challenges/[id]", () => {
   it("returns 404 when a non-challenger tries to cancel", async () => {
     authedAs(makeUser({ id: 2 })); // the challenged party cannot cancel
     mockSelect.mockReturnValue(makeDbChain([makeChallenge({ status: "pending" })]));
-    const res = await PATCH(makePatchReq("1", { action: "cancel" }), { params: Promise.resolve({ id: "1" }) });
+    const res = await PATCH(makePatchReq("1", { action: "cancel" }), {
+      params: Promise.resolve({ id: "1" }),
+    });
     expect(res.status).toBe(404);
   });
 });

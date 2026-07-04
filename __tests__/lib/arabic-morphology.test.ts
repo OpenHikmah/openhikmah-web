@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  normalizeArabic,
-  tokenizeVerse,
-  type MorphologyWord,
-} from "@/lib/arabic-morphology";
+import { normalizeArabic, tokenizeVerse, type MorphologyWord } from "@/lib/arabic-morphology";
 
 // Real morphology for Surah 1:1 (from data/morphology/001.jsonl).
 const BISMILLAH_WORDS: MorphologyWord[] = [
@@ -58,9 +54,7 @@ describe("tokenizeVerse", () => {
   });
 
   it("ignores morphology words without a root", () => {
-    const words: MorphologyWord[] = [
-      { position: 1, surface: "وَ", root: null, lemma: null },
-    ];
+    const words: MorphologyWord[] = [{ position: 1, surface: "وَ", root: null, lemma: null }];
     const tokens = tokenizeVerse("وَ بِسْمِ", words);
     expect(tokens[0].root).toBeUndefined();
     expect(tokens[1].root).toBeUndefined();

@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui";
-import { Table, Th, Td, Pill, StateNote, ConfirmButton, StatTile } from "@/components/admin/primitives";
+import {
+  Table,
+  Th,
+  Td,
+  Pill,
+  StateNote,
+  ConfirmButton,
+  StatTile,
+} from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { cn } from "@/lib/utils";
@@ -31,7 +39,13 @@ interface Stats {
 const FILTERS = ["all", "pending", "active", "completed", "declined", "cancelled"] as const;
 
 const statusTone = (s: AdminChallenge["status"]) =>
-  s === "active" ? "active" : s === "pending" ? "flagged" : s === "completed" ? "neutral" : "retired";
+  s === "active"
+    ? "active"
+    : s === "pending"
+      ? "flagged"
+      : s === "completed"
+        ? "neutral"
+        : "retired";
 
 export function ChallengesModeration() {
   const api = useAdminFetch();
@@ -70,12 +84,41 @@ export function ChallengesModeration() {
     <div className="space-y-4">
       {data && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-          <StatTile label="Total" value={data.stats.total} tone="plain" info="All 1v1 challenges ever created, across every status." />
-          <StatTile label="Active" value={data.stats.byStatus.active ?? 0} tone="teal" info="Challenges that have been accepted and are currently being competed (within their time window)." />
-          <StatTile label="Pending" value={data.stats.byStatus.pending ?? 0} info="Challenges sent but not yet accepted or declined by the recipient." />
-          <StatTile label="Completed" value={data.stats.byStatus.completed ?? 0} tone="plain" info="Challenges whose window has ended and a winner (or draw) has been resolved." />
-          <StatTile label="Declined" value={data.stats.byStatus.declined ?? 0} tone="plain" info="Challenges the recipient declined. (Withdrawn ones show as 'cancelled'.)" />
-          <StatTile label="From suggestions" value={data.stats.fromSuggestions} tone="teal" info="How many challenges were started from an admin-curated suggestion, rather than created from scratch." />
+          <StatTile
+            label="Total"
+            value={data.stats.total}
+            tone="plain"
+            info="All 1v1 challenges ever created, across every status."
+          />
+          <StatTile
+            label="Active"
+            value={data.stats.byStatus.active ?? 0}
+            tone="teal"
+            info="Challenges that have been accepted and are currently being competed (within their time window)."
+          />
+          <StatTile
+            label="Pending"
+            value={data.stats.byStatus.pending ?? 0}
+            info="Challenges sent but not yet accepted or declined by the recipient."
+          />
+          <StatTile
+            label="Completed"
+            value={data.stats.byStatus.completed ?? 0}
+            tone="plain"
+            info="Challenges whose window has ended and a winner (or draw) has been resolved."
+          />
+          <StatTile
+            label="Declined"
+            value={data.stats.byStatus.declined ?? 0}
+            tone="plain"
+            info="Challenges the recipient declined. (Withdrawn ones show as 'cancelled'.)"
+          />
+          <StatTile
+            label="From suggestions"
+            value={data.stats.fromSuggestions}
+            tone="teal"
+            info="How many challenges were started from an admin-curated suggestion, rather than created from scratch."
+          />
         </div>
       )}
 
@@ -149,24 +192,67 @@ export function ChallengesModeration() {
                   <Td>
                     <div className="flex flex-wrap items-center justify-end gap-1.5">
                       {c.status === "active" && (
-                        <Button size="sm" variant="secondary" onClick={() => act(() =>
-                          api(`/challenges/${c.id}`, { method: "PATCH", json: { action: "end" } }))}>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() =>
+                            act(() =>
+                              api(`/challenges/${c.id}`, {
+                                method: "PATCH",
+                                json: { action: "end" },
+                              })
+                            )
+                          }
+                        >
                           End now
                         </Button>
                       )}
                       {(c.status === "active" || c.status === "completed") && (
                         <span className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5">
-                          <span className="font-mono text-[10px] uppercase text-text-muted">win</span>
-                          <OverrideButton label={`@${a}`} onClick={() => act(() =>
-                            api(`/challenges/${c.id}`, { method: "PATCH", json: { action: "override-winner", winnerId: c.challengerId } }))} />
-                          <OverrideButton label="draw" onClick={() => act(() =>
-                            api(`/challenges/${c.id}`, { method: "PATCH", json: { action: "override-winner", winnerId: null } }))} />
-                          <OverrideButton label={`@${b}`} onClick={() => act(() =>
-                            api(`/challenges/${c.id}`, { method: "PATCH", json: { action: "override-winner", winnerId: c.challengedId } }))} />
+                          <span className="font-mono text-[10px] uppercase text-text-muted">
+                            win
+                          </span>
+                          <OverrideButton
+                            label={`@${a}`}
+                            onClick={() =>
+                              act(() =>
+                                api(`/challenges/${c.id}`, {
+                                  method: "PATCH",
+                                  json: { action: "override-winner", winnerId: c.challengerId },
+                                })
+                              )
+                            }
+                          />
+                          <OverrideButton
+                            label="draw"
+                            onClick={() =>
+                              act(() =>
+                                api(`/challenges/${c.id}`, {
+                                  method: "PATCH",
+                                  json: { action: "override-winner", winnerId: null },
+                                })
+                              )
+                            }
+                          />
+                          <OverrideButton
+                            label={`@${b}`}
+                            onClick={() =>
+                              act(() =>
+                                api(`/challenges/${c.id}`, {
+                                  method: "PATCH",
+                                  json: { action: "override-winner", winnerId: c.challengedId },
+                                })
+                              )
+                            }
+                          />
                         </span>
                       )}
-                      <ConfirmButton onConfirm={() => act(() =>
-                        api(`/challenges/${c.id}`, { method: "DELETE" }))} confirmLabel="Void?">
+                      <ConfirmButton
+                        onConfirm={() =>
+                          act(() => api(`/challenges/${c.id}`, { method: "DELETE" }))
+                        }
+                        confirmLabel="Void?"
+                      >
                         Void
                       </ConfirmButton>
                     </div>

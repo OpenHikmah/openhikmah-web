@@ -28,9 +28,12 @@ export function useCopyFeedback(resetMs = 2000) {
   );
 
   // Clear a pending reset on unmount so it can't fire on a gone component.
-  useEffect(() => () => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    },
+    []
+  );
 
   return { copied, copy };
 }

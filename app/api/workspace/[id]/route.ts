@@ -4,10 +4,7 @@ import { db } from "@/lib/db";
 import { savedWorkspaces } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 
@@ -30,10 +27,7 @@ export async function GET(
   }
 }
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 

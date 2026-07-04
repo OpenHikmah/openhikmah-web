@@ -22,9 +22,9 @@ describe("embeddings", () => {
   });
 
   it("embed() returns the vector for a single text and requests 768 dims", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      jsonResponse({ embeddings: [{ values: [0.1, 0.2, 0.3] }] })
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ embeddings: [{ values: [0.1, 0.2, 0.3] }] }));
     vi.stubGlobal("fetch", fetchMock);
 
     const v = await embed("patience");
@@ -38,9 +38,11 @@ describe("embeddings", () => {
   it("embedBatch() preserves input order", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        jsonResponse({ embeddings: [{ values: [1] }, { values: [2] }, { values: [3] }] })
-      )
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse({ embeddings: [{ values: [1] }, { values: [2] }, { values: [3] }] })
+        )
     );
     const out = await embedBatch(["a", "b", "c"]);
     expect(out).toEqual([[1], [2], [3]]);

@@ -117,11 +117,16 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
             const src = state.nodes.find((n) => n.id === e.source);
             const tgt = state.nodes.find((n) => n.id === e.target);
             if (!src || !tgt) return [];
-            return [{
-              pos: { x: (src.position.x + tgt.position.x) / 2, y: (src.position.y + tgt.position.y) / 2 },
-              w: NODE_WIDTH + 60,   // full node width + half-label width
-              h: NODE_HEIGHT + 16,  // full node height + half-label height
-            }];
+            return [
+              {
+                pos: {
+                  x: (src.position.x + tgt.position.x) / 2,
+                  y: (src.position.y + tgt.position.y) / 2,
+                },
+                w: NODE_WIDTH + 60, // full node width + half-label width
+                h: NODE_HEIGHT + 16, // full node height + half-label height
+              },
+            ];
           });
           const pos = findFreeSlot(existing, target, { labelObstacles });
           const newId = addVerseNode(conn as unknown as Verse, pos);
@@ -174,7 +179,14 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
     const sourceNode = getNodeById(nodeId);
     if (!sourceNode) return;
     const verse = sourceNode.data as unknown as Verse;
-    runExpansion(nodeId, verse.ref, "thematic", verse.arabicText, verse.translation, sourceNode.position);
+    runExpansion(
+      nodeId,
+      verse.ref,
+      "thematic",
+      verse.arabicText,
+      verse.translation,
+      sourceNode.position
+    );
   }, [pendingAutoExpand, setPendingAutoExpand, getNodeById, runExpansion]);
 
   const handleEdgeClick = useCallback(
@@ -186,8 +198,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
       const fromVerse = fromNode.data as unknown as Verse;
       const toVerse = toNode.data as unknown as Verse;
       const edgeData = edge.data as
-        | { kind: "thematic" | "root" | "contrast"; label: string; reason?: string }
-        | undefined;
+        { kind: "thematic" | "root" | "contrast"; label: string; reason?: string } | undefined;
 
       setSidebarContent({
         type: "edge",

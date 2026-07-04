@@ -60,7 +60,11 @@ async function callTokenEndpoint(refreshToken: string): Promise<RefreshOutcome> 
 
     const data = (await res.json()) as { access_token: string; refresh_token?: string };
     // Re-stamp the existing token if the provider didn't rotate.
-    return { kind: "ok", accessToken: data.access_token, refreshToken: data.refresh_token ?? refreshToken };
+    return {
+      kind: "ok",
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token ?? refreshToken,
+    };
   } catch {
     return { kind: "transient" };
   }

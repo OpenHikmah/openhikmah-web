@@ -1,10 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { connections, type Connection } from "@/lib/db/schema";
-import {
-  generateConnections,
-  generateGroundedConnections,
-} from "@/lib/connection-generator";
+import { generateConnections, generateGroundedConnections } from "@/lib/connection-generator";
 import { discoverCandidates } from "@/lib/connection-discovery";
 import { resolveVerse } from "@/lib/verse-resolver";
 import { consume, RateLimitError } from "@/lib/rate-limit";
@@ -142,12 +139,7 @@ async function generateAndPersist(
           kind,
           candidates
         )
-      : await generateConnections(
-          fromRef,
-          source.arabicText,
-          source.translation,
-          kind
-        );
+      : await generateConnections(fromRef, source.arabicText, source.translation, kind);
 
   if (generated.length > 0) {
     const model = process.env.ANTHROPIC_MODEL ?? null;

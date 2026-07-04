@@ -32,7 +32,10 @@ async function fetchVerseData(ref: string): Promise<Omit<NameVerse, "reason"> | 
       fetch(`https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/en.sahih`),
     ]);
     if (!arabicRes.ok || !translationRes.ok) return null;
-    const [arabicData, translationData] = await Promise.all([arabicRes.json(), translationRes.json()]);
+    const [arabicData, translationData] = await Promise.all([
+      arabicRes.json(),
+      translationRes.json(),
+    ]);
     const [surahName, surahNameArabic] = getSurahName(surahNum);
     return {
       ref: ref as VerseRef,
@@ -52,7 +55,10 @@ async function fetchVerseData(ref: string): Promise<Omit<NameVerse, "reason"> | 
 async function searchVerseRefs(arabic: string): Promise<string[]> {
   try {
     const url = `https://api.quran.com/api/v4/search?q=${encodeURIComponent(arabic)}&size=8&language=en&page=1`;
-    const res = await fetch(url, { headers: { Accept: "application/json" }, next: { revalidate: 86400 } });
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      next: { revalidate: 86400 },
+    });
     if (!res.ok) return [];
     const data = await res.json();
     const results = (data?.search?.results ?? []) as Array<{ verse_key?: string }>;
@@ -99,7 +105,12 @@ Output format:
 }
 
 // Fallback: AI-only verse finding (used when search returns no results)
-async function fallbackAIVerses(arabic: string, transliteration: string, meaning: string, description: string): Promise<Array<{ ref: string; reason: string }>> {
+async function fallbackAIVerses(
+  arabic: string,
+  transliteration: string,
+  meaning: string,
+  description: string
+): Promise<Array<{ ref: string; reason: string }>> {
   const prompt = `You are a classical Islamic scholar (Maturidi/Hanafi tradition).
 
 The divine name ${transliteration} (${arabic}) means "${meaning}".
@@ -161,10 +172,17 @@ async function getVersesBySlug(slug: string): Promise<NameVerse[]> {
       }
 
       // Fallback: pure AI verse selection
-      const aiItems = await fallbackAIVerses(name.arabic, name.transliteration, name.meaning, name.description);
+      const aiItems = await fallbackAIVerses(
+        name.arabic,
+        name.transliteration,
+        name.meaning,
+        name.description
+      );
       if (aiItems.length === 0) return [];
 
-      const verseDataResults = await Promise.all(aiItems.slice(0, 5).map((item) => fetchVerseData(item.ref)));
+      const verseDataResults = await Promise.all(
+        aiItems.slice(0, 5).map((item) => fetchVerseData(item.ref))
+      );
       return aiItems
         .slice(0, 5)
         .map((item, i) => {
@@ -178,10 +196,7 @@ async function getVersesBySlug(slug: string): Promise<NameVerse[]> {
   );
 }
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
-) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const name = getNameBySlug(slug);
   if (!name) {

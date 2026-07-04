@@ -93,17 +93,29 @@ export default function ConnectionsPage() {
                   <Td>
                     <div className="flex justify-end gap-1.5">
                       {c.status !== "flagged" && (
-                        <Button size="sm" variant="secondary" onClick={() => setStatusOf(c.id, "flagged")}>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => setStatusOf(c.id, "flagged")}
+                        >
                           Flag
                         </Button>
                       )}
                       {c.status !== "retired" && (
-                        <Button size="sm" variant="danger" onClick={() => setStatusOf(c.id, "retired")}>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => setStatusOf(c.id, "retired")}
+                        >
                           Retire
                         </Button>
                       )}
                       {c.status !== "active" && (
-                        <Button size="sm" variant="secondary" onClick={() => setStatusOf(c.id, "active")}>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => setStatusOf(c.id, "active")}
+                        >
                           Restore
                         </Button>
                       )}
@@ -132,7 +144,9 @@ function FilterRow<T extends string>({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">{label}</span>
+      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">
+        {label}
+      </span>
       <div className="flex gap-1">
         {options.map((o) => (
           <button

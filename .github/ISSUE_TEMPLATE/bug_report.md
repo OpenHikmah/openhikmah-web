@@ -25,7 +25,7 @@ assignees: ""
 - Browser / OS:
 - Node.js version (`node -v`):
 - Branch / commit:
-- Is this reproducible on [openhikmah.com](https://openhikmah.com)?  [ ] Yes  [ ] No  [ ] Not checked
+- Is this reproducible on [openhikmah.com](https://openhikmah.com)? [ ] Yes [ ] No [ ] Not checked
 
 ## Screenshots / console errors
 

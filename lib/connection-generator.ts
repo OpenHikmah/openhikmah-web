@@ -22,8 +22,7 @@ import type { ConnectionResult, EdgeKind, Verse } from "@/types/quran";
 const KIND_INSTRUCTIONS: Record<EdgeKind, string> = {
   thematic:
     "Find 3 other Quran verses that share the same theological theme as the given verse. Focus on verses that reinforce or expand the same divine message.",
-  root:
-    "Find 3 other Quran verses that share a significant Arabic root word with the given verse. The shared root should carry meaning relevant to the verse's central message.",
+  root: "Find 3 other Quran verses that share a significant Arabic root word with the given verse. The shared root should carry meaning relevant to the verse's central message.",
   contrast:
     "Find 3 other Quran verses that present a contrasting theological concept to the given verse — opposing states such as ease/hardship, gratitude/ingratitude, mercy/punishment.",
 };
@@ -31,8 +30,7 @@ const KIND_INSTRUCTIONS: Record<EdgeKind, string> = {
 const KIND_SELECTION: Record<EdgeKind, string> = {
   thematic:
     "Select the 3 candidates that most strongly share the same theological theme as the source verse — reinforcing or expanding the same divine message.",
-  root:
-    "Select the 3 candidates whose shared Arabic root carries meaning most relevant to the source verse's central message.",
+  root: "Select the 3 candidates whose shared Arabic root carries meaning most relevant to the source verse's central message.",
   contrast:
     "Select the 3 candidates that present the clearest contrasting theological concept to the source verse — opposing states such as ease/hardship, gratitude/ingratitude, mercy/punishment.",
 };
@@ -138,9 +136,7 @@ function buildSelectionPrompt(
   kind: EdgeKind,
   candidates: Verse[]
 ): string {
-  const list = candidates
-    .map((v) => `- ${v.ref} — ${v.translation}`)
-    .join("\n");
+  const list = candidates.map((v) => `- ${v.ref} — ${v.translation}`).join("\n");
 
   return `You are a classical Islamic scholar grounded in the Maturidi/Hanafi tradition (Ahl al-Sunnah wal-Jama'ah).
 

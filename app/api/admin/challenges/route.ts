@@ -73,7 +73,10 @@ export async function GET(req: NextRequest) {
 
     const userIds = [...new Set(rows.flatMap((c) => [c.challengerId, c.challengedId]))];
     const userRows = userIds.length
-      ? await db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, userIds))
+      ? await db
+          .select({ id: users.id, username: users.username })
+          .from(users)
+          .where(inArray(users.id, userIds))
       : [];
     const userMap = new Map(userRows.map((u) => [u.id, u.username]));
 
@@ -84,7 +87,10 @@ export async function GET(req: NextRequest) {
         const [challengerScore, challengedScore] = cached
           ? [cached.challengerScore, cached.challengedScore]
           : needsScores
-            ? await Promise.all([scoreChallenge(c.challengerId, c), scoreChallenge(c.challengedId, c)])
+            ? await Promise.all([
+                scoreChallenge(c.challengerId, c),
+                scoreChallenge(c.challengedId, c),
+              ])
             : [0, 0];
         return {
           ...c,

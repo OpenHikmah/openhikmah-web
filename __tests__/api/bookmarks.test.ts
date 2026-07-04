@@ -11,17 +11,22 @@ vi.mock("@/lib/social-auth", () => ({
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
-    function () { return chain; },
+    function () {
+      return chain;
+    },
     {
       get(_t, prop) {
-        if (prop === "then") return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-        if (prop === "catch") return (rej: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).catch(rej);
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        if (prop === "catch")
+          return (rej: (e: unknown) => unknown) => Promise.resolve(resolveWith).catch(rej);
         if (prop === Symbol.toStringTag) return "MockChain";
         return () => chain;
       },
-      apply() { return chain; },
+      apply() {
+        return chain;
+      },
     }
   );
   return chain;
@@ -32,20 +37,25 @@ function makeDbChain(resolveWith: unknown = []) {
 function makeRecordingChain(resolveWith: unknown, calls: Record<string, unknown[][]>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
-    function () { return chain; },
+    function () {
+      return chain;
+    },
     {
       get(_t, prop) {
-        if (prop === "then") return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-        if (prop === "catch") return (rej: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).catch(rej);
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        if (prop === "catch")
+          return (rej: (e: unknown) => unknown) => Promise.resolve(resolveWith).catch(rej);
         if (prop === Symbol.toStringTag) return "MockChain";
         return (...args: unknown[]) => {
           (calls[prop as string] ??= []).push(args);
           return chain;
         };
       },
-      apply() { return chain; },
+      apply() {
+        return chain;
+      },
     }
   );
   return chain;
@@ -124,9 +134,7 @@ describe("GET /api/bookmarks", () => {
 
   it("returns refs for authenticated user", async () => {
     authedUser();
-    mockSelect.mockReturnValue(
-      makeDbChain([{ verseRef: "2:255" }, { verseRef: "1:1" }])
-    );
+    mockSelect.mockReturnValue(makeDbChain([{ verseRef: "2:255" }, { verseRef: "1:1" }]));
     const res = await GET(req());
     expect(res.status).toBe(200);
     const body = await res.json();

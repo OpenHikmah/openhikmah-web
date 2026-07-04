@@ -5,7 +5,10 @@ import { sql } from "drizzle-orm";
 // the query path is deterministic; the ranking itself is done by real pgvector.
 const { mockEmbed } = vi.hoisted(() => ({ mockEmbed: vi.fn() }));
 vi.mock("@/lib/ai", () => ({ embed: mockEmbed }));
-vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false })));
+vi.stubGlobal(
+  "fetch",
+  vi.fn(async () => ({ ok: false }))
+);
 
 import { db } from "@/lib/db";
 import { verses } from "@/lib/db/schema";

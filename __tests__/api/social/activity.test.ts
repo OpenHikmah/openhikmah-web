@@ -13,42 +13,49 @@ vi.mock("@/lib/social-auth", () => ({
 function makeDbChain(resolveWith: unknown = undefined) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
-    function () { return chain; },
+    function () {
+      return chain;
+    },
     {
       get(_t, prop) {
-        if (prop === "then") return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-        if (prop === "catch") return (rej: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).catch(rej);
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        if (prop === "catch")
+          return (rej: (e: unknown) => unknown) => Promise.resolve(resolveWith).catch(rej);
         if (prop === Symbol.toStringTag) return "MockChain";
         return () => chain;
       },
-      apply() { return chain; },
+      apply() {
+        return chain;
+      },
     }
   );
   return chain;
 }
 
 // Use vi.hoisted so mock fns are defined before vi.mock factories run
-const { mockInsert, mockUpdate, mockTxSelect, mockTransaction, mockRateLimitOrNull } = vi.hoisted(() => {
-  const insert = vi.fn(() => makeDbChain());
-  const update = vi.fn(() => makeDbChain());
-  const txSelect = vi.fn(() => makeDbChain([]));
-  // The route does insert + streak read/compute/write inside a
-  // db.transaction(async (tx) => ...) — the tx object exposes the same
-  // insert/update/select surface, reusing the same mocks so existing test
-  // expectations (mockInsert/mockUpdate called, etc.) still hold.
-  const transaction = vi.fn(async (cb: (tx: unknown) => unknown) =>
-    cb({ insert, update, select: txSelect })
-  );
-  return {
-    mockInsert: insert,
-    mockUpdate: update,
-    mockTxSelect: txSelect,
-    mockTransaction: transaction,
-    mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
-  };
-});
+const { mockInsert, mockUpdate, mockTxSelect, mockTransaction, mockRateLimitOrNull } = vi.hoisted(
+  () => {
+    const insert = vi.fn(() => makeDbChain());
+    const update = vi.fn(() => makeDbChain());
+    const txSelect = vi.fn(() => makeDbChain([]));
+    // The route does insert + streak read/compute/write inside a
+    // db.transaction(async (tx) => ...) — the tx object exposes the same
+    // insert/update/select surface, reusing the same mocks so existing test
+    // expectations (mockInsert/mockUpdate called, etc.) still hold.
+    const transaction = vi.fn(async (cb: (tx: unknown) => unknown) =>
+      cb({ insert, update, select: txSelect })
+    );
+    return {
+      mockInsert: insert,
+      mockUpdate: update,
+      mockTxSelect: txSelect,
+      mockTransaction: transaction,
+      mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
+    };
+  }
+);
 
 vi.mock("@/lib/db", () => ({
   db: {
@@ -147,7 +154,9 @@ describe("POST /api/social/activity", () => {
 
   it("returns 429 when the per-user activity rate limit is exceeded", async () => {
     authedAs(makeUser());
-    mockRateLimitOrNull.mockResolvedValue(NextResponse.json({ error: "Too many" }, { status: 429 }));
+    mockRateLimitOrNull.mockResolvedValue(
+      NextResponse.json({ error: "Too many" }, { status: 429 })
+    );
     const res = await POST(makeReq({ type: "verse_added" }));
     expect(res.status).toBe(429);
   });
@@ -237,7 +246,9 @@ describe("POST /api/social/activity", () => {
     // must use the fresh row, not the stale cached one.
     authedAs(makeUser({ currentStreak: 3, longestStreak: 3, lastActivityDate: yesterdayStr() }));
     mockTxSelect.mockReturnValue(
-      makeDbChain([makeUser({ currentStreak: 9, longestStreak: 9, lastActivityDate: yesterdayStr() })])
+      makeDbChain([
+        makeUser({ currentStreak: 9, longestStreak: 9, lastActivityDate: yesterdayStr() }),
+      ])
     );
     const res = await POST(makeReq({ type: "verse_added" }));
     expect(res.status).toBe(200);

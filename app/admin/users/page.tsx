@@ -55,7 +55,11 @@ export default function UsersPage() {
             setSubmitted(query.trim());
           }}
         >
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search username…" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search username…"
+          />
           <Button type="submit" variant="secondary">
             Search
           </Button>
@@ -85,16 +89,23 @@ export default function UsersPage() {
                       <span className="text-sm text-text-primary">{u.username}</span>
                       {u.isAdmin && <Pill tone="flagged">admin</Pill>}
                     </div>
-                    {u.displayName && <div className="text-xs text-text-muted">{u.displayName}</div>}
+                    {u.displayName && (
+                      <div className="text-xs text-text-muted">{u.displayName}</div>
+                    )}
                   </Td>
                   <Td className="text-xs text-text-secondary tabular-nums">
-                    {u.currentStreak} <span className="text-text-muted">/ {u.longestStreak} best</span>
+                    {u.currentStreak}{" "}
+                    <span className="text-text-muted">/ {u.longestStreak} best</span>
                   </Td>
                   <Td className="whitespace-nowrap text-xs text-text-muted">
                     {new Date(u.lastActiveAt).toLocaleDateString()}
                   </Td>
                   <Td>
-                    {u.disabledAt ? <Pill tone="retired">disabled</Pill> : <Pill tone="active">active</Pill>}
+                    {u.disabledAt ? (
+                      <Pill tone="retired">disabled</Pill>
+                    ) : (
+                      <Pill tone="active">active</Pill>
+                    )}
                   </Td>
                   <Td>
                     <div className="flex justify-end">

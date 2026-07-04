@@ -25,7 +25,7 @@ export function StreakBadge() {
         }
       })
       .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, userId]);
 
   if (!accessToken || !userId) return null;

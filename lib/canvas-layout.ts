@@ -48,11 +48,7 @@ function overlaps(a: XY, b: XY, w: number, h: number, gap: number): boolean {
  * prefers the candidate closest to the anchor so new nodes stay tucked in beside
  * the graph rather than flung far away.
  */
-export function findFreeSlot(
-  existing: XY[],
-  anchor: XY,
-  options: FreeSlotOptions = {}
-): XY {
+export function findFreeSlot(existing: XY[], anchor: XY, options: FreeSlotOptions = {}): XY {
   const w = options.width ?? NODE_WIDTH;
   const h = options.height ?? NODE_HEIGHT;
   const gap = options.gap ?? NODE_GAP;
@@ -80,7 +76,8 @@ export function findFreeSlot(
     // Nearest-first so the node lands as close to the anchor as possible.
     candidates.sort(
       (p, q) =>
-        (p.x - anchor.x) ** 2 + (p.y - anchor.y) ** 2 -
+        (p.x - anchor.x) ** 2 +
+        (p.y - anchor.y) ** 2 -
         ((q.x - anchor.x) ** 2 + (q.y - anchor.y) ** 2)
     );
     for (const c of candidates) {

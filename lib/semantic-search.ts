@@ -60,9 +60,7 @@ async function nearest(
   excludeRef?: string
 ): Promise<Array<{ ref: string; similarity: number }>> {
   const similarity = sql<number>`1 - (${cosineDistance(verseEmbeddings.embedding, queryVec)})`;
-  const where: SQL | undefined = excludeRef
-    ? ne(verseEmbeddings.ref, excludeRef)
-    : undefined;
+  const where: SQL | undefined = excludeRef ? ne(verseEmbeddings.ref, excludeRef) : undefined;
   return db
     .select({ ref: verseEmbeddings.ref, similarity })
     .from(verseEmbeddings)
@@ -71,9 +69,7 @@ async function nearest(
     .limit(limit);
 }
 
-async function hydrate(
-  rows: Array<{ ref: string; similarity: number }>
-): Promise<SemanticMatch[]> {
+async function hydrate(rows: Array<{ ref: string; similarity: number }>): Promise<SemanticMatch[]> {
   const verseMap = await getVerses(rows.map((r) => r.ref));
   return rows
     .map((r) => {

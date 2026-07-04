@@ -1,7 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Share2, Save, Maximize2, RotateCcw, ListMusic, Loader2, Check, AlertCircle, LogIn } from "lucide-react";
+import {
+  Search,
+  Share2,
+  Save,
+  Maximize2,
+  RotateCcw,
+  ListMusic,
+  Loader2,
+  Check,
+  AlertCircle,
+  LogIn,
+} from "lucide-react";
 import { Panel, useReactFlow } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { useCanvasStore, serializeCanvas } from "@/store/canvas";
@@ -128,11 +139,14 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
   };
 
   const handlePlay = () => {
-    if (currentRef) { stopAudio(); return; }
+    if (currentRef) {
+      stopAudio();
+      return;
+    }
     const verses: AudioVerse[] = [...nodes]
       .map((n) => n.data as unknown as Verse)
       .filter((v) => v?.surah && v?.ayah)
-      .sort((a, b) => a.surah !== b.surah ? a.surah - b.surah : a.ayah - b.ayah)
+      .sort((a, b) => (a.surah !== b.surah ? a.surah - b.surah : a.ayah - b.ayah))
       .map((v) => ({ ref: v.ref, surah: v.surah, ayah: v.ayah, surahName: v.surahName }));
     if (verses.length > 0) playGraph(verses);
   };
@@ -146,7 +160,9 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
         <ToolbarBtn onClick={onSearchOpen} className="text-gold hover:bg-gold/10 hover:text-gold">
           <Search className="h-3.5 w-3.5" />
           Search
-          <kbd className="ml-0.5 rounded bg-gold/10 px-1 font-mono text-[10px] text-text-muted">⌘K</kbd>
+          <kbd className="ml-0.5 rounded bg-gold/10 px-1 font-mono text-[10px] text-text-muted">
+            ⌘K
+          </kbd>
         </ToolbarBtn>
 
         {divider}

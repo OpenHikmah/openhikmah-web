@@ -4,10 +4,7 @@ import { db } from "@/lib/db";
 import { bookmarks } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ ref: string }> }
-) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ ref: string }> }) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 

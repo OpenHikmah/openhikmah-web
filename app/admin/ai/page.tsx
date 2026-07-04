@@ -62,7 +62,9 @@ export default function AiPage() {
               <StatTile
                 label="Est. cost (MTD)"
                 value={cost(data.monthToDate.estCostUsd)}
-                hint={data.pricePer1k === null ? "set AI_USD_PER_1K_TOKENS" : `@ $${data.pricePer1k}/1k`}
+                hint={
+                  data.pricePer1k === null ? "set AI_USD_PER_1K_TOKENS" : `@ $${data.pricePer1k}/1k`
+                }
                 info="Estimated USD cost this month from token usage. Shows a figure only if AI_USD_PER_1K_TOKENS is set in the env; otherwise it's a dash."
               />
             </div>
@@ -133,7 +135,9 @@ export default function AiPage() {
                 <div className="space-y-1.5 rounded-lg border border-border bg-surface p-4">
                   {data.daily.map((d) => (
                     <div key={d.day} className="flex items-center gap-3">
-                      <span className="w-20 shrink-0 font-mono text-[11px] text-text-muted">{d.day}</span>
+                      <span className="w-20 shrink-0 font-mono text-[11px] text-text-muted">
+                        {d.day}
+                      </span>
                       <div className="h-2 flex-1 overflow-hidden rounded-full bg-bg">
                         <div
                           className="h-full rounded-full bg-teal"

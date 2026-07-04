@@ -50,7 +50,9 @@ export default function NamesPage() {
   const invalidate = async (r: Row) => {
     setMsg(null);
     try {
-      await api(`/names?slug=${encodeURIComponent(r.slug)}&kind=${encodeURIComponent(r.kind)}`, { method: "DELETE" });
+      await api(`/names?slug=${encodeURIComponent(r.slug)}&kind=${encodeURIComponent(r.kind)}`, {
+        method: "DELETE",
+      });
       reload();
     } catch (e) {
       setMsg(e instanceof AdminApiError ? e.message : "Invalidate failed.");

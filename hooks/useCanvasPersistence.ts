@@ -15,7 +15,7 @@ export async function buildShareUrl(canvas: SavedCanvas): Promise<string> {
     body: JSON.stringify(canvas),
   });
   if (!res.ok) throw new Error("Share failed");
-  const { id } = await res.json() as { id: string };
+  const { id } = (await res.json()) as { id: string };
   const url = new URL(window.location.href);
   // Point at the canvas — that's where the share is restored (see the mount
   // effect below). A "/" link would just land on the marketing page.
@@ -80,7 +80,7 @@ export function useCanvasPersistence() {
     }
 
     tryRestoreFromLocalStorage();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-save to localStorage whenever nodes/edges change (debounced 800ms)

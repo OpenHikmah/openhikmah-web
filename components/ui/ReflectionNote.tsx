@@ -15,10 +15,7 @@ export function ReflectionNote({
 }: HTMLAttributes<HTMLDivElement> & { label?: string }) {
   return (
     <div
-      className={cn(
-        "border-l-2 border-teal bg-teal/[0.06] rounded-r-md px-4 py-3",
-        className
-      )}
+      className={cn("border-l-2 border-teal bg-teal/[0.06] rounded-r-md px-4 py-3", className)}
       {...props}
     >
       <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-teal">

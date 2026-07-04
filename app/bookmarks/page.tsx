@@ -31,7 +31,7 @@ export default function BookmarksPage() {
           const [surah, ayah] = ref.split(":");
           const res = await fetch(`/api/verse/${surah}/${ayah}`);
           if (!res.ok) return [ref, null] as const;
-          const verse = await res.json() as Verse;
+          const verse = (await res.json()) as Verse;
           verseCache.set(ref, verse);
           return [ref, verse] as const;
         } catch {
@@ -42,7 +42,7 @@ export default function BookmarksPage() {
       setVerses(new Map(entries.filter((e): e is [string, Verse] => e[1] !== null)));
       setLoading(false);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookmarks.join(",")]);
 
   return (
@@ -77,7 +77,10 @@ export default function BookmarksPage() {
         ) : loading ? (
           <div className="space-y-3">
             {bookmarks.map((ref) => (
-              <div key={ref} className="animate-pulse rounded-xl border border-border bg-surface p-5">
+              <div
+                key={ref}
+                className="animate-pulse rounded-xl border border-border bg-surface p-5"
+              >
                 <div className="mb-4 flex items-center gap-2">
                   <div className="h-5 w-14 rounded bg-surface-overlay" />
                   <div className="h-4 w-24 rounded bg-surface-overlay" />
@@ -98,9 +101,7 @@ export default function BookmarksPage() {
                       <span className="rounded border border-gold bg-gold/[0.08] px-1.5 py-0.5 font-mono text-xs text-gold">
                         {ref}
                       </span>
-                      {verse && (
-                        <span className="text-xs text-text-muted">{verse.surahName}</span>
-                      )}
+                      {verse && <span className="text-xs text-text-muted">{verse.surahName}</span>}
                     </div>
                     <div className="flex items-center gap-1">
                       <Tooltip label="Open in canvas">
@@ -130,7 +131,9 @@ export default function BookmarksPage() {
                       <p className="font-arabic text-right text-base leading-loose text-text-primary">
                         {verse.arabicText}
                       </p>
-                      <p className="text-sm leading-relaxed text-text-secondary">{verse.translation}</p>
+                      <p className="text-sm leading-relaxed text-text-secondary">
+                        {verse.translation}
+                      </p>
                     </div>
                   ) : (
                     <p className="mt-3 text-xs text-text-muted">Could not load verse text.</p>

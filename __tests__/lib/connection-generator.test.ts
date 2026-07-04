@@ -35,8 +35,8 @@ describe("generateConnections", () => {
     mockInsert.mockClear();
     mockGetVerses.mockReset();
     // Default: every requested ref hydrates from the local corpus.
-    mockGetVerses.mockImplementation(async (refs: string[]) =>
-      new Map(refs.map((r) => [r, verse(r)]))
+    mockGetVerses.mockImplementation(
+      async (refs: string[]) => new Map(refs.map((r) => [r, verse(r)]))
     );
   });
 
@@ -67,8 +67,8 @@ describe("generateConnections", () => {
         { ref: "9:999", reason: "fake" },
       ])
     );
-    mockGetVerses.mockImplementation(async (refs: string[]) =>
-      new Map(refs.filter((r) => r !== "9:999").map((r) => [r, verse(r)]))
+    mockGetVerses.mockImplementation(
+      async (refs: string[]) => new Map(refs.filter((r) => r !== "9:999").map((r) => [r, verse(r)]))
     );
     const out = await generateConnections("1:1", "ar", "tr", "thematic");
     expect(out.map((c) => c.ref)).toEqual(["2:255"]);
@@ -113,8 +113,8 @@ describe("generateGroundedConnections", () => {
     mockInsert.mockClear();
     mockGetVerses.mockReset();
     // Default: every requested candidate ref resolves to a verse.
-    mockGetVerses.mockImplementation(async (refs: string[]) =>
-      new Map(refs.map((r) => [r, verse(r)]))
+    mockGetVerses.mockImplementation(
+      async (refs: string[]) => new Map(refs.map((r) => [r, verse(r)]))
     );
   });
 
@@ -141,10 +141,7 @@ describe("generateGroundedConnections", () => {
         { ref: "9:99", reason: "NOT a candidate — must be dropped" },
       ])
     );
-    const out = await generateGroundedConnections("1:1", "ar", "tr", "root", [
-      "2:255",
-      "3:18",
-    ]);
+    const out = await generateGroundedConnections("1:1", "ar", "tr", "root", ["2:255", "3:18"]);
     expect(out.map((c) => c.ref)).toEqual(["2:255"]);
   });
 
@@ -155,17 +152,13 @@ describe("generateGroundedConnections", () => {
         { ref: "2:255", reason: "valid" },
       ])
     );
-    const out = await generateGroundedConnections("1:1", "ar", "tr", "contrast", [
-      "2:255",
-    ]);
+    const out = await generateGroundedConnections("1:1", "ar", "tr", "contrast", ["2:255"]);
     expect(out.map((c) => c.ref)).toEqual(["2:255"]);
   });
 
   it("returns [] without calling the AI when no candidate verse resolves", async () => {
     mockGetVerses.mockResolvedValue(new Map());
-    const out = await generateGroundedConnections("1:1", "ar", "tr", "thematic", [
-      "2:255",
-    ]);
+    const out = await generateGroundedConnections("1:1", "ar", "tr", "thematic", ["2:255"]);
     expect(out).toEqual([]);
     expect(mockCallAI).not.toHaveBeenCalled();
   });

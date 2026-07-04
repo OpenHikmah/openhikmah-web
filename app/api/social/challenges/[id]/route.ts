@@ -4,10 +4,7 @@ import { db } from "@/lib/db";
 import { challenges } from "@/lib/db/schema";
 import { requireUser } from "@/lib/social-auth";
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
   const { userId } = authed;
@@ -27,7 +24,10 @@ export async function PATCH(
 
   const { action } = body;
   if (action !== "accept" && action !== "decline" && action !== "cancel") {
-    return NextResponse.json({ error: "action must be accept, decline, or cancel" }, { status: 400 });
+    return NextResponse.json(
+      { error: "action must be accept, decline, or cancel" },
+      { status: 400 }
+    );
   }
 
   const [challenge] = await db

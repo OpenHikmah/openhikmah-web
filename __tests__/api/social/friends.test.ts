@@ -11,17 +11,22 @@ vi.mock("@/lib/social-auth", () => ({
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
-    function () { return chain; },
+    function () {
+      return chain;
+    },
     {
       get(_t, prop) {
-        if (prop === "then") return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-        if (prop === "catch") return (rej: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).catch(rej);
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        if (prop === "catch")
+          return (rej: (e: unknown) => unknown) => Promise.resolve(resolveWith).catch(rej);
         if (prop === Symbol.toStringTag) return "MockChain";
         return () => chain;
       },
-      apply() { return chain; },
+      apply() {
+        return chain;
+      },
     }
   );
   return chain;
@@ -136,7 +141,9 @@ describe("POST /api/social/friends", () => {
 
   it("returns 429 when the per-user friend-request rate limit is exceeded", async () => {
     authedAs(makeUser());
-    mockRateLimitOrNull.mockResolvedValue(NextResponse.json({ error: "Too many" }, { status: 429 }));
+    mockRateLimitOrNull.mockResolvedValue(
+      NextResponse.json({ error: "Too many" }, { status: 429 })
+    );
     const res = await POST(makePostReq({ username: "friend99" }));
     expect(res.status).toBe(429);
   });

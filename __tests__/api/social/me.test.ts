@@ -11,17 +11,22 @@ vi.mock("@/lib/social-auth", () => ({
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
-    function () { return chain; },
+    function () {
+      return chain;
+    },
     {
       get(_t, prop) {
-        if (prop === "then") return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).then(res, rej);
-        if (prop === "catch") return (rej: (e: unknown) => unknown) =>
-          Promise.resolve(resolveWith).catch(rej);
+        if (prop === "then")
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+            Promise.resolve(resolveWith).then(res, rej);
+        if (prop === "catch")
+          return (rej: (e: unknown) => unknown) => Promise.resolve(resolveWith).catch(rej);
         if (prop === Symbol.toStringTag) return "MockChain";
         return () => chain;
       },
-      apply() { return chain; },
+      apply() {
+        return chain;
+      },
     }
   );
   return chain;
@@ -198,7 +203,9 @@ describe("PATCH /api/social/me", () => {
   it("returns updated profile on success", async () => {
     authedAs(makeUser());
     mockSelect.mockReturnValue(makeDbChain([]));
-    mockUpdate.mockReturnValue(makeDbChain([{ id: 1, username: "scholar_one", displayName: null }]));
+    mockUpdate.mockReturnValue(
+      makeDbChain([{ id: 1, username: "scholar_one", displayName: null }])
+    );
     const res = await PATCH(makePatchReq({ username: "scholar_one" }));
     expect(res.status).toBe(200);
     const body = await res.json();

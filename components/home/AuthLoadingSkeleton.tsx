@@ -15,7 +15,10 @@ export function AuthLoadingSkeleton() {
       {/* Cards */}
       <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="h-[100px] animate-pulse rounded-xl border border-border bg-surface" />
+          <div
+            key={i}
+            className="h-[100px] animate-pulse rounded-xl border border-border bg-surface"
+          />
         ))}
       </div>
 
@@ -24,7 +27,10 @@ export function AuthLoadingSkeleton() {
         <div className="mb-4 h-4 w-28 animate-pulse rounded bg-surface" />
         <div className="flex flex-wrap gap-2.5">
           {[0, 1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-9 w-20 animate-pulse rounded-md border border-border bg-surface" />
+            <div
+              key={i}
+              className="h-9 w-20 animate-pulse rounded-md border border-border bg-surface"
+            />
           ))}
         </div>
       </div>

@@ -69,7 +69,7 @@ export function useActivityTracker() {
       .catch(() => {
         // Non-blocking — ignore errors
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeCount, edgeCount]);
   // ^ watches counts only — re-fetching accessToken/bumpStreak on every render would re-fire
 }
