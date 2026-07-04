@@ -5,8 +5,7 @@ on:
     branches: ["**"]
   pull_request:
 
-# Least privilege: this workflow only reads the repo (checkout) and runs
-# tests/build — it never writes back to GitHub. Override per-job if needed.
+# Least privilege by default. Jobs that need to report back to PRs override this explicitly.
 permissions:
   contents: read
 
@@ -16,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -43,6 +44,8 @@ jobs:
     # Testcontainers spins up Postgres without extra setup.
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -58,6 +61,10 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: [lint-typecheck-test, integration]
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     # Placeholder env vars so Next.js build succeeds without real secrets.
     # Actual secrets are set in Vercel project settings for deployments.
     env:
@@ -74,6 +81,8 @@ jobs:
       DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -84,6 +93,80 @@ jobs:
 
       - name: Build
         run: bun run build
+
+      - name: Measure bundle size
+        run: |
+          bunx size-limit --json > "$RUNNER_TEMP/size-current.json" || true
+          cp .size-limit.cjs "$RUNNER_TEMP/.size-limit.cjs"
+
+      - name: Check out base branch for bundle comparison
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+
+      - name: Install base dependencies
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        working-directory: base
+        run: bun install --frozen-lockfile
+
+      - name: Build base branch
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        working-directory: base
+        run: bun run build
+
+      - name: Measure base bundle size
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        working-directory: base
+        run: |
+          cp "$RUNNER_TEMP/.size-limit.cjs" .size-limit.cjs
+          ../node_modules/.bin/size-limit --json > "$RUNNER_TEMP/size-base.json" || true
+
+      - name: Comment bundle size delta
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            const fs = require('node:fs')
+
+            const current = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/size-current.json`, 'utf8'))[0]
+            const base = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/size-base.json`, 'utf8'))[0]
+            const delta = current.size - base.size
+            const percent = base.size === 0 ? 0 : (delta / base.size) * 100
+            const marker = '<!-- openhikmah-size-limit-report -->'
+
+            const formatBytes = (bytes) => `${(bytes / 1000).toFixed(2)} kB`
+            const formatDelta = (bytes) => `${bytes >= 0 ? '+' : '-'}${formatBytes(Math.abs(bytes))}`
+            const formatPercent = (value) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
+
+            const body = [
+              marker,
+              '### Bundle Size Report',
+              '',
+              '| Budget | Base | PR | Delta | Status |',
+              '| --- | ---: | ---: | ---: | --- |',
+              `| ${formatBytes(current.sizeLimit)} | ${formatBytes(base.size)} | ${formatBytes(current.size)} | ${formatDelta(delta)} (${formatPercent(percent)}) | ${current.passed ? 'Passed' : 'Failed'} |`,
+              '',
+              'Scope: total shipped client JS matching `.next/static/**/*.js`, including route-level and dynamically imported chunks. This is intentionally not an initial-load-only budget.',
+            ].join('\n')
+
+            const { owner, repo } = context.repo
+            const issue_number = context.payload.pull_request.number
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number, per_page: 100 })
+            const existing = comments.find((comment) => comment.user.type === 'Bot' && comment.body.includes(marker))
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body })
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body })
+            }
 
       - name: Check bundle size
         run: bun run size
