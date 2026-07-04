@@ -16,6 +16,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test",
     "embed": "bun scripts/embed-corpus.mjs",
+    "db:migrate": "bun scripts/migrate.mjs",
     "prepare": "husky"
   },
   "lint-staged": {
