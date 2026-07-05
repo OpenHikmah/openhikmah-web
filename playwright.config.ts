@@ -6,7 +6,10 @@ export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // All e2e tests share one fixed dev-bypass identity (DEV_AUTH_TOKEN/DEV_AUTH_QF_ID),
+  // so running them in parallel causes real cross-test collisions on that user's data.
+  // This is a correctness requirement, not a CI-only resource limit — keep it unconditional.
+  workers: 1,
   reporter: process.env.CI ? "github" : "list",
   use: {
     baseURL: `http://localhost:${PORT}`,
