@@ -1,0 +1,97 @@
+name: Bundle size comment
+
+# Fork PRs get a read-only GITHUB_TOKEN on `pull_request` events, so the CI
+# workflow's build job (ci.yml) cannot post/update a PR comment no matter what
+# permissions it declares. `workflow_run` runs in the base repo's context
+# instead, so it gets a normal write token even when triggered by a fork PR's
+# CI run. This workflow reads the size reports that job uploaded as an
+# artifact and does the actual commenting.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  comment:
+    name: Comment bundle size delta
+    runs-on: ubuntu-latest
+    if: |
+      github.event.workflow_run.event == 'pull_request' &&
+      (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure')
+    steps:
+      - name: Download bundle size reports
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+          name: bundle-size-reports
+          path: reports
+
+      - name: Download PR number
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+          name: pr-number
+          path: pr-number
+
+      - name: Comment bundle size delta
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs')
+
+            const loadReport = (fileName) => {
+              try {
+                const content = fs.readFileSync(`reports/${fileName}`, 'utf8').trim()
+                if (!content) return null
+
+                const report = JSON.parse(content)
+                return Array.isArray(report) && report.length > 0 ? report[0] : null
+              } catch {
+                return null
+              }
+            }
+
+            const currentReport = loadReport('size-current.json')
+            const baseReport = loadReport('size-base.json')
+            const current = currentReport ?? baseReport
+            const base = baseReport ?? currentReport
+
+            if (!current || !base) {
+              throw new Error('No bundle size report was available to comment on')
+            }
+
+            const delta = current.size - base.size
+            const percent = base.size === 0 ? 0 : (delta / base.size) * 100
+            const marker = '<!-- openhikmah-size-limit-report -->'
+
+            const formatBytes = (bytes) => `${(bytes / 1000).toFixed(2)} kB`
+            const formatDelta = (bytes) => `${bytes >= 0 ? '+' : '-'}${formatBytes(Math.abs(bytes))}`
+            const formatPercent = (value) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
+
+            const body = [
+              marker,
+              '### Bundle Size Report',
+              '',
+              '| Budget | Base | PR | Delta | Status |',
+              '| --- | ---: | ---: | ---: | --- |',
+              `| ${formatBytes(current.sizeLimit)} | ${formatBytes(base.size)} | ${formatBytes(current.size)} | ${formatDelta(delta)} (${formatPercent(percent)}) | ${current.passed ? 'Passed' : 'Failed'} |`,
+              '',
+              'Scope: total shipped client JS matching `.next/static/**/*.js`, including route-level and dynamically imported chunks. This is intentionally not an initial-load-only budget.',
+            ].join('\n')
+
+            const issue_number = parseInt(fs.readFileSync('pr-number/pr-number.txt', 'utf8').trim(), 10)
+            const { owner, repo } = context.repo
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number, per_page: 100 })
+            const existing = comments.find((comment) => comment.user.type === 'Bot' && comment.body.includes(marker))
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body })
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body })
+            }

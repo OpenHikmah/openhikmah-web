@@ -5,8 +5,7 @@ on:
     branches: ["**"]
   pull_request:
 
-# Least privilege: this workflow only reads the repo (checkout) and runs
-# tests/build — it never writes back to GitHub. Override per-job if needed.
+# Least privilege by default. Jobs that need to report back to PRs override this explicitly.
 permissions:
   contents: read
 
@@ -16,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -43,6 +44,8 @@ jobs:
     # Testcontainers spins up Postgres without extra setup.
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -74,6 +77,8 @@ jobs:
       DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -84,6 +89,69 @@ jobs:
 
       - name: Build
         run: bun run build
+
+      - name: Measure bundle size
+        run: |
+          bunx size-limit --json > "$RUNNER_TEMP/size-current.json" || true
+          cp .size-limit.cjs "$RUNNER_TEMP/.size-limit.cjs"
+
+      - name: Check out base branch for bundle comparison
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+
+      - name: Install base dependencies
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        working-directory: base
+        run: bun install --frozen-lockfile
+
+      - name: Build base branch
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        working-directory: base
+        run: bun run build
+
+      - name: Measure base bundle size
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        working-directory: base
+        run: |
+          cp "$RUNNER_TEMP/.size-limit.cjs" .size-limit.cjs
+          ../node_modules/.bin/size-limit --json > "$RUNNER_TEMP/size-base.json" || true
+
+      # Fork PRs get a read-only GITHUB_TOKEN on `pull_request` events no matter what
+      # `permissions:` declares here, so this job can never post the PR comment itself.
+      # It only publishes the reports; bundle-size-comment.yml (triggered by `workflow_run`,
+      # which runs with the base repo's write token) does the actual commenting.
+      - name: Upload bundle size reports
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-size-reports
+          path: |
+            ${{ runner.temp }}/size-current.json
+            ${{ runner.temp }}/size-base.json
+          retention-days: 1
+
+      - name: Save PR number
+        if: github.event_name == 'pull_request'
+        run: echo "${{ github.event.pull_request.number }}" > "$RUNNER_TEMP/pr-number.txt"
+
+      - name: Upload PR number
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-number
+          path: ${{ runner.temp }}/pr-number.txt
+          retention-days: 1
+
+      - name: Check bundle size
+        run: bun run size
 
   e2e:
     name: E2E (Playwright)
@@ -119,6 +187,8 @@ jobs:
       NEXT_PUBLIC_QF_AUTH_BASE: https://placeholder.example.com
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: oven-sh/setup-bun@v2
         with:
