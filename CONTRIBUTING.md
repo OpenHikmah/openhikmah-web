@@ -18,12 +18,12 @@ Thank you for your interest in contributing. Open Hikmah is a theological sensem
 ## Getting Started
 
 ```bash
-git clone https://github.com/Nazm-AI/open-hikmah
-cd open-hikmah
-npm install
+git clone https://github.com/OpenHikmah/openhikmah-web
+cd openhikmah-web
+bun install
 cp .env.example .env.local
 # Fill in .env.local (see .env.example for instructions)
-npm run dev
+bun run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -61,11 +61,13 @@ docs(names): add theological notes for Sifat al-Af'al
 ## Running Tests
 
 ```bash
-npm run test        # interactive watch mode
-npm run test:ci     # single run (used in CI)
+bun run test              # unit tests, interactive watch mode
+bun run test:ci           # unit tests, single run (used in CI)
+bun run test:integration  # integration tests against a real Postgres (Testcontainers, needs Docker)
+bun run test:e2e          # end-to-end tests (Playwright), including accessibility checks
 ```
 
-Tests live in `__tests__/` and mirror the source structure:
+Unit tests live in `__tests__/` and mirror the source structure:
 
 ```
 __tests__/
@@ -74,13 +76,16 @@ __tests__/
   store/     # Zustand store tests
 ```
 
-CI runs automatically on every push via GitHub Actions (`.github/workflows/ci.yml`). All tests must pass and the TypeScript build must succeed before a PR can be merged.
+End-to-end tests live in `e2e/` and run against a real dev server and database.
+
+CI runs automatically on every push via GitHub Actions (`.github/workflows/ci.yml`). All CI checks — linting, type-checking, unit tests, integration tests, the production build, and end-to-end tests — must pass before a PR can be merged.
 
 **When adding a new feature:**
 
-- Add tests in the appropriate `__tests__/` subfolder
+- Add unit tests in the appropriate `__tests__/` subfolder
 - API routes: mock `global.fetch` with `vi.stubGlobal`; mock `@anthropic-ai/sdk` if the route uses Claude
 - Stores: reset state in `beforeEach`
+- User-facing flows that span multiple pages are good candidates for an `e2e/` test
 
 ---
 
@@ -90,7 +95,7 @@ CI runs automatically on every push via GitHub Actions (`.github/workflows/ci.ym
 - **No comments** unless the _why_ is non-obvious (a hidden constraint, a Quran API quirk, a security invariant)
 - **No feature flags or backwards-compatibility shims** — change the code directly
 - **No error handling for impossible scenarios** — trust Next.js and TypeScript guarantees; only validate at system boundaries
-- Run `npm run lint` before pushing; the CI will reject lint failures
+- Run `bun run lint` before pushing; the CI will reject lint failures
 
 File structure follows Next.js App Router conventions. New API routes go under `app/api/`, new pages under `app/`, shared logic under `lib/`, Zustand stores under `store/`.
 
@@ -116,7 +121,7 @@ All AI prompts, divine name descriptions, and verse connections must:
 
 1. Fork the repo and create your branch from `main`
 2. Make your changes with tests
-3. Ensure `npm run lint`, `npx tsc --noEmit`, and `npm run test:ci` all pass locally
+3. Ensure `bun run lint`, `bun run typecheck`, and `bun run test:ci` all pass locally
 4. Open a PR against `main` using the pull request template
 5. Describe the theological implications of any AI prompt changes
 6. A maintainer will review within a few days

@@ -27,9 +27,10 @@
 
 ## Testing
 
-- [ ] `npm run test:ci` passes locally
-- [ ] `npx tsc --noEmit` passes locally
-- [ ] `npm run lint` passes locally
+- [ ] `bun run test:ci` passes locally
+- [ ] `bun run typecheck` passes locally
+- [ ] `bun run lint` passes locally
+- [ ] `bun run format:check` passes locally
 - [ ] New tests added for new functionality
 - [ ] Tested in browser (for UI changes)
 

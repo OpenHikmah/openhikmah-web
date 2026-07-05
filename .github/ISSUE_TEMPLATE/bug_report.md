@@ -23,7 +23,7 @@ assignees: ""
 ## Environment
 
 - Browser / OS:
-- Node.js version (`node -v`):
+- Bun version (`bun -v`):
 - Branch / commit:
 - Is this reproducible on [openhikmah.com](https://openhikmah.com)? [ ] Yes [ ] No [ ] Not checked
 
