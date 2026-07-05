@@ -4,22 +4,12 @@ import { db } from "@/lib/db";
 import { sharedCanvases } from "@/lib/db/schema";
 import { clientKey } from "@/lib/http";
 import { rateLimitOrNull } from "@/lib/rate-limit";
+import { isValidNode } from "@/lib/share-canvas";
 
 const MAX_BYTES = 512 * 1024; // 512 KB
 const RATE_LIMIT = 10;
 const WINDOW_SECONDS = 60 * 60; // 1 hour
 const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-
-/** The fields the OG image handler and canvas renderer actually read from `verse`. */
-function isValidNode(node: unknown): boolean {
-  if (typeof node !== "object" || node === null) return false;
-  const verse = (node as { verse?: unknown }).verse;
-  if (typeof verse !== "object" || verse === null) return false;
-  const { ref, surahName, translation } = verse as Record<string, unknown>;
-  return (
-    typeof ref === "string" && typeof surahName === "string" && typeof translation === "string"
-  );
-}
 
 export async function POST(req: Request) {
   const limited = await rateLimitOrNull(

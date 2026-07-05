@@ -125,6 +125,15 @@ describe("GET /api/share/[id]/opengraph-image", () => {
     await expect(imageReq(VALID_ID)).resolves.toBeDefined();
   });
 
+  it("falls back instead of throwing when .verse is present but missing required fields", async () => {
+    mockSelect.mockReturnValue(
+      makeDbChain([
+        { id: VALID_ID, data: JSON.stringify({ v: 1, nodes: [{ verse: { ref: "2:255" } }] }) },
+      ])
+    );
+    await expect(imageReq(VALID_ID)).resolves.toBeDefined();
+  });
+
   it("renders normally for well-formed stored data", async () => {
     mockSelect.mockReturnValue(
       makeDbChain([
