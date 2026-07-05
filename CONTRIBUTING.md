@@ -95,7 +95,8 @@ CI runs automatically on every push via GitHub Actions (`.github/workflows/ci.ym
 - **No comments** unless the _why_ is non-obvious (a hidden constraint, a Quran API quirk, a security invariant)
 - **No feature flags or backwards-compatibility shims** — change the code directly
 - **No error handling for impossible scenarios** — trust Next.js and TypeScript guarantees; only validate at system boundaries
-- Run `bun run lint` before pushing; the CI will reject lint failures
+
+* Run `bun run lint` and `bun run format:check` before pushing; the CI will reject lint/format failures
 
 File structure follows Next.js App Router conventions. New API routes go under `app/api/`, new pages under `app/`, shared logic under `lib/`, Zustand stores under `store/`.
 
@@ -121,7 +122,7 @@ All AI prompts, divine name descriptions, and verse connections must:
 
 1. Fork the repo and create your branch from `main`
 2. Make your changes with tests
-3. Ensure `bun run lint`, `bun run typecheck`, and `bun run test:ci` all pass locally
+3. Ensure `bun run format:check`, `bun run lint`, `bun run typecheck`, and `bun run test:ci` all pass locally
 4. Open a PR against `main` using the pull request template
 5. Describe the theological implications of any AI prompt changes
 6. A maintainer will review within a few days
