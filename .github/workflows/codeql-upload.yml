@@ -1,0 +1,62 @@
+name: CodeQL SARIF upload (fork PRs)
+
+# Fork PRs' `pull_request` runs can't upload SARIF directly (read-only token,
+# same restriction bundle-size-comment.yml works around). workflow_run runs in
+# the base repo's context, so it gets a normal write token even when triggered
+# by a fork PR's CodeQL run — this downloads the SARIF codeql.yml published as
+# an artifact and uploads it against the fork PR's actual head commit.
+on:
+  workflow_run:
+    workflows: ["CodeQL"]
+    types: [completed]
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  upload:
+    name: Upload SARIF (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    if: |
+      github.event.workflow_run.event == 'pull_request' &&
+      (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure')
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, actions]
+    steps:
+      - name: Download SARIF artifact
+        id: download-sarif
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+          name: codeql-sarif-${{ matrix.language }}
+          path: sarif-results
+
+      - name: Download PR metadata
+        if: steps.download-sarif.outcome == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+          name: codeql-pr-metadata-${{ matrix.language }}
+          path: pr-metadata
+
+      - name: Read PR metadata
+        if: steps.download-sarif.outcome == 'success'
+        id: pr
+        run: |
+          echo "number=$(cat pr-metadata/pr-number.txt)" >> "$GITHUB_OUTPUT"
+          echo "sha=$(cat pr-metadata/pr-sha.txt)" >> "$GITHUB_OUTPUT"
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: steps.download-sarif.outcome == 'success'
+        with:
+          sarif_file: sarif-results
+          category: "/language:${{ matrix.language }}"
+          ref: refs/pull/${{ steps.pr.outputs.number }}/head
+          sha: ${{ steps.pr.outputs.sha }}
