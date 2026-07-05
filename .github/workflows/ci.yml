@@ -61,10 +61,6 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: [lint-typecheck-test, integration]
-    permissions:
-      contents: read
-      issues: write
-      pull-requests: write
     # Placeholder env vars so Next.js build succeeds without real secrets.
     # Actual secrets are set in Vercel project settings for deployments.
     env:
@@ -128,64 +124,82 @@ jobs:
           cp "$RUNNER_TEMP/.size-limit.cjs" .size-limit.cjs
           ../node_modules/.bin/size-limit --json > "$RUNNER_TEMP/size-base.json" || true
 
-      - name: Comment bundle size delta
+      # Fork PRs get a read-only GITHUB_TOKEN on `pull_request` events no matter what
+      # `permissions:` declares here, so this job can never post the PR comment itself.
+      # It only publishes the reports; bundle-size-comment.yml (triggered by `workflow_run`,
+      # which runs with the base repo's write token) does the actual commenting.
+      - name: Upload bundle size reports
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        continue-on-error: true
+        uses: actions/upload-artifact@v4
         with:
-          script: |
-            const fs = require('node:fs')
+          name: bundle-size-reports
+          path: |
+            ${{ runner.temp }}/size-current.json
+            ${{ runner.temp }}/size-base.json
+          retention-days: 1
 
-            const loadReport = (fileName) => {
-              try {
-                const content = fs.readFileSync(`${process.env.RUNNER_TEMP}/${fileName}`, 'utf8').trim()
-                if (!content) return null
+      - name: Save PR number
+        if: github.event_name == 'pull_request'
+        run: echo "${{ github.event.pull_request.number }}" > "$RUNNER_TEMP/pr-number.txt"
 
-                const report = JSON.parse(content)
-                return Array.isArray(report) && report.length > 0 ? report[0] : null
-              } catch {
-                return null
-              }
-            }
-
-            const currentReport = loadReport('size-current.json')
-            const baseReport = loadReport('size-base.json')
-            const current = currentReport ?? baseReport
-            const base = baseReport ?? currentReport
-
-            if (!current || !base) {
-              throw new Error('No bundle size report was available to comment on')
-            }
-
-            const delta = current.size - base.size
-            const percent = base.size === 0 ? 0 : (delta / base.size) * 100
-            const marker = '<!-- openhikmah-size-limit-report -->'
-
-            const formatBytes = (bytes) => `${(bytes / 1000).toFixed(2)} kB`
-            const formatDelta = (bytes) => `${bytes >= 0 ? '+' : '-'}${formatBytes(Math.abs(bytes))}`
-            const formatPercent = (value) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
-
-            const body = [
-              marker,
-              '### Bundle Size Report',
-              '',
-              '| Budget | Base | PR | Delta | Status |',
-              '| --- | ---: | ---: | ---: | --- |',
-              `| ${formatBytes(current.sizeLimit)} | ${formatBytes(base.size)} | ${formatBytes(current.size)} | ${formatDelta(delta)} (${formatPercent(percent)}) | ${current.passed ? 'Passed' : 'Failed'} |`,
-              '',
-              'Scope: total shipped client JS matching `.next/static/**/*.js`, including route-level and dynamically imported chunks. This is intentionally not an initial-load-only budget.',
-            ].join('\n')
-
-            const { owner, repo } = context.repo
-            const issue_number = context.payload.pull_request.number
-            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number, per_page: 100 })
-            const existing = comments.find((comment) => comment.user.type === 'Bot' && comment.body.includes(marker))
-
-            if (existing) {
-              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body })
-            } else {
-              await github.rest.issues.createComment({ owner, repo, issue_number, body })
-            }
+      - name: Upload PR number
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-number
+          path: ${{ runner.temp }}/pr-number.txt
+          retention-days: 1
 
       - name: Check bundle size
         run: bun run size
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: [lint-typecheck-test]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      DEV_AUTH_TOKEN: e2e-dev-token
+      DEV_AUTH_QF_ID: e2e-dev-qf-id
+      ANTHROPIC_API_KEY: sk-ant-placeholder
+      AI_PROVIDER: claude
+      GEMINI_API_KEY: placeholder-gemini-key
+      GEMINI_MODEL: gemini-2.0-flash
+      NEXT_PUBLIC_QF_CLIENT_ID: placeholder-client-id
+      QF_API_BASE: https://placeholder.example.com
+      QF_AUTH_BASE: https://placeholder.example.com
+      QF_CLIENT_SECRET: placeholder-secret
+      NEXT_PUBLIC_APP_URL: http://localhost:3100
+      NEXT_PUBLIC_QF_AUTH_BASE: https://placeholder.example.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run migrations
+        run: bun run db:migrate
+
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium
+
+      - name: E2E tests
+        run: bun run test:e2e
