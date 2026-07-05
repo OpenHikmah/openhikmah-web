@@ -34,4 +34,34 @@ test.describe("accessibility", () => {
     await page.goto("/social");
     await scanAndAssert(page, "social");
   });
+
+  test("today page has no serious a11y violations", async ({ authenticatedPage: page }) => {
+    await page.goto("/today");
+    await scanAndAssert(page, "today");
+  });
+
+  test("names index has no serious a11y violations", async ({ page }) => {
+    await page.goto("/names");
+    await scanAndAssert(page, "names index");
+  });
+
+  test("names detail page has no serious a11y violations", async ({ page }) => {
+    await page.goto("/names/ar-rahman");
+    await scanAndAssert(page, "names detail");
+  });
+
+  test("bookmarks page has no serious a11y violations", async ({ authenticatedPage: page }) => {
+    await page.goto("/bookmarks");
+    await scanAndAssert(page, "bookmarks");
+  });
+
+  test("workspaces page has no serious a11y violations", async ({ authenticatedPage: page }) => {
+    await page.goto("/workspaces");
+    await scanAndAssert(page, "workspaces");
+  });
+
+  test("onboarding page has no serious a11y violations", async ({ authenticatedPage: page }) => {
+    await page.goto("/onboarding");
+    await scanAndAssert(page, "onboarding");
+  });
 });
