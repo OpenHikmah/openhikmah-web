@@ -3,32 +3,24 @@ import { lt } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { sharedCanvases } from "@/lib/db/schema";
 import { clientKey } from "@/lib/http";
+import { rateLimitOrNull } from "@/lib/rate-limit";
+import { isValidNode } from "@/lib/share-canvas";
 
 const MAX_BYTES = 512 * 1024; // 512 KB
 const RATE_LIMIT = 10;
-const WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const WINDOW_SECONDS = 60 * 60; // 1 hour
 const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-const ipBuckets = new Map<string, { count: number; windowStart: number }>();
-
 export async function POST(req: Request) {
-  const ip = clientKey(req);
+  const limited = await rateLimitOrNull(
+    `share:${clientKey(req)}`,
+    "Too many requests",
+    RATE_LIMIT,
+    WINDOW_SECONDS
+  );
+  if (limited) return limited;
+
   const now = Date.now();
-  const bucket = ipBuckets.get(ip);
-  if (!bucket || now - bucket.windowStart > WINDOW_MS) {
-    ipBuckets.set(ip, { count: 1, windowStart: now });
-    // Opportunistically evict expired buckets so the map can't grow unbounded.
-    if (Math.random() < 0.05) {
-      for (const [key, b] of ipBuckets) {
-        if (now - b.windowStart > WINDOW_MS) ipBuckets.delete(key);
-      }
-    }
-  } else {
-    bucket.count += 1;
-    if (bucket.count > RATE_LIMIT) {
-      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
-    }
-  }
   let body: unknown;
   try {
     const text = await req.text();
@@ -45,7 +37,8 @@ export async function POST(req: Request) {
     body === null ||
     (body as { v?: unknown }).v !== 1 ||
     !Array.isArray((body as { nodes?: unknown }).nodes) ||
-    (body as { nodes: unknown[] }).nodes.length === 0
+    (body as { nodes: unknown[] }).nodes.length === 0 ||
+    !(body as { nodes: unknown[] }).nodes.every(isValidNode)
   ) {
     return NextResponse.json({ error: "Invalid canvas" }, { status: 400 });
   }
@@ -53,7 +46,7 @@ export async function POST(req: Request) {
   if (Math.random() < 0.05) {
     db.delete(sharedCanvases)
       .where(lt(sharedCanvases.createdAt, new Date(now - TTL_MS)))
-      .catch(() => {});
+      .catch((err) => console.error("share TTL cleanup error:", err));
   }
 
   const id = crypto.randomUUID();

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { sharedCanvases } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { renderOgCard, clampBody, OG_SIZE, OG_CONTENT_TYPE } from "@/lib/og-card";
+import { isValidNode } from "@/lib/share-canvas";
 import type { SavedCanvas } from "@/store/canvas";
 
 export const alt = "Shared canvas — Open Hikmah";
@@ -35,11 +36,18 @@ export default async function Image({ params }: { params: Promise<{ id: string }
 
   if (!rows[0]) return fallback();
 
-  const canvas = JSON.parse(rows[0].data) as SavedCanvas;
+  let canvas: SavedCanvas;
+  try {
+    canvas = JSON.parse(rows[0].data) as SavedCanvas;
+  } catch (err) {
+    console.error("share opengraph-image parse error:", err);
+    return fallback();
+  }
   if (!canvas?.nodes?.length) return fallback();
 
   const first = canvas.nodes[0];
   const count = canvas.nodes.length;
+  if (!isValidNode(first)) return fallback();
 
   return new ImageResponse(
     renderOgCard({
