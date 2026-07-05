@@ -15,6 +15,20 @@
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg" alt="License: GPL-3.0" />
   </a>
+  <a href="CODE_OF_CONDUCT.md">
+    <img src="https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg" alt="Contributor Covenant" />
+  </a>
+  <a href="CONTRIBUTING.md">
+    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome" />
+  </a>
+  <br />
+  <img src="https://img.shields.io/badge/TypeScript-strict-3178c6.svg?logo=typescript&logoColor=white" alt="TypeScript" />
+  <a href="https://github.com/OpenHikmah/openhikmah-web/stargazers">
+    <img src="https://img.shields.io/github/stars/OpenHikmah/openhikmah-web?style=flat&color=blue" alt="GitHub stars" />
+  </a>
+  <a href="https://github.com/OpenHikmah/openhikmah-web/issues">
+    <img src="https://img.shields.io/github/issues/OpenHikmah/openhikmah-web" alt="Open issues" />
+  </a>
 </p>
 
 <p align="center">
@@ -23,19 +37,21 @@
 
 ---
 
-## What is this?
+## Overview
 
-Open Hikmah lets you explore the Qur'an the way ideas actually connect — not linearly, page by
-page, but as a graph. Search for a verse, place it on the canvas, and expand it to see verses
-that share a root word, a theme, or a meaningful contrast.
+Open Hikmah is an AI-grounded Quran knowledge graph. Rather than reading the Qur'an linearly,
+page by page, it lets you explore verses as a connected graph: search for a verse, place it on
+an infinite canvas, and expand it to surface related verses — by shared root word, by theme, or
+by meaningful contrast.
 
-The connections themselves are **grounded, not hallucinated**: canonical data — shared Arabic
-roots and embedding-based meaning similarity — finds the real candidate verses first. The AI's
-only job is to explain _why_ a connection matters; it never invents a reference that isn't
-actually there. Click any edge on the canvas to read that explanation.
+Connections are **grounded, not hallucinated**: canonical data — shared Arabic roots and
+embedding-based semantic similarity — identifies the candidate verses first. The AI's role is
+limited to explaining _why_ a connection holds; it never invents a reference. Every edge on the
+canvas links to that explanation.
 
-Search directly by reference (`2:255`), by keyword, or **by meaning** — describe a concept in
-your own words and find verses about it even if they don't share a single word with your query.
+Verses can be found by direct reference (`2:255`), by keyword, or **by meaning** — describing a
+concept in your own words and retrieving verses about it even when no words are shared with the
+query.
 
 ---
 
