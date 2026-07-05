@@ -1,0 +1,65 @@
+name: CodeQL
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  schedule:
+    # Matches the cadence the prior default-setup config used.
+    - cron: "0 3 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, actions]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      # Fork PRs get a read-only GITHUB_TOKEN on `pull_request` events, so this job
+      # can't upload SARIF itself (needs `security-events: write`) in that case —
+      # same restriction already hit and fixed for bundle-size-comment.yml. For
+      # same-repo pushes/PRs, upload directly; for fork PRs, keep the SARIF as a
+      # local file and hand it to codeql-upload.yml (workflow_run, base-repo
+      # context) instead.
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+          upload: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+          output: sarif-results
+
+      - name: Upload SARIF artifact (fork PRs only)
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-sarif-${{ matrix.language }}
+          path: sarif-results
+          retention-days: 1
+
+      - name: Save PR metadata (fork PRs only)
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          mkdir -p pr-metadata
+          echo "${{ github.event.pull_request.number }}" > pr-metadata/pr-number.txt
+          echo "${{ github.event.pull_request.head.sha }}" > pr-metadata/pr-sha.txt
+
+      - name: Upload PR metadata (fork PRs only)
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-pr-metadata-${{ matrix.language }}
+          path: pr-metadata
+          retention-days: 1
