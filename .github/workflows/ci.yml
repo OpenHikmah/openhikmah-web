@@ -5,6 +5,10 @@ on:
     branches: ["**"]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 # Least privilege by default. Jobs that need to report back to PRs override this explicitly.
 permissions:
   contents: read
