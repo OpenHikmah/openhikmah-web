@@ -1,22 +1,18 @@
-// Standalone migration runner — safe to execute in the production container.
-// Uses drizzle-orm's migrate() directly; does not need drizzle-kit or drizzle.config.ts.
+import { join } from "node:path";
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const migrationsFolder = join(__dirname, "../lib/db/migrations");
-
-if (!process.env.DATABASE_URL) {
-  console.error("DATABASE_URL is not set");
+const url = process.env.DATABASE_URL;
+if (!url) {
+  console.error("DATABASE_URL is required");
   process.exit(1);
 }
 
-const sql = postgres(process.env.DATABASE_URL, { max: 1 });
-const db = drizzle(sql);
-
-await migrate(db, { migrationsFolder });
-console.log("Migrations applied successfully");
-await sql.end();
+const sql = postgres(url, { max: 1 });
+try {
+  await migrate(drizzle(sql), { migrationsFolder: join(process.cwd(), "lib/db/migrations") });
+  console.log("Migrations applied");
+} finally {
+  await sql.end();
+}
