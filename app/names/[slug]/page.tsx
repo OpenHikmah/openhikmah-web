@@ -33,7 +33,7 @@ const CATEGORY_STYLES: Record<NameCategory, { accent: string; badge: string }> =
   },
   sifat: {
     accent: "var(--color-teal)",
-    badge: "border border-teal/30 bg-teal/15 text-teal",
+    badge: "border border-teal/30 bg-teal/15 text-text-primary",
   },
   "af'al": {
     accent: "var(--color-accent)",
