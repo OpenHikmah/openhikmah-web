@@ -19,7 +19,7 @@ const CATEGORY_COLORS: Record<NameCategory, { border: string; badge: string; dot
   },
   sifat: {
     border: "border-teal",
-    badge: "bg-teal/[0.12] text-teal",
+    badge: "border border-teal/30 bg-teal/[0.12] text-text-primary",
     dot: "bg-teal",
   },
   "af'al": {
