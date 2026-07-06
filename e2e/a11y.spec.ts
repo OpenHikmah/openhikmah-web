@@ -7,8 +7,7 @@ const BLOCKING_IMPACTS = new Set(["serious", "critical"]);
 const FIRST_DIVINE_NAME_SLUG = DIVINE_NAMES[0].slug;
 
 async function gotoAndSettle(page: Page, path: string): Promise<void> {
-  await page.goto(path);
-  await page.waitForLoadState("networkidle");
+  await page.goto(path, { waitUntil: "domcontentloaded" });
 }
 
 async function scanAndAssert(page: Page, label: string): Promise<void> {
