@@ -3,6 +3,8 @@
 export function AuthLoadingSkeleton() {
   return (
     <main className="mx-auto w-full max-w-[1180px] flex-1 px-6 py-10 md:px-12">
+      <h1 className="sr-only">Open Hikmah home</h1>
+
       {/* Greeting */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-2">
