@@ -73,27 +73,6 @@ query.
 
 ---
 
-## Getting Started
-
-```bash
-git clone https://github.com/OpenHikmah/openhikmah-web
-cd openhikmah-web
-bun install
-cp .env.example .env.local
-# fill in .env.local — see the comments in .env.example for what each value needs
-bun run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-At minimum you'll need `ANTHROPIC_API_KEY` to test AI connections; the Quran Foundation OAuth
-variables are only required to test sign-in, bookmarks, and social features.
-
-For the full contributor setup (running tests, Docker requirement for pushing, commit
-conventions), see [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
-
 ## Tech Stack
 
 | Layer      | Choice                                                                                           |
@@ -113,9 +92,10 @@ conventions), see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR. The project touches sacred content —
-theological changes (AI prompts, divine name data, verse framing) have extra requirements detailed
-in [Theological Standards](CONTRIBUTING.md#theological-standards).
+Want to run this locally or contribute? See [CONTRIBUTING.md](CONTRIBUTING.md) — it covers local
+setup, running tests, and commit conventions. Read it fully before opening a PR: the project
+touches sacred content, and theological changes (AI prompts, divine name data, verse framing) have
+extra requirements detailed in [Theological Standards](CONTRIBUTING.md#theological-standards).
 
 ## Security
 
@@ -129,4 +109,4 @@ Report vulnerabilities privately to **security@openhikmah.com**. See [SECURITY.m
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=OpenHikmah/openhikmah-web&type=Date)](https://www.star-history.com/#OpenHikmah/openhikmah-web&Date)
+[![Star History Chart](https://api.star-history.com/chart?repos=OpenHikmah/openhikmah-web&type=date&legend=top-left&sealed_token=m6ay3MuCXgOMAwUC_M95-RaSOeeS25FuaTMam_NUsnUryl1VNi4r_2M6dObUIszMpqfOLKRWwXPYR4hxz_osDIaPXYC9NzMb-iAYkCTiGNhGpQoF9OnbRw)](https://www.star-history.com/?repos=OpenHikmah%2Fopenhikmah-web&type=date&legend=top-left)
