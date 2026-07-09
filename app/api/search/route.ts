@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(req.nextUrl.searchParams.get("page") ?? "1", 10) || 1);
   const pageSize = Math.max(
     1,
-    parseInt(req.nextUrl.searchParams.get("pageSize") ?? "10", 10) || 10
+    Math.min(parseInt(req.nextUrl.searchParams.get("pageSize") ?? "10", 10) || 10, 50)
   );
 
   if (!q) {

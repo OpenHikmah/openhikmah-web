@@ -29,7 +29,7 @@ export function SearchPageClient() {
 
   const [inputValue, setInputValue] = useState(q);
   const [data, setData] = useState<SearchResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!!q.trim());
   const [fellBackToKeyword, setFellBackToKeyword] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -39,6 +39,14 @@ export function SearchPageClient() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setInputValue(q);
   }, [q]);
+
+  // Clear pending debounce on unmount to avoid a stale navigation firing
+  // after the user has already clicked away (e.g. to "Map on Canvas").
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     abortRef.current?.abort();
@@ -109,6 +117,7 @@ export function SearchPageClient() {
           <Input
             value={inputValue}
             onChange={(e) => onInputChange(e.target.value)}
+            aria-label="Search verses"
             placeholder={
               mode === "meaning"
                 ? "Describe a meaning, e.g. trusting God in hardship…"
