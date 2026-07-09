@@ -1,0 +1,28 @@
+# CODEOWNERS routes review requests for security- and infra-sensitive paths
+# to a maintainer, so contributor PRs touching these areas get guaranteed
+# maintainer eyes rather than just any approving review.
+#
+# Note: this file alone does not block merges. Branch protection on `main`
+# must also enable "Require review from Code Owners" (repo Settings) for
+# these entries to be enforced.
+
+# Admin API routes
+/app/api/admin/ @nazarli-shabnam
+
+# Admin auth/audit logic
+/lib/admin/ @nazarli-shabnam
+
+# OAuth callback handling
+/app/callback/ @nazarli-shabnam
+
+# Auth logic (PKCE, social auth)
+/lib/auth/ @nazarli-shabnam
+
+# Security headers / CSP config
+/next.config.ts @nazarli-shabnam
+
+# CI itself
+/.github/workflows/ @nazarli-shabnam
+
+# Ownership rules for this file
+/.github/CODEOWNERS @nazarli-shabnam
