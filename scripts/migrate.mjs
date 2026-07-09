@@ -11,7 +11,7 @@ if (!url) {
 
 const sql = postgres(url, { max: 1 });
 try {
-  await migrate(drizzle(sql), { migrationsFolder: join(process.cwd(), "lib/db/migrations") });
+  await migrate(drizzle(sql), { migrationsFolder: join(process.cwd(), "lib/infra/db/migrations") });
   console.log("Migrations applied");
 } finally {
   await sql.end();

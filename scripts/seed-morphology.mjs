@@ -1,7 +1,7 @@
 /**
  * Seed the `word_morphology` table from committed canonical data files, so
  * "By Root" connections are discovered from real Arabic roots instead of the
- * model's memory (see lib/connection-discovery.ts).
+ * model's memory (see lib/ai/connection-discovery.ts).
  *
  *   DATABASE_URL=... node scripts/seed-morphology.mjs
  *

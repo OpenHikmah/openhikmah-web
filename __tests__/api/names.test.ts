@@ -6,8 +6,8 @@ vi.mock("next/cache", () => ({
   unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
-// The name routes now read/write a durable `name_content` cache via lib/db
-// (see lib/name-content.ts). Mock the DB so the cache check is always a miss and
+// The name routes now read/write a durable `name_content` cache via lib/infra/db
+// (see lib/names/name-content.ts). Mock the DB so the cache check is always a miss and
 // the persist is a no-op — the routes then exercise their real generation path.
 function makeDbChain(resolveWith: unknown[] = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

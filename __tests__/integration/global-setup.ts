@@ -27,14 +27,14 @@ export async function setup({ provide }: SetupContext) {
   const sql = postgres(url, { max: 1 });
   try {
     await migrate(drizzle(sql), {
-      migrationsFolder: join(process.cwd(), "lib/db/migrations"),
+      migrationsFolder: join(process.cwd(), "lib/infra/db/migrations"),
     });
   } finally {
     await sql.end();
   }
 
   // Hand the connection string to the worker (inject-env.ts reads it before
-  // lib/db is imported and creates its client).
+  // lib/infra/db is imported and creates its client).
   provide("DATABASE_URL", url);
   process.env.DATABASE_URL = url;
 }
