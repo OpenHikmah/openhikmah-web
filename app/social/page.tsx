@@ -46,9 +46,14 @@ export default function SocialPage() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [prefill, setPrefill] = useState<ChallengePrefill | null>(null);
   const [prefillKey, setPrefillKey] = useState(0);
-  const [loadingFriends, setLoadingFriends] = useState(false);
-  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
-  const [loadingChallenges, setLoadingChallenges] = useState(false);
+  // Default true, not false: this section only renders once userId is resolved
+  // (see the !userId guard below), at which point the fetch effect is about to
+  // run (or has just run) and its `finally` always clears these. Defaulting to
+  // false let the empty-state UI (e.g. "Add friends to see them here.") flash
+  // for one frame before the real data arrived.
+  const [loadingFriends, setLoadingFriends] = useState(true);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
+  const [loadingChallenges, setLoadingChallenges] = useState(true);
   // Tracked per section (not one shared flag) — otherwise a later-resolving
   // fetch that succeeds would clear the banner even though a different
   // section actually failed and is showing stale/missing data.
