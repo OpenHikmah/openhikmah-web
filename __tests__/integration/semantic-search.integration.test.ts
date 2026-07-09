@@ -4,15 +4,15 @@ import { sql } from "drizzle-orm";
 // Real Postgres + pgvector (Testcontainers). Only the embedding API is mocked so
 // the query path is deterministic; the ranking itself is done by real pgvector.
 const { mockEmbed } = vi.hoisted(() => ({ mockEmbed: vi.fn() }));
-vi.mock("@/lib/ai", () => ({ embed: mockEmbed }));
+vi.mock("@/lib/ai/ai", () => ({ embed: mockEmbed }));
 vi.stubGlobal(
   "fetch",
   vi.fn(async () => ({ ok: false }))
 );
 
-import { db } from "@/lib/db";
-import { verses } from "@/lib/db/schema";
-import { searchByMeaning, similarVerses, semanticCandidates } from "@/lib/semantic-search";
+import { db } from "@/lib/infra/db";
+import { verses } from "@/lib/infra/db/schema";
+import { searchByMeaning, similarVerses, semanticCandidates } from "@/lib/quran/semantic-search";
 
 const DIM = 768;
 /** A 768-d unit-ish vector controlled by its first two components. */

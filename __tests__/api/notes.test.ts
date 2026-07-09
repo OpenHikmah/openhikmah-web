@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import type { User } from "@/lib/db/schema";
+import type { User } from "@/lib/infra/db/schema";
 
-vi.mock("@/lib/social-auth", () => ({ requireUser: vi.fn() }));
+vi.mock("@/lib/auth/social-auth", () => ({ requireUser: vi.fn() }));
 
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,13 +31,13 @@ const { mockSelect, mockInsert, mockRateLimitOrNull } = vi.hoisted(() => ({
   mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
 }));
 
-vi.mock("@/lib/db", () => ({ db: { select: mockSelect, insert: mockInsert } }));
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect, insert: mockInsert } }));
+vi.mock("@/lib/infra/rate-limit", () => ({
   rateLimitOrNull: mockRateLimitOrNull,
 }));
 
 import { GET, POST } from "@/app/api/notes/route";
-import { requireUser } from "@/lib/social-auth";
+import { requireUser } from "@/lib/auth/social-auth";
 
 function makeUser(): User {
   return {

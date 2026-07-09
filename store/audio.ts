@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { getAudioUrl } from "@/lib/audio";
+import { getAudioUrl } from "@/lib/quran/audio";
 
 export interface AudioVerse {
   ref: string;

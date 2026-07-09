@@ -34,14 +34,14 @@ const { mockSelect, mockInsert, mockDelete, mockRateLimitOrNull } = vi.hoisted((
   mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
 }));
 
-vi.mock("@/lib/db", () => ({
+vi.mock("@/lib/infra/db", () => ({
   db: {
     select: mockSelect,
     insert: mockInsert,
     delete: mockDelete,
   },
 }));
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/lib/infra/rate-limit", () => ({
   rateLimitOrNull: mockRateLimitOrNull,
 }));
 

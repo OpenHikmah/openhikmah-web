@@ -1,4 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
+import { loadEnvConfig } from "@next/env";
+
+// Playwright's own process doesn't get .env.local the way `next dev` does —
+// only the spawned webServer subprocess picks it up. Fixtures like
+// e2e/fixtures/auth.ts read process.env.DEV_AUTH_TOKEN directly, so load it
+// here too (mirrors Next.js's own env loading; see @next/env docs).
+loadEnvConfig(process.cwd());
 
 const PORT = 3100;
 

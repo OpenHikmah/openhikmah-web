@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { asc, eq } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin-auth";
-import { logAdminAction } from "@/lib/admin-audit";
-import { db } from "@/lib/db";
-import { challengeSuggestions } from "@/lib/db/schema";
-import { isDuration } from "@/lib/challenges";
-import { isValidRef } from "@/lib/quran-corpus";
+import { requireAdmin } from "@/lib/admin/admin-auth";
+import { logAdminAction } from "@/lib/admin/admin-audit";
+import { db } from "@/lib/infra/db";
+import { challengeSuggestions } from "@/lib/infra/db/schema";
+import { isDuration } from "@/lib/social/challenges";
+import { isValidRef } from "@/lib/quran/quran-corpus";
 
 /** Validates an incoming suggestion payload; returns an error string or null. */
 function validate(body: {

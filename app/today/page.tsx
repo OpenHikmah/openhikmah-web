@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { NavBar } from "@/components/layout/NavBar";
 import { VerseOfDayCard } from "@/components/today/VerseOfDayCard";
-import { getVerseOfDayWithReflection } from "@/lib/verse-of-day";
+import { getVerseOfDayWithReflection } from "@/lib/quran/verse-of-day";
 
 export const metadata: Metadata = {
   title: "Verse of the Day — Open Hikmah",

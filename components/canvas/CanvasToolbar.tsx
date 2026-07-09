@@ -20,7 +20,7 @@ import { useAuthStore } from "@/store/auth";
 import { useAudioStore } from "@/store/audio";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 import { buildShareUrl } from "@/hooks/useCanvasPersistence";
-import { buildAuthUrl } from "@/lib/pkce";
+import { buildAuthUrl } from "@/lib/auth/pkce";
 import type { AudioVerse } from "@/store/audio";
 import type { Verse } from "@/types/quran";
 

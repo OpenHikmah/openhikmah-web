@@ -4,7 +4,7 @@ import { create } from "zustand";
 import type { Verse, CanvasEdge, SidebarContent, PendingExpand, EdgeKind } from "@/types/quran";
 import type { Node, Edge, NodeChange, EdgeChange } from "@xyflow/react";
 import { applyNodeChanges, applyEdgeChanges } from "@xyflow/react";
-import { findFreeSlot } from "@/lib/canvas-layout";
+import { findFreeSlot } from "@/lib/canvas/canvas-layout";
 
 // ─── Persistence helpers ───────────────────────────────────────────────────────
 

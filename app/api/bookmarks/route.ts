@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { bookmarks } from "@/lib/db/schema";
-import { requireUser } from "@/lib/social-auth";
-import { isValidRef } from "@/lib/quran-corpus";
-import { jsonError, parseJson } from "@/lib/http";
+import { db } from "@/lib/infra/db";
+import { bookmarks } from "@/lib/infra/db/schema";
+import { requireUser } from "@/lib/auth/social-auth";
+import { isValidRef } from "@/lib/quran/quran-corpus";
+import { jsonError, parseJson } from "@/lib/infra/http";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);

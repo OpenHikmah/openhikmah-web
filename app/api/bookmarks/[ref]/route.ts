@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { bookmarks } from "@/lib/db/schema";
-import { requireUser } from "@/lib/social-auth";
+import { db } from "@/lib/infra/db";
+import { bookmarks } from "@/lib/infra/db/schema";
+import { requireUser } from "@/lib/auth/social-auth";
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ ref: string }> }) {
   const authed = await requireUser(req);

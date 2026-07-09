@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/canvas/EmptyState";
 import { CanvasTour } from "@/components/canvas/CanvasTour";
 import { ContextSidebar } from "@/components/layout/ContextSidebar";
 import { useCanvasStore } from "@/store/canvas";
-import { findFreeSlot } from "@/lib/canvas-layout";
+import { findFreeSlot } from "@/lib/canvas/canvas-layout";
 import type { Verse } from "@/types/quran";
 
 const HikmahCanvas = dynamic(

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import type { User } from "@/lib/db/schema";
+import type { User } from "@/lib/infra/db/schema";
 
-vi.mock("@/lib/admin-auth", () => ({ requireAdmin: vi.fn() }));
+vi.mock("@/lib/admin/admin-auth", () => ({ requireAdmin: vi.fn() }));
 
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -29,19 +29,19 @@ const { mockSelect, mockCount } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
   mockCount: vi.fn(() => Promise.resolve(0)),
 }));
-vi.mock("@/lib/db", () => ({ db: { select: mockSelect, $count: mockCount } }));
+vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect, $count: mockCount } }));
 
 const { mockRedisEnabled, mockGetRedis } = vi.hoisted(() => ({
   mockRedisEnabled: vi.fn(() => false),
   mockGetRedis: vi.fn(() => null),
 }));
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/lib/infra/redis", () => ({
   redisEnabled: mockRedisEnabled,
   getRedis: mockGetRedis,
 }));
 
 import { GET } from "@/app/api/admin/overview/route";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/admin/admin-auth";
 
 const admin = { userId: 1, user: { qfId: "qf-admin" } as User };
 

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, or } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { friendships, users } from "@/lib/db/schema";
-import { requireUser } from "@/lib/social-auth";
-import { effectiveStreak } from "@/lib/streak";
+import { db } from "@/lib/infra/db";
+import { friendships, users } from "@/lib/infra/db/schema";
+import { requireUser } from "@/lib/auth/social-auth";
+import { effectiveStreak } from "@/lib/social/streak";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);

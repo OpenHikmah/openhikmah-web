@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { asc, eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { wordMorphology } from "@/lib/db/schema";
-import { isValidRef } from "@/lib/quran-corpus";
+import { db } from "@/lib/infra/db";
+import { wordMorphology } from "@/lib/infra/db/schema";
+import { isValidRef } from "@/lib/quran/quran-corpus";
 
 /**
  * Per-word morphology (root + lemma) for a verse, from the seeded

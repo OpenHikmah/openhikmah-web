@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resolveVerse } from "@/lib/verse-resolver";
+import { resolveVerse } from "@/lib/quran/verse-resolver";
 
 export async function GET(
   _req: NextRequest,

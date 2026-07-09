@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
-import { DIVINE_NAMES } from "../lib/divine-names";
+import { DIVINE_NAMES } from "../lib/names/divine-names";
 import { test, expect } from "./fixtures/auth";
 
 const BLOCKING_IMPACTS = new Set(["serious", "critical"]);

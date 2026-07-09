@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, type SQL } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin-auth";
-import { logAdminAction } from "@/lib/admin-audit";
-import { db } from "@/lib/db";
-import { connections } from "@/lib/db/schema";
+import { requireAdmin } from "@/lib/admin/admin-auth";
+import { logAdminAction } from "@/lib/admin/admin-audit";
+import { db } from "@/lib/infra/db";
+import { connections } from "@/lib/infra/db/schema";
 
 const STATUSES = ["active", "flagged", "retired"] as const;
 const KINDS = ["thematic", "root", "contrast"] as const;

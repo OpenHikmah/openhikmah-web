@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import type { User } from "@/lib/db/schema";
+import type { User } from "@/lib/infra/db/schema";
 
-vi.mock("@/lib/admin-auth", () => ({ requireAdmin: vi.fn(), isAdminQfId: vi.fn(() => false) }));
-vi.mock("@/lib/admin-audit", () => ({ logAdminAction: vi.fn() }));
-vi.mock("@/lib/social-auth", () => ({ clearTokenCache: vi.fn() }));
+vi.mock("@/lib/admin/admin-auth", () => ({
+  requireAdmin: vi.fn(),
+  isAdminQfId: vi.fn(() => false),
+}));
+vi.mock("@/lib/admin/admin-audit", () => ({ logAdminAction: vi.fn() }));
+vi.mock("@/lib/auth/social-auth", () => ({ clearTokenCache: vi.fn() }));
 
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,12 +34,12 @@ const { mockSelect, mockUpdate } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
   mockUpdate: vi.fn(() => makeDbChain([])),
 }));
-vi.mock("@/lib/db", () => ({ db: { select: mockSelect, update: mockUpdate } }));
+vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect, update: mockUpdate } }));
 
 import { GET, PATCH } from "@/app/api/admin/users/route";
-import { requireAdmin, isAdminQfId } from "@/lib/admin-auth";
-import { logAdminAction } from "@/lib/admin-audit";
-import { clearTokenCache } from "@/lib/social-auth";
+import { requireAdmin, isAdminQfId } from "@/lib/admin/admin-auth";
+import { logAdminAction } from "@/lib/admin/admin-audit";
+import { clearTokenCache } from "@/lib/auth/social-auth";
 
 const admin = { userId: 1, user: { qfId: "qf-admin" } as User };
 

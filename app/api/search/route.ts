@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SearchResult, VerseRef } from "@/types/quran";
-import { getSurahName } from "@/lib/surah-names";
-import { searchByMeaning } from "@/lib/semantic-search";
-import { consume } from "@/lib/rate-limit";
-import { clientKey } from "@/lib/http";
+import { getSurahName } from "@/lib/quran/surah-names";
+import { searchByMeaning } from "@/lib/quran/semantic-search";
+import { consume } from "@/lib/infra/rate-limit";
+import { clientKey } from "@/lib/infra/http";
 import sanitizeHtml from "sanitize-html";
 
 /** Keyword search via the quran.com full-text API. Returns [] on any failure. */

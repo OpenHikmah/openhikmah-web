@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, lt } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin-auth";
-import { logAdminAction } from "@/lib/admin-audit";
-import { db } from "@/lib/db";
-import { challenges } from "@/lib/db/schema";
-import { resolveEndedChallenges, resolveExpiredPending } from "@/lib/challenges";
+import { requireAdmin } from "@/lib/admin/admin-auth";
+import { logAdminAction } from "@/lib/admin/admin-audit";
+import { db } from "@/lib/infra/db";
+import { challenges } from "@/lib/infra/db/schema";
+import { resolveEndedChallenges, resolveExpiredPending } from "@/lib/social/challenges";
 
 /**
  * Finalize every `active` challenge whose window has ended (compute scores, set

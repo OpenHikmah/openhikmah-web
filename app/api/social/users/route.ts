@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, ne, or, sql } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { friendships, users } from "@/lib/db/schema";
-import { requireUser } from "@/lib/social-auth";
+import { db } from "@/lib/infra/db";
+import { friendships, users } from "@/lib/infra/db/schema";
+import { requireUser } from "@/lib/auth/social-auth";
 
 /**
  * User search for the add-friend flow: case-insensitive partial username match,

@@ -16,7 +16,7 @@ next-env.d.ts
 bun.lock
 package-lock.json
 skills-lock.json
-lib/db/migrations/meta
+lib/infra/db/migrations/meta
 
 *.log
 .env*

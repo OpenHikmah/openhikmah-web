@@ -5,8 +5,8 @@ const { mockSearchByMeaning, mockConsume } = vi.hoisted(() => ({
   mockSearchByMeaning: vi.fn(),
   mockConsume: vi.fn(async () => true),
 }));
-vi.mock("@/lib/semantic-search", () => ({ searchByMeaning: mockSearchByMeaning }));
-vi.mock("@/lib/rate-limit", () => ({ consume: mockConsume }));
+vi.mock("@/lib/quran/semantic-search", () => ({ searchByMeaning: mockSearchByMeaning }));
+vi.mock("@/lib/infra/rate-limit", () => ({ consume: mockConsume }));
 
 import { GET } from "@/app/api/search/route";
 

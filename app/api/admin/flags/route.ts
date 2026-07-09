@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { asc, eq } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin-auth";
-import { logAdminAction } from "@/lib/admin-audit";
-import { db } from "@/lib/db";
-import { featureFlags } from "@/lib/db/schema";
+import { requireAdmin } from "@/lib/admin/admin-auth";
+import { logAdminAction } from "@/lib/admin/admin-audit";
+import { db } from "@/lib/infra/db";
+import { featureFlags } from "@/lib/infra/db/schema";
 
 const KEY_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
 

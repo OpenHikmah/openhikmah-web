@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, gte } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin-auth";
-import { db } from "@/lib/db";
-import { aiGenerations } from "@/lib/db/schema";
+import { requireAdmin } from "@/lib/admin/admin-auth";
+import { db } from "@/lib/infra/db";
+import { aiGenerations } from "@/lib/infra/db/schema";
 
 /**
  * AI generation cost/usage aggregates. Tokens are the real signal (one row per

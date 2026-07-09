@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import type { User } from "@/lib/db/schema";
+import type { User } from "@/lib/infra/db/schema";
 
-vi.mock("@/lib/admin-auth", () => ({ requireAdmin: vi.fn() }));
+vi.mock("@/lib/admin/admin-auth", () => ({ requireAdmin: vi.fn() }));
 
 function makeDbChain(resolveWith: unknown = [], onLimit?: (n: number) => void) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -29,10 +29,10 @@ function makeDbChain(resolveWith: unknown = [], onLimit?: (n: number) => void) {
 const { mockSelect } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
 }));
-vi.mock("@/lib/db", () => ({ db: { select: mockSelect } }));
+vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect } }));
 
 import { GET } from "@/app/api/admin/audit/route";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/admin/admin-auth";
 
 const admin = { userId: 1, user: { qfId: "qf-admin" } as User };
 

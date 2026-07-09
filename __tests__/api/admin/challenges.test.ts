@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import type { User } from "@/lib/db/schema";
+import type { User } from "@/lib/infra/db/schema";
 
-vi.mock("@/lib/admin-auth", () => ({ requireAdmin: vi.fn() }));
-vi.mock("@/lib/admin-audit", () => ({ logAdminAction: vi.fn() }));
-vi.mock("@/lib/challenges", () => ({
+vi.mock("@/lib/admin/admin-auth", () => ({ requireAdmin: vi.fn() }));
+vi.mock("@/lib/admin/admin-audit", () => ({ logAdminAction: vi.fn() }));
+vi.mock("@/lib/social/challenges", () => ({
   scoreChallenge: vi.fn(async () => 0),
   pickWinner: vi.fn(() => 1),
   resolveEndedChallenges: vi.fn(
@@ -39,11 +39,13 @@ const { mockSelect, mockUpdate, mockDelete } = vi.hoisted(() => ({
   mockUpdate: vi.fn(() => makeDbChain([])),
   mockDelete: vi.fn(() => makeDbChain([])),
 }));
-vi.mock("@/lib/db", () => ({ db: { select: mockSelect, update: mockUpdate, delete: mockDelete } }));
+vi.mock("@/lib/infra/db", () => ({
+  db: { select: mockSelect, update: mockUpdate, delete: mockDelete },
+}));
 
 import { PATCH, DELETE } from "@/app/api/admin/challenges/[id]/route";
 import { POST as FINALIZE } from "@/app/api/admin/challenges/finalize/route";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/admin/admin-auth";
 
 const admin = { userId: 1, user: { qfId: "qf-admin" } as User };
 const challenge = { id: 1, challengerId: 1, challengedId: 2, status: "active", endsAt: new Date() };

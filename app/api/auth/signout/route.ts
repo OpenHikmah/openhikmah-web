@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { invalidateTokenCache } from "@/lib/social-auth";
+import { invalidateTokenCache } from "@/lib/auth/social-auth";
 
 export async function POST(req: NextRequest) {
   // Drop the server-side token cache for this access token. This clears THIS

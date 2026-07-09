@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import type { User } from "@/lib/db/schema";
+import type { User } from "@/lib/infra/db/schema";
 
-vi.mock("@/lib/admin-auth", () => ({ requireAdmin: vi.fn() }));
-vi.mock("@/lib/admin-audit", () => ({ logAdminAction: vi.fn() }));
+vi.mock("@/lib/admin/admin-auth", () => ({ requireAdmin: vi.fn() }));
+vi.mock("@/lib/admin/admin-audit", () => ({ logAdminAction: vi.fn() }));
 
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -32,12 +32,12 @@ const { mockSelect, mockInsert, mockUpdate, mockDelete } = vi.hoisted(() => ({
   mockUpdate: vi.fn(() => makeDbChain([])),
   mockDelete: vi.fn(() => makeDbChain([])),
 }));
-vi.mock("@/lib/db", () => ({
+vi.mock("@/lib/infra/db", () => ({
   db: { select: mockSelect, insert: mockInsert, update: mockUpdate, delete: mockDelete },
 }));
 
 import { GET, POST, PUT, DELETE } from "@/app/api/admin/challenge-suggestions/route";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/admin/admin-auth";
 
 const admin = { userId: 1, user: { qfId: "qf-admin" } as User };
 const row = {

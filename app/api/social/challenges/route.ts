@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, gte, lt, or } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { challenges, challengeSuggestions, friendships, users } from "@/lib/db/schema";
-import { requireUser } from "@/lib/social-auth";
+import { db } from "@/lib/infra/db";
+import { challenges, challengeSuggestions, friendships, users } from "@/lib/infra/db/schema";
+import { requireUser } from "@/lib/auth/social-auth";
 import {
   DURATIONS,
   scoreChallenge,
   resolveEndedChallenges,
   resolveExpiredPending,
-} from "@/lib/challenges";
-import { rateLimitOrNull } from "@/lib/rate-limit";
+} from "@/lib/social/challenges";
+import { rateLimitOrNull } from "@/lib/infra/rate-limit";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);

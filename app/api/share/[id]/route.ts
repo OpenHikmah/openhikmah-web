@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { sharedCanvases } from "@/lib/db/schema";
+import { db } from "@/lib/infra/db";
+import { sharedCanvases } from "@/lib/infra/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {

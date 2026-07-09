@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { resolveQfId } from "@/lib/social-auth";
+import { db } from "@/lib/infra/db";
+import { users } from "@/lib/infra/db/schema";
+import { resolveQfId } from "@/lib/auth/social-auth";
 
 function generateUsername(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";

@@ -1,9 +1,9 @@
 import { ImageResponse } from "next/og";
-import { db } from "@/lib/db";
-import { sharedCanvases } from "@/lib/db/schema";
+import { db } from "@/lib/infra/db";
+import { sharedCanvases } from "@/lib/infra/db/schema";
 import { eq } from "drizzle-orm";
 import { renderOgCard, clampBody, OG_SIZE, OG_CONTENT_TYPE } from "@/lib/og-card";
-import { isValidNode } from "@/lib/share-canvas";
+import { isValidNode } from "@/lib/canvas/share-canvas";
 import type { SavedCanvas } from "@/store/canvas";
 
 export const alt = "Shared canvas — Open Hikmah";

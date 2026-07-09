@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { asc, eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { challengeSuggestions } from "@/lib/db/schema";
-import { requireUser } from "@/lib/social-auth";
+import { db } from "@/lib/infra/db";
+import { challengeSuggestions } from "@/lib/infra/db/schema";
+import { requireUser } from "@/lib/auth/social-auth";
 
 /**
  * Active challenge suggestions for the user-facing challenges tab. Users pick one

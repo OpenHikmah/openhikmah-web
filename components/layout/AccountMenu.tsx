@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
-import { buildAuthUrl } from "@/lib/pkce";
+import { buildAuthUrl } from "@/lib/auth/pkce";
 import { cn } from "@/lib/utils";
 
 export function AccountMenu() {

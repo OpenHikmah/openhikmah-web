@@ -13,7 +13,7 @@ import postgres from "postgres";
 
 // gemini-embedding-001 is natively 3072-dim; we reduce to 768 via
 // outputDimensionality to match the verse_embeddings vector(768) column. Must stay
-// in sync with lib/ai.ts (the runtime query embedder). Override the model via
+// in sync with lib/ai/ai.ts (the runtime query embedder). Override the model via
 // GEMINI_EMBEDDING_MODEL and the batch size via EMBED_BATCH if the API tightens.
 const EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL ?? "gemini-embedding-001";
 const OUTPUT_DIM = 768;

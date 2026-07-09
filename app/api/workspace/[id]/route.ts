@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { savedWorkspaces } from "@/lib/db/schema";
-import { requireUser } from "@/lib/social-auth";
+import { db } from "@/lib/infra/db";
+import { savedWorkspaces } from "@/lib/infra/db/schema";
+import { requireUser } from "@/lib/auth/social-auth";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authed = await requireUser(req);

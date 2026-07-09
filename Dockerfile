@@ -49,7 +49,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Migration runner — bun scripts/migrate.mjs (uses drizzle-orm, no drizzle-kit needed)
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/ensure-tables.mjs ./scripts/ensure-tables.mjs
-COPY --from=builder --chown=nextjs:nodejs /app/lib/db/migrations ./lib/db/migrations
+COPY --from=builder --chown=nextjs:nodejs /app/lib/infra/db/migrations ./lib/infra/db/migrations
 
 # postgres and drizzle-orm are bundled into Next.js chunks and not left in
 # standalone node_modules, so migrate.mjs can't resolve them without these copies.

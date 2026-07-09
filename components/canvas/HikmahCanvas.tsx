@@ -20,7 +20,7 @@ import { CanvasToolbar } from "./CanvasToolbar";
 import { useCanvasStore } from "@/store/canvas";
 import { useActivityTracker } from "@/hooks/useActivityTracker";
 import { useCanvasPersistence } from "@/hooks/useCanvasPersistence";
-import { findFreeSlot, NODE_WIDTH, NODE_HEIGHT } from "@/lib/canvas-layout";
+import { findFreeSlot, NODE_WIDTH, NODE_HEIGHT } from "@/lib/canvas/canvas-layout";
 import type { ConnectionResult, Verse } from "@/types/quran";
 
 const nodeTypes = { verse: VerseNode };

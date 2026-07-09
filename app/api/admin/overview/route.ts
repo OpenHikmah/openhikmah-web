@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, gte, eq, isNotNull } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin-auth";
-import { db } from "@/lib/db";
-import { users, connections, curatedVotd, aiGenerations } from "@/lib/db/schema";
-import { redisEnabled, getRedis } from "@/lib/redis";
-import { votdDateKey } from "@/lib/verse-of-day";
+import { requireAdmin } from "@/lib/admin/admin-auth";
+import { db } from "@/lib/infra/db";
+import { users, connections, curatedVotd, aiGenerations } from "@/lib/infra/db/schema";
+import { redisEnabled, getRedis } from "@/lib/infra/redis";
+import { votdDateKey } from "@/lib/quran/verse-of-day";
 
 async function redisStatus(): Promise<"disabled" | "up" | "down"> {
   if (!redisEnabled()) return "disabled";

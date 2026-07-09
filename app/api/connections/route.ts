@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getConnections } from "@/lib/graph-service";
-import { isValidRef } from "@/lib/quran-corpus";
-import { RateLimitError } from "@/lib/rate-limit";
-import { clientKey } from "@/lib/http";
+import { getConnections } from "@/lib/ai/graph-service";
+import { isValidRef } from "@/lib/quran/quran-corpus";
+import { RateLimitError } from "@/lib/infra/rate-limit";
+import { clientKey } from "@/lib/infra/http";
 import type { EdgeKind } from "@/types/quran";
 
 export async function POST(req: NextRequest) {

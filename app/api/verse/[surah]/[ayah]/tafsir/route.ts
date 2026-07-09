@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isValidRef } from "@/lib/quran-corpus";
-import { htmlToTafsirBlocks } from "@/lib/tafsir";
+import { isValidRef } from "@/lib/quran/quran-corpus";
+import { htmlToTafsirBlocks } from "@/lib/quran/tafsir";
 
 // English "Ibn Kathir (Abridged)" on the quran.com API. The previous source
 // (alquran.cloud en.ibn-kathir) doesn't exist there and silently fell back to
