@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { NavBar } from "@/components/layout/NavBar";
 import { HomeView } from "@/components/home/HomeView";
-import { getVerseOfDay } from "@/lib/verse-of-day";
+import { getVerseOfDay } from "@/lib/quran/verse-of-day";
 
 export const metadata: Metadata = {
   title: "Open Hikmah — the Qur'an as a connected graph",

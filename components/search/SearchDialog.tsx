@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Search, X, Loader2, BookOpen, Network } from "lucide-react";
 import { useCanvasStore } from "@/store/canvas";
-import { findFreeSlot, viewportCenter, NODE_WIDTH, NODE_HEIGHT } from "@/lib/canvas-layout";
+import { findFreeSlot, viewportCenter, NODE_WIDTH, NODE_HEIGHT } from "@/lib/canvas/canvas-layout";
 import type { Verse, SearchResult } from "@/types/quran";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui";

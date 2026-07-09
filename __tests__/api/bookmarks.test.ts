@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import type { User } from "@/lib/db/schema";
+import type { User } from "@/lib/infra/db/schema";
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
 
-vi.mock("@/lib/social-auth", () => ({
+vi.mock("@/lib/auth/social-auth", () => ({
   requireUser: vi.fn(),
 }));
 
@@ -67,7 +67,7 @@ const { mockSelect, mockInsert, mockDelete } = vi.hoisted(() => ({
   mockDelete: vi.fn(() => makeDbChain([])),
 }));
 
-vi.mock("@/lib/db", () => ({
+vi.mock("@/lib/infra/db", () => ({
   db: {
     select: mockSelect,
     insert: mockInsert,
@@ -77,7 +77,7 @@ vi.mock("@/lib/db", () => ({
 
 import { GET, POST } from "@/app/api/bookmarks/route";
 import { DELETE } from "@/app/api/bookmarks/[ref]/route";
-import { requireUser } from "@/lib/social-auth";
+import { requireUser } from "@/lib/auth/social-auth";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 

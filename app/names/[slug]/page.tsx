@@ -6,7 +6,7 @@ import {
   DIVINE_NAMES,
   CATEGORY_LABELS,
   type NameCategory,
-} from "@/lib/divine-names";
+} from "@/lib/names/divine-names";
 import { Wordmark } from "@/components/layout/Wordmark";
 import { NameVerses } from "./NameVerses";
 import { NameReflection } from "./NameReflection";

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import type { User } from "@/lib/db/schema";
+import type { User } from "@/lib/infra/db/schema";
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
 
-vi.mock("@/lib/social-auth", () => ({
+vi.mock("@/lib/auth/social-auth", () => ({
   requireUser: vi.fn(),
 }));
 
@@ -39,19 +39,19 @@ const { mockSelect, mockInsert, mockUpdate, mockRateLimitOrNull } = vi.hoisted((
   mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
 }));
 
-vi.mock("@/lib/db", () => ({
+vi.mock("@/lib/infra/db", () => ({
   db: {
     select: mockSelect,
     insert: mockInsert,
     update: mockUpdate,
   },
 }));
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/lib/infra/rate-limit", () => ({
   rateLimitOrNull: mockRateLimitOrNull,
 }));
 
 import { GET, POST } from "@/app/api/social/friends/route";
-import { requireUser } from "@/lib/social-auth";
+import { requireUser } from "@/lib/auth/social-auth";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 

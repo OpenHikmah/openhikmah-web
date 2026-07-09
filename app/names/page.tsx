@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DIVINE_NAMES, CATEGORY_LABELS, type NameCategory } from "@/lib/divine-names";
+import { DIVINE_NAMES, CATEGORY_LABELS, type NameCategory } from "@/lib/names/divine-names";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { NavBar } from "@/components/layout/NavBar";
 

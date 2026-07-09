@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, gte, lt, eq } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin-auth";
-import { logAdminAction } from "@/lib/admin-audit";
-import { db } from "@/lib/db";
-import { curatedVotd } from "@/lib/db/schema";
-import { isValidRef } from "@/lib/quran-corpus";
-import { resolveVerse } from "@/lib/verse-resolver";
+import { requireAdmin } from "@/lib/admin/admin-auth";
+import { logAdminAction } from "@/lib/admin/admin-audit";
+import { db } from "@/lib/infra/db";
+import { curatedVotd } from "@/lib/infra/db/schema";
+import { isValidRef } from "@/lib/quran/quran-corpus";
+import { resolveVerse } from "@/lib/quran/verse-resolver";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;

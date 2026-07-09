@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 const { mockGetVerse } = vi.hoisted(() => ({ mockGetVerse: vi.fn() }));
-vi.mock("@/lib/quran-corpus", () => ({ getVerse: mockGetVerse }));
+vi.mock("@/lib/quran/quran-corpus", () => ({ getVerse: mockGetVerse }));
 
 import { GET } from "@/app/api/verse/[surah]/[ayah]/route";
 

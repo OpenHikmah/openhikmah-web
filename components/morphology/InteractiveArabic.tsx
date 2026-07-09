@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import * as Popover from "@radix-ui/react-popover";
 import { Loader2 } from "lucide-react";
-import { tokenizeVerse, type MorphologyWord, type VerseToken } from "@/lib/arabic-morphology";
+import { tokenizeVerse, type MorphologyWord, type VerseToken } from "@/lib/quran/arabic-morphology";
 
 interface InteractiveVerse {
   ref: string;

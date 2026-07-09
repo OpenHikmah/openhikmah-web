@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 
 // Real Postgres (Testcontainers) — only the AI call is mocked.
 const { mockCallAI } = vi.hoisted(() => ({ mockCallAI: vi.fn() }));
-vi.mock("@/lib/ai", () => ({ callAI: mockCallAI }));
+vi.mock("@/lib/ai/ai", () => ({ callAI: mockCallAI }));
 // Guard against accidental network in the resolver fallback — everything must
 // resolve from the seeded corpus.
 vi.stubGlobal(
@@ -11,10 +11,10 @@ vi.stubGlobal(
   vi.fn(async () => ({ ok: false }))
 );
 
-import { db } from "@/lib/db";
-import { verses, connections, aiGenerations } from "@/lib/db/schema";
-import { getConnections } from "@/lib/graph-service";
-import { consume } from "@/lib/rate-limit";
+import { db } from "@/lib/infra/db";
+import { verses, connections, aiGenerations } from "@/lib/infra/db/schema";
+import { getConnections } from "@/lib/ai/graph-service";
+import { consume } from "@/lib/infra/rate-limit";
 
 async function reset() {
   await db.execute(

@@ -29,11 +29,11 @@ const { mockSelect, mockInsert, mockConsume } = vi.hoisted(() => ({
   mockConsume: vi.fn(async () => true),
 }));
 
-vi.mock("@/lib/db", () => ({ db: { select: mockSelect, insert: mockInsert } }));
+vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect, insert: mockInsert } }));
 // The legacy generate path hydrates from the local corpus via getVerses; return a
 // verse for every requested ref so the cache-miss path yields connections.
-vi.mock("@/lib/quran-corpus", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/quran-corpus")>();
+vi.mock("@/lib/quran/quran-corpus", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/quran/quran-corpus")>();
   return {
     ...actual,
     getVerses: vi.fn(
@@ -58,7 +58,7 @@ vi.mock("@/lib/quran-corpus", async (importOriginal) => {
     ),
   };
 });
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/lib/infra/rate-limit", () => ({
   consume: mockConsume,
   RateLimitError: class RateLimitError extends Error {
     constructor() {

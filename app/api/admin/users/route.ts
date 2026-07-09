@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { desc, eq, ilike } from "drizzle-orm";
-import { requireAdmin, isAdminQfId } from "@/lib/admin-auth";
-import { logAdminAction } from "@/lib/admin-audit";
-import { clearTokenCache } from "@/lib/social-auth";
-import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { requireAdmin, isAdminQfId } from "@/lib/admin/admin-auth";
+import { logAdminAction } from "@/lib/admin/admin-audit";
+import { clearTokenCache } from "@/lib/auth/social-auth";
+import { db } from "@/lib/infra/db";
+import { users } from "@/lib/infra/db/schema";
 
 /** List users (newest-active first) with optional `?q=` username search. */
 export async function GET(req: NextRequest) {

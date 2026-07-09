@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callAI } from "@/lib/ai";
-import { getNameBySlug } from "@/lib/divine-names";
-import { getOrGenerateNameContent } from "@/lib/name-content";
+import { callAI } from "@/lib/ai/ai";
+import { getNameBySlug } from "@/lib/names/divine-names";
+import { getOrGenerateNameContent } from "@/lib/names/name-content";
 
 // Bump to force regeneration after a prompt change.
 const REFLECTION_VERSION = 1;

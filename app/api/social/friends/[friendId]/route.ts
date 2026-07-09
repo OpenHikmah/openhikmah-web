@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, or } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { friendships } from "@/lib/db/schema";
-import { requireUser } from "@/lib/social-auth";
+import { db } from "@/lib/infra/db";
+import { friendships } from "@/lib/infra/db/schema";
+import { requireUser } from "@/lib/auth/social-auth";
 
 export async function PATCH(
   req: NextRequest,

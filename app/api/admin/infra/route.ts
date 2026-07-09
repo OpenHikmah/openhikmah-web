@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-auth";
-import { logAdminAction } from "@/lib/admin-audit";
-import { db } from "@/lib/db";
-import { rateLimits } from "@/lib/db/schema";
-import { redisEnabled, getRedis } from "@/lib/redis";
-import { counterSnapshot, uptimeSeconds } from "@/lib/metrics";
-import { tokenCache, clearTokenCache, clearJwksCache } from "@/lib/social-auth";
+import { requireAdmin } from "@/lib/admin/admin-auth";
+import { logAdminAction } from "@/lib/admin/admin-audit";
+import { db } from "@/lib/infra/db";
+import { rateLimits } from "@/lib/infra/db/schema";
+import { redisEnabled, getRedis } from "@/lib/infra/redis";
+import { counterSnapshot, uptimeSeconds } from "@/lib/infra/metrics";
+import { tokenCache, clearTokenCache, clearJwksCache } from "@/lib/auth/social-auth";
 
 async function redisStatus(): Promise<"disabled" | "up" | "down"> {
   if (!redisEnabled()) return "disabled";

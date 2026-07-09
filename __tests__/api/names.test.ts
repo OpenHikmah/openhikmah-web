@@ -29,7 +29,7 @@ function makeDbChain(resolveWith: unknown[] = []) {
   );
   return chain;
 }
-vi.mock("@/lib/db", () => ({
+vi.mock("@/lib/infra/db", () => ({
   db: {
     select: () => makeDbChain([]), // cache miss
     insert: () => ({ values: () => ({ onConflictDoUpdate: async () => undefined }) }),

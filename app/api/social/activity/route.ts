@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { activityLog, users } from "@/lib/db/schema";
-import { requireUser, invalidateTokenCache } from "@/lib/social-auth";
-import { todayUTC, yesterdayUTC, effectiveStreak } from "@/lib/streak";
-import { rateLimitOrNull, MUTATION_WINDOW_SECONDS } from "@/lib/rate-limit";
+import { db } from "@/lib/infra/db";
+import { activityLog, users } from "@/lib/infra/db/schema";
+import { requireUser, invalidateTokenCache } from "@/lib/auth/social-auth";
+import { todayUTC, yesterdayUTC, effectiveStreak } from "@/lib/social/streak";
+import { rateLimitOrNull, MUTATION_WINDOW_SECONDS } from "@/lib/infra/rate-limit";
 
 // Activity pings fire on ordinary reading (each verse/connection), so a genuinely
 // engaged session can log far more than a typical "create a row" mutation —

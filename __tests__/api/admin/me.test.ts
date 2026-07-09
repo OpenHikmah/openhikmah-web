@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import type { User } from "@/lib/db/schema";
+import type { User } from "@/lib/infra/db/schema";
 
-vi.mock("@/lib/admin-auth", () => ({ requireAdmin: vi.fn() }));
+vi.mock("@/lib/admin/admin-auth", () => ({ requireAdmin: vi.fn() }));
 
 import { GET } from "@/app/api/admin/me/route";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/admin/admin-auth";
 
 const admin = { userId: 1, user: { qfId: "qf-admin", username: "admin_user" } as User };
 

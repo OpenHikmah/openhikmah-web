@@ -7,9 +7,9 @@ vi.stubGlobal(
   vi.fn(async () => ({ ok: false }))
 );
 
-import { db } from "@/lib/db";
-import { verses, wordMorphology } from "@/lib/db/schema";
-import { discoverCandidates } from "@/lib/connection-discovery";
+import { db } from "@/lib/infra/db";
+import { verses, wordMorphology } from "@/lib/infra/db/schema";
+import { discoverCandidates } from "@/lib/ai/connection-discovery";
 
 async function reset() {
   await db.execute(sql`TRUNCATE verses, word_morphology RESTART IDENTITY CASCADE`);

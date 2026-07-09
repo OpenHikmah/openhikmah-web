@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { savedWorkspaces } from "@/lib/db/schema";
-import { requireUser } from "@/lib/social-auth";
-import { rateLimitOrNull } from "@/lib/rate-limit";
+import { db } from "@/lib/infra/db";
+import { savedWorkspaces } from "@/lib/infra/db/schema";
+import { requireUser } from "@/lib/auth/social-auth";
+import { rateLimitOrNull } from "@/lib/infra/rate-limit";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);

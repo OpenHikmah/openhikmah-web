@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import type { User } from "@/lib/db/schema";
+import type { User } from "@/lib/infra/db/schema";
 
-vi.mock("@/lib/admin-auth", () => ({ requireAdmin: vi.fn() }));
-vi.mock("@/lib/admin-audit", () => ({ logAdminAction: vi.fn() }));
+vi.mock("@/lib/admin/admin-auth", () => ({ requireAdmin: vi.fn() }));
+vi.mock("@/lib/admin/admin-audit", () => ({ logAdminAction: vi.fn() }));
 
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,19 +30,19 @@ const { mockCount, mockDelete } = vi.hoisted(() => ({
   mockCount: vi.fn(() => Promise.resolve(0)),
   mockDelete: vi.fn(() => makeDbChain([])),
 }));
-vi.mock("@/lib/db", () => ({ db: { $count: mockCount, delete: mockDelete } }));
+vi.mock("@/lib/infra/db", () => ({ db: { $count: mockCount, delete: mockDelete } }));
 
 const { mockRedisEnabled, mockGetRedis } = vi.hoisted(() => ({
   mockRedisEnabled: vi.fn(() => false),
   mockGetRedis: vi.fn(() => null),
 }));
-vi.mock("@/lib/redis", () => ({ redisEnabled: mockRedisEnabled, getRedis: mockGetRedis }));
+vi.mock("@/lib/infra/redis", () => ({ redisEnabled: mockRedisEnabled, getRedis: mockGetRedis }));
 
 const { mockCounterSnapshot, mockUptimeSeconds } = vi.hoisted(() => ({
   mockCounterSnapshot: vi.fn(() => ({})),
   mockUptimeSeconds: vi.fn(() => 123),
 }));
-vi.mock("@/lib/metrics", () => ({
+vi.mock("@/lib/infra/metrics", () => ({
   counterSnapshot: mockCounterSnapshot,
   uptimeSeconds: mockUptimeSeconds,
 }));
@@ -52,15 +52,15 @@ const { mockTokenCache, mockClearTokenCache, mockClearJwksCache } = vi.hoisted((
   mockClearTokenCache: vi.fn(() => 0),
   mockClearJwksCache: vi.fn(() => Promise.resolve()),
 }));
-vi.mock("@/lib/social-auth", () => ({
+vi.mock("@/lib/auth/social-auth", () => ({
   tokenCache: mockTokenCache,
   clearTokenCache: mockClearTokenCache,
   clearJwksCache: mockClearJwksCache,
 }));
 
 import { GET, POST } from "@/app/api/admin/infra/route";
-import { requireAdmin } from "@/lib/admin-auth";
-import { logAdminAction } from "@/lib/admin-audit";
+import { requireAdmin } from "@/lib/admin/admin-auth";
+import { logAdminAction } from "@/lib/admin/admin-audit";
 
 const admin = { userId: 1, user: { qfId: "qf-admin" } as User };
 

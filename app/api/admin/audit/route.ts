@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { desc } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin-auth";
-import { db } from "@/lib/db";
-import { adminAuditLog } from "@/lib/db/schema";
+import { requireAdmin } from "@/lib/admin/admin-auth";
+import { db } from "@/lib/infra/db";
+import { adminAuditLog } from "@/lib/infra/db/schema";
 
 /** Most-recent admin actions (newest first). `?limit=` caps the page (default 100). */
 export async function GET(req: NextRequest) {

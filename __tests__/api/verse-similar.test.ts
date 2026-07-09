@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 const { mockSimilarVerses } = vi.hoisted(() => ({ mockSimilarVerses: vi.fn() }));
-vi.mock("@/lib/semantic-search", () => ({ similarVerses: mockSimilarVerses }));
+vi.mock("@/lib/quran/semantic-search", () => ({ similarVerses: mockSimilarVerses }));
 
 import { GET } from "@/app/api/verse/[surah]/[ayah]/similar/route";
 

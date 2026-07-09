@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { lt } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { sharedCanvases } from "@/lib/db/schema";
-import { clientKey } from "@/lib/http";
-import { rateLimitOrNull } from "@/lib/rate-limit";
-import { isValidNode } from "@/lib/share-canvas";
+import { db } from "@/lib/infra/db";
+import { sharedCanvases } from "@/lib/infra/db/schema";
+import { clientKey } from "@/lib/infra/http";
+import { rateLimitOrNull } from "@/lib/infra/rate-limit";
+import { isValidNode } from "@/lib/canvas/share-canvas";
 
 const MAX_BYTES = 512 * 1024; // 512 KB
 const RATE_LIMIT = 10;

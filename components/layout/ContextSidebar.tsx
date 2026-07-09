@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";
 import type { EdgeKind } from "@/types/quran";
 import { Card } from "@/components/ui";
 import { InteractiveArabic } from "@/components/morphology/InteractiveArabic";
-import type { TafsirBlock } from "@/lib/tafsir";
+import type { TafsirBlock } from "@/lib/quran/tafsir";
 
 function TafsirSection({ surah, ayah }: { surah: number; ayah: number }) {
   const [open, setOpen] = useState(false);

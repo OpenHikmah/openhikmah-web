@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
-import type { User } from "@/lib/db/schema";
+import type { User } from "@/lib/infra/db/schema";
 
-vi.mock("@/lib/admin-auth", () => ({ requireAdmin: vi.fn() }));
-vi.mock("@/lib/admin-audit", () => ({ logAdminAction: vi.fn() }));
-vi.mock("@/lib/verse-resolver", () => ({ resolveVerse: vi.fn() }));
+vi.mock("@/lib/admin/admin-auth", () => ({ requireAdmin: vi.fn() }));
+vi.mock("@/lib/admin/admin-audit", () => ({ logAdminAction: vi.fn() }));
+vi.mock("@/lib/quran/verse-resolver", () => ({ resolveVerse: vi.fn() }));
 
 // Chainable db stub: every method returns the chain; awaiting it resolves to the
 // configured value. Covers select/from/where and insert/values/onConflictDoUpdate.
@@ -34,11 +34,13 @@ const { mockSelect, mockInsert, mockDelete } = vi.hoisted(() => ({
   mockInsert: vi.fn(() => makeDbChain([])),
   mockDelete: vi.fn(() => makeDbChain([])),
 }));
-vi.mock("@/lib/db", () => ({ db: { select: mockSelect, insert: mockInsert, delete: mockDelete } }));
+vi.mock("@/lib/infra/db", () => ({
+  db: { select: mockSelect, insert: mockInsert, delete: mockDelete },
+}));
 
 import { GET, PUT, DELETE } from "@/app/api/admin/votd/route";
-import { requireAdmin } from "@/lib/admin-auth";
-import { resolveVerse } from "@/lib/verse-resolver";
+import { requireAdmin } from "@/lib/admin/admin-auth";
+import { resolveVerse } from "@/lib/quran/verse-resolver";
 
 const admin = { userId: 1, user: { qfId: "qf-admin" } as User };
 

@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin-auth";
-import { db } from "@/lib/db";
-import { challenges, users } from "@/lib/db/schema";
-import { scoreChallenge, resolveEndedChallenges, resolveExpiredPending } from "@/lib/challenges";
+import { requireAdmin } from "@/lib/admin/admin-auth";
+import { db } from "@/lib/infra/db";
+import { challenges, users } from "@/lib/infra/db/schema";
+import {
+  scoreChallenge,
+  resolveEndedChallenges,
+  resolveExpiredPending,
+} from "@/lib/social/challenges";
 
 const STATUSES = ["pending", "active", "completed", "declined", "cancelled"] as const;
 

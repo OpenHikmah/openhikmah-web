@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import type { User } from "@/lib/db/schema";
+import type { User } from "@/lib/infra/db/schema";
 
-vi.mock("@/lib/social-auth", () => ({ requireUser: vi.fn() }));
+vi.mock("@/lib/auth/social-auth", () => ({ requireUser: vi.fn() }));
 
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -28,10 +28,10 @@ function makeDbChain(resolveWith: unknown = []) {
 }
 
 const { mockSelect } = vi.hoisted(() => ({ mockSelect: vi.fn(() => makeDbChain([])) }));
-vi.mock("@/lib/db", () => ({ db: { select: mockSelect } }));
+vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect } }));
 
 import { GET } from "@/app/api/social/users/route";
-import { requireUser } from "@/lib/social-auth";
+import { requireUser } from "@/lib/auth/social-auth";
 
 function makeUser(overrides: Partial<User> = {}): User {
   return {

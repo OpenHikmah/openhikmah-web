@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { getRedis, redisEnabled } from "@/lib/redis";
-import { counterSnapshot, uptimeSeconds } from "@/lib/metrics";
+import { db } from "@/lib/infra/db";
+import { getRedis, redisEnabled } from "@/lib/infra/redis";
+import { counterSnapshot, uptimeSeconds } from "@/lib/infra/metrics";
 
 // Live probes must not be cached.
 export const dynamic = "force-dynamic";

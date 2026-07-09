@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { similarVerses } from "@/lib/semantic-search";
-import { isValidRef } from "@/lib/quran-corpus";
+import { similarVerses } from "@/lib/quran/semantic-search";
+import { isValidRef } from "@/lib/quran/quran-corpus";
 
 /**
  * Verses semantically nearest to a given verse (by embedding similarity).

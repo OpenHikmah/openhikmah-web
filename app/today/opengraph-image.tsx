@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { getVerseOfDay } from "@/lib/verse-of-day";
+import { getVerseOfDay } from "@/lib/quran/verse-of-day";
 import { renderOgCard, clampBody, OG_SIZE, OG_CONTENT_TYPE } from "@/lib/og-card";
 
 export const alt = "Verse of the Day — Open Hikmah";

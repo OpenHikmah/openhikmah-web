@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { wordMorphology } from "@/lib/db/schema";
-import { getVerses } from "@/lib/quran-corpus";
+import { db } from "@/lib/infra/db";
+import { wordMorphology } from "@/lib/infra/db/schema";
+import { getVerses } from "@/lib/quran/quran-corpus";
 
 /**
  * Concordance for an Arabic root: other verses that contain a word sharing it.

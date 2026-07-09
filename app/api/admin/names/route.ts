@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, asc, eq } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin-auth";
-import { logAdminAction } from "@/lib/admin-audit";
-import { db } from "@/lib/db";
-import { nameContent } from "@/lib/db/schema";
+import { requireAdmin } from "@/lib/admin/admin-auth";
+import { logAdminAction } from "@/lib/admin/admin-audit";
+import { db } from "@/lib/infra/db";
+import { nameContent } from "@/lib/infra/db/schema";
 
 const KINDS = ["verses", "reflection", "pairings"] as const;
 

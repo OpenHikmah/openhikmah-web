@@ -5,7 +5,7 @@ import { POST } from "@/app/api/auth/signout/route";
 const { mockInvalidateTokenCache } = vi.hoisted(() => ({
   mockInvalidateTokenCache: vi.fn(),
 }));
-vi.mock("@/lib/social-auth", () => ({
+vi.mock("@/lib/auth/social-auth", () => ({
   invalidateTokenCache: mockInvalidateTokenCache,
 }));
 

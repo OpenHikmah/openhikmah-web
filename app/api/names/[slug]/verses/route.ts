@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callAI } from "@/lib/ai";
-import { getNameBySlug } from "@/lib/divine-names";
-import { getSurahName } from "@/lib/surah-names";
-import { getOrGenerateNameContent } from "@/lib/name-content";
+import { callAI } from "@/lib/ai/ai";
+import { getNameBySlug } from "@/lib/names/divine-names";
+import { getSurahName } from "@/lib/quran/surah-names";
+import { getOrGenerateNameContent } from "@/lib/names/name-content";
 import sanitizeHtml from "sanitize-html";
 import type { VerseRef } from "@/types/quran";
 

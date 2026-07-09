@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Search } from "lucide-react";
-import { JOURNEYS } from "@/lib/journeys";
+import { JOURNEYS } from "@/lib/social/journeys";
 
 interface EmptyStateProps {
   onSearchOpen: () => void;
