@@ -30,6 +30,7 @@ export function SearchPageClient() {
   const [inputValue, setInputValue] = useState(q);
   const [data, setData] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(!!q.trim());
+  const [error, setError] = useState(false);
   const [fellBackToKeyword, setFellBackToKeyword] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -59,6 +60,7 @@ export function SearchPageClient() {
     const controller = new AbortController();
     abortRef.current = controller;
     setLoading(true);
+    setError(false);
     setFellBackToKeyword(false);
 
     fetch(
@@ -76,8 +78,10 @@ export function SearchPageClient() {
         setData(json);
       })
       .catch((err) => {
-        if ((err as Error).name !== "AbortError")
+        if ((err as Error).name !== "AbortError") {
+          setError(true);
           setData({ results: [], total: 0, page, pageSize: PAGE_SIZE });
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -145,6 +149,10 @@ export function SearchPageClient() {
                 <div className="h-4 w-3/4 rounded bg-surface-overlay" />
               </div>
             ))}
+          </div>
+        ) : error ? (
+          <div className="py-20 text-center">
+            <p className="text-sm text-text-muted">Something went wrong. Try again.</p>
           </div>
         ) : !data || data.results.length === 0 ? (
           <div className="py-20 text-center">
