@@ -83,6 +83,8 @@ interface CanvasStore {
   sidebarContent: SidebarContent | null;
   pendingExpand: PendingExpand | null;
   pendingAutoExpand: string | null;
+  pendingPanToNodeId: string | null;
+  newlyAddedNodeId: string | null;
   viewport: CanvasViewport;
 
   setNodes: (nodes: Node[]) => void;
@@ -99,9 +101,12 @@ interface CanvasStore {
   setSidebarContent: (content: SidebarContent | null) => void;
   setPendingExpand: (action: PendingExpand | null) => void;
   setPendingAutoExpand: (nodeId: string | null) => void;
+  setPendingPanToNode: (nodeId: string | null) => void;
+  setNewlyAddedNode: (nodeId: string | null) => void;
   hasNode: (ref: string) => boolean;
   getNodeByRef: (ref: string) => Node | undefined;
   getNodeById: (id: string) => Node | undefined;
+  getDuplicateNodeIds: (ref: string) => string[];
   reset: () => void;
   restoreCanvas: (saved: SavedCanvas) => void;
   appendWorkspace: (saved: SavedCanvas) => void;
@@ -109,6 +114,11 @@ interface CanvasStore {
 
 let nodeIdCounter = 0;
 const nextId = () => `node-${++nodeIdCounter}`;
+
+// Pulse duration must exceed the CSS `.node-pulse` animation length (1.5s) so the
+// highlight class isn't stripped mid-animation.
+const NEWLY_ADDED_PULSE_MS = 1600;
+let newlyAddedTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
   nodes: [],
@@ -119,6 +129,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   sidebarContent: null,
   pendingExpand: null,
   pendingAutoExpand: null,
+  pendingPanToNodeId: null,
+  newlyAddedNodeId: null,
   viewport: { x: 0, y: 0, zoom: 1 },
 
   setNodes: (nodes) => set({ nodes }),
@@ -144,6 +156,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     set((s) => ({
       nodes: [...s.nodes, { id, type: "verse", position: pos, data: { ...verse } } as Node],
     }));
+    get().setNewlyAddedNode(id);
     return id;
   },
 
@@ -177,12 +190,28 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setSidebarContent: (content) => set({ sidebarContent: content }),
   setPendingExpand: (action) => set({ pendingExpand: action }),
   setPendingAutoExpand: (nodeId) => set({ pendingAutoExpand: nodeId }),
+  setPendingPanToNode: (nodeId) => set({ pendingPanToNodeId: nodeId }),
+
+  setNewlyAddedNode: (nodeId) => {
+    if (newlyAddedTimeout) clearTimeout(newlyAddedTimeout);
+    set({ newlyAddedNodeId: nodeId });
+    if (nodeId) {
+      newlyAddedTimeout = setTimeout(() => {
+        set((s) => (s.newlyAddedNodeId === nodeId ? { newlyAddedNodeId: null } : {}));
+      }, NEWLY_ADDED_PULSE_MS);
+    }
+  },
 
   hasNode: (ref) => get().nodes.some((n) => (n.data as unknown as Verse)?.ref === ref),
 
   getNodeByRef: (ref) => get().nodes.find((n) => (n.data as unknown as Verse)?.ref === ref),
 
   getNodeById: (id) => get().nodes.find((n) => n.id === id),
+
+  getDuplicateNodeIds: (ref) =>
+    get()
+      .nodes.filter((n) => (n.data as unknown as Verse)?.ref === ref)
+      .map((n) => n.id),
 
   reset: () =>
     set({
@@ -194,6 +223,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       sidebarContent: null,
       pendingExpand: null,
       pendingAutoExpand: null,
+      pendingPanToNodeId: null,
+      newlyAddedNodeId: null,
     }),
 
   restoreCanvas: (saved: SavedCanvas) => {
@@ -212,6 +243,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       sidebarContent: null,
       pendingExpand: null,
       pendingAutoExpand: null,
+      pendingPanToNodeId: null,
+      newlyAddedNodeId: null,
     });
   },
 

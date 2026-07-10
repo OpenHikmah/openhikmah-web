@@ -63,11 +63,13 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
   const onEdgesChange = useCanvasStore((s) => s.onEdgesChange);
   const pendingExpand = useCanvasStore((s) => s.pendingExpand);
   const pendingAutoExpand = useCanvasStore((s) => s.pendingAutoExpand);
+  const pendingPanToNodeId = useCanvasStore((s) => s.pendingPanToNodeId);
   const addVerseNode = useCanvasStore((s) => s.addVerseNode);
   const addConnectionEdge = useCanvasStore((s) => s.addConnectionEdge);
   const setExpandingNode = useCanvasStore((s) => s.setExpandingNode);
   const setPendingExpand = useCanvasStore((s) => s.setPendingExpand);
   const setPendingAutoExpand = useCanvasStore((s) => s.setPendingAutoExpand);
+  const setPendingPanToNode = useCanvasStore((s) => s.setPendingPanToNode);
   const setOpenExpandNodeId = useCanvasStore((s) => s.setOpenExpandNodeId);
   const setSidebarContent = useCanvasStore((s) => s.setSidebarContent);
   const setViewport = useCanvasStore((s) => s.setViewport);
@@ -188,6 +190,21 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
       sourceNode.position
     );
   }, [pendingAutoExpand, setPendingAutoExpand, getNodeById, runExpansion]);
+
+  // Search-added verses have no fixed relationship to the current view, so pan
+  // to them after they land — expansion-added nodes already appear near their
+  // source via findFreeSlot and don't need the camera to move.
+  useEffect(() => {
+    if (!pendingPanToNodeId) return;
+    const nodeId = pendingPanToNodeId;
+    setPendingPanToNode(null);
+    const node = getNodeById(nodeId);
+    if (!node) return;
+    reactFlow.setCenter(node.position.x + NODE_WIDTH / 2, node.position.y + NODE_HEIGHT / 2, {
+      zoom: reactFlow.getZoom(),
+      duration: 400,
+    });
+  }, [pendingPanToNodeId, setPendingPanToNode, getNodeById, reactFlow]);
 
   const handleEdgeClick = useCallback(
     (_: React.MouseEvent, edge: Edge) => {

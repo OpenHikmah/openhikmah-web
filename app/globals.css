@@ -164,6 +164,28 @@
     animation: nodeEntrance var(--duration-base, 200ms)
       var(--ease-standard, cubic-bezier(0.2, 0, 0, 1)) both;
   }
+
+  .node-pulse {
+    animation: nodePulse 1.5s ease-out;
+  }
+}
+
+@keyframes nodePulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-teal) 55%, transparent);
+  }
+  20% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-teal) 0%, transparent);
+  }
+  40% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-teal) 45%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-teal) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 
 @keyframes fadeIn {

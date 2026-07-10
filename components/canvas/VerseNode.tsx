@@ -1,15 +1,16 @@
 "use client";
 
 import { memo } from "react";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
 import type { Verse, EdgeKind } from "@/types/quran";
 import { useCanvasStore } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import { cn } from "@/lib/utils";
-import { Loader2, Plus, Heart, Volume2 } from "lucide-react";
+import { Loader2, Plus, Heart, Volume2, Copy } from "lucide-react";
 import { IconButton, Tooltip } from "@/components/ui";
 import { ExpandMenu } from "./ExpandMenu";
 import { useAudioStore } from "@/store/audio";
+import { NODE_WIDTH, NODE_HEIGHT } from "@/lib/canvas/canvas-layout";
 
 type VerseNodeData = Verse & { isRoot?: boolean; isLoading?: boolean };
 
@@ -18,10 +19,15 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
 
   const expandingNodeId = useCanvasStore((s) => s.expandingNodeId);
   const openExpandNodeId = useCanvasStore((s) => s.openExpandNodeId);
+  const newlyAddedNodeId = useCanvasStore((s) => s.newlyAddedNodeId);
   const setSelectedNode = useCanvasStore((s) => s.setSelectedNode);
   const setOpenExpandNodeId = useCanvasStore((s) => s.setOpenExpandNodeId);
   const setSidebarContent = useCanvasStore((s) => s.setSidebarContent);
   const setPendingExpand = useCanvasStore((s) => s.setPendingExpand);
+  const setNewlyAddedNode = useCanvasStore((s) => s.setNewlyAddedNode);
+  const getDuplicateNodeIds = useCanvasStore((s) => s.getDuplicateNodeIds);
+  const getNodeById = useCanvasStore((s) => s.getNodeById);
+  const reactFlow = useReactFlow();
 
   const isBookmarked = useAuthStore((s) => s.isBookmarked(verse.ref));
   const toggleBookmark = useAuthStore((s) => s.toggleBookmark);
@@ -35,9 +41,25 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
 
   const isExpanding = expandingNodeId === id;
   const expandMenuOpen = openExpandNodeId === id;
+  const isPulsing = newlyAddedNodeId === id;
+  const otherDuplicateIds = getDuplicateNodeIds(verse.ref).filter((did) => did !== id);
+  const hasDuplicate = otherDuplicateIds.length > 0;
 
   const handleExpandSelect = (kind: EdgeKind) => {
     setPendingExpand({ nodeId: id, ref: verse.ref, kind });
+  };
+
+  const jumpToDuplicate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const targetId = otherDuplicateIds[0];
+    const targetNode = getNodeById(targetId);
+    if (!targetNode) return;
+    reactFlow.setCenter(
+      targetNode.position.x + NODE_WIDTH / 2,
+      targetNode.position.y + NODE_HEIGHT / 2,
+      { zoom: reactFlow.getZoom(), duration: 400 }
+    );
+    setNewlyAddedNode(targetId);
   };
 
   const toggleSelected = () => {
@@ -73,6 +95,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal focus-visible:ring-offset-2 focus-visible:ring-offset-bg",
         selected && "node-selected",
         isExpanding && "node-expanding",
+        isPulsing && "node-pulse",
         !selected && !isExpanding && "hover:border-text-muted"
       )}
     >
@@ -81,6 +104,20 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
         position={Position.Left}
         className="!w-2 !h-2 !bg-border !border-border-subtle"
       />
+
+      {hasDuplicate && (
+        <Tooltip label="Also open elsewhere on canvas — click to jump">
+          <button
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={jumpToDuplicate}
+            aria-label="Jump to duplicate verse card"
+            className="absolute -top-2 -left-2 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-gold bg-surface-raised text-gold shadow-sm transition-colors hover:bg-gold/10"
+          >
+            <Copy className="h-3 w-3" />
+          </button>
+        </Tooltip>
+      )}
 
       <div className="p-3 space-y-2.5">
         <div className="flex items-center justify-between gap-2">
