@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutTemplate, Sparkles } from "lucide-react";
+import { LayoutTemplate, Search, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCanvasStore } from "@/store/canvas";
 
@@ -11,6 +11,7 @@ import { useCanvasStore } from "@/store/canvas";
 // share the same destinations but are rendered independently per breakpoint.
 const ITEMS = [
   { href: "/canvas", label: "Canvas", icon: LayoutTemplate },
+  { href: "/search", label: "Search", icon: Search },
   { href: "/names", label: "Asma’ul Husna", icon: Sparkles },
 ] as const;
 

@@ -10,6 +10,7 @@ import { useAuthStore } from "@/store/auth";
 // duplicated in the AccountMenu dropdown, so there's exactly one home for it.
 const ITEMS = [
   { href: "/canvas", label: "Canvas" },
+  { href: "/search", label: "Search" },
   { href: "/names", label: "Asma’ul Husna" },
 ] as const;
 

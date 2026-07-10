@@ -5,3 +5,4 @@ export { Card, cardVariants, type CardProps } from "./Card";
 export { Tooltip, TooltipProvider } from "./Tooltip";
 export { Input } from "./Input";
 export { ReflectionNote } from "./ReflectionNote";
+export { Pagination, type PaginationProps } from "./Pagination";

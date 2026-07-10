@@ -1,23 +1,20 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Search, X, Loader2, BookOpen, Network } from "lucide-react";
+import { Search, X, Loader2, BookOpen, Network, CornerDownLeft } from "lucide-react";
 import { useCanvasStore } from "@/store/canvas";
 import { findFreeSlot, viewportCenter, NODE_WIDTH, NODE_HEIGHT } from "@/lib/canvas/canvas-layout";
-import type { Verse, SearchResult } from "@/types/quran";
+import type { Verse, SearchResult, SearchResponse } from "@/types/quran";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui";
+import { SearchModeToggle, type SearchMode } from "@/components/search/SearchModeToggle";
 
 interface SearchDialogProps {
   open: boolean;
   onClose: () => void;
 }
-
-// Keyword → Quran.com text search. Meaning → semantic (embedding) search over the
-// local corpus. A bare reference like 2:255 short-circuits to a direct preview in
-// either mode.
-type SearchMode = "keyword" | "meaning";
 
 const SEED_VERSES: Array<{ ref: string; label: string }> = [
   { ref: "1:1", label: "Al-Fatiha — Opening" },
@@ -29,10 +26,12 @@ const SEED_VERSES: Array<{ ref: string; label: string }> = [
 ];
 
 export function SearchDialog({ open, onClose }: SearchDialogProps) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [previewVerse, setPreviewVerse] = useState<Verse | null>(null);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [totalResults, setTotalResults] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   const [previewError, setPreviewError] = useState(false);
   const [mode, setMode] = useState<SearchMode>("keyword");
@@ -74,6 +73,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     async (q: string, signal: AbortSignal, searchMode: SearchMode) => {
       setIsSearching(true);
       setSearchResults([]);
+      setTotalResults(0);
       setFellBackToKeyword(false);
       try {
         const url = `/api/search?q=${encodeURIComponent(q)}${
@@ -81,16 +81,18 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
         }`;
         const res = await fetch(url, { signal });
         if (!res.ok) throw new Error();
-        const results: SearchResult[] = await res.json();
+        const data: SearchResponse = await res.json();
         // In "by meaning" mode the server falls back to keyword search when
         // semantic results aren't available; flag it so we can tell the user.
         setFellBackToKeyword(
           searchMode === "meaning" && res.headers.get("x-search-fallback") === "keyword"
         );
-        setSearchResults(results);
+        setSearchResults(data.results);
+        setTotalResults(data.total);
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
           setSearchResults([]);
+          setTotalResults(0);
         }
       } finally {
         if (!signal.aborted) setIsSearching(false);
@@ -175,6 +177,13 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     [hasNode, onClose, mapConnections]
   );
 
+  const viewAllResults = useCallback(() => {
+    const trimmed = query.trim();
+    if (!trimmed || /^\d+:\d+$/.test(trimmed)) return;
+    router.push(`/search?q=${encodeURIComponent(trimmed)}&type=${mode}`);
+    onClose();
+  }, [query, mode, router, onClose]);
+
   const busy = loading || isSearching;
   const showSeedVerses = !query.trim();
   const showPreview = !!previewVerse && !loading;
@@ -191,6 +200,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
           setQuery("");
           setPreviewVerse(null);
           setSearchResults([]);
+          setTotalResults(0);
           setPreviewError(false);
           setLoading(false);
           setIsSearching(false);
@@ -226,11 +236,15 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                     if (debounceRef.current) clearTimeout(debounceRef.current);
                     setPreviewVerse(null);
                     setSearchResults([]);
+                    setTotalResults(0);
                     setPreviewError(false);
                     setLoading(false);
                     setIsSearching(false);
                     setFellBackToKeyword(false);
                   }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && showResults) viewAllResults();
                 }}
                 placeholder={
                   mode === "meaning"
@@ -250,29 +264,11 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
             </div>
 
             {/* Mode toggle — keyword (Quran.com text) vs by-meaning (semantic) */}
-            <div className="flex items-center gap-1.5 border-b border-border px-3 py-2">
-              {(["keyword", "meaning"] as SearchMode[]).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setMode(m)}
-                  aria-pressed={mode === m}
-                  className={cn(
-                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                    mode === m
-                      ? "bg-teal/15 text-teal"
-                      : "text-text-muted hover:text-text-secondary"
-                  )}
-                >
-                  {m === "keyword" ? "Keyword" : "By meaning"}
-                </button>
-              ))}
-              {mode === "meaning" && (
-                <span className="ml-auto text-[10px] text-text-muted">
-                  semantic · finds related ideas
-                </span>
-              )}
-            </div>
+            <SearchModeToggle
+              mode={mode}
+              onChange={setMode}
+              className="border-b border-border px-3 py-2"
+            />
 
             {/* Content area */}
             <div className="max-h-[60vh] overflow-y-auto">
@@ -358,6 +354,24 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                 </div>
               )}
             </div>
+
+            {showResults && totalResults > searchResults.length && (
+              <button
+                type="button"
+                onClick={viewAllResults}
+                className="w-full flex items-center justify-between gap-2 border-t border-border px-4 py-2.5 text-left transition-colors hover:bg-surface-raised"
+              >
+                <span className="text-xs font-medium text-teal">
+                  View all {totalResults} results for &ldquo;{query.trim()}&rdquo;
+                </span>
+                <span className="flex items-center gap-1.5 text-[11px] text-text-muted">
+                  Press
+                  <kbd className="flex items-center gap-1 rounded border border-border bg-surface-overlay px-1.5 py-0.5 font-mono">
+                    <CornerDownLeft className="w-3 h-3" /> Enter
+                  </kbd>
+                </span>
+              </button>
+            )}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

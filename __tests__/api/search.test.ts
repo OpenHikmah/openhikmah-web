@@ -1,48 +1,57 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import type { Verse } from "@/types/quran";
 
-const { mockSearchByMeaning, mockConsume } = vi.hoisted(() => ({
+const { mockSearchByMeaning, mockConsume, mockGetVerse, mockGetVerses } = vi.hoisted(() => ({
   mockSearchByMeaning: vi.fn(),
   mockConsume: vi.fn(async () => true),
+  mockGetVerse: vi.fn(),
+  mockGetVerses: vi.fn(async () => new Map()),
 }));
 vi.mock("@/lib/quran/semantic-search", () => ({ searchByMeaning: mockSearchByMeaning }));
 vi.mock("@/lib/infra/rate-limit", () => ({ consume: mockConsume }));
+vi.mock("@/lib/quran/quran-corpus", () => ({
+  getVerse: mockGetVerse,
+  getVerses: mockGetVerses,
+}));
 
 import { GET } from "@/app/api/search/route";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
-function makeSearchReq(q: string) {
-  return new NextRequest(`http://localhost/api/search?q=${encodeURIComponent(q)}`);
+function makeSearchReq(q: string, extra = "") {
+  return new NextRequest(`http://localhost/api/search?q=${encodeURIComponent(q)}${extra}`);
 }
 
-function makeMeaningReq(q: string, headers: Record<string, string> = {}) {
-  return new NextRequest(`http://localhost/api/search?q=${encodeURIComponent(q)}&mode=meaning`, {
-    headers,
-  });
+function makeMeaningReq(q: string, headers: Record<string, string> = {}, extra = "") {
+  return new NextRequest(
+    `http://localhost/api/search?q=${encodeURIComponent(q)}&mode=meaning${extra}`,
+    { headers }
+  );
 }
 
-function semanticMatch(ref: string, translation: string) {
+function verse(ref: string, translation: string): Verse {
   const [s, a] = ref.split(":");
   return {
-    verse: {
-      surah: Number(s),
-      ayah: Number(a),
-      ref,
-      arabicText: "ar",
-      translation,
-      surahName: "Surah",
-      surahNameArabic: "سورة",
-    },
-    similarity: 0.9,
+    surah: Number(s),
+    ayah: Number(a),
+    ref: ref as Verse["ref"],
+    arabicText: "ar",
+    translation,
+    surahName: "Surah",
+    surahNameArabic: "سورة",
   };
 }
 
-function quranComResponse(results: unknown[]) {
+function semanticMatch(ref: string, translation: string) {
+  return { verse: verse(ref, translation), similarity: 0.9 };
+}
+
+function quranComResponse(results: unknown[], total?: number) {
   return {
     ok: true,
-    json: async () => ({ search: { results } }),
+    json: async () => ({ search: { results, total_results: total ?? results.length } }),
   };
 }
 
@@ -52,6 +61,9 @@ describe("GET /api/search", () => {
     mockSearchByMeaning.mockReset();
     mockConsume.mockReset();
     mockConsume.mockResolvedValue(true);
+    mockGetVerse.mockReset();
+    mockGetVerses.mockReset();
+    mockGetVerses.mockResolvedValue(new Map());
   });
 
   it("returns 400 when query is missing", async () => {
@@ -61,22 +73,23 @@ describe("GET /api/search", () => {
   });
 
   it("returns single SearchResult for ref-format query", async () => {
+    mockGetVerse.mockResolvedValueOnce(verse("2:255", "Allah - there is no deity except Him..."));
     const req = makeSearchReq("2:255");
     const res = await GET(req);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
-    expect(body).toHaveLength(1);
-    expect(body[0].ref).toBe("2:255");
-    expect(body[0].surahName).toBe("Al-Baqarah");
+    expect(body.results).toHaveLength(1);
+    expect(body.total).toBe(1);
+    expect(body.results[0].ref).toBe("2:255");
     expect(mockFetch).not.toHaveBeenCalled(); // no external call for ref lookup
   });
 
   it("includes correct surahNameArabic for ref-format query", async () => {
+    mockGetVerse.mockResolvedValueOnce(null);
     const req = makeSearchReq("1:1");
     const res = await GET(req);
-    const [result] = await res.json();
-    expect(result.surahNameArabic).toBe("الفاتحة");
+    const body = await res.json();
+    expect(body.results[0].surahNameArabic).toBe("الفاتحة");
   });
 
   it("calls quran.com for text query and returns results", async () => {
@@ -97,10 +110,21 @@ describe("GET /api/search", () => {
     const res = await GET(req);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
-    expect(body).toHaveLength(2);
-    expect(body[0].ref).toBe("2:30");
-    expect(body[1].ref).toBe("6:165");
+    expect(body.results).toHaveLength(2);
+    expect(body.results[0].ref).toBe("2:30");
+    expect(body.results[1].ref).toBe("6:165");
+    expect(body.total).toBe(2);
+  });
+
+  it("forwards page/pageSize to quran.com and returns them in the response", async () => {
+    mockFetch.mockResolvedValueOnce(quranComResponse([], 42));
+    const res = await GET(makeSearchReq("salam", "&page=2&pageSize=20"));
+    const body = await res.json();
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining("size=20"), expect.anything());
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining("page=2"), expect.anything());
+    expect(body.page).toBe(2);
+    expect(body.pageSize).toBe(20);
+    expect(body.total).toBe(42);
   });
 
   it("strips HTML tags from snippets", async () => {
@@ -115,10 +139,10 @@ describe("GET /api/search", () => {
 
     const req = makeSearchReq("alif");
     const res = await GET(req);
-    const [result] = await res.json();
-    expect(result.snippet).not.toContain("<em>");
-    expect(result.snippet).not.toContain("<strong>");
-    expect(result.snippet).toContain("Alif");
+    const body = await res.json();
+    expect(body.results[0].snippet).not.toContain("<em>");
+    expect(body.results[0].snippet).not.toContain("<strong>");
+    expect(body.results[0].snippet).toContain("Alif");
   });
 
   it("filters out results without valid verse_key", async () => {
@@ -133,24 +157,28 @@ describe("GET /api/search", () => {
     const req = makeSearchReq("test");
     const res = await GET(req);
     const body = await res.json();
-    expect(body).toHaveLength(1);
-    expect(body[0].ref).toBe("2:1");
+    expect(body.results).toHaveLength(1);
+    expect(body.results[0].ref).toBe("2:1");
   });
 
-  it("returns empty array when quran.com returns non-ok", async () => {
+  it("returns empty results when quran.com returns non-ok", async () => {
     mockFetch.mockResolvedValueOnce({ ok: false });
     const req = makeSearchReq("test");
     const res = await GET(req);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual([]);
+    const body = await res.json();
+    expect(body.results).toEqual([]);
+    expect(body.total).toBe(0);
   });
 
-  it("returns empty array when fetch throws", async () => {
+  it("returns empty results when fetch throws", async () => {
     mockFetch.mockRejectedValueOnce(new Error("network error"));
     const req = makeSearchReq("test");
     const res = await GET(req);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual([]);
+    const body = await res.json();
+    expect(body.results).toEqual([]);
+    expect(body.total).toBe(0);
   });
 
   it("mode=meaning uses semantic search and maps matches to SearchResults", async () => {
@@ -162,16 +190,31 @@ describe("GET /api/search", () => {
     const res = await GET(makeMeaningReq("staying strong through hardship"));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.map((r: { ref: string }) => r.ref)).toEqual(["94:5", "2:286"]);
-    expect(body[0].snippet).toContain("hardship");
+    expect(body.results.map((r: { ref: string }) => r.ref)).toEqual(["94:5", "2:286"]);
+    expect(body.results[0].snippet).toContain("hardship");
     expect(mockFetch).not.toHaveBeenCalled(); // no quran.com call in meaning mode
   });
 
+  it("mode=meaning paginates the capped ranked list in memory", async () => {
+    const matches = Array.from({ length: 30 }, (_, i) =>
+      semanticMatch(`1:${i + 1}`, `verse ${i + 1}`)
+    );
+    mockSearchByMeaning.mockResolvedValueOnce(matches);
+
+    const res = await GET(makeMeaningReq("mercy", {}, "&page=2&pageSize=10"));
+    const body = await res.json();
+    expect(body.results).toHaveLength(10);
+    expect(body.results[0].ref).toBe("1:11");
+    expect(body.total).toBe(30);
+    expect(body.page).toBe(2);
+  });
+
   it("mode=meaning still answers ref-format queries directly", async () => {
+    mockGetVerse.mockResolvedValueOnce(null);
     const res = await GET(makeMeaningReq("2:255"));
     const body = await res.json();
-    expect(body).toHaveLength(1);
-    expect(body[0].ref).toBe("2:255");
+    expect(body.results).toHaveLength(1);
+    expect(body.results[0].ref).toBe("2:255");
     expect(mockSearchByMeaning).not.toHaveBeenCalled();
   });
 
@@ -184,7 +227,7 @@ describe("GET /api/search", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("x-search-fallback")).toBe("keyword");
     const body = await res.json();
-    expect(body.map((r: { ref: string }) => r.ref)).toEqual(["1:3"]);
+    expect(body.results.map((r: { ref: string }) => r.ref)).toEqual(["1:3"]);
   });
 
   it("mode=meaning falls back to keyword when semantic search is empty (not seeded)", async () => {
@@ -195,7 +238,7 @@ describe("GET /api/search", () => {
     const res = await GET(makeMeaningReq("mercy"));
     expect(res.status).toBe(200);
     expect(res.headers.get("x-search-fallback")).toBe("keyword");
-    expect((await res.json())[0].ref).toBe("1:1");
+    expect((await res.json()).results[0].ref).toBe("1:1");
   });
 
   it("mode=meaning rate-limits under the last (proxy-appended) hop of x-forwarded-for", async () => {
@@ -219,7 +262,7 @@ describe("GET /api/search", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("x-search-fallback")).toBe("keyword");
     expect(mockSearchByMeaning).not.toHaveBeenCalled();
-    expect((await res.json())[0].ref).toBe("2:1");
+    expect((await res.json()).results[0].ref).toBe("2:1");
   });
 
   it("does not rate-limit the keyword path", async () => {
