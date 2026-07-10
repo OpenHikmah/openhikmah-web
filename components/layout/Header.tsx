@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 import { AccountMenu } from "./AccountMenu";
 import { Wordmark } from "./Wordmark";
+import { HeaderNavLinks } from "./HeaderNavLinks";
 
 interface HeaderProps {
   onSearchOpen: () => void;
@@ -133,7 +134,10 @@ export function Header({ onSearchOpen }: HeaderProps) {
   return (
     <>
       <header className="flex items-center justify-between px-6 md:px-12 h-[60px] shrink-0 bg-bg border-b border-border">
-        <Wordmark />
+        <div className="flex items-center h-full gap-6">
+          <Wordmark />
+          <HeaderNavLinks />
+        </div>
         <AccountMenu />
       </header>
 

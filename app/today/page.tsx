@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LandingHeader } from "@/components/layout/LandingHeader";
-import { NavBar } from "@/components/layout/NavBar";
+import { MobileNavBar } from "@/components/layout/MobileNavBar";
 import { VerseOfDayCard } from "@/components/today/VerseOfDayCard";
 import { getVerseOfDayWithReflection } from "@/lib/quran/verse-of-day";
 
@@ -22,7 +22,7 @@ export default async function TodayPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
       <LandingHeader />
-      <NavBar />
+      <MobileNavBar />
 
       <main className="mx-auto flex w-full max-w-[1180px] flex-1 flex-col items-center justify-center px-6 py-12 md:px-12">
         {today ? (
