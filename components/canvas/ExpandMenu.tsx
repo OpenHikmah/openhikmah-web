@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
+import { FocusScope } from "@radix-ui/react-focus-scope";
 import type { EdgeKind } from "@/types/quran";
 
 interface ExpandMenuProps {
@@ -41,7 +42,6 @@ const OPTIONS: Array<{
 
 export function ExpandMenu({ onSelect, onClose, existingCounts }: ExpandMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const firstOptionRef = useRef<HTMLButtonElement>(null);
   const [openUp, setOpenUp] = useState(false);
 
   useEffect(() => {
@@ -50,10 +50,6 @@ export function ExpandMenu({ onSelect, onClose, existingCounts }: ExpandMenuProp
     if (rect.bottom > window.innerHeight - 16) {
       setOpenUp(true);
     }
-  }, []);
-
-  useEffect(() => {
-    firstOptionRef.current?.focus();
   }, []);
 
   useEffect(() => {
@@ -68,44 +64,45 @@ export function ExpandMenu({ onSelect, onClose, existingCounts }: ExpandMenuProp
   }, [onClose]);
 
   return (
-    <div
-      ref={menuRef}
-      className={`absolute left-1/2 z-50 w-48 -translate-x-1/2 ${openUp ? "bottom-full mb-1" : "top-full mt-1"}`}
-      onMouseDown={(e) => e.stopPropagation()}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="rounded-md border border-border overflow-hidden bg-surface-overlay shadow-sm">
-        {OPTIONS.map((opt, i) => (
-          <button
-            key={opt.kind}
-            ref={i === 0 ? firstOptionRef : undefined}
-            onClick={() => {
-              onSelect(opt.kind);
-              onClose();
-            }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors cursor-pointer hover:bg-white/5 focus-visible:outline-none focus-visible:bg-white/5"
-          >
-            <span
-              className="w-5 h-5 rounded flex items-center justify-center text-xs font-mono shrink-0"
-              style={{
-                background: `color-mix(in srgb, ${opt.color} 12%, transparent)`,
-                color: opt.color,
+    <FocusScope asChild trapped loop>
+      <div
+        ref={menuRef}
+        className={`absolute left-1/2 z-50 w-48 -translate-x-1/2 ${openUp ? "bottom-full mb-1" : "top-full mt-1"}`}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="rounded-md border border-border overflow-hidden bg-surface-overlay shadow-sm">
+          {OPTIONS.map((opt) => (
+            <button
+              key={opt.kind}
+              onClick={() => {
+                onSelect(opt.kind);
+                onClose();
               }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors cursor-pointer hover:bg-white/5 focus-visible:outline-none focus-visible:bg-white/5"
             >
-              {opt.icon}
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-text-primary">
-                {opt.label}
-                {!!existingCounts?.[opt.kind] && (
-                  <span className="text-text-muted"> ({existingCounts[opt.kind]} found)</span>
-                )}
-              </p>
-              <p className="text-xs text-text-muted">{opt.description}</p>
-            </div>
-          </button>
-        ))}
+              <span
+                className="w-5 h-5 rounded flex items-center justify-center text-xs font-mono shrink-0"
+                style={{
+                  background: `color-mix(in srgb, ${opt.color} 12%, transparent)`,
+                  color: opt.color,
+                }}
+              >
+                {opt.icon}
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-text-primary">
+                  {opt.label}
+                  {!!existingCounts?.[opt.kind] && (
+                    <span className="text-text-muted"> ({existingCounts[opt.kind]} found)</span>
+                  )}
+                </p>
+                <p className="text-xs text-text-muted">{opt.description}</p>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
+    </FocusScope>
   );
 }
