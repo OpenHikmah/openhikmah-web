@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq, type SQL } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, type SQL } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
@@ -7,9 +7,10 @@ import { connections } from "@/lib/infra/db/schema";
 
 const STATUSES = ["active", "flagged", "retired"] as const;
 const KINDS = ["thematic", "root", "contrast"] as const;
+const REVIEWED_FILTERS = ["pending", "reviewed"] as const;
 type Status = (typeof STATUSES)[number];
 
-/** List AI connections with optional `?status=` / `?kind=` filters, newest first. */
+/** List AI connections with optional `?status=` / `?kind=` / `?reviewed=` filters, newest first. */
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
@@ -17,6 +18,7 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const status = sp.get("status");
   const kind = sp.get("kind");
+  const reviewed = sp.get("reviewed");
   const limitParam = Number(sp.get("limit"));
   const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 200) : 100;
 
@@ -28,10 +30,15 @@ export async function GET(req: NextRequest) {
   if (kind && !(KINDS as readonly string[]).includes(kind)) {
     return NextResponse.json({ error: "Invalid kind filter" }, { status: 400 });
   }
+  if (reviewed && !(REVIEWED_FILTERS as readonly string[]).includes(reviewed)) {
+    return NextResponse.json({ error: "Invalid reviewed filter" }, { status: 400 });
+  }
 
   const filters: SQL[] = [];
   if (status) filters.push(eq(connections.status, status));
   if (kind) filters.push(eq(connections.kind, kind));
+  if (reviewed === "pending") filters.push(isNull(connections.reviewedAt));
+  if (reviewed === "reviewed") filters.push(isNotNull(connections.reviewedAt));
 
   const rows = await db
     .select()
@@ -43,44 +50,76 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ connections: rows });
 }
 
-/** Change a connection's moderation status (active | flagged | retired). */
+/**
+ * Change a connection's moderation status (active | flagged | retired), or
+ * mark it reviewed without changing status (`{ id, reviewed: true }`) — the
+ * "looked at it, it's fine as-is" case. A status change always stamps
+ * reviewedAt too, since moderating a row is itself a review.
+ */
 export async function PATCH(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
 
-  let body: { id?: number; status?: string };
+  let body: { id?: number; status?: string; reviewed?: boolean };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { id } = body;
+  const { id, reviewed } = body;
   const status = body.status as Status | undefined;
   if (!Number.isInteger(id)) {
     return NextResponse.json({ error: "Invalid connection id" }, { status: 400 });
   }
-  if (!status || !(STATUSES as readonly string[]).includes(status)) {
-    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+
+  if (status !== undefined) {
+    if (!(STATUSES as readonly string[]).includes(status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+
+    const [updated] = await db
+      .update(connections)
+      .set({ status, reviewedAt: new Date(), reviewedBy: auth.user.qfId })
+      .where(eq(connections.id, id as number))
+      .returning();
+
+    if (!updated) {
+      return NextResponse.json({ error: "Connection not found" }, { status: 404 });
+    }
+
+    await logAdminAction({
+      adminQfId: auth.user.qfId,
+      action: "connection.status",
+      targetType: "connection",
+      targetId: String(id),
+      meta: { status, fromRef: updated.fromRef, toRef: updated.toRef, kind: updated.kind },
+    });
+
+    return NextResponse.json({ connection: updated });
   }
 
-  const [updated] = await db
-    .update(connections)
-    .set({ status })
-    .where(eq(connections.id, id as number))
-    .returning();
+  if (reviewed === true) {
+    const [updated] = await db
+      .update(connections)
+      .set({ reviewedAt: new Date(), reviewedBy: auth.user.qfId })
+      .where(eq(connections.id, id as number))
+      .returning();
 
-  if (!updated) {
-    return NextResponse.json({ error: "Connection not found" }, { status: 404 });
+    if (!updated) {
+      return NextResponse.json({ error: "Connection not found" }, { status: 404 });
+    }
+
+    await logAdminAction({
+      adminQfId: auth.user.qfId,
+      action: "connection.reviewed",
+      targetType: "connection",
+      targetId: String(id),
+      meta: { fromRef: updated.fromRef, toRef: updated.toRef, kind: updated.kind },
+    });
+
+    return NextResponse.json({ connection: updated });
   }
 
-  await logAdminAction({
-    adminQfId: auth.user.qfId,
-    action: "connection.status",
-    targetType: "connection",
-    targetId: String(id),
-    meta: { status, fromRef: updated.fromRef, toRef: updated.toRef, kind: updated.kind },
-  });
-
-  return NextResponse.json({ connection: updated });
+  return NextResponse.json({ error: "Must specify status or reviewed" }, { status: 400 });
 }

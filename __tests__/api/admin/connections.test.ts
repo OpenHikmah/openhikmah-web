@@ -87,6 +87,11 @@ describe("GET /api/admin/connections", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 for an unknown reviewed filter", async () => {
+    const res = await GET(get("reviewed=bogus"));
+    expect(res.status).toBe(400);
+  });
+
   it("lists connections with valid filters", async () => {
     mockSelect.mockReturnValue(makeDbChain([connectionRow]));
     const res = await GET(get("status=active&kind=thematic"));
@@ -95,6 +100,12 @@ describe("GET /api/admin/connections", () => {
     expect(body.connections).toEqual([
       { ...connectionRow, createdAt: connectionRow.createdAt.toISOString() },
     ]);
+  });
+
+  it("accepts reviewed=pending and reviewed=reviewed filters", async () => {
+    mockSelect.mockReturnValue(makeDbChain([connectionRow]));
+    expect((await GET(get("reviewed=pending"))).status).toBe(200);
+    expect((await GET(get("reviewed=reviewed"))).status).toBe(200);
   });
 });
 
@@ -132,6 +143,30 @@ describe("PATCH /api/admin/connections", () => {
     expect(body.connection.status).toBe("flagged");
     expect(logAdminAction).toHaveBeenCalledWith(
       expect.objectContaining({ action: "connection.status", targetId: "7" })
+    );
+  });
+
+  it("returns 400 when neither status nor reviewed is specified", async () => {
+    const res = await PATCH(patch({ id: 7 }));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 404 when marking reviewed on a connection that doesn't exist", async () => {
+    mockUpdate.mockReturnValue(makeDbChain([]));
+    const res = await PATCH(patch({ id: 7, reviewed: true }));
+    expect(res.status).toBe(404);
+  });
+
+  it("marks a connection reviewed without changing status and logs connection.reviewed", async () => {
+    mockUpdate.mockReturnValue(
+      makeDbChain([{ ...connectionRow, reviewedAt: new Date("2026-01-02") }])
+    );
+    const res = await PATCH(patch({ id: 7, reviewed: true }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.connection.status).toBe("active");
+    expect(logAdminAction).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "connection.reviewed", targetId: "7" })
     );
   });
 });
