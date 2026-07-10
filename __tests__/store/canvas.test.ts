@@ -166,6 +166,81 @@ describe("canvas store", () => {
     expect(useCanvasStore.getState().pendingAutoExpand).toBe("node-10");
   });
 
+  it("getExpansionRefs returns refs of same-kind children of a node", () => {
+    const sourceId = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+    const themeTarget = { ...baseVerse, ref: "1:1" as const, surah: 1, ayah: 1 };
+    const rootTarget = { ...baseVerse, ref: "3:3" as const, surah: 3, ayah: 3 };
+    const themeId = useCanvasStore.getState().addVerseNode(themeTarget, { x: 300, y: 0 });
+    const rootId = useCanvasStore.getState().addVerseNode(rootTarget, { x: 600, y: 0 });
+
+    useCanvasStore.getState().addConnectionEdge({
+      id: "e1",
+      source: sourceId,
+      target: themeId,
+      type: "hikmah",
+      data: { kind: "thematic", label: "t" },
+    });
+    useCanvasStore.getState().addConnectionEdge({
+      id: "e2",
+      source: sourceId,
+      target: rootId,
+      type: "hikmah",
+      data: { kind: "root", label: "r" },
+    });
+
+    expect(useCanvasStore.getState().getExpansionRefs(sourceId, "thematic")).toEqual(["1:1"]);
+    expect(useCanvasStore.getState().getExpansionRefs(sourceId, "root")).toEqual(["3:3"]);
+    expect(useCanvasStore.getState().getExpansionRefs(sourceId, "contrast")).toEqual([]);
+  });
+
+  it("getExpansionRefs is directed — a node's own incoming edges don't count", () => {
+    const sourceId = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+    const targetId = useCanvasStore
+      .getState()
+      .addVerseNode({ ...baseVerse, ref: "1:1" as const, surah: 1, ayah: 1 }, { x: 300, y: 0 });
+    useCanvasStore.getState().addConnectionEdge({
+      id: "e1",
+      source: sourceId,
+      target: targetId,
+      type: "hikmah",
+      data: { kind: "thematic", label: "t" },
+    });
+
+    expect(useCanvasStore.getState().getExpansionRefs(targetId, "thematic")).toEqual([]);
+  });
+
+  it("getExpansionCounts groups edges by kind for a given source node", () => {
+    const sourceId = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+    const a = useCanvasStore
+      .getState()
+      .addVerseNode({ ...baseVerse, ref: "1:1" as const, surah: 1, ayah: 1 }, { x: 300, y: 0 });
+    const b = useCanvasStore
+      .getState()
+      .addVerseNode({ ...baseVerse, ref: "3:3" as const, surah: 3, ayah: 3 }, { x: 600, y: 0 });
+
+    useCanvasStore.getState().addConnectionEdge({
+      id: "e1",
+      source: sourceId,
+      target: a,
+      type: "hikmah",
+      data: { kind: "thematic", label: "t" },
+    });
+    useCanvasStore.getState().addConnectionEdge({
+      id: "e2",
+      source: sourceId,
+      target: b,
+      type: "hikmah",
+      data: { kind: "thematic", label: "t" },
+    });
+
+    expect(useCanvasStore.getState().getExpansionCounts(sourceId)).toEqual({ thematic: 2 });
+  });
+
+  it("getExpansionCounts returns an empty object for a node with no expansions", () => {
+    const id = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+    expect(useCanvasStore.getState().getExpansionCounts(id)).toEqual({});
+  });
+
   it("reset clears all state", () => {
     useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
     useCanvasStore.getState().setSelectedNode("x");

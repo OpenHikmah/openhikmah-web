@@ -68,4 +68,15 @@ describe("connection discovery — root (integration, real Postgres)", () => {
   it("returns [] for a verse with no morphology seeded", async () => {
     expect(await discoverCandidates("9:9", "root", 10)).toEqual([]);
   });
+
+  it("excludes refs already surfaced to the caller, e.g. a repeat 'get more' request", async () => {
+    const out = await discoverCandidates("1:1", "root", 10, ["3:3"]);
+    expect(out).not.toContain("3:3");
+    expect(out).toContain("2:2");
+  });
+
+  it("returns [] when every remaining candidate has already been excluded", async () => {
+    const out = await discoverCandidates("1:1", "root", 10, ["3:3", "2:2"]);
+    expect(out).toEqual([]);
+  });
 });

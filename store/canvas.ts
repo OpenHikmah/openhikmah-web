@@ -107,6 +107,8 @@ interface CanvasStore {
   getNodeByRef: (ref: string) => Node | undefined;
   getNodeById: (id: string) => Node | undefined;
   getDuplicateNodeIds: (ref: string) => string[];
+  getExpansionRefs: (nodeId: string, kind: EdgeKind) => string[];
+  getExpansionCounts: (nodeId: string) => Partial<Record<EdgeKind, number>>;
   reset: () => void;
   restoreCanvas: (saved: SavedCanvas) => void;
   appendWorkspace: (saved: SavedCanvas) => void;
@@ -212,6 +214,27 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     get()
       .nodes.filter((n) => (n.data as unknown as Verse)?.ref === ref)
       .map((n) => n.id),
+
+  // Expansion edges are always directed source(nodeId) -> target(newNode), so a
+  // simple source+kind filter is sufficient — no need to check the reverse edge.
+  getExpansionRefs: (nodeId, kind) => {
+    const { edges, getNodeById } = get();
+    return edges
+      .filter((e) => e.source === nodeId && (e.data as { kind?: EdgeKind })?.kind === kind)
+      .map((e) => (getNodeById(e.target)?.data as unknown as Verse)?.ref)
+      .filter((ref) => !!ref) as string[];
+  },
+
+  getExpansionCounts: (nodeId) => {
+    const counts: Partial<Record<EdgeKind, number>> = {};
+    for (const e of get().edges) {
+      if (e.source !== nodeId) continue;
+      const kind = (e.data as { kind?: EdgeKind })?.kind;
+      if (!kind) continue;
+      counts[kind] = (counts[kind] ?? 0) + 1;
+    }
+    return counts;
+  },
 
   reset: () =>
     set({

@@ -199,7 +199,7 @@ describe("getConnections", () => {
 
     const out = await getConnections("1:1", "thematic", source);
 
-    expect(mockDiscover).toHaveBeenCalledWith("1:1", "thematic");
+    expect(mockDiscover).toHaveBeenCalledWith("1:1", "thematic", undefined, []);
     expect(mockGenerateGrounded).toHaveBeenCalledTimes(1);
     expect(mockGenerateGrounded).toHaveBeenCalledWith("1:1", "ar", "tr", "thematic", [
       "2:255",
@@ -219,6 +219,39 @@ describe("getConnections", () => {
 
     expect(mockGenerateGrounded).not.toHaveBeenCalled();
     expect(mockGenerate).toHaveBeenCalledWith("1:1", "ar", "tr", "root");
+    expect(out).toHaveLength(1);
+  });
+
+  it("threads excludeRefs into discoverCandidates on a miss", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    mockDiscover.mockResolvedValue(["3:18"]);
+    mockGenerateGrounded.mockResolvedValue([result("3:18")]);
+
+    await getConnections("1:1", "thematic", source, { excludeRefs: ["2:255"] });
+
+    expect(mockDiscover).toHaveBeenCalledWith("1:1", "thematic", undefined, ["2:255"]);
+  });
+
+  it("returns [] without falling back to legacy generation when excludeRefs exhausts candidates", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    mockDiscover.mockResolvedValue([]); // nothing left to offer beyond excludeRefs
+
+    const out = await getConnections("1:1", "thematic", source, { excludeRefs: ["2:255", "3:18"] });
+
+    expect(mockGenerate).not.toHaveBeenCalled();
+    expect(mockGenerateGrounded).not.toHaveBeenCalled();
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(out).toEqual([]);
+  });
+
+  it("still falls back to legacy generation on a true first-time miss (no excludeRefs)", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    mockDiscover.mockResolvedValue([]); // no grounding data seeded yet
+    mockGenerate.mockResolvedValue([result("2:255")]);
+
+    const out = await getConnections("1:1", "thematic", source);
+
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
     expect(out).toHaveLength(1);
   });
 
@@ -284,6 +317,25 @@ describe("getConnections — single-flight de-duplication", () => {
     expect(b).toBe(a); // followers receive the very same resolved array
     expect(c).toBe(a);
     expect(mockInsert).toHaveBeenCalledTimes(1); // persisted once, not per-caller
+  });
+
+  it("does NOT coalesce a plain request with a 'get more' request (different excludeRefs)", async () => {
+    // Grounding available only for the "get more" (excludeRefs) request, so if the
+    // two requests wrongly shared a single-flight key, only one of the two
+    // generation paths below would ever run.
+    mockDiscover.mockImplementation(
+      async (_ref: string, _kind: string, _limit?: number, excl?: string[]) =>
+        excl && excl.length > 0 ? ["3:18"] : []
+    );
+    mockGenerate.mockImplementation(async () => [result("2:255")]);
+    mockGenerateGrounded.mockImplementation(async () => [result("3:18")]);
+
+    await Promise.all([
+      getConnections("1:1", "thematic", source),
+      getConnections("1:1", "thematic", source, { excludeRefs: ["2:255"] }),
+    ]);
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
+    expect(mockGenerateGrounded).toHaveBeenCalledTimes(1);
   });
 
   it("does NOT coalesce different verse+kind keys", async () => {
