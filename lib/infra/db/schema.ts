@@ -247,10 +247,16 @@ export const connections = pgTable(
     // 'active' | 'flagged' | 'retired' — lets edges be soft-deactivated without schema change
     status: text("status").notNull().default("active"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // null until an admin has looked at this edge (see /admin/connections review queue).
+    // Independent of `status` — an admin can mark an `active` edge reviewed without
+    // changing it, or reviewedAt gets stamped automatically on any status change.
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedBy: text("reviewed_by"),
   },
   (t) => [
     uniqueIndex("connections_from_to_kind_idx").on(t.fromRef, t.toRef, t.kind),
     index("connections_from_kind_idx").on(t.fromRef, t.kind),
+    index("connections_reviewed_at_idx").on(t.reviewedAt),
   ]
 );
 

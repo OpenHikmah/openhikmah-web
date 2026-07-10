@@ -17,30 +17,44 @@ interface Connection {
   model: string | null;
   confidence: number | null;
   status: "active" | "flagged" | "retired";
+  reviewedAt: string | null;
 }
 
 const STATUS_FILTERS = ["all", "active", "flagged", "retired"] as const;
 const KIND_FILTERS = ["all", "thematic", "root", "contrast"] as const;
+const REVIEWED_FILTERS = ["pending", "reviewed", "all"] as const;
 
 export default function ConnectionsPage() {
   const api = useAdminFetch();
   const [status, setStatus] = useState<(typeof STATUS_FILTERS)[number]>("all");
   const [kind, setKind] = useState<(typeof KIND_FILTERS)[number]>("all");
+  const [reviewed, setReviewed] = useState<(typeof REVIEWED_FILTERS)[number]>("pending");
   const [actionError, setActionError] = useState<string | null>(null);
 
   const qs = new URLSearchParams();
   if (status !== "all") qs.set("status", status);
   if (kind !== "all") qs.set("kind", kind);
+  if (reviewed !== "all") qs.set("reviewed", reviewed);
 
   const { data, error, loading, reload } = useAsync<{ connections: Connection[] }>(
     () => api(`/connections?${qs.toString()}`),
-    `connections:${status}:${kind}`
+    `connections:${status}:${kind}:${reviewed}`
   );
 
   const setStatusOf = async (id: number, next: Connection["status"]) => {
     setActionError(null);
     try {
       await api("/connections", { method: "PATCH", json: { id, status: next } });
+      reload();
+    } catch (e) {
+      setActionError(e instanceof AdminApiError ? e.message : "Failed to update connection.");
+    }
+  };
+
+  const markReviewed = async (id: number) => {
+    setActionError(null);
+    try {
+      await api("/connections", { method: "PATCH", json: { id, reviewed: true } });
       reload();
     } catch (e) {
       setActionError(e instanceof AdminApiError ? e.message : "Failed to update connection.");
@@ -55,6 +69,12 @@ export default function ConnectionsPage() {
       />
       <div className="space-y-4 p-7">
         <div className="flex flex-wrap items-center gap-4">
+          <FilterRow
+            label="Review"
+            options={REVIEWED_FILTERS}
+            value={reviewed}
+            onChange={setReviewed}
+          />
           <FilterRow label="Status" options={STATUS_FILTERS} value={status} onChange={setStatus} />
           <FilterRow label="Kind" options={KIND_FILTERS} value={kind} onChange={setKind} />
         </div>
@@ -72,6 +92,7 @@ export default function ConnectionsPage() {
                 <Th>Kind</Th>
                 <Th>Why</Th>
                 <Th>Status</Th>
+                <Th>Review</Th>
                 <Th className="text-right">Actions</Th>
               </tr>
             </thead>
@@ -90,8 +111,20 @@ export default function ConnectionsPage() {
                   <Td>
                     <Pill tone={c.status}>{c.status}</Pill>
                   </Td>
+                  <Td className="whitespace-nowrap text-xs text-text-secondary">
+                    {c.reviewedAt ? (
+                      new Date(c.reviewedAt).toLocaleString()
+                    ) : (
+                      <Pill tone="flagged">pending</Pill>
+                    )}
+                  </Td>
                   <Td>
                     <div className="flex justify-end gap-1.5">
+                      {!c.reviewedAt && (
+                        <Button size="sm" variant="secondary" onClick={() => markReviewed(c.id)}>
+                          Mark reviewed
+                        </Button>
+                      )}
                       {c.status !== "flagged" && (
                         <Button
                           size="sm"
