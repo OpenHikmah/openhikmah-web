@@ -1,4 +1,5 @@
 import { callAI } from "@/lib/ai/ai";
+import { getPrompt, renderTemplate } from "@/lib/ai/prompt-registry";
 import { db } from "@/lib/infra/db";
 import { aiGenerations } from "@/lib/infra/db/schema";
 import { isValidRef, getVerses } from "@/lib/quran/quran-corpus";
@@ -35,25 +36,23 @@ const KIND_SELECTION: Record<EdgeKind, string> = {
     "Select the 3 candidates that present the clearest contrasting theological concept to the source verse — opposing states such as ease/hardship, gratitude/ingratitude, mercy/punishment.",
 };
 
-function buildPrompt(
-  fromRef: string,
-  arabicText: string,
-  translation: string,
-  kind: EdgeKind
-): string {
-  return `You are a classical Islamic scholar grounded in the Maturidi/Hanafi tradition (Ahl al-Sunnah wal-Jama'ah).
+// Fallback templates used when no active prompt_versions row exists for the
+// key (see lib/ai/prompt-registry.ts). `{{placeholders}}` are filled per-call
+// via renderTemplate — this is also the format an admin's DB-stored override
+// must follow.
+const LEGACY_FALLBACK_TEMPLATE = `You are a classical Islamic scholar grounded in the Maturidi/Hanafi tradition (Ahl al-Sunnah wal-Jama'ah).
 
 Given this Quran verse:
-Reference: ${fromRef}
-Arabic: ${arabicText}
-Translation: ${translation}
+Reference: {{fromRef}}
+Arabic: {{arabicText}}
+Translation: {{translation}}
 
-Task: ${KIND_INSTRUCTIONS[kind]}
+Task: {{task}}
 
 Rules:
 - Return EXACTLY 3 different verses (not the source verse).
 - Verse references must be real and accurate (format: surah:ayah, e.g. 2:255).
-- Each reason must be one concise sentence explaining the ${kind} connection in classical Islamic terms.
+- Each reason must be one concise sentence explaining the {{kind}} connection in classical Islamic terms.
 - Maintain strict Tanzih (divine transcendence). Avoid Tashbih (anthropomorphism).
 - Return ONLY a valid JSON array. No prose, no markdown, no explanation outside the JSON.
 
@@ -63,6 +62,22 @@ Output format:
   { "ref": "surah:ayah", "reason": "one-sentence theological justification" },
   { "ref": "surah:ayah", "reason": "one-sentence theological justification" }
 ]`;
+
+async function buildPrompt(
+  fromRef: string,
+  arabicText: string,
+  translation: string,
+  kind: EdgeKind
+): Promise<{ text: string; promptVersion: number | null }> {
+  const { template, version } = await getPrompt("connection.legacy", LEGACY_FALLBACK_TEMPLATE);
+  const text = renderTemplate(template, {
+    fromRef,
+    arabicText,
+    translation,
+    task: KIND_INSTRUCTIONS[kind],
+    kind,
+  });
+  return { text, promptVersion: version };
 }
 
 function parseRawConnections(text: string): Array<{ ref: string; reason: string }> {
@@ -91,11 +106,12 @@ export async function generateConnections(
   kind: EdgeKind
 ): Promise<ConnectionResult[]> {
   const model = process.env.ANTHROPIC_MODEL ?? null;
-  const text = await callAI(buildPrompt(fromRef, arabicText, translation, kind));
+  const { text: prompt, promptVersion } = await buildPrompt(fromRef, arabicText, translation, kind);
+  const text = await callAI(prompt);
 
   // Best-effort audit log — never fail generation because logging failed.
   try {
-    await db.insert(aiGenerations).values({ fromRef, kind, model });
+    await db.insert(aiGenerations).values({ fromRef, kind, model, promptVersion });
   } catch (err) {
     console.error("ai_generations log failed:", err);
   }
@@ -129,31 +145,22 @@ export async function generateConnections(
     .filter((c): c is ConnectionResult => c !== null);
 }
 
-function buildSelectionPrompt(
-  fromRef: string,
-  arabicText: string,
-  translation: string,
-  kind: EdgeKind,
-  candidates: Verse[]
-): string {
-  const list = candidates.map((v) => `- ${v.ref} — ${v.translation}`).join("\n");
-
-  return `You are a classical Islamic scholar grounded in the Maturidi/Hanafi tradition (Ahl al-Sunnah wal-Jama'ah).
+const SELECTION_FALLBACK_TEMPLATE = `You are a classical Islamic scholar grounded in the Maturidi/Hanafi tradition (Ahl al-Sunnah wal-Jama'ah).
 
 Source verse:
-Reference: ${fromRef}
-Arabic: ${arabicText}
-Translation: ${translation}
+Reference: {{fromRef}}
+Arabic: {{arabicText}}
+Translation: {{translation}}
 
-Below is a list of CANDIDATE verses, each pre-selected from canonical data as potentially related. Your task: ${KIND_SELECTION[kind]}
+Below is a list of CANDIDATE verses, each pre-selected from canonical data as potentially related. Your task: {{task}}
 
 Candidates:
-${list}
+{{candidates}}
 
 Rules:
 - Choose ONLY from the candidate references listed above. Do NOT introduce any verse that is not in the list.
 - Return at most 3, fewer if fewer are genuinely appropriate.
-- Each reason must be one concise sentence explaining the ${kind} connection in classical Islamic terms.
+- Each reason must be one concise sentence explaining the {{kind}} connection in classical Islamic terms.
 - Maintain strict Tanzih (divine transcendence). Avoid Tashbih (anthropomorphism).
 - Return ONLY a valid JSON array. No prose, no markdown, no explanation outside the JSON.
 
@@ -161,6 +168,28 @@ Output format:
 [
   { "ref": "surah:ayah", "reason": "one-sentence theological justification" }
 ]`;
+
+async function buildSelectionPrompt(
+  fromRef: string,
+  arabicText: string,
+  translation: string,
+  kind: EdgeKind,
+  candidates: Verse[]
+): Promise<{ text: string; promptVersion: number | null }> {
+  const list = candidates.map((v) => `- ${v.ref} — ${v.translation}`).join("\n");
+  const { template, version } = await getPrompt(
+    "connection.selection",
+    SELECTION_FALLBACK_TEMPLATE
+  );
+  const text = renderTemplate(template, {
+    fromRef,
+    arabicText,
+    translation,
+    task: KIND_SELECTION[kind],
+    candidates: list,
+    kind,
+  });
+  return { text, promptVersion: version };
 }
 
 function toResult(verse: Verse, reason: string, kind: EdgeKind): ConnectionResult {
@@ -197,12 +226,17 @@ export async function generateGroundedConnections(
   if (candidates.length === 0) return [];
 
   const model = process.env.ANTHROPIC_MODEL ?? null;
-  const text = await callAI(
-    buildSelectionPrompt(fromRef, arabicText, translation, kind, candidates)
+  const { text: prompt, promptVersion } = await buildSelectionPrompt(
+    fromRef,
+    arabicText,
+    translation,
+    kind,
+    candidates
   );
+  const text = await callAI(prompt);
 
   try {
-    await db.insert(aiGenerations).values({ fromRef, kind, model });
+    await db.insert(aiGenerations).values({ fromRef, kind, model, promptVersion });
   } catch (err) {
     console.error("ai_generations log failed:", err);
   }

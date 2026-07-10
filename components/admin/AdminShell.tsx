@@ -14,6 +14,7 @@ import {
   BookOpen,
   Server,
   ScrollText,
+  MessageSquareText,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ const NAV: NavItem[] = [
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/challenges", label: "Challenges", icon: Swords },
   { href: "/admin/ai", label: "AI & Cost", icon: Coins },
+  { href: "/admin/prompts", label: "Prompts", icon: MessageSquareText },
   { href: "/admin/flags", label: "Feature Flags", icon: Flag },
   { href: "/admin/names", label: "Names Content", icon: BookOpen },
   { href: "/admin/infra", label: "Infra", icon: Server },

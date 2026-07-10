@@ -13,6 +13,18 @@ vi.mock("@/lib/quran/quran-corpus", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/quran/quran-corpus")>();
   return { ...actual, getVerses: mockGetVerses };
 });
+// No active DB prompt version in these tests — always fall back to the
+// hardcoded template, exercising the same rendering path a real generation uses.
+vi.mock("@/lib/ai/prompt-registry", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai/prompt-registry")>();
+  return {
+    ...actual,
+    getPrompt: vi.fn(async (_key: string, fallback: string) => ({
+      template: fallback,
+      version: null,
+    })),
+  };
+});
 
 import { generateConnections, generateGroundedConnections } from "@/lib/ai/connection-generator";
 
