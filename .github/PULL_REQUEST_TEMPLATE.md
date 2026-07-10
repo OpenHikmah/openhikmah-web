@@ -32,7 +32,8 @@
 - [ ] `bun run lint` passes locally
 - [ ] `bun run format:check` passes locally
 - [ ] New tests added for new functionality
-- [ ] Tested in browser (for UI changes)
+
+_e2e, accessibility (axe), and bundle-size checks now run automatically in CI — no need to re-verify these by hand._
 
 ## Checklist
 
