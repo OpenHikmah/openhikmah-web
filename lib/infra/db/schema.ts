@@ -414,6 +414,30 @@ export const promptVersions = pgTable(
   ]
 );
 
+// ─── Search Log ───────────────────────────────────────────────────────────────
+// One row per search request (keyword or semantic), so the admin analytics view
+// can surface popular queries and — the part that feeds content curation —
+// queries that returned nothing. No user attribution: search is public/
+// unauthenticated and the aggregate query text is what curation acts on, not
+// who searched.
+
+export const searchLog = pgTable(
+  "search_log",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    query: text("query").notNull(),
+    // 'keyword' | 'meaning'
+    mode: text("mode").notNull(),
+    resultCount: integer("result_count").notNull(),
+    zeroResult: boolean("zero_result").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("search_log_created_idx").on(t.createdAt),
+    index("search_log_zero_result_idx").on(t.zeroResult, t.createdAt),
+  ]
+);
+
 // ─── Feature Flags / Config ───────────────────────────────────────────────────
 // Key→JSON config the admin can tune at runtime (rate-limit windows, AI model per
 // connection kind, feature toggles). Read by the relevant subsystem; absence of a
@@ -465,3 +489,5 @@ export type FeatureFlag = typeof featureFlags.$inferSelect;
 export type NewFeatureFlag = typeof featureFlags.$inferInsert;
 export type PromptVersion = typeof promptVersions.$inferSelect;
 export type NewPromptVersion = typeof promptVersions.$inferInsert;
+export type SearchLogEntry = typeof searchLog.$inferSelect;
+export type NewSearchLogEntry = typeof searchLog.$inferInsert;

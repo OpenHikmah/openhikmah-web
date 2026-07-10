@@ -15,6 +15,7 @@ import {
   Server,
   ScrollText,
   MessageSquareText,
+  BarChart3,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ interface NavItem {
 // highest-frequency operator tasks near the top.
 const NAV: NavItem[] = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/admin/votd", label: "Verse of the Day", icon: CalendarDays },
   { href: "/admin/connections", label: "Connections", icon: Network },
   { href: "/admin/users", label: "Users", icon: Users },

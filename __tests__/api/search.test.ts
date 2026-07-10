@@ -14,6 +14,7 @@ vi.mock("@/lib/quran/quran-corpus", () => ({
   getVerse: mockGetVerse,
   getVerses: mockGetVerses,
 }));
+vi.mock("@/lib/infra/search-log", () => ({ logSearchQuery: vi.fn(async () => undefined) }));
 
 import { GET } from "@/app/api/search/route";
 

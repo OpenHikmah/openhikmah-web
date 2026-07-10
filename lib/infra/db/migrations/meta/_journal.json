@@ -99,6 +99,13 @@
       "when": 1783725577007,
       "tag": "0013_prompt_versions",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1783741773463,
+      "tag": "0014_search_log",
+      "breakpoints": true
     }
   ]
 }

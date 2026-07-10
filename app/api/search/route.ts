@@ -5,6 +5,7 @@ import { searchByMeaning } from "@/lib/quran/semantic-search";
 import { getVerse, getVerses } from "@/lib/quran/quran-corpus";
 import { consume } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
+import { logSearchQuery } from "@/lib/infra/search-log";
 import sanitizeHtml from "sanitize-html";
 
 // Semantic similarity has no natural cutoff across the whole corpus (every verse
@@ -134,6 +135,7 @@ export async function GET(req: NextRequest) {
             translation: m.verse.translation,
           }));
           const response: SearchResponse = { results, total, page, pageSize };
+          await logSearchQuery(q, "meaning", total);
           return NextResponse.json(response);
         }
       } catch (err) {
@@ -143,10 +145,12 @@ export async function GET(req: NextRequest) {
     // No semantic results (empty / error / rate-limited) → keyword fallback.
     const { results, total } = await keywordSearch(q, page, pageSize);
     const response: SearchResponse = { results, total, page, pageSize };
+    await logSearchQuery(q, "keyword", total);
     return NextResponse.json(response, { headers: { "x-search-fallback": "keyword" } });
   }
 
   const { results, total } = await keywordSearch(q, page, pageSize);
   const response: SearchResponse = { results, total, page, pageSize };
+  await logSearchQuery(q, "keyword", total);
   return NextResponse.json(response);
 }
