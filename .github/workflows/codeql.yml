@@ -25,7 +25,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
 
@@ -35,7 +35,7 @@ jobs:
       # same-repo pushes/PRs, upload directly; for fork PRs, keep the SARIF as a
       # local file and hand it to codeql-upload.yml (workflow_run, base-repo
       # context) instead.
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
           upload: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}

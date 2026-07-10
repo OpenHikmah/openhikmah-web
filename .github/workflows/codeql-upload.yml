@@ -53,7 +53,7 @@ jobs:
           echo "number=$(cat pr-metadata/pr-number.txt)" >> "$GITHUB_OUTPUT"
           echo "sha=$(cat pr-metadata/pr-sha.txt)" >> "$GITHUB_OUTPUT"
 
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         if: steps.download-sarif.outcome == 'success'
         with:
           sarif_file: sarif-results
