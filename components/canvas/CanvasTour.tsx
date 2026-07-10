@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Search, Network, MessageSquareText, X } from "lucide-react";
+import { FocusScope } from "@radix-ui/react-focus-scope";
 import { Card, Button } from "@/components/ui";
 
 const TOUR_KEY = "open-hikmah-tour-seen";
@@ -56,10 +57,9 @@ export function CanvasTour() {
     setShow(false);
   };
 
-  // Move focus to the primary action when the tour appears, and let Escape dismiss.
+  // Let Escape dismiss. Initial/returned focus is handled by FocusScope below.
   useEffect(() => {
     if (!show) return;
-    primaryRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") dismiss();
     };
@@ -75,64 +75,75 @@ export function CanvasTour() {
 
   return (
     <div className="pointer-events-none absolute bottom-[calc(70px+env(safe-area-inset-bottom))] left-1/2 z-50 w-[min(360px,calc(100vw-2rem))] -translate-x-1/2 md:bottom-6 md:left-6 md:translate-x-0">
-      <Card
-        variant="floating"
-        role="dialog"
-        aria-labelledby="canvas-tour-title"
-        aria-describedby="canvas-tour-body"
-        className="pointer-events-auto animate-[fadeIn_200ms_ease-out] p-5"
+      <FocusScope
+        asChild
+        trapped
+        loop
+        onMountAutoFocus={(e) => {
+          e.preventDefault();
+          primaryRef.current?.focus();
+        }}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2 text-gold">
-            <Icon className="h-4 w-4" />
-            <span className="text-[11px] font-mono uppercase tracking-[0.16em] text-text-muted">
-              Getting started · {step + 1}/{STEPS.length}
-            </span>
-          </div>
-          <button
-            onClick={dismiss}
-            aria-label="Dismiss tour"
-            className="-mr-1 -mt-1 cursor-pointer rounded p-1 text-text-muted transition-colors hover:text-text-secondary"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        <p id="canvas-tour-title" className="mt-3 text-sm font-medium text-text-primary">
-          {current.title}
-        </p>
-        <p id="canvas-tour-body" className="mt-1.5 text-xs leading-relaxed text-text-secondary">
-          {current.body}
-        </p>
-
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <div className="flex gap-1.5">
-            {STEPS.map((_, i) => (
-              <span
-                key={i}
-                className={`h-1.5 w-1.5 rounded-full transition-colors ${
-                  i === step ? "bg-gold" : "bg-border"
-                }`}
-              />
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            {!isLast && (
-              <Button variant="ghost" size="sm" onClick={dismiss}>
-                Skip
-              </Button>
-            )}
-            <Button
-              ref={primaryRef}
-              variant="primary"
-              size="sm"
-              onClick={() => (isLast ? dismiss() : setStep((s) => s + 1))}
+        <Card
+          variant="floating"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="canvas-tour-title"
+          aria-describedby="canvas-tour-body"
+          className="pointer-events-auto animate-[fadeIn_200ms_ease-out] p-5"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2 text-gold">
+              <Icon className="h-4 w-4" />
+              <span className="text-[11px] font-mono uppercase tracking-[0.16em] text-text-muted">
+                Getting started · {step + 1}/{STEPS.length}
+              </span>
+            </div>
+            <button
+              onClick={dismiss}
+              aria-label="Dismiss tour"
+              className="-mr-1 -mt-1 cursor-pointer rounded p-1 text-text-muted transition-colors hover:text-text-secondary"
             >
-              {isLast ? "Got it" : "Next"}
-            </Button>
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
-        </div>
-      </Card>
+
+          <p id="canvas-tour-title" className="mt-3 text-sm font-medium text-text-primary">
+            {current.title}
+          </p>
+          <p id="canvas-tour-body" className="mt-1.5 text-xs leading-relaxed text-text-secondary">
+            {current.body}
+          </p>
+
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <div className="flex gap-1.5">
+              {STEPS.map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-1.5 w-1.5 rounded-full transition-colors ${
+                    i === step ? "bg-gold" : "bg-border"
+                  }`}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              {!isLast && (
+                <Button variant="ghost" size="sm" onClick={dismiss}>
+                  Skip
+                </Button>
+              )}
+              <Button
+                ref={primaryRef}
+                variant="primary"
+                size="sm"
+                onClick={() => (isLast ? dismiss() : setStep((s) => s + 1))}
+              >
+                {isLast ? "Got it" : "Next"}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </FocusScope>
     </div>
   );
 }
