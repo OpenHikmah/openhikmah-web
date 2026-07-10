@@ -179,6 +179,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
       DEV_AUTH_TOKEN: e2e-dev-token
       DEV_AUTH_QF_ID: e2e-dev-qf-id
+      ADMIN_QF_IDS: e2e-dev-qf-id
       ANTHROPIC_API_KEY: sk-ant-placeholder
       AI_PROVIDER: claude
       GEMINI_API_KEY: placeholder-gemini-key

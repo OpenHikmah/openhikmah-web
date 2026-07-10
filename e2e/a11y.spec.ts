@@ -76,3 +76,31 @@ test.describe("accessibility", () => {
     await scanAndAssert(page, "onboarding");
   });
 });
+
+// `/admin/*` is gated client-side by AdminGate, which shows an "Authorising…"
+// spinner while it fetches /api/admin/me, then renders the real page (with its
+// <h1> from AdminPageHeader) once that resolves — so a scan right after
+// domcontentloaded would race the spinner. Wait for the heading first. Requires
+// the e2e dev-bypass identity to also be listed in ADMIN_QF_IDS.
+const ADMIN_PAGES = [
+  { path: "/admin", label: "admin overview" },
+  { path: "/admin/votd", label: "admin votd" },
+  { path: "/admin/connections", label: "admin connections" },
+  { path: "/admin/users", label: "admin users" },
+  { path: "/admin/challenges", label: "admin challenges" },
+  { path: "/admin/ai", label: "admin ai" },
+  { path: "/admin/flags", label: "admin flags" },
+  { path: "/admin/names", label: "admin names" },
+  { path: "/admin/infra", label: "admin infra" },
+  { path: "/admin/audit", label: "admin audit" },
+];
+
+test.describe("admin accessibility", () => {
+  for (const { path, label } of ADMIN_PAGES) {
+    test(`${label} page has no serious a11y violations`, async ({ authenticatedPage: page }) => {
+      await gotoAndSettle(page, path);
+      await page.getByRole("heading", { level: 1 }).waitFor();
+      await scanAndAssert(page, label);
+    });
+  }
+});
