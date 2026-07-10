@@ -24,7 +24,7 @@ export function SearchModeToggle({ mode, onChange, className }: SearchModeToggle
           aria-pressed={mode === m}
           className={cn(
             "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-            mode === m ? "bg-teal/15 text-teal" : "text-text-muted hover:text-text-secondary"
+            mode === m ? "bg-teal/15 text-teal-bright" : "text-text-muted hover:text-text-secondary"
           )}
         >
           {m === "keyword" ? "Keyword" : "By meaning"}

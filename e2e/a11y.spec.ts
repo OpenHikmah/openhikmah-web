@@ -41,6 +41,11 @@ test.describe("accessibility", () => {
     await scanAndAssert(page, "social");
   });
 
+  test("search page has no serious a11y violations", async ({ page }) => {
+    await gotoAndSettle(page, "/search?q=2:255");
+    await scanAndAssert(page, "search");
+  });
+
   test("today page has no serious a11y violations", async ({ authenticatedPage: page }) => {
     await gotoAndSettle(page, "/today");
     await scanAndAssert(page, "today");

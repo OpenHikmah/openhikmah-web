@@ -6,6 +6,9 @@
   --color-gold-muted: #8a6d2c;
   --color-teal: #0d9488;
   --color-teal-dim: #0f766e;
+  /* Lighter than --color-teal specifically for small text on dark surfaces —
+     plain teal text fails WCAG AA contrast (4.35:1) at this size/weight. */
+  --color-teal-bright: #2dd4bf;
 
   /* Surface layers */
   --color-bg: #0a0f1a;
