@@ -42,6 +42,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
   const addVerseNode = useCanvasStore((s) => s.addVerseNode);
   const setPendingAutoExpand = useCanvasStore((s) => s.setPendingAutoExpand);
+  const setPendingPanToNode = useCanvasStore((s) => s.setPendingPanToNode);
   const hasNode = useCanvasStore((s) => s.hasNode);
   const nodes = useCanvasStore((s) => s.nodes);
   const viewport = useCanvasStore((s) => s.viewport);
@@ -124,12 +125,9 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
   const mapConnections = useCallback(
     (verse: Verse) => {
-      // Defensive: triggers are already disabled for added verses, but never stack
-      // a duplicate node regardless of how this is reached.
-      if (hasNode(verse.ref)) {
-        onClose();
-        return;
-      }
+      // Re-adding a verse already on canvas is allowed — the user may want to try
+      // a different expansion (root/theme/contrast) on a second copy. Both copies
+      // get a duplicate badge (VerseNode) so the user can tell they're linked.
       const isFirst = nodes.length === 0;
       // First node anchors at the origin; later searches drop into the nearest
       // empty slot beside the *visible* part of the graph, never overlapping.
@@ -150,18 +148,18 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
       const nodeId = addVerseNode({ ...verse, isRoot: isFirst }, position);
       if (isFirst) {
         setPendingAutoExpand(nodeId);
+      } else {
+        // The user has no way to know where a search-added verse landed on a
+        // populated canvas, so pan the camera to it.
+        setPendingPanToNode(nodeId);
       }
       onClose();
     },
-    [nodes, viewport, hasNode, addVerseNode, setPendingAutoExpand, onClose]
+    [nodes, viewport, addVerseNode, setPendingAutoExpand, setPendingPanToNode, onClose]
   );
 
   const loadSeedVerse = useCallback(
     async (ref: string) => {
-      if (hasNode(ref)) {
-        onClose();
-        return;
-      }
       setLoading(true);
       try {
         const res = await fetch(`/api/verse/${ref.replace(":", "/")}`);
@@ -174,7 +172,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
         setLoading(false);
       }
     },
-    [hasNode, onClose, mapConnections]
+    [mapConnections]
   );
 
   const viewAllResults = useCallback(() => {
@@ -391,7 +389,7 @@ function VerseCard({
   const [submitting, setSubmitting] = useState(false);
 
   const handleClick = async () => {
-    if (submitting || alreadyAdded) return;
+    if (submitting) return;
     setSubmitting(true);
     try {
       onMapConnections();
@@ -417,27 +415,20 @@ function VerseCard({
         {verse.translation}
       </p>
 
-      {alreadyAdded ? (
-        <Button variant="secondary" size="sm" disabled className="w-full">
+      <Button
+        variant={alreadyAdded ? "secondary" : "primary"}
+        size="sm"
+        onClick={handleClick}
+        disabled={submitting}
+        className="w-full"
+      >
+        {submitting ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        ) : (
           <Network className="w-3.5 h-3.5" />
-          Already on canvas
-        </Button>
-      ) : (
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={handleClick}
-          disabled={submitting}
-          className="w-full"
-        >
-          {submitting ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Network className="w-3.5 h-3.5" />
-          )}
-          Map Connections
-        </Button>
-      )}
+        )}
+        {alreadyAdded ? "Already on canvas — add again" : "Map Connections"}
+      </Button>
     </div>
   );
 }
@@ -454,10 +445,9 @@ function SearchResultRow({
   return (
     <button
       onClick={onSelect}
-      disabled={alreadyAdded}
       className={cn(
         "w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left transition-colors",
-        "hover:bg-surface-raised disabled:opacity-50 disabled:cursor-not-allowed"
+        "hover:bg-surface-raised"
       )}
     >
       <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 mt-0.5 bg-surface-overlay">
