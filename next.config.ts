@@ -17,9 +17,11 @@ const nextConfig: NextConfig = {
   async headers() {
     // Baseline security headers on every response. CSP starts in report-only
     // mode: the app uses inline `style={{...}}` throughout the canvas UI (so
-    // style-src needs 'unsafe-inline' regardless), and we don't yet have a
-    // deployed report endpoint to validate script-src against real traffic —
-    // enforcing untested would risk breaking the OAuth/canvas flows in prod.
+    // style-src needs 'unsafe-inline' regardless), and we want a monitoring
+    // window against real traffic — via the /api/csp-report endpoint wired
+    // below — before flipping script-src enforcement on and risking the
+    // OAuth/canvas flows in prod. Flip to `Content-Security-Policy` once that
+    // endpoint has been observed clean for a while.
     const securityHeaders = [
       { key: "X-Frame-Options", value: "DENY" },
       { key: "X-Content-Type-Options", value: "nosniff" },
@@ -39,7 +41,15 @@ const nextConfig: NextConfig = {
           "frame-ancestors 'none'",
           "base-uri 'self'",
           "form-action 'self' https://*.quran.foundation",
+          "report-uri /api/csp-report",
+          "report-to csp-endpoint",
         ].join("; "),
+      },
+      {
+        // Pairs with the `report-to` CSP directive above (the modern
+        // Reporting API); report-uri is kept alongside it for older browsers.
+        key: "Reporting-Endpoints",
+        value: 'csp-endpoint="/api/csp-report"',
       },
     ];
     return [
