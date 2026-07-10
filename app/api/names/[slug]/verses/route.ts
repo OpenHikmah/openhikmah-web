@@ -3,6 +3,7 @@ import { callAI } from "@/lib/ai/ai";
 import { getNameBySlug } from "@/lib/names/divine-names";
 import { getSurahName } from "@/lib/quran/surah-names";
 import { getOrGenerateNameContent } from "@/lib/names/name-content";
+import { incr } from "@/lib/infra/metrics";
 import sanitizeHtml from "sanitize-html";
 import type { VerseRef } from "@/types/quran";
 
@@ -46,7 +47,11 @@ async function fetchVerseData(ref: string): Promise<Omit<NameVerse, "reason"> | 
       surahName,
       surahNameArabic,
     };
-  } catch {
+  } catch (err) {
+    // An upstream outage must not look identical to "no verse data" —
+    // log and count it so it's visible on /api/metrics, not silent.
+    console.error(`Name verses: alquran.cloud fetch failed for ${ref}:`, err);
+    incr("quran_api_fetch_error");
     return null;
   }
 }
@@ -66,7 +71,11 @@ async function searchVerseRefs(arabic: string): Promise<string[]> {
       .filter((r) => r.verse_key && /^\d+:\d+$/.test(r.verse_key))
       .map((r) => r.verse_key as string)
       .slice(0, 5);
-  } catch {
+  } catch (err) {
+    // Same reasoning as fetchVerseData: a failed search must be distinguishable
+    // from "genuinely no matching verses" in logs and /api/metrics.
+    console.error(`Name verses: quran.com search failed for "${arabic}":`, err);
+    incr("quran_search_api_error");
     return [];
   }
 }
