@@ -85,6 +85,13 @@
       "when": 1782054408485,
       "tag": "0011_challenges",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1783694440297,
+      "tag": "0012_overrated_king_cobra",
+      "breakpoints": true
     }
   ]
 }
