@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { cosineDistance, desc, eq, ne, sql, type SQL } from "drizzle-orm";
+import { cosineDistance, desc, eq, notInArray, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { verseEmbeddings } from "@/lib/infra/db/schema";
 import { embed } from "@/lib/ai/ai";
@@ -57,10 +57,11 @@ export interface SemanticMatch {
 async function nearest(
   queryVec: number[],
   limit: number,
-  excludeRef?: string
+  excludeRefs: string[] = []
 ): Promise<Array<{ ref: string; similarity: number }>> {
   const similarity = sql<number>`1 - (${cosineDistance(verseEmbeddings.embedding, queryVec)})`;
-  const where: SQL | undefined = excludeRef ? ne(verseEmbeddings.ref, excludeRef) : undefined;
+  const where: SQL | undefined =
+    excludeRefs.length > 0 ? notInArray(verseEmbeddings.ref, excludeRefs) : undefined;
   return db
     .select({ ref: verseEmbeddings.ref, similarity })
     .from(verseEmbeddings)
@@ -87,15 +88,23 @@ export async function searchByMeaning(query: string, limit = 10): Promise<Semant
   return hydrate(await nearest(queryVec, limit));
 }
 
-/** Find verses semantically nearest to a given verse (excluding itself). */
-export async function similarVerses(ref: string, limit = 5): Promise<SemanticMatch[]> {
+/**
+ * Find verses semantically nearest to a given verse (excluding itself, and any
+ * additional `excludeRefs` — e.g. verses already surfaced to the caller for
+ * this source+kind, so a repeat request returns something new).
+ */
+export async function similarVerses(
+  ref: string,
+  limit = 5,
+  excludeRefs: string[] = []
+): Promise<SemanticMatch[]> {
   const self = await db
     .select({ embedding: verseEmbeddings.embedding })
     .from(verseEmbeddings)
     .where(eq(verseEmbeddings.ref, ref))
     .limit(1);
   if (!self[0]) return [];
-  return hydrate(await nearest(self[0].embedding, limit, ref));
+  return hydrate(await nearest(self[0].embedding, limit, [ref, ...excludeRefs]));
 }
 
 /**
@@ -103,7 +112,11 @@ export async function similarVerses(ref: string, limit = 5): Promise<SemanticMat
  * in meaning to `ref`, as plain refs (the generator hydrates + articulates).
  * Returns [] when the source verse has no stored embedding.
  */
-export async function semanticCandidates(ref: string, limit = 10): Promise<string[]> {
-  const matches = await similarVerses(ref, limit);
+export async function semanticCandidates(
+  ref: string,
+  limit = 10,
+  excludeRefs: string[] = []
+): Promise<string[]> {
+  const matches = await similarVerses(ref, limit, excludeRefs);
   return matches.map((m) => m.verse.ref);
 }

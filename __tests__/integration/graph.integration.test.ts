@@ -17,8 +17,13 @@ import { getConnections } from "@/lib/ai/graph-service";
 import { consume } from "@/lib/infra/rate-limit";
 
 async function reset() {
+  // word_morphology is included even though this file never seeds it — root
+  // discovery reads real DB state, and another integration file (connection-
+  // discovery) seeds roots for ref "1:1" used here too. Since files share one
+  // container and run serially (not parallel) but each only cleans up its own
+  // tables, leftover rows would otherwise leak into this file's "root" test.
   await db.execute(
-    sql`TRUNCATE verses, connections, ai_generations, rate_limits RESTART IDENTITY CASCADE`
+    sql`TRUNCATE verses, connections, ai_generations, rate_limits, word_morphology RESTART IDENTITY CASCADE`
   );
 }
 

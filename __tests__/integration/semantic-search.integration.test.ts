@@ -84,4 +84,13 @@ describe("semantic search (integration, real pgvector)", () => {
   it("semanticCandidates returns nearest refs excluding the source", async () => {
     expect(await semanticCandidates("1:1", 5)).toEqual(["2:2", "3:3"]);
   });
+
+  it("semanticCandidates excludes additional refs already surfaced to the caller", async () => {
+    expect(await semanticCandidates("1:1", 5, ["2:2"])).toEqual(["3:3"]);
+  });
+
+  it("similarVerses excludes additional refs already surfaced to the caller", async () => {
+    const out = await similarVerses("1:1", 5, ["2:2"]);
+    expect(out.map((m) => m.verse.ref)).toEqual(["3:3"]);
+  });
 });

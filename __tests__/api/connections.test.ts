@@ -98,7 +98,10 @@ function transResp(text = "A noble verse.") {
   return { ok: true, json: async () => ({ data: { text } }) };
 }
 
-function makeRequest(body: Record<string, string>, headers: Record<string, string> = {}) {
+function makeRequest(
+  body: Record<string, string | string[]>,
+  headers: Record<string, string> = {}
+) {
   return new NextRequest("http://localhost/api/connections", {
     method: "POST",
     body: JSON.stringify(body),
@@ -294,5 +297,59 @@ describe("POST /api/connections", () => {
     expect(mockInsert).not.toHaveBeenCalled();
     // The mocked Anthropic client was never constructed/used for a hit.
     expect(anthropic.default).toBeDefined();
+  });
+
+  it("returns 400 for a non-array excludeRefs", async () => {
+    const req = makeRequest({
+      fromRef: "1:1",
+      kind: "thematic",
+      arabicText: "x",
+      translation: "y",
+      excludeRefs: "2:255" as unknown as string[],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for an excludeRefs entry that isn't a valid ref", async () => {
+    const req = makeRequest({
+      fromRef: "1:1",
+      kind: "thematic",
+      arabicText: "x",
+      translation: "y",
+      excludeRefs: ["2:255", "garbage"],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for an oversized excludeRefs list", async () => {
+    const req = makeRequest({
+      fromRef: "1:1",
+      kind: "thematic",
+      arabicText: "x",
+      translation: "y",
+      excludeRefs: Array.from({ length: 101 }, (_, i) => `2:${i + 1}`),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 200 with an empty array (not a 500) when excludeRefs exhausts a repeat request", async () => {
+    // Cache hit path would normally return the stored edge, but with excludeRefs
+    // matching it, the DB filter should exclude it — simulate that by returning
+    // an empty result set even though this is technically a "hit" scenario.
+    mockSelect.mockReturnValue(makeDbChain([]));
+    const req = makeRequest({
+      fromRef: "2:255",
+      kind: "thematic",
+      arabicText: "x",
+      translation: "y",
+      excludeRefs: ["3:18", "112:1"],
+    });
+    const res = await POST(req);
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body).toEqual([]);
   });
 });

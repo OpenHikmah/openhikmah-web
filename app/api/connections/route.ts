@@ -5,15 +5,23 @@ import { RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import type { EdgeKind } from "@/types/quran";
 
+const MAX_EXCLUDE_REFS = 100;
+
 export async function POST(req: NextRequest) {
-  let body: { fromRef?: string; kind?: string; arabicText?: string; translation?: string };
+  let body: {
+    fromRef?: string;
+    kind?: string;
+    arabicText?: string;
+    translation?: string;
+    excludeRefs?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { fromRef, kind, arabicText, translation } = body;
+  const { fromRef, kind, arabicText, translation, excludeRefs: rawExcludeRefs } = body;
 
   if (!fromRef || !kind || !arabicText || !translation) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -27,15 +35,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid fromRef" }, { status: 400 });
   }
 
+  let excludeRefs: string[] = [];
+  if (rawExcludeRefs !== undefined) {
+    if (
+      !Array.isArray(rawExcludeRefs) ||
+      rawExcludeRefs.length > MAX_EXCLUDE_REFS ||
+      !rawExcludeRefs.every((r) => typeof r === "string" && isValidRef(r))
+    ) {
+      return NextResponse.json({ error: "Invalid excludeRefs" }, { status: 400 });
+    }
+    excludeRefs = rawExcludeRefs;
+  }
+
   try {
     const results = await getConnections(
       fromRef,
       kind as EdgeKind,
       { arabicText, translation },
-      { clientKey: clientKey(req) }
+      { clientKey: clientKey(req), excludeRefs }
     );
 
-    if (results.length === 0) {
+    // A "get more" request (excludeRefs non-empty) legitimately can run out of
+    // fresh connections — that's not a server error, just nothing left to give.
+    if (results.length === 0 && excludeRefs.length === 0) {
       return NextResponse.json({ error: "Could not resolve any verses" }, { status: 500 });
     }
 

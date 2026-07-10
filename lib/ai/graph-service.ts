@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, notInArray } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { connections, type Connection } from "@/lib/infra/db/schema";
 import { generateConnections, generateGroundedConnections } from "@/lib/ai/connection-generator";
@@ -33,6 +33,10 @@ interface GetConnectionsOptions {
    *  When set and the client is over budget, a miss throws RateLimitError.
    *  Cache hits are never rate-limited. */
   clientKey?: string;
+  /** Refs already shown to the caller for this fromRef+kind — excluded from
+   *  both the cache read and any fresh generation, so a repeat "get more"
+   *  request surfaces genuinely new connections instead of the same set. */
+  excludeRefs?: string[];
 }
 
 /** Hydrate stored edges (which carry only refs + reason) into full results. */
@@ -69,6 +73,8 @@ export async function getConnections(
   source: SourceVerse,
   options: GetConnectionsOptions = {}
 ): Promise<ConnectionResult[]> {
+  const excludeRefs = options.excludeRefs ?? [];
+
   const existing = await db
     .select()
     .from(connections)
@@ -76,7 +82,8 @@ export async function getConnections(
       and(
         eq(connections.fromRef, fromRef),
         eq(connections.kind, kind),
-        eq(connections.status, "active")
+        eq(connections.status, "active"),
+        ...(excludeRefs.length > 0 ? [notInArray(connections.toRef, excludeRefs)] : [])
       )
     )
     // A single generation inserts ~12 edges (see discoverCandidates), but this
@@ -100,7 +107,9 @@ export async function getConnections(
   // Single-flight: if an identical generation is already running, join it rather
   // than starting a second AI call. The get→set below MUST stay synchronous (no
   // await between them) or two concurrent callers could both become the leader.
-  const key = `${fromRef}:${kind}`;
+  // The exclude set is folded into the key so a "get more" request never
+  // coalesces with a plain repeat request for the same verse+kind.
+  const key = `${fromRef}:${kind}:${[...excludeRefs].sort().join(",")}`;
   const pending = inFlight.get(key);
   if (pending) {
     incr("gen_coalesced");
@@ -108,7 +117,7 @@ export async function getConnections(
   }
 
   incr("gen_started");
-  const work = generateAndPersist(fromRef, kind, source);
+  const work = generateAndPersist(fromRef, kind, source, excludeRefs);
   inFlight.set(key, work);
   try {
     return await work;
@@ -127,9 +136,15 @@ export async function getConnections(
 async function generateAndPersist(
   fromRef: string,
   kind: EdgeKind,
-  source: SourceVerse
+  source: SourceVerse,
+  excludeRefs: string[] = []
 ): Promise<ConnectionResult[]> {
-  const candidates = await discoverCandidates(fromRef, kind);
+  const candidates = await discoverCandidates(fromRef, kind, undefined, excludeRefs);
+  // The legacy ungrounded path has no notion of excludeRefs — it would just
+  // regenerate a similar set from memory, defeating the point of "get more."
+  // Only fall back to it on a true first-time miss (no grounding data seeded
+  // for this verse yet); once a caller is asking for more, an empty candidate
+  // pool means the grounded data is genuinely exhausted, not unavailable.
   const generated =
     candidates.length > 0
       ? await generateGroundedConnections(
@@ -139,7 +154,9 @@ async function generateAndPersist(
           kind,
           candidates
         )
-      : await generateConnections(fromRef, source.arabicText, source.translation, kind);
+      : excludeRefs.length > 0
+        ? []
+        : await generateConnections(fromRef, source.arabicText, source.translation, kind);
 
   if (generated.length > 0) {
     const model = process.env.ANTHROPIC_MODEL ?? null;

@@ -26,6 +26,13 @@ import type { ConnectionResult, Verse } from "@/types/quran";
 const nodeTypes = { verse: VerseNode };
 const edgeTypes = { hikmah: HikmahEdge };
 
+/** Signals a repeat "get more" expansion that genuinely has nothing further to
+ *  give, so the catch block can show a distinct message instead of the generic
+ *  fetch-failure one — kept as a throw (rather than an inline early return)
+ *  so runExpansion has a single setState call site, which the effects that
+ *  invoke it directly depend on for the react-hooks lint rule to stay clean. */
+class ExhaustedExpansionError extends Error {}
+
 function radialPos(
   src: { x: number; y: number },
   i: number,
@@ -75,6 +82,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
   const setViewport = useCanvasStore((s) => s.setViewport);
   const getNodeById = useCanvasStore((s) => s.getNodeById);
   const hasNode = useCanvasStore((s) => s.hasNode);
+  const getExpansionRefs = useCanvasStore((s) => s.getExpansionRefs);
 
   const runExpansion = useCallback(
     async (
@@ -90,15 +98,22 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
       setExpandingNode(nodeId);
 
       try {
+        const excludeRefs = getExpansionRefs(nodeId, kind);
         const res = await fetch("/api/connections", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fromRef: ref, kind, arabicText, translation }),
+          body: JSON.stringify({ fromRef: ref, kind, arabicText, translation, excludeRefs }),
         });
 
         if (!res.ok) throw new Error("Connections API failed");
 
         const connections: ConnectionResult[] = await res.json();
+
+        // A repeat "get more" request can legitimately run dry — that's not a
+        // fetch failure, just nothing further to surface for this kind.
+        if (connections.length === 0 && excludeRefs.length > 0) {
+          throw new ExhaustedExpansionError();
+        }
 
         for (let i = 0; i < connections.length; i++) {
           await new Promise<void>((resolve) => setTimeout(resolve, 350 * i));
@@ -151,9 +166,14 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
           reactFlow.fitView({ padding: 0.35, maxZoom: 1, duration: 600 });
         }
       } catch (err) {
-        console.error("Expansion failed:", err);
+        const exhausted = err instanceof ExhaustedExpansionError;
+        if (!exhausted) console.error("Expansion failed:", err);
         if (mountedRef.current) {
-          setExpansionError("Could not find connections. Try a different type.");
+          setExpansionError(
+            exhausted
+              ? "No more connections of this type."
+              : "Could not find connections. Try a different type."
+          );
           setTimeout(() => setExpansionError(null), 3500);
         }
       } finally {
@@ -161,7 +181,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
         expandingRef.current = false;
       }
     },
-    [addVerseNode, addConnectionEdge, setExpandingNode, hasNode, reactFlow]
+    [addVerseNode, addConnectionEdge, setExpandingNode, hasNode, getExpansionRefs, reactFlow]
   );
 
   useEffect(() => {

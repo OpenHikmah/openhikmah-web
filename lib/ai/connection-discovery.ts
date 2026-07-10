@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, ne, notInArray, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { wordMorphology } from "@/lib/infra/db/schema";
 import { semanticCandidates } from "@/lib/quran/semantic-search";
@@ -21,7 +21,11 @@ import type { EdgeKind } from "@/types/quran";
  */
 
 /** Verses sharing an Arabic root with the source verse, most-shared first. */
-async function rootCandidates(fromRef: string, limit: number): Promise<string[]> {
+async function rootCandidates(
+  fromRef: string,
+  limit: number,
+  excludeRefs: string[] = []
+): Promise<string[]> {
   const srcRoots = await db
     .selectDistinct({ root: wordMorphology.root })
     .from(wordMorphology)
@@ -34,7 +38,13 @@ async function rootCandidates(fromRef: string, limit: number): Promise<string[]>
   const rows = await db
     .select({ ref: wordMorphology.ref, shared: sharedRoots })
     .from(wordMorphology)
-    .where(and(inArray(wordMorphology.root, roots), ne(wordMorphology.ref, fromRef)))
+    .where(
+      and(
+        inArray(wordMorphology.root, roots),
+        ne(wordMorphology.ref, fromRef),
+        ...(excludeRefs.length > 0 ? [notInArray(wordMorphology.ref, excludeRefs)] : [])
+      )
+    )
     .groupBy(wordMorphology.ref)
     .orderBy(desc(sharedRoots))
     .limit(limit);
@@ -43,15 +53,17 @@ async function rootCandidates(fromRef: string, limit: number): Promise<string[]>
 }
 
 /**
- * Returns up to `limit` real candidate refs for the given source verse and kind.
+ * Returns up to `limit` real candidate refs for the given source verse and kind,
+ * skipping any ref already in `excludeRefs` (refs the caller has already seen).
  * Empty array means "no grounding data available for this verse" — not an error.
  */
 export async function discoverCandidates(
   fromRef: string,
   kind: EdgeKind,
-  limit = 12
+  limit = 12,
+  excludeRefs: string[] = []
 ): Promise<string[]> {
-  if (kind === "root") return rootCandidates(fromRef, limit);
+  if (kind === "root") return rootCandidates(fromRef, limit, excludeRefs);
   // thematic + contrast both start from semantic neighbors.
-  return semanticCandidates(fromRef, limit);
+  return semanticCandidates(fromRef, limit, excludeRefs);
 }

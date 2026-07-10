@@ -6,6 +6,7 @@ import type { EdgeKind } from "@/types/quran";
 interface ExpandMenuProps {
   onSelect: (kind: EdgeKind) => void;
   onClose: () => void;
+  existingCounts?: Partial<Record<EdgeKind, number>>;
 }
 
 const OPTIONS: Array<{
@@ -38,7 +39,7 @@ const OPTIONS: Array<{
   },
 ];
 
-export function ExpandMenu({ onSelect, onClose }: ExpandMenuProps) {
+export function ExpandMenu({ onSelect, onClose, existingCounts }: ExpandMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const firstOptionRef = useRef<HTMLButtonElement>(null);
   const [openUp, setOpenUp] = useState(false);
@@ -94,7 +95,12 @@ export function ExpandMenu({ onSelect, onClose }: ExpandMenuProps) {
               {opt.icon}
             </span>
             <div className="min-w-0">
-              <p className="text-xs font-medium text-text-primary">{opt.label}</p>
+              <p className="text-xs font-medium text-text-primary">
+                {opt.label}
+                {!!existingCounts?.[opt.kind] && (
+                  <span className="text-text-muted"> ({existingCounts[opt.kind]} found)</span>
+                )}
+              </p>
               <p className="text-xs text-text-muted">{opt.description}</p>
             </div>
           </button>

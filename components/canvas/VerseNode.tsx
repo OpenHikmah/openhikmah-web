@@ -26,6 +26,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
   const setPendingExpand = useCanvasStore((s) => s.setPendingExpand);
   const setNewlyAddedNode = useCanvasStore((s) => s.setNewlyAddedNode);
   const getDuplicateNodeIds = useCanvasStore((s) => s.getDuplicateNodeIds);
+  const getExpansionCounts = useCanvasStore((s) => s.getExpansionCounts);
   const getNodeById = useCanvasStore((s) => s.getNodeById);
   const reactFlow = useReactFlow();
 
@@ -44,6 +45,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
   const isPulsing = newlyAddedNodeId === id;
   const otherDuplicateIds = getDuplicateNodeIds(verse.ref).filter((did) => did !== id);
   const hasDuplicate = otherDuplicateIds.length > 0;
+  const expansionCounts = getExpansionCounts(id);
 
   const handleExpandSelect = (kind: EdgeKind) => {
     setPendingExpand({ nodeId: id, ref: verse.ref, kind });
@@ -218,7 +220,11 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
       </div>
 
       {expandMenuOpen && (
-        <ExpandMenu onSelect={handleExpandSelect} onClose={() => setOpenExpandNodeId(null)} />
+        <ExpandMenu
+          onSelect={handleExpandSelect}
+          onClose={() => setOpenExpandNodeId(null)}
+          existingCounts={expansionCounts}
+        />
       )}
 
       {isExpanding && (
