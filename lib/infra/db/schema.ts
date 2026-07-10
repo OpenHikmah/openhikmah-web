@@ -272,6 +272,10 @@ export const aiGenerations = pgTable(
     kind: text("kind").notNull(),
     model: text("model"),
     tokens: integer("tokens"),
+    // FK-less reference to prompt_versions.id — null means the hardcoded
+    // fallback template was used (no active DB version for the key at the
+    // time). See lib/ai/prompt-registry.ts.
+    promptVersion: integer("prompt_version"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("ai_generations_created_idx").on(t.createdAt)]
@@ -386,6 +390,30 @@ export const adminAuditLog = pgTable(
   (t) => [index("admin_audit_created_idx").on(t.createdAt)]
 );
 
+// ─── Prompt Versions ──────────────────────────────────────────────────────────
+// Versioned, DB-stored prompt templates for the AI connection generator (see
+// lib/ai/prompt-registry.ts, lib/ai/connection-generator.ts). `key` picks the
+// prompt slot ("connection.legacy" | "connection.selection"); only one row per
+// key is `active` at a time — creating a new version or rolling back both flip
+// `active` on exactly one row per key. Absence of an active row for a key means
+// "use the hardcoded fallback template", so this table can start empty.
+
+export const promptVersions = pgTable(
+  "prompt_versions",
+  {
+    id: serial("id").primaryKey(),
+    key: text("key").notNull(),
+    template: text("template").notNull(),
+    createdBy: text("created_by"), // admin qfId
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    active: boolean("active").notNull().default(false),
+  },
+  (t) => [
+    index("prompt_versions_key_idx").on(t.key),
+    index("prompt_versions_key_active_idx").on(t.key, t.active),
+  ]
+);
+
 // ─── Feature Flags / Config ───────────────────────────────────────────────────
 // Key→JSON config the admin can tune at runtime (rate-limit windows, AI model per
 // connection kind, feature toggles). Read by the relevant subsystem; absence of a
@@ -435,3 +463,5 @@ export type AdminAuditEntry = typeof adminAuditLog.$inferSelect;
 export type NewAdminAuditEntry = typeof adminAuditLog.$inferInsert;
 export type FeatureFlag = typeof featureFlags.$inferSelect;
 export type NewFeatureFlag = typeof featureFlags.$inferInsert;
+export type PromptVersion = typeof promptVersions.$inferSelect;
+export type NewPromptVersion = typeof promptVersions.$inferInsert;
