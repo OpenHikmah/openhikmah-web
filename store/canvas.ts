@@ -86,6 +86,7 @@ interface CanvasStore {
   pendingPanToNodeId: string | null;
   newlyAddedNodeId: string | null;
   viewport: CanvasViewport;
+  sidebarWidth: number;
 
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
@@ -103,6 +104,7 @@ interface CanvasStore {
   setPendingAutoExpand: (nodeId: string | null) => void;
   setPendingPanToNode: (nodeId: string | null) => void;
   setNewlyAddedNode: (nodeId: string | null) => void;
+  setSidebarWidth: (width: number) => void;
   hasNode: (ref: string) => boolean;
   getNodeByRef: (ref: string) => Node | undefined;
   getNodeById: (id: string) => Node | undefined;
@@ -116,6 +118,8 @@ interface CanvasStore {
 
 let nodeIdCounter = 0;
 const nextId = () => `node-${++nodeIdCounter}`;
+
+export const DEFAULT_SIDEBAR_WIDTH = 288;
 
 // Pulse duration must exceed the CSS `.node-pulse` animation length (1.5s) so the
 // highlight class isn't stripped mid-animation.
@@ -134,6 +138,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   pendingPanToNodeId: null,
   newlyAddedNodeId: null,
   viewport: { x: 0, y: 0, zoom: 1 },
+  sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
@@ -193,6 +198,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setPendingExpand: (action) => set({ pendingExpand: action }),
   setPendingAutoExpand: (nodeId) => set({ pendingAutoExpand: nodeId }),
   setPendingPanToNode: (nodeId) => set({ pendingPanToNodeId: nodeId }),
+  setSidebarWidth: (width) => set({ sidebarWidth: width }),
 
   setNewlyAddedNode: (nodeId) => {
     if (newlyAddedTimeout) clearTimeout(newlyAddedTimeout);

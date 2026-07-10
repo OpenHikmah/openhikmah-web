@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useCanvasStore } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import { useState, useEffect } from "react";
+import { useSidebarResize } from "@/hooks/useSidebarResize";
 import type { EdgeKind } from "@/types/quran";
 import { Card } from "@/components/ui";
 import { InteractiveArabic } from "@/components/morphology/InteractiveArabic";
@@ -257,6 +258,17 @@ const KIND_BADGE: Record<EdgeKind, string> = {
 export function ContextSidebar() {
   const sidebarContent = useCanvasStore((s) => s.sidebarContent);
   const setSidebarContent = useCanvasStore((s) => s.setSidebarContent);
+  const { width, onHandlePointerDown, isResizing } = useSidebarResize();
+
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(min-width: 640px)").matches
+  );
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 640px)");
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
 
   return (
     <AnimatePresence>
@@ -267,8 +279,20 @@ export function ContextSidebar() {
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: "100%", opacity: 0 }}
           transition={{ duration: 0.15, ease: "easeOut" }}
-          className="pointer-events-auto absolute top-0 right-0 z-40 flex h-full w-full flex-col border-l border-border bg-surface sm:w-72"
+          style={isDesktop ? { width } : undefined}
+          className="pointer-events-auto absolute top-0 right-0 z-40 flex h-full w-full flex-col border-l border-border bg-surface"
         >
+          {isDesktop && (
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize panel"
+              onPointerDown={onHandlePointerDown}
+              className={`absolute left-0 top-0 h-full w-1.5 -translate-x-1/2 cursor-col-resize transition-colors ${
+                isResizing ? "bg-gold-muted/60" : "hover:bg-gold-muted/40"
+              }`}
+            />
+          )}
           {/* Header */}
           <div className="flex h-10 shrink-0 items-center justify-between border-b border-border px-4">
             <span className="text-xs text-text-muted">
