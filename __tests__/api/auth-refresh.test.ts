@@ -132,4 +132,36 @@ describe("POST /api/auth/refresh", () => {
     expect(secondBody.accessToken).toBe("access-8");
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
+
+  it("hits the token endpoint again once the cached result's TTL has expired", async () => {
+    vi.useFakeTimers();
+    try {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "access-9", refresh_token: "refresh-rotated-9" }),
+      });
+      const first = await POST(makeReq("refresh-ttl-9"));
+      expect(first.status).toBe(200);
+
+      // Just under the 30s TTL: still served from cache, no second call.
+      vi.advanceTimersByTime(29_000);
+      const stillCached = await POST(makeReq("refresh-ttl-9"));
+      expect(stillCached.status).toBe(200);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Past the TTL: cache entry is swept, so the token is re-sent upstream.
+      vi.advanceTimersByTime(2_000);
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "access-9b", refresh_token: "refresh-rotated-9b" }),
+      });
+      const afterExpiry = await POST(makeReq("refresh-ttl-9"));
+      expect(afterExpiry.status).toBe(200);
+      const afterExpiryBody = await afterExpiry.json();
+      expect(afterExpiryBody.accessToken).toBe("access-9b");
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
