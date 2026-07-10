@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Search, Network, Heart, BookOpen } from "lucide-react";
 import { LandingHeader } from "@/components/layout/LandingHeader";
-import { NavBar } from "@/components/layout/NavBar";
+import { MobileNavBar } from "@/components/layout/MobileNavBar";
 import { SearchModeToggle, type SearchMode } from "@/components/search/SearchModeToggle";
 import { Card, Input, IconButton, Tooltip, Pagination, buttonVariants } from "@/components/ui";
 import { useAuthStore } from "@/store/auth";
@@ -112,7 +112,7 @@ export function SearchPageClient() {
   return (
     <div className="min-h-screen bg-bg pb-[calc(72px+env(safe-area-inset-bottom))] text-text-primary md:pb-0">
       <LandingHeader />
-      <NavBar />
+      <MobileNavBar />
 
       <div className="mx-auto w-full max-w-[800px] px-6 py-10">
         {/* Search bar */}

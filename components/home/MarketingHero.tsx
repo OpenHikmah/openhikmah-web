@@ -17,7 +17,7 @@ import type { Verse } from "@/types/quran";
  * scrollbar. On mobile there isn't room for graph + copy + CTA in one screen, so
  * the <main> scrolls (like the signed-in PersonalHome): copy and the primary CTA
  * come first, the graph follows as a bounded block, and the trailing padding keeps
- * the last row clear of the fixed bottom NavBar.
+ * the last row clear of the fixed bottom MobileNavBar.
  */
 export function MarketingHero({ verse }: { verse: Verse | null }) {
   return (

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { DIVINE_NAMES, CATEGORY_LABELS, type NameCategory } from "@/lib/names/divine-names";
 import { LandingHeader } from "@/components/layout/LandingHeader";
-import { NavBar } from "@/components/layout/NavBar";
+import { MobileNavBar } from "@/components/layout/MobileNavBar";
 
 export const metadata = {
   title: "Asma-ul-Husna — Open Hikmah",
@@ -40,7 +40,7 @@ export default function NamesPage() {
       {/* Shared chrome — same wordmark, section nav, and account menu as the rest
           of the app, so signed-in users can reach their account from here too. */}
       <LandingHeader />
-      <NavBar />
+      <MobileNavBar />
 
       {/* Hero */}
       <div className="px-6 pt-12 pb-10 text-center border-b border-border-subtle">

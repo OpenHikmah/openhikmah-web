@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   Flame,
   Award,
-  Heart,
   FolderOpen,
   Trophy,
   LogOut,
@@ -22,7 +21,6 @@ export function AccountMenu() {
   const accessToken = useAuthStore((s) => s.accessToken);
   const isSessionLoading = useAuthStore((s) => s.isSessionLoading);
   const clearAuth = useAuthStore((s) => s.clearAuth);
-  const bookmarkCount = useAuthStore((s) => s.bookmarks.length);
   const username = useSocialStore((s) => s.username);
   const streak = useSocialStore((s) => s.streak);
   const longestStreak = useSocialStore((s) => s.longestStreak);
@@ -185,12 +183,6 @@ export function AccountMenu() {
           <div className="h-px bg-border" />
 
           <div className="p-1.5">
-            <Link href="/bookmarks" onClick={() => setOpen(false)} className={linkRow}>
-              <Heart /> Bookmarks
-              {bookmarkCount > 0 && (
-                <span className="ml-auto text-xs text-text-muted">{bookmarkCount}</span>
-              )}
-            </Link>
             <Link href="/workspaces" onClick={() => setOpen(false)} className={linkRow}>
               <FolderOpen /> Saved canvases
             </Link>
