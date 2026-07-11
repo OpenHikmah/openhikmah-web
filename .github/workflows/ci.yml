@@ -134,7 +134,7 @@ jobs:
       # which runs with the base repo's write token) does the actual commenting.
       - name: Upload bundle size reports
         if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bundle-size-reports
           path: |
@@ -148,7 +148,7 @@ jobs:
 
       - name: Upload PR number
         if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pr-number
           path: ${{ runner.temp }}/pr-number.txt
