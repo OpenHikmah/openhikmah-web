@@ -3,7 +3,7 @@ import { createHash, createPublicKey, verify as verifySignature } from "node:cry
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { users, type User } from "@/lib/infra/db/schema";
-import { redisGet, redisSet, redisDel } from "@/lib/infra/redis";
+import { redisGet, redisSet, redisDel, redisPublish, redisSubscribe } from "@/lib/infra/redis";
 import { incr } from "@/lib/infra/metrics";
 
 export interface AuthedUser {
@@ -13,8 +13,9 @@ export interface AuthedUser {
 
 // A soft-disabled account (set by an admin) is rejected at the auth boundary.
 // Returned as 403 so the client can distinguish "disabled" from "not signed in".
-// Note: a freshly-disabled user may linger until their cached entry expires
-// (≤5 min) or the token caches are flushed from the admin Infra panel.
+// A disable/flush is broadcast via Redis pub/sub (see broadcastUserCacheInvalidation
+// / broadcastFlushTokenCache below) so every instance's L1 drops the stale entry
+// immediately, not just the instance that served the admin's request.
 function disabledResponse(): NextResponse {
   return NextResponse.json({ error: "Account disabled" }, { status: 403 });
 }
@@ -71,14 +72,61 @@ export function invalidateTokenCache(token: string): void {
 }
 
 /**
- * Clears the in-process token cache (admin Infra action). Forces every request
- * to re-resolve its user on the next call, so a just-disabled account stops being
- * served from this instance's L1 immediately. Redis L2 token entries expire on
+ * Clears the in-process token cache on THIS instance only. Forces every request
+ * to re-resolve its user on the next call. Redis L2 token entries expire on
  * their own ≤5-min TTL. Returns how many entries were dropped.
  */
 export function clearTokenCache(): number {
   const n = tokenCache.size;
   tokenCache.clear();
+  return n;
+}
+
+// ─── Cross-instance cache invalidation (Redis pub/sub) ────────────────────────
+// The L1 token cache is per-process, so disabling a user (or flushing tokens
+// from the admin Infra panel) only clears the instance that handled that HTTP
+// request — in a multi-instance deployment every other instance keeps serving
+// its own stale L1 snapshot for up to CACHE_TTL_MS. These two channels let every
+// instance react immediately, without waiting for the local TTL to expire.
+const USER_INVALIDATE_CHANNEL = "auth:invalidate-user";
+const FLUSH_ALL_CHANNEL = "auth:flush-all";
+let subscribed = false;
+
+function ensureInvalidationSubscription(): void {
+  if (subscribed) return;
+  subscribed = true;
+  redisSubscribe(USER_INVALIDATE_CHANNEL, (message) => {
+    const userId = Number(message);
+    if (!Number.isInteger(userId)) return;
+    for (const [t, v] of tokenCache) {
+      if (v.user.id === userId) tokenCache.delete(t);
+    }
+  });
+  redisSubscribe(FLUSH_ALL_CHANNEL, () => {
+    tokenCache.clear();
+  });
+}
+ensureInvalidationSubscription();
+
+/** Drops `userId` from this instance's L1 cache and broadcasts the same
+ *  eviction to every other instance via Redis pub/sub. Call this whenever a
+ *  user's disabledAt (or other cached-auth-relevant field) changes. Best-effort:
+ *  when Redis is disabled/unreachable, other instances just fall back to the
+ *  normal ≤5-min TTL expiry — this never weakens the L2/DB check itself. */
+export function broadcastUserCacheInvalidation(userId: number): void {
+  for (const [t, v] of tokenCache) {
+    if (v.user.id === userId) tokenCache.delete(t);
+  }
+  redisPublish(USER_INVALIDATE_CHANNEL, String(userId));
+}
+
+/** Clears this instance's L1 token cache AND broadcasts the flush to every
+ *  other instance, so the admin Infra "flush tokens" action isn't scoped to a
+ *  single, arbitrarily-chosen instance. Returns how many entries this instance
+ *  dropped. */
+export function broadcastFlushTokenCache(): number {
+  const n = clearTokenCache();
+  redisPublish(FLUSH_ALL_CHANNEL, "1");
   return n;
 }
 

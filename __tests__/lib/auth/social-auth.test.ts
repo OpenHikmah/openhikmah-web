@@ -18,6 +18,8 @@ vi.mock("@/lib/infra/redis", () => ({
   redisGet: mockRedisGet,
   redisSet: mockRedisSet,
   redisDel: vi.fn(),
+  redisPublish: vi.fn(),
+  redisSubscribe: vi.fn(),
 }));
 
 const mockFetch = vi.fn();
