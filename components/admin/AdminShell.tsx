@@ -16,6 +16,7 @@ import {
   ScrollText,
   MessageSquareText,
   BarChart3,
+  PlayCircle,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,7 @@ const NAV: NavItem[] = [
   { href: "/admin/flags", label: "Feature Flags", icon: Flag },
   { href: "/admin/names", label: "Names Content", icon: BookOpen },
   { href: "/admin/infra", label: "Infra", icon: Server },
+  { href: "/admin/jobs", label: "Jobs", icon: PlayCircle },
   { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
 ];
 
