@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { Table, Th, Td, Pill, StateNote } from "@/components/admin/primitives";
+import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ export default function ConnectionsPage() {
   const [kind, setKind] = useState<(typeof KIND_FILTERS)[number]>("all");
   const [reviewed, setReviewed] = useState<(typeof REVIEWED_FILTERS)[number]>("pending");
   const [actionError, setActionError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   const qs = new URLSearchParams();
   if (status !== "all") qs.set("status", status);
@@ -43,21 +44,27 @@ export default function ConnectionsPage() {
 
   const setStatusOf = async (id: number, next: Connection["status"]) => {
     setActionError(null);
+    setBusyId(id);
     try {
       await api("/connections", { method: "PATCH", json: { id, status: next } });
       reload();
     } catch (e) {
       setActionError(e instanceof AdminApiError ? e.message : "Failed to update connection.");
+    } finally {
+      setBusyId(null);
     }
   };
 
   const markReviewed = async (id: number) => {
     setActionError(null);
+    setBusyId(id);
     try {
       await api("/connections", { method: "PATCH", json: { id, reviewed: true } });
       reload();
     } catch (e) {
       setActionError(e instanceof AdminApiError ? e.message : "Failed to update connection.");
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -121,7 +128,12 @@ export default function ConnectionsPage() {
                   <Td>
                     <div className="flex justify-end gap-1.5">
                       {!c.reviewedAt && (
-                        <Button size="sm" variant="secondary" onClick={() => markReviewed(c.id)}>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={busyId === c.id}
+                          onClick={() => markReviewed(c.id)}
+                        >
                           Mark reviewed
                         </Button>
                       )}
@@ -129,24 +141,26 @@ export default function ConnectionsPage() {
                         <Button
                           size="sm"
                           variant="secondary"
+                          disabled={busyId === c.id}
                           onClick={() => setStatusOf(c.id, "flagged")}
                         >
                           Flag
                         </Button>
                       )}
                       {c.status !== "retired" && (
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={() => setStatusOf(c.id, "retired")}
+                        <ConfirmButton
+                          onConfirm={() => setStatusOf(c.id, "retired")}
+                          confirmLabel="Retire?"
+                          disabled={busyId === c.id}
                         >
                           Retire
-                        </Button>
+                        </ConfirmButton>
                       )}
                       {c.status !== "active" && (
                         <Button
                           size="sm"
                           variant="secondary"
+                          disabled={busyId === c.id}
                           onClick={() => setStatusOf(c.id, "active")}
                         >
                           Restore

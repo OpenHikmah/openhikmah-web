@@ -22,6 +22,7 @@ export default function NamesPage() {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const startEdit = (r: Row) => {
     setEditing(`${r.slug}/${r.kind}`);
@@ -38,17 +39,23 @@ export default function NamesPage() {
       setMsg("Data must be valid JSON.");
       return;
     }
+    const id = `${r.slug}/${r.kind}`;
+    setBusyId(id);
     try {
       await api("/names", { method: "PATCH", json: { slug: r.slug, kind: r.kind, data: parsed } });
       setEditing(null);
       reload();
     } catch (e) {
       setMsg(e instanceof AdminApiError ? e.message : "Save failed.");
+    } finally {
+      setBusyId(null);
     }
   };
 
   const invalidate = async (r: Row) => {
     setMsg(null);
+    const id = `${r.slug}/${r.kind}`;
+    setBusyId(id);
     try {
       await api(`/names?slug=${encodeURIComponent(r.slug)}&kind=${encodeURIComponent(r.kind)}`, {
         method: "DELETE",
@@ -56,6 +63,8 @@ export default function NamesPage() {
       reload();
     } catch (e) {
       setMsg(e instanceof AdminApiError ? e.message : "Invalidate failed.");
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -97,10 +106,19 @@ export default function NamesPage() {
                       <Td className="tabular-nums text-text-secondary">{r.version}</Td>
                       <Td>
                         <div className="flex justify-end gap-1.5">
-                          <Button size="sm" variant="secondary" onClick={() => startEdit(r)}>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={busyId === id}
+                            onClick={() => startEdit(r)}
+                          >
                             {isEditing ? "Editing…" : "Edit"}
                           </Button>
-                          <ConfirmButton onConfirm={() => invalidate(r)} confirmLabel="Invalidate?">
+                          <ConfirmButton
+                            disabled={busyId === id}
+                            onConfirm={() => invalidate(r)}
+                            confirmLabel="Invalidate?"
+                          >
                             Invalidate
                           </ConfirmButton>
                         </div>
@@ -116,10 +134,20 @@ export default function NamesPage() {
                             className="w-full rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary focus:border-gold-muted"
                           />
                           <div className="mt-2 flex items-center gap-2">
-                            <Button size="sm" variant="primary" onClick={() => save(r)}>
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              disabled={busyId === id}
+                              onClick={() => save(r)}
+                            >
                               Save
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={busyId === id}
+                              onClick={() => setEditing(null)}
+                            >
                               Cancel
                             </Button>
                           </div>
