@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { featureFlags } from "@/lib/infra/db/schema";
+import { invalidateFlagCache } from "@/lib/admin/feature-flags";
 
 const KEY_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
 
@@ -59,6 +60,7 @@ export async function PUT(req: NextRequest) {
     targetId: key,
     meta: { value: body.value },
   });
+  invalidateFlagCache(key);
 
   return NextResponse.json({ key, value: body.value });
 }
@@ -80,6 +82,7 @@ export async function DELETE(req: NextRequest) {
     targetType: "flag",
     targetId: key,
   });
+  invalidateFlagCache(key);
 
   return new NextResponse(null, { status: 204 });
 }

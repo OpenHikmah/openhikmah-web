@@ -4,6 +4,7 @@ import type { User } from "@/lib/infra/db/schema";
 
 vi.mock("@/lib/admin/admin-auth", () => ({ requireAdmin: vi.fn() }));
 vi.mock("@/lib/admin/admin-audit", () => ({ logAdminAction: vi.fn() }));
+vi.mock("@/lib/admin/feature-flags", () => ({ invalidateFlagCache: vi.fn() }));
 
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,6 +39,7 @@ vi.mock("@/lib/infra/db", () => ({
 import { GET, PUT, DELETE } from "@/app/api/admin/flags/route";
 import { requireAdmin } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
+import { invalidateFlagCache } from "@/lib/admin/feature-flags";
 
 const admin = { userId: 1, user: { qfId: "qf-admin" } as User };
 
@@ -66,6 +68,7 @@ beforeEach(() => {
   mockInsert.mockReturnValue(makeDbChain([]));
   mockDelete.mockReturnValue(makeDbChain([]));
   vi.mocked(logAdminAction).mockClear();
+  vi.mocked(invalidateFlagCache).mockClear();
 });
 
 describe("GET /api/admin/flags", () => {
@@ -133,6 +136,7 @@ describe("PUT /api/admin/flags", () => {
     expect(logAdminAction).toHaveBeenCalledWith(
       expect.objectContaining({ action: "flag.set", targetId: "new-canvas" })
     );
+    expect(invalidateFlagCache).toHaveBeenCalledWith("new-canvas");
   });
 
   it("accepts value: false (not treated as missing)", async () => {
@@ -156,5 +160,6 @@ describe("DELETE /api/admin/flags", () => {
     expect(logAdminAction).toHaveBeenCalledWith(
       expect.objectContaining({ action: "flag.delete", targetId: "new-canvas" })
     );
+    expect(invalidateFlagCache).toHaveBeenCalledWith("new-canvas");
   });
 });

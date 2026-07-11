@@ -1,15 +1,24 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getFlagString } from "@/lib/admin/feature-flags";
 
 type Provider = "claude" | "gemini";
 
-const provider = (process.env.AI_PROVIDER ?? "claude") as Provider;
+const ENV_PROVIDER = (process.env.AI_PROVIDER ?? "claude") as Provider;
+
+/** Resolves the active provider: the `ai_provider` flag if set, else AI_PROVIDER env. */
+async function resolveProvider(): Promise<Provider> {
+  const flagged = await getFlagString("ai_provider", ENV_PROVIDER);
+  return flagged === "gemini" ? "gemini" : "claude";
+}
 
 /**
  * Calls the configured LLM provider and returns the raw text response.
- * Provider is selected by AI_PROVIDER env var ("claude" | "gemini", default: "claude").
+ * Provider is selected by the `ai_provider` admin flag, falling back to the
+ * AI_PROVIDER env var ("claude" | "gemini", default: "claude") when unset.
  */
 export async function callAI(prompt: string): Promise<string> {
+  const provider = await resolveProvider();
   if (provider === "gemini") return callGemini(prompt);
   return callClaude(prompt);
 }
