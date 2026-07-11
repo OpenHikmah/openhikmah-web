@@ -3,7 +3,7 @@ import type { SearchResponse, SearchResult, VerseRef } from "@/types/quran";
 import { getSurahName } from "@/lib/quran/surah-names";
 import { searchByMeaning } from "@/lib/quran/semantic-search";
 import { getVerse, getVerses } from "@/lib/quran/quran-corpus";
-import { consume } from "@/lib/infra/rate-limit";
+import { consume, SEARCH_LOG_LIMIT, SEARCH_LOG_WINDOW_SECONDS } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import { logSearchQuery } from "@/lib/infra/search-log";
 import sanitizeHtml from "sanitize-html";
@@ -84,6 +84,29 @@ async function hydrate(
   });
 }
 
+/**
+ * Records a search query for analytics, but only within a per-client budget.
+ * The search endpoints are unauthenticated and intentionally unrate-limited
+ * for the keyword path, so gating the *write* (not the response) keeps
+ * scripted/spam traffic from growing search_log unbounded while still
+ * serving results normally.
+ */
+async function maybeLogSearchQuery(
+  req: NextRequest,
+  query: string,
+  mode: "keyword" | "meaning",
+  resultCount: number
+): Promise<void> {
+  const allowed = await consume(
+    `searchlog:${clientKey(req)}`,
+    SEARCH_LOG_LIMIT,
+    SEARCH_LOG_WINDOW_SECONDS
+  );
+  if (allowed) {
+    await logSearchQuery(query, mode, resultCount);
+  }
+}
+
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim();
   const page = Math.max(1, parseInt(req.nextUrl.searchParams.get("page") ?? "1", 10) || 1);
@@ -135,7 +158,7 @@ export async function GET(req: NextRequest) {
             translation: m.verse.translation,
           }));
           const response: SearchResponse = { results, total, page, pageSize };
-          await logSearchQuery(q, "meaning", total);
+          await maybeLogSearchQuery(req, q, "meaning", total);
           return NextResponse.json(response);
         }
       } catch (err) {
@@ -145,12 +168,12 @@ export async function GET(req: NextRequest) {
     // No semantic results (empty / error / rate-limited) → keyword fallback.
     const { results, total } = await keywordSearch(q, page, pageSize);
     const response: SearchResponse = { results, total, page, pageSize };
-    await logSearchQuery(q, "keyword", total);
+    await maybeLogSearchQuery(req, q, "keyword", total);
     return NextResponse.json(response, { headers: { "x-search-fallback": "keyword" } });
   }
 
   const { results, total } = await keywordSearch(q, page, pageSize);
   const response: SearchResponse = { results, total, page, pageSize };
-  await logSearchQuery(q, "keyword", total);
+  await maybeLogSearchQuery(req, q, "keyword", total);
   return NextResponse.json(response);
 }

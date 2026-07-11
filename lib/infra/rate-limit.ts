@@ -49,6 +49,17 @@ export const AI_GEN_WINDOW_SECONDS = positiveIntEnv("AI_GEN_RATE_WINDOW", 60);
 export const MUTATION_LIMIT = positiveIntEnv("MUTATION_RATE_LIMIT", 60);
 export const MUTATION_WINDOW_SECONDS = positiveIntEnv("MUTATION_RATE_WINDOW", 600);
 
+/**
+ * Default budget for search-log writes per client — the search endpoints
+ * themselves are intentionally unauthenticated and unlimited (see
+ * app/api/search/route.ts), but the DB write that records each query for
+ * analytics must not grow unbounded under scripted/spam traffic. Gating only
+ * the write (not the search response) means abusive traffic still gets
+ * results, it just stops being logged past the budget.
+ */
+export const SEARCH_LOG_LIMIT = positiveIntEnv("SEARCH_LOG_RATE_LIMIT", 30);
+export const SEARCH_LOG_WINDOW_SECONDS = positiveIntEnv("SEARCH_LOG_RATE_WINDOW", 60);
+
 /** Probability that a given `consume` call also prunes expired buckets. */
 const SWEEP_PROBABILITY = 0.01;
 /** Keep this many windows of history before a bucket is eligible for pruning. */
