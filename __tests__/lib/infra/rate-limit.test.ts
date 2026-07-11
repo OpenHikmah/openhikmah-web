@@ -8,6 +8,7 @@ const {
   mockDelete,
   mockRedisIncr,
   mockIncr,
+  mockGetFlagNumber,
 } = vi.hoisted(() => {
   const mockReturning = vi.fn();
   const mockOnConflict = vi.fn(() => ({ returning: mockReturning }));
@@ -19,6 +20,7 @@ const {
   // Postgres fallback path unchanged.
   const mockRedisIncr = vi.fn().mockResolvedValue(null);
   const mockIncr = vi.fn();
+  const mockGetFlagNumber = vi.fn(async (_key: string, fallback: number) => fallback);
   return {
     mockReturning,
     mockValues,
@@ -27,12 +29,14 @@ const {
     mockDelete,
     mockRedisIncr,
     mockIncr,
+    mockGetFlagNumber,
   };
 });
 
 vi.mock("@/lib/infra/db", () => ({ db: { insert: mockInsert, delete: mockDelete } }));
 vi.mock("@/lib/infra/redis", () => ({ redisIncrWithTtl: mockRedisIncr }));
 vi.mock("@/lib/infra/metrics", () => ({ incr: mockIncr }));
+vi.mock("@/lib/admin/feature-flags", () => ({ getFlagNumber: mockGetFlagNumber }));
 
 import {
   consume,
@@ -40,6 +44,10 @@ import {
   sweepRateLimits,
   RateLimitError,
   positiveIntEnv,
+  AI_GEN_LIMIT,
+  AI_GEN_WINDOW_SECONDS,
+  MUTATION_LIMIT,
+  MUTATION_WINDOW_SECONDS,
 } from "@/lib/infra/rate-limit";
 
 describe("rate-limit consume", () => {
@@ -50,6 +58,8 @@ describe("rate-limit consume", () => {
     mockRedisIncr.mockReset();
     mockRedisIncr.mockResolvedValue(null); // default: Postgres fallback path
     mockIncr.mockClear();
+    mockGetFlagNumber.mockReset();
+    mockGetFlagNumber.mockImplementation(async (_key: string, fallback: number) => fallback);
   });
 
   it("allows when count is within the limit", async () => {
@@ -116,12 +126,30 @@ describe("rate-limit consume", () => {
     expect(mockIncr).toHaveBeenCalledWith("ratelimit_redis_fallback");
     expect(mockIncr).toHaveBeenCalledWith("ratelimit_allow");
   });
+
+  // ─── Flag-aware defaults (new) ───────────────────────────────────────────────
+
+  it("resolves limit/window from the ai_gen_* flags when omitted", async () => {
+    mockGetFlagNumber.mockImplementation(async (key: string) => (key === "ai_gen_limit" ? 5 : 30));
+    mockRedisIncr.mockResolvedValue(6); // over the flagged limit of 5
+    expect(await consume("ip:1")).toBe(false);
+    expect(mockGetFlagNumber).toHaveBeenCalledWith("ai_gen_limit", AI_GEN_LIMIT);
+    expect(mockGetFlagNumber).toHaveBeenCalledWith("ai_gen_window_seconds", AI_GEN_WINDOW_SECONDS);
+  });
+
+  it("does not consult flags when limit/window are passed explicitly", async () => {
+    mockRedisIncr.mockResolvedValue(1);
+    await consume("ip:1", 20, 60);
+    expect(mockGetFlagNumber).not.toHaveBeenCalled();
+  });
 });
 
 describe("rateLimitOrNull", () => {
   beforeEach(() => {
     mockReturning.mockReset();
     mockRedisIncr.mockReset();
+    mockGetFlagNumber.mockReset();
+    mockGetFlagNumber.mockImplementation(async (_key: string, fallback: number) => fallback);
   });
 
   it("returns null (allowed) when under the limit", async () => {
@@ -136,6 +164,21 @@ describe("rateLimitOrNull", () => {
     expect(res!.status).toBe(429);
     const body = await res!.json();
     expect(body.error).toBe("Too many widgets");
+  });
+
+  it("resolves limit/window from the mutation_* flags when omitted", async () => {
+    mockGetFlagNumber.mockImplementation(async (key: string) =>
+      key === "mutation_limit" ? 2 : 600
+    );
+    mockRedisIncr.mockResolvedValue(3); // over the flagged limit of 2
+    const res = await rateLimitOrNull("ip:1", "Too many");
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(429);
+    expect(mockGetFlagNumber).toHaveBeenCalledWith("mutation_limit", MUTATION_LIMIT);
+    expect(mockGetFlagNumber).toHaveBeenCalledWith(
+      "mutation_window_seconds",
+      MUTATION_WINDOW_SECONDS
+    );
   });
 });
 

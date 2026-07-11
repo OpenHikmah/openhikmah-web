@@ -4,6 +4,7 @@ import { db } from "@/lib/infra/db";
 import { rateLimits } from "@/lib/infra/db/schema";
 import { redisIncrWithTtl } from "@/lib/infra/redis";
 import { incr } from "@/lib/infra/metrics";
+import { getFlagNumber } from "@/lib/admin/feature-flags";
 
 /**
  * Fixed-window rate limiter. Guards the expensive AI generation path so a single
@@ -93,12 +94,25 @@ function maybeSweep(windowSeconds: number): void {
  * Records a hit for `key` and returns true if still within `limit` for the
  * current window. Fails open (returns true) if the limiter itself errors — we
  * never want a limiter outage to take down the feature.
+ *
+ * When `limit`/`windowSeconds` are omitted, they resolve from the
+ * `ai_gen_limit` / `ai_gen_window_seconds` admin flags (falling back to
+ * AI_GEN_LIMIT / AI_GEN_WINDOW_SECONDS) so an operator can tune the AI-gen
+ * budget without a redeploy. Callers that pass explicit values (routes with
+ * their own budget) are unaffected by the flags.
  */
 export async function consume(
   key: string,
-  limit: number = AI_GEN_LIMIT,
-  windowSeconds: number = AI_GEN_WINDOW_SECONDS
+  limit?: number,
+  windowSeconds?: number
 ): Promise<boolean> {
+  const resolvedLimit = limit ?? (await getFlagNumber("ai_gen_limit", AI_GEN_LIMIT));
+  const resolvedWindow =
+    windowSeconds ?? (await getFlagNumber("ai_gen_window_seconds", AI_GEN_WINDOW_SECONDS));
+  return consumeWith(key, resolvedLimit, resolvedWindow);
+}
+
+async function consumeWith(key: string, limit: number, windowSeconds: number): Promise<boolean> {
   const bucket = Math.floor(Date.now() / 1000 / windowSeconds);
   const rowKey = `${key}:${bucket}`;
 
@@ -147,13 +161,21 @@ export async function consume(
  * the limit/window pairing and the 429 envelope so future changes (Retry-After,
  * per-route metrics) are a one-file edit. Returns `null` when the request is
  * allowed, or the `NextResponse` the caller should return immediately.
+ *
+ * When `limit`/`windowSeconds` are omitted, they resolve from the
+ * `mutation_limit` / `mutation_window_seconds` admin flags (falling back to
+ * MUTATION_LIMIT / MUTATION_WINDOW_SECONDS). Callers that pass explicit
+ * values (routes with their own budget) are unaffected by the flags.
  */
 export async function rateLimitOrNull(
   key: string,
   message: string,
-  limit: number = MUTATION_LIMIT,
-  windowSeconds: number = MUTATION_WINDOW_SECONDS
+  limit?: number,
+  windowSeconds?: number
 ): Promise<NextResponse | null> {
-  const allowed = await consume(key, limit, windowSeconds);
+  const resolvedLimit = limit ?? (await getFlagNumber("mutation_limit", MUTATION_LIMIT));
+  const resolvedWindow =
+    windowSeconds ?? (await getFlagNumber("mutation_window_seconds", MUTATION_WINDOW_SECONDS));
+  const allowed = await consumeWith(key, resolvedLimit, resolvedWindow);
   return allowed ? null : NextResponse.json({ error: message }, { status: 429 });
 }
