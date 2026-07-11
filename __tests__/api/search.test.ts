@@ -2,18 +2,25 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import type { Verse } from "@/types/quran";
 
-const { mockSearchByMeaning, mockConsume, mockGetVerse, mockGetVerses } = vi.hoisted(() => ({
-  mockSearchByMeaning: vi.fn(),
-  mockConsume: vi.fn(async () => true),
-  mockGetVerse: vi.fn(),
-  mockGetVerses: vi.fn(async () => new Map()),
-}));
+const { mockSearchByMeaning, mockConsume, mockGetVerse, mockGetVerses, mockLogSearchQuery } =
+  vi.hoisted(() => ({
+    mockSearchByMeaning: vi.fn(),
+    mockConsume: vi.fn(async () => true),
+    mockGetVerse: vi.fn(),
+    mockGetVerses: vi.fn(async () => new Map()),
+    mockLogSearchQuery: vi.fn(async () => undefined),
+  }));
 vi.mock("@/lib/quran/semantic-search", () => ({ searchByMeaning: mockSearchByMeaning }));
-vi.mock("@/lib/infra/rate-limit", () => ({ consume: mockConsume }));
+vi.mock("@/lib/infra/rate-limit", () => ({
+  consume: mockConsume,
+  SEARCH_LOG_LIMIT: 30,
+  SEARCH_LOG_WINDOW_SECONDS: 60,
+}));
 vi.mock("@/lib/quran/quran-corpus", () => ({
   getVerse: mockGetVerse,
   getVerses: mockGetVerses,
 }));
+vi.mock("@/lib/infra/search-log", () => ({ logSearchQuery: mockLogSearchQuery }));
 
 import { GET } from "@/app/api/search/route";
 
@@ -64,6 +71,8 @@ describe("GET /api/search", () => {
     mockGetVerse.mockReset();
     mockGetVerses.mockReset();
     mockGetVerses.mockResolvedValue(new Map());
+    mockLogSearchQuery.mockReset();
+    mockLogSearchQuery.mockResolvedValue(undefined);
   });
 
   it("returns 400 when query is missing", async () => {
@@ -265,9 +274,28 @@ describe("GET /api/search", () => {
     expect((await res.json()).results[0].ref).toBe("2:1");
   });
 
-  it("does not rate-limit the keyword path", async () => {
+  it("does not rate-limit the keyword search response itself", async () => {
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([{ verse_key: "1:1", translations: [{ text: "In the name of God" }] }])
+    );
+    mockConsume.mockResolvedValue(false); // search-log budget exhausted
+    const res = await GET(makeSearchReq("mercy"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.results[0].ref).toBe("1:1");
+  });
+
+  it("rate-limits the search-log write on the keyword path, within budget", async () => {
     mockFetch.mockResolvedValueOnce(quranComResponse([]));
     await GET(makeSearchReq("mercy"));
-    expect(mockConsume).not.toHaveBeenCalled();
+    expect(mockConsume).toHaveBeenCalledWith(expect.stringMatching(/^searchlog:/), 30, 60);
+    expect(mockLogSearchQuery).toHaveBeenCalledWith("mercy", "keyword", 0);
+  });
+
+  it("skips the search-log write once the per-client log budget is exhausted", async () => {
+    mockFetch.mockResolvedValueOnce(quranComResponse([]));
+    mockConsume.mockResolvedValue(false);
+    await GET(makeSearchReq("mercy"));
+    expect(mockLogSearchQuery).not.toHaveBeenCalled();
   });
 });
