@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin/admin-auth";
+import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { promptVersions } from "@/lib/infra/db/schema";
@@ -16,13 +16,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid prompt key" }, { status: 400 });
   }
 
-  const rows = await db
-    .select()
-    .from(promptVersions)
-    .where(key ? eq(promptVersions.key, key) : undefined)
-    .orderBy(desc(promptVersions.createdAt));
+  try {
+    const rows = await db
+      .select()
+      .from(promptVersions)
+      .where(key ? eq(promptVersions.key, key) : undefined)
+      .orderBy(desc(promptVersions.createdAt));
 
-  return NextResponse.json({ keys: PROMPT_KEYS, versions: rows });
+    return NextResponse.json({ keys: PROMPT_KEYS, versions: rows });
+  } catch (err) {
+    console.error("admin prompts GET db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 /**
@@ -32,6 +37,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
+  const limited = await rateLimitAdminMutation(auth);
+  if (limited) return limited;
 
   let body: { key?: string; template?: string };
   try {
@@ -49,28 +56,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing template" }, { status: 400 });
   }
 
-  const created = await db.transaction(async (tx) => {
-    await tx
-      .update(promptVersions)
-      .set({ active: false })
-      .where(and(eq(promptVersions.key, key), eq(promptVersions.active, true)));
+  try {
+    const created = await db.transaction(async (tx) => {
+      await tx
+        .update(promptVersions)
+        .set({ active: false })
+        .where(and(eq(promptVersions.key, key), eq(promptVersions.active, true)));
 
-    const [row] = await tx
-      .insert(promptVersions)
-      .values({ key, template, createdBy: auth.user.qfId, active: true })
-      .returning();
-    return row;
-  });
+      const [row] = await tx
+        .insert(promptVersions)
+        .values({ key, template, createdBy: auth.user.qfId, active: true })
+        .returning();
+      return row;
+    });
 
-  invalidatePromptCache(key);
+    invalidatePromptCache(key);
 
-  await logAdminAction({
-    adminQfId: auth.user.qfId,
-    action: "prompt.version.create",
-    targetType: "prompt_version",
-    targetId: String(created.id),
-    meta: { key },
-  });
+    await logAdminAction({
+      adminQfId: auth.user.qfId,
+      action: "prompt.version.create",
+      targetType: "prompt_version",
+      targetId: String(created.id),
+      meta: { key },
+    });
 
-  return NextResponse.json({ version: created });
+    return NextResponse.json({ version: created });
+  } catch (err) {
+    console.error("admin prompts POST db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

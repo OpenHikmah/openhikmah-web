@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { asc, eq } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin/admin-auth";
+import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { challengeSuggestions } from "@/lib/infra/db/schema";
@@ -32,17 +32,24 @@ export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
 
-  const rows = await db
-    .select()
-    .from(challengeSuggestions)
-    .orderBy(asc(challengeSuggestions.sortOrder), asc(challengeSuggestions.id));
-  return NextResponse.json({ suggestions: rows });
+  try {
+    const rows = await db
+      .select()
+      .from(challengeSuggestions)
+      .orderBy(asc(challengeSuggestions.sortOrder), asc(challengeSuggestions.id));
+    return NextResponse.json({ suggestions: rows });
+  } catch (err) {
+    console.error("admin challenge-suggestions GET db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 /** Create a suggestion. */
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
+  const limited = await rateLimitAdminMutation(auth);
+  if (limited) return limited;
 
   let body: Record<string, unknown>;
   try {
@@ -54,33 +61,41 @@ export async function POST(req: NextRequest) {
   const err = validate(body);
   if (err) return NextResponse.json({ error: err }, { status: 400 });
 
-  const [created] = await db
-    .insert(challengeSuggestions)
-    .values({
-      title: (body.title as string).trim(),
-      description: typeof body.description === "string" ? body.description.trim() || null : null,
-      verseRef: typeof body.verseRef === "string" ? body.verseRef : null,
-      suggestedDuration: typeof body.suggestedDuration === "string" ? body.suggestedDuration : null,
-      isActive: body.isActive === undefined ? true : (body.isActive as boolean),
-      sortOrder: Number.isInteger(body.sortOrder) ? (body.sortOrder as number) : 0,
-      createdBy: auth.user.qfId,
-    })
-    .returning();
+  try {
+    const [created] = await db
+      .insert(challengeSuggestions)
+      .values({
+        title: (body.title as string).trim(),
+        description: typeof body.description === "string" ? body.description.trim() || null : null,
+        verseRef: typeof body.verseRef === "string" ? body.verseRef : null,
+        suggestedDuration:
+          typeof body.suggestedDuration === "string" ? body.suggestedDuration : null,
+        isActive: body.isActive === undefined ? true : (body.isActive as boolean),
+        sortOrder: Number.isInteger(body.sortOrder) ? (body.sortOrder as number) : 0,
+        createdBy: auth.user.qfId,
+      })
+      .returning();
 
-  await logAdminAction({
-    adminQfId: auth.user.qfId,
-    action: "suggestion.create",
-    targetType: "challenge_suggestion",
-    targetId: String(created.id),
-    meta: { title: created.title },
-  });
-  return NextResponse.json({ suggestion: created }, { status: 201 });
+    await logAdminAction({
+      adminQfId: auth.user.qfId,
+      action: "suggestion.create",
+      targetType: "challenge_suggestion",
+      targetId: String(created.id),
+      meta: { title: created.title },
+    });
+    return NextResponse.json({ suggestion: created }, { status: 201 });
+  } catch (err) {
+    console.error("admin challenge-suggestions POST db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 /** Update a suggestion (full upsert of editable fields). */
 export async function PUT(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
+  const limited = await rateLimitAdminMutation(auth);
+  if (limited) return limited;
 
   let body: Record<string, unknown>;
   try {
@@ -94,50 +109,63 @@ export async function PUT(req: NextRequest) {
   const err = validate(body);
   if (err) return NextResponse.json({ error: err }, { status: 400 });
 
-  const [updated] = await db
-    .update(challengeSuggestions)
-    .set({
-      title: (body.title as string).trim(),
-      description: typeof body.description === "string" ? body.description.trim() || null : null,
-      verseRef: typeof body.verseRef === "string" ? body.verseRef : null,
-      suggestedDuration: typeof body.suggestedDuration === "string" ? body.suggestedDuration : null,
-      isActive: body.isActive === undefined ? true : (body.isActive as boolean),
-      sortOrder: Number.isInteger(body.sortOrder) ? (body.sortOrder as number) : 0,
-      updatedAt: new Date(),
-    })
-    .where(eq(challengeSuggestions.id, id))
-    .returning();
+  try {
+    const [updated] = await db
+      .update(challengeSuggestions)
+      .set({
+        title: (body.title as string).trim(),
+        description: typeof body.description === "string" ? body.description.trim() || null : null,
+        verseRef: typeof body.verseRef === "string" ? body.verseRef : null,
+        suggestedDuration:
+          typeof body.suggestedDuration === "string" ? body.suggestedDuration : null,
+        isActive: body.isActive === undefined ? true : (body.isActive as boolean),
+        sortOrder: Number.isInteger(body.sortOrder) ? (body.sortOrder as number) : 0,
+        updatedAt: new Date(),
+      })
+      .where(eq(challengeSuggestions.id, id))
+      .returning();
 
-  if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await logAdminAction({
-    adminQfId: auth.user.qfId,
-    action: "suggestion.update",
-    targetType: "challenge_suggestion",
-    targetId: String(id),
-  });
-  return NextResponse.json({ suggestion: updated });
+    await logAdminAction({
+      adminQfId: auth.user.qfId,
+      action: "suggestion.update",
+      targetType: "challenge_suggestion",
+      targetId: String(id),
+    });
+    return NextResponse.json({ suggestion: updated });
+  } catch (err) {
+    console.error("admin challenge-suggestions PUT db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 /** Delete a suggestion (`?id=`). Challenges that used it keep `suggestion_id` null. */
 export async function DELETE(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
+  const limited = await rateLimitAdminMutation(auth);
+  if (limited) return limited;
 
   const id = Number(req.nextUrl.searchParams.get("id"));
   if (!Number.isInteger(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
-  const [deleted] = await db
-    .delete(challengeSuggestions)
-    .where(eq(challengeSuggestions.id, id))
-    .returning();
-  if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  try {
+    const [deleted] = await db
+      .delete(challengeSuggestions)
+      .where(eq(challengeSuggestions.id, id))
+      .returning();
+    if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await logAdminAction({
-    adminQfId: auth.user.qfId,
-    action: "suggestion.delete",
-    targetType: "challenge_suggestion",
-    targetId: String(id),
-  });
-  return new NextResponse(null, { status: 204 });
+    await logAdminAction({
+      adminQfId: auth.user.qfId,
+      action: "suggestion.delete",
+      targetType: "challenge_suggestion",
+      targetId: String(id),
+    });
+    return new NextResponse(null, { status: 204 });
+  } catch (err) {
+    console.error("admin challenge-suggestions DELETE db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

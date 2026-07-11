@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "prompt_versions_one_active_per_key_uidx" ON "prompt_versions" USING btree ("key") WHERE "prompt_versions"."active";

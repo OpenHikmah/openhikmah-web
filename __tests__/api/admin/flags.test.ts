@@ -2,9 +2,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import type { User } from "@/lib/infra/db/schema";
 
-vi.mock("@/lib/admin/admin-auth", () => ({ requireAdmin: vi.fn() }));
+vi.mock("@/lib/admin/admin-auth", () => ({
+  requireAdmin: vi.fn(),
+  rateLimitAdminMutation: vi.fn(() => null),
+}));
 vi.mock("@/lib/admin/admin-audit", () => ({ logAdminAction: vi.fn() }));
-vi.mock("@/lib/admin/feature-flags", () => ({ invalidateFlagCache: vi.fn() }));
+vi.mock("@/lib/admin/feature-flags", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/admin/feature-flags")>(
+    "@/lib/admin/feature-flags"
+  );
+  return { invalidateFlagCache: vi.fn(), validateFlagType: actual.validateFlagType };
+});
 
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -141,6 +149,20 @@ describe("PUT /api/admin/flags", () => {
 
   it("accepts value: false (not treated as missing)", async () => {
     const res = await PUT(put({ key: "some-flag", value: false }));
+    expect(res.status).toBe(200);
+  });
+
+  it("rejects a type mismatch for a known operational-setting key", async () => {
+    const insertCallsBefore = mockInsert.mock.calls.length;
+    const res = await PUT(put({ key: "ai_gen_limit", value: "not-a-number" }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/ai_gen_limit/);
+    expect(mockInsert.mock.calls.length).toBe(insertCallsBefore);
+  });
+
+  it("accepts a correctly-typed value for a known operational-setting key", async () => {
+    const res = await PUT(put({ key: "ai_gen_limit", value: 30 }));
     expect(res.status).toBe(200);
   });
 });

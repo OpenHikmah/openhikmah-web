@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, gte, lt, eq } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin/admin-auth";
+import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { curatedVotd } from "@/lib/infra/db/schema";
@@ -38,26 +38,35 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid month (expected YYYY-MM, 01–12)" }, { status: 400 });
   }
 
-  const rows = await db
-    .select()
-    .from(curatedVotd)
-    .where(and(gte(curatedVotd.date, `${month}-01`), lt(curatedVotd.date, nextMonthFirst(month))));
+  try {
+    const rows = await db
+      .select()
+      .from(curatedVotd)
+      .where(
+        and(gte(curatedVotd.date, `${month}-01`), lt(curatedVotd.date, nextMonthFirst(month)))
+      );
 
-  return NextResponse.json({
-    month,
-    entries: rows.map((r) => ({
-      date: r.date,
-      verseRef: r.verseRef,
-      reflection: r.reflection,
-      updatedAt: r.updatedAt,
-    })),
-  });
+    return NextResponse.json({
+      month,
+      entries: rows.map((r) => ({
+        date: r.date,
+        verseRef: r.verseRef,
+        reflection: r.reflection,
+        updatedAt: r.updatedAt,
+      })),
+    });
+  } catch (err) {
+    console.error("admin votd GET db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 /** Set (upsert) the curated verse + reflection for a given UTC day. */
 export async function PUT(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
+  const limited = await rateLimitAdminMutation(auth);
+  if (limited) return limited;
 
   let body: { date?: string; verseRef?: string; reflection?: string | null };
   try {
@@ -79,29 +88,34 @@ export async function PUT(req: NextRequest) {
   if (!verseRef || !isValidRef(verseRef)) {
     return NextResponse.json({ error: "Invalid verse reference" }, { status: 400 });
   }
-  // Reject refs that resolve nowhere — catches valid-looking but out-of-range ayahs.
-  const verse = await resolveVerse(verseRef);
-  if (!verse) {
-    return NextResponse.json({ error: "That verse could not be resolved" }, { status: 400 });
-  }
+  try {
+    // Reject refs that resolve nowhere — catches valid-looking but out-of-range ayahs.
+    const verse = await resolveVerse(verseRef);
+    if (!verse) {
+      return NextResponse.json({ error: "That verse could not be resolved" }, { status: 400 });
+    }
 
-  await db
-    .insert(curatedVotd)
-    .values({ date, verseRef, reflection, updatedBy: auth.user.qfId })
-    .onConflictDoUpdate({
-      target: curatedVotd.date,
-      set: { verseRef, reflection, updatedBy: auth.user.qfId, updatedAt: new Date() },
+    await db
+      .insert(curatedVotd)
+      .values({ date, verseRef, reflection, updatedBy: auth.user.qfId })
+      .onConflictDoUpdate({
+        target: curatedVotd.date,
+        set: { verseRef, reflection, updatedBy: auth.user.qfId, updatedAt: new Date() },
+      });
+
+    await logAdminAction({
+      adminQfId: auth.user.qfId,
+      action: "votd.set",
+      targetType: "date",
+      targetId: date,
+      meta: { verseRef, hasReflection: reflection !== null },
     });
 
-  await logAdminAction({
-    adminQfId: auth.user.qfId,
-    action: "votd.set",
-    targetType: "date",
-    targetId: date,
-    meta: { verseRef, hasReflection: reflection !== null },
-  });
-
-  return NextResponse.json({ date, verseRef, reflection });
+    return NextResponse.json({ date, verseRef, reflection });
+  } catch (err) {
+    console.error("admin votd PUT db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 /** Clear the curated override for a day: `?date=YYYY-MM-DD`. Falls back to the
@@ -109,6 +123,8 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
+  const limited = await rateLimitAdminMutation(auth);
+  if (limited) return limited;
 
   const date = req.nextUrl.searchParams.get("date");
   if (!date || !isRealDay(date)) {
@@ -118,13 +134,18 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  await db.delete(curatedVotd).where(eq(curatedVotd.date, date));
-  await logAdminAction({
-    adminQfId: auth.user.qfId,
-    action: "votd.clear",
-    targetType: "date",
-    targetId: date,
-  });
+  try {
+    await db.delete(curatedVotd).where(eq(curatedVotd.date, date));
+    await logAdminAction({
+      adminQfId: auth.user.qfId,
+      action: "votd.clear",
+      targetType: "date",
+      targetId: date,
+    });
 
-  return new NextResponse(null, { status: 204 });
+    return new NextResponse(null, { status: 204 });
+  } catch (err) {
+    console.error("admin votd DELETE db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

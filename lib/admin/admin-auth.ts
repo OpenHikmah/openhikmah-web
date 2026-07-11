@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, type AuthedUser } from "@/lib/auth/social-auth";
+import { rateLimitOrNull } from "@/lib/infra/rate-limit";
 
 /**
  * Single super-admin access control.
@@ -55,4 +56,24 @@ export async function requireAdmin(req: NextRequest): Promise<AuthedUser | NextR
   }
 
   return result;
+}
+
+/**
+ * Rate-limits an already-authenticated admin's mutating requests (POST/PUT/
+ * PATCH/DELETE) against a single shared budget across every `/api/admin/*`
+ * route — a leaked admin bearer token otherwise has no throttle on high-
+ * privilege actions (disable a user, delete a challenge, change flags, ...).
+ * Read-only GETs are deliberately not limited. Call right after `requireAdmin`
+ * succeeds, before doing any work:
+ *
+ *   const auth = await requireAdmin(req);
+ *   if (auth instanceof NextResponse) return auth;
+ *   const limited = await rateLimitAdminMutation(auth);
+ *   if (limited) return limited;
+ */
+export async function rateLimitAdminMutation(auth: AuthedUser): Promise<NextResponse | null> {
+  return rateLimitOrNull(
+    `admin-mutation:${auth.userId}`,
+    "Too many admin actions — try again later"
+  );
 }

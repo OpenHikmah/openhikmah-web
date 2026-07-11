@@ -411,6 +411,13 @@ export const promptVersions = pgTable(
   (t) => [
     index("prompt_versions_key_idx").on(t.key),
     index("prompt_versions_key_active_idx").on(t.key, t.active),
+    // Enforces "at most one active version per key" at the DB layer, not just
+    // in the deactivate-then-activate transaction in the create/rollback
+    // routes — a belt-and-suspenders guard against a two active rows for the
+    // same key under a broken isolation level or a bug in that transaction.
+    uniqueIndex("prompt_versions_one_active_per_key_uidx")
+      .on(t.key)
+      .where(sql`${t.active}`),
   ]
 );
 

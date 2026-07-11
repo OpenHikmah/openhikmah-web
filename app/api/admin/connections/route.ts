@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, isNotNull, isNull, type SQL } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin/admin-auth";
+import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { connections } from "@/lib/infra/db/schema";
@@ -40,14 +40,19 @@ export async function GET(req: NextRequest) {
   if (reviewed === "pending") filters.push(isNull(connections.reviewedAt));
   if (reviewed === "reviewed") filters.push(isNotNull(connections.reviewedAt));
 
-  const rows = await db
-    .select()
-    .from(connections)
-    .where(filters.length ? and(...filters) : undefined)
-    .orderBy(desc(connections.createdAt))
-    .limit(limit);
+  try {
+    const rows = await db
+      .select()
+      .from(connections)
+      .where(filters.length ? and(...filters) : undefined)
+      .orderBy(desc(connections.createdAt))
+      .limit(limit);
 
-  return NextResponse.json({ connections: rows });
+    return NextResponse.json({ connections: rows });
+  } catch (err) {
+    console.error("admin connections GET db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 /**
@@ -59,6 +64,8 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
+  const limited = await rateLimitAdminMutation(auth);
+  if (limited) return limited;
 
   let body: { id?: number; status?: string; reviewed?: boolean };
   try {
@@ -73,33 +80,36 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Invalid connection id" }, { status: 400 });
   }
 
-  if (status !== undefined) {
-    if (!(STATUSES as readonly string[]).includes(status)) {
-      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
-    }
-
-    const [updated] = await db
-      .update(connections)
-      .set({ status, reviewedAt: new Date(), reviewedBy: auth.user.qfId })
-      .where(eq(connections.id, id as number))
-      .returning();
-
-    if (!updated) {
-      return NextResponse.json({ error: "Connection not found" }, { status: 404 });
-    }
-
-    await logAdminAction({
-      adminQfId: auth.user.qfId,
-      action: "connection.status",
-      targetType: "connection",
-      targetId: String(id),
-      meta: { status, fromRef: updated.fromRef, toRef: updated.toRef, kind: updated.kind },
-    });
-
-    return NextResponse.json({ connection: updated });
+  if (status !== undefined && !(STATUSES as readonly string[]).includes(status)) {
+    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  }
+  if (status === undefined && reviewed !== true) {
+    return NextResponse.json({ error: "Must specify status or reviewed" }, { status: 400 });
   }
 
-  if (reviewed === true) {
+  try {
+    if (status !== undefined) {
+      const [updated] = await db
+        .update(connections)
+        .set({ status, reviewedAt: new Date(), reviewedBy: auth.user.qfId })
+        .where(eq(connections.id, id as number))
+        .returning();
+
+      if (!updated) {
+        return NextResponse.json({ error: "Connection not found" }, { status: 404 });
+      }
+
+      await logAdminAction({
+        adminQfId: auth.user.qfId,
+        action: "connection.status",
+        targetType: "connection",
+        targetId: String(id),
+        meta: { status, fromRef: updated.fromRef, toRef: updated.toRef, kind: updated.kind },
+      });
+
+      return NextResponse.json({ connection: updated });
+    }
+
     const [updated] = await db
       .update(connections)
       .set({ reviewedAt: new Date(), reviewedBy: auth.user.qfId })
@@ -119,7 +129,8 @@ export async function PATCH(req: NextRequest) {
     });
 
     return NextResponse.json({ connection: updated });
+  } catch (err) {
+    console.error("admin connections PATCH db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  return NextResponse.json({ error: "Must specify status or reviewed" }, { status: 400 });
 }
