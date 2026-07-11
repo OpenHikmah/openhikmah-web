@@ -5,9 +5,10 @@ import type { User } from "@/lib/infra/db/schema";
 vi.mock("@/lib/admin/admin-auth", () => ({
   requireAdmin: vi.fn(),
   isAdminQfId: vi.fn(() => false),
+  rateLimitAdminMutation: vi.fn(() => null),
 }));
 vi.mock("@/lib/admin/admin-audit", () => ({ logAdminAction: vi.fn() }));
-vi.mock("@/lib/auth/social-auth", () => ({ clearTokenCache: vi.fn() }));
+vi.mock("@/lib/auth/social-auth", () => ({ broadcastUserCacheInvalidation: vi.fn() }));
 
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,7 +40,7 @@ vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect, update: mockUpdate 
 import { GET, PATCH } from "@/app/api/admin/users/route";
 import { requireAdmin, isAdminQfId } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
-import { clearTokenCache } from "@/lib/auth/social-auth";
+import { broadcastUserCacheInvalidation } from "@/lib/auth/social-auth";
 
 const admin = { userId: 1, user: { qfId: "qf-admin" } as User };
 
@@ -75,7 +76,7 @@ beforeEach(() => {
   mockSelect.mockReturnValue(makeDbChain([]));
   mockUpdate.mockReturnValue(makeDbChain([]));
   vi.mocked(logAdminAction).mockClear();
-  vi.mocked(clearTokenCache).mockClear();
+  vi.mocked(broadcastUserCacheInvalidation).mockClear();
 });
 
 describe("GET /api/admin/users", () => {
@@ -129,7 +130,7 @@ describe("PATCH /api/admin/users", () => {
     expect(res.status).toBe(403);
   });
 
-  it("disables a non-admin user, clears the token cache, and logs the action", async () => {
+  it("disables a non-admin user, broadcasts a cache invalidation, and logs the action", async () => {
     mockSelect.mockReturnValue(makeDbChain([targetUser]));
     mockUpdate.mockReturnValue(makeDbChain([{ id: 42, disabledAt: new Date("2026-06-01") }]));
 
@@ -137,7 +138,7 @@ describe("PATCH /api/admin/users", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.id).toBe(42);
-    expect(clearTokenCache).toHaveBeenCalled();
+    expect(broadcastUserCacheInvalidation).toHaveBeenCalledWith(42);
     expect(logAdminAction).toHaveBeenCalledWith(
       expect.objectContaining({ action: "user.disable", targetId: "42" })
     );

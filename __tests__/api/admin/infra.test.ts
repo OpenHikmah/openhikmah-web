@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import type { User } from "@/lib/infra/db/schema";
 
-vi.mock("@/lib/admin/admin-auth", () => ({ requireAdmin: vi.fn() }));
+vi.mock("@/lib/admin/admin-auth", () => ({
+  requireAdmin: vi.fn(),
+  rateLimitAdminMutation: vi.fn(() => null),
+}));
 vi.mock("@/lib/admin/admin-audit", () => ({ logAdminAction: vi.fn() }));
 
 function makeDbChain(resolveWith: unknown = []) {
@@ -47,14 +50,14 @@ vi.mock("@/lib/infra/metrics", () => ({
   uptimeSeconds: mockUptimeSeconds,
 }));
 
-const { mockTokenCache, mockClearTokenCache, mockClearJwksCache } = vi.hoisted(() => ({
+const { mockTokenCache, mockBroadcastFlushTokenCache, mockClearJwksCache } = vi.hoisted(() => ({
   mockTokenCache: new Map(),
-  mockClearTokenCache: vi.fn(() => 0),
+  mockBroadcastFlushTokenCache: vi.fn(() => 0),
   mockClearJwksCache: vi.fn(() => Promise.resolve()),
 }));
 vi.mock("@/lib/auth/social-auth", () => ({
   tokenCache: mockTokenCache,
-  clearTokenCache: mockClearTokenCache,
+  broadcastFlushTokenCache: mockBroadcastFlushTokenCache,
   clearJwksCache: mockClearJwksCache,
 }));
 
@@ -84,7 +87,7 @@ beforeEach(() => {
   mockDelete.mockReturnValue(makeDbChain([]));
   mockRedisEnabled.mockReturnValue(false);
   mockGetRedis.mockReturnValue(null);
-  mockClearTokenCache.mockClear();
+  mockBroadcastFlushTokenCache.mockClear();
   mockClearJwksCache.mockClear();
   vi.mocked(logAdminAction).mockClear();
 });
@@ -141,7 +144,7 @@ describe("POST /api/admin/infra", () => {
   });
 
   it("flushes the token cache and logs the action", async () => {
-    mockClearTokenCache.mockReturnValue(5);
+    mockBroadcastFlushTokenCache.mockReturnValue(5);
     const res = await POST(post({ action: "flush-tokens" }));
     expect(res.status).toBe(200);
     const body = await res.json();

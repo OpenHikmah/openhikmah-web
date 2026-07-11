@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin/admin-auth";
+import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { challenges } from "@/lib/infra/db/schema";
@@ -15,6 +15,8 @@ import { scoreChallenge, pickWinner } from "@/lib/social/challenges";
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
+  const limited = await rateLimitAdminMutation(auth);
+  if (limited) return limited;
 
   const challengeId = Number((await params).id);
   if (!Number.isInteger(challengeId)) {
@@ -109,6 +111,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
+  const limited = await rateLimitAdminMutation(auth);
+  if (limited) return limited;
 
   const challengeId = Number((await params).id);
   if (!Number.isInteger(challengeId)) {

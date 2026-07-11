@@ -21,6 +21,7 @@ interface Flag {
 function OperationalSettings({ flags, reload }: { flags: Flag[]; reload: () => void }) {
   const api = useAdminFetch();
   const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const byKey = new Map(flags.map((f) => [f.key, f.value]));
   const aiProviderRaw = byKey.get("ai_provider");
@@ -36,11 +37,14 @@ function OperationalSettings({ flags, reload }: { flags: Flag[]; reload: () => v
 
   const setFlag = async (key: string, value: unknown) => {
     setMsg(null);
+    setBusy(true);
     try {
       await api("/flags", { method: "PUT", json: { key, value } });
       reload();
     } catch (e) {
       setMsg(e instanceof AdminApiError ? e.message : "Save failed.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -64,6 +68,7 @@ function OperationalSettings({ flags, reload }: { flags: Flag[]; reload: () => v
           <select
             value={aiProvider}
             onChange={(e) => setFlag("ai_provider", e.target.value)}
+            disabled={busy}
             className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary hover:border-border-subtle focus:border-gold-muted"
           >
             <option value="">Default (env: AI_PROVIDER)</option>
@@ -76,6 +81,7 @@ function OperationalSettings({ flags, reload }: { flags: Flag[]; reload: () => v
           <span className="block text-xs text-text-secondary">Maintenance mode</span>
           <Button
             variant={maintenanceOn ? "primary" : "secondary"}
+            disabled={busy}
             onClick={() => setFlag("maintenance_mode", !maintenanceOn)}
           >
             {maintenanceOn ? "On — click to disable" : "Off — click to enable"}
@@ -93,6 +99,7 @@ function OperationalSettings({ flags, reload }: { flags: Flag[]; reload: () => v
             />
             <Button
               variant="secondary"
+              disabled={busy}
               onClick={() => setNumberFlag("ai_gen_limit", aiGenLimitRef)}
             >
               Save
@@ -111,6 +118,7 @@ function OperationalSettings({ flags, reload }: { flags: Flag[]; reload: () => v
             />
             <Button
               variant="secondary"
+              disabled={busy}
               onClick={() => setNumberFlag("ai_gen_window_seconds", aiGenWindowRef)}
             >
               Save
@@ -129,6 +137,7 @@ function OperationalSettings({ flags, reload }: { flags: Flag[]; reload: () => v
             />
             <Button
               variant="secondary"
+              disabled={busy}
               onClick={() => setNumberFlag("mutation_limit", mutationLimitRef)}
             >
               Save
@@ -147,6 +156,7 @@ function OperationalSettings({ flags, reload }: { flags: Flag[]; reload: () => v
             />
             <Button
               variant="secondary"
+              disabled={busy}
               onClick={() => setNumberFlag("mutation_window_seconds", mutationWindowRef)}
             >
               Save
@@ -174,6 +184,8 @@ export default function FlagsPage() {
   const [key, setKey] = useState("");
   const [value, setValue] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
 
   const save = async () => {
     setMsg(null);
@@ -184,6 +196,7 @@ export default function FlagsPage() {
       setMsg('Value must be valid JSON (e.g. true, 42, "text", {"a":1}).');
       return;
     }
+    setSaving(true);
     try {
       await api("/flags", { method: "PUT", json: { key: key.trim(), value: parsed } });
       setKey("");
@@ -191,6 +204,8 @@ export default function FlagsPage() {
       reload();
     } catch (e) {
       setMsg(e instanceof AdminApiError ? e.message : "Save failed.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -202,11 +217,14 @@ export default function FlagsPage() {
 
   const remove = async (k: string) => {
     setMsg(null);
+    setBusyKey(k);
     try {
       await api(`/flags?key=${encodeURIComponent(k)}`, { method: "DELETE" });
       reload();
     } catch (e) {
       setMsg(e instanceof AdminApiError ? e.message : "Delete failed.");
+    } finally {
+      setBusyKey(null);
     }
   };
 
@@ -239,7 +257,11 @@ export default function FlagsPage() {
             </label>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="primary" onClick={save} disabled={!key.trim() || !value.trim()}>
+            <Button
+              variant="primary"
+              onClick={save}
+              disabled={saving || !key.trim() || !value.trim()}
+            >
               Save flag
             </Button>
             {msg && <span className="text-xs text-error">{msg}</span>}
@@ -272,10 +294,19 @@ export default function FlagsPage() {
                   </Td>
                   <Td>
                     <div className="flex justify-end gap-1.5">
-                      <Button size="sm" variant="secondary" onClick={() => edit(f)}>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busyKey === f.key}
+                        onClick={() => edit(f)}
+                      >
                         Edit
                       </Button>
-                      <ConfirmButton onConfirm={() => remove(f.key)} confirmLabel="Delete?">
+                      <ConfirmButton
+                        disabled={busyKey === f.key}
+                        onConfirm={() => remove(f.key)}
+                        confirmLabel="Delete?"
+                      >
                         Delete
                       </ConfirmButton>
                     </div>

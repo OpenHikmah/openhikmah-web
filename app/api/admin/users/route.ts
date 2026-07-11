@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { desc, eq, ilike } from "drizzle-orm";
-import { requireAdmin, isAdminQfId } from "@/lib/admin/admin-auth";
+import { requireAdmin, isAdminQfId, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
-import { clearTokenCache } from "@/lib/auth/social-auth";
+import { broadcastUserCacheInvalidation } from "@/lib/auth/social-auth";
 import { db } from "@/lib/infra/db";
 import { users } from "@/lib/infra/db/schema";
 
@@ -15,33 +15,40 @@ export async function GET(req: NextRequest) {
   const limitParam = Number(req.nextUrl.searchParams.get("limit"));
   const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 200) : 100;
 
-  const rows = await db
-    .select()
-    .from(users)
-    .where(q ? ilike(users.username, `%${q}%`) : undefined)
-    .orderBy(desc(users.lastActiveAt))
-    .limit(limit);
+  try {
+    const rows = await db
+      .select()
+      .from(users)
+      .where(q ? ilike(users.username, `%${q}%`) : undefined)
+      .orderBy(desc(users.lastActiveAt))
+      .limit(limit);
 
-  return NextResponse.json({
-    users: rows.map((u) => ({
-      id: u.id,
-      qfId: u.qfId,
-      username: u.username,
-      displayName: u.displayName,
-      createdAt: u.createdAt,
-      lastActiveAt: u.lastActiveAt,
-      currentStreak: u.currentStreak,
-      longestStreak: u.longestStreak,
-      disabledAt: u.disabledAt,
-      isAdmin: isAdminQfId(u.qfId),
-    })),
-  });
+    return NextResponse.json({
+      users: rows.map((u) => ({
+        id: u.id,
+        qfId: u.qfId,
+        username: u.username,
+        displayName: u.displayName,
+        createdAt: u.createdAt,
+        lastActiveAt: u.lastActiveAt,
+        currentStreak: u.currentStreak,
+        longestStreak: u.longestStreak,
+        disabledAt: u.disabledAt,
+        isAdmin: isAdminQfId(u.qfId),
+      })),
+    });
+  } catch (err) {
+    console.error("admin users GET db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 /** Soft-disable / re-enable a user account: body `{ id, disabled: boolean }`. */
 export async function PATCH(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
+  const limited = await rateLimitAdminMutation(auth);
+  if (limited) return limited;
 
   let body: { id?: number; disabled?: boolean };
   try {
@@ -55,43 +62,48 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Expected { id, disabled }" }, { status: 400 });
   }
 
-  const [target] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, id as number))
-    .limit(1);
-  if (!target) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  try {
+    const [target] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, id as number))
+      .limit(1);
+    if (!target) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+    // Never let an admin lock out themselves or another admin via this panel.
+    if (disabled && isAdminQfId(target.qfId)) {
+      return NextResponse.json({ error: "Cannot disable an admin account" }, { status: 403 });
+    }
+
+    const [updated] = await db
+      .update(users)
+      .set({ disabledAt: disabled ? new Date() : null })
+      .where(eq(users.id, id as number))
+      .returning();
+
+    // The row could have been deleted between the select and the update.
+    if (!updated) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Cached auth entries hold the pre-toggle user snapshot (≤5 min), so a freshly
+    // disabled user could keep authorising until expiry. Broadcast the eviction to
+    // every instance (not just this one) so the change takes effect immediately
+    // everywhere (the L2/DB re-read then picks up the new disabledAt).
+    broadcastUserCacheInvalidation(id as number);
+
+    await logAdminAction({
+      adminQfId: auth.user.qfId,
+      action: disabled ? "user.disable" : "user.enable",
+      targetType: "user",
+      targetId: String(id),
+      meta: { username: target.username },
+    });
+
+    return NextResponse.json({ id: updated.id, disabledAt: updated.disabledAt });
+  } catch (err) {
+    console.error("admin users PATCH db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-  // Never let an admin lock out themselves or another admin via this panel.
-  if (disabled && isAdminQfId(target.qfId)) {
-    return NextResponse.json({ error: "Cannot disable an admin account" }, { status: 403 });
-  }
-
-  const [updated] = await db
-    .update(users)
-    .set({ disabledAt: disabled ? new Date() : null })
-    .where(eq(users.id, id as number))
-    .returning();
-
-  // The row could have been deleted between the select and the update.
-  if (!updated) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
-
-  // Cached auth entries hold the pre-toggle user snapshot (≤5 min), so a freshly
-  // disabled user could keep authorising until expiry. Flush the in-process token
-  // cache so the change takes effect on the next request (the L2/DB re-read picks
-  // up the new disabledAt).
-  clearTokenCache();
-
-  await logAdminAction({
-    adminQfId: auth.user.qfId,
-    action: disabled ? "user.disable" : "user.enable",
-    targetType: "user",
-    targetId: String(id),
-    meta: { username: target.username },
-  });
-
-  return NextResponse.json({ id: updated.id, disabledAt: updated.disabledAt });
 }

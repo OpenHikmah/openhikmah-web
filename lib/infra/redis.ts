@@ -100,6 +100,49 @@ export async function redisDel(key: string): Promise<void> {
   }
 }
 
+/** Publishes `message` on `channel`; silently no-ops on disable/error. Used for
+ *  cross-instance cache invalidation (e.g. auth cache flushes). */
+export function redisPublish(channel: string, message: string): void {
+  const r = getRedis();
+  if (!r) return;
+  void r.publish(channel, message).catch(() => {});
+}
+
+// Subscribing puts an ioredis connection into subscriber mode, where it can no
+// longer run normal commands — so this must be a dedicated duplicate client,
+// never the shared one from getRedis(). Reused across hot-reloads the same way
+// as the primary client.
+let subscriberClient: Redis | null | undefined;
+const globalForRedisSub = globalThis as unknown as { __redisSub?: Redis | null };
+
+/** Subscribes `onMessage` to `channel`; no-ops when Redis is disabled. Safe to
+ *  call multiple times for different channels — they share one subscriber
+ *  connection. Best-effort: a missed message just means a cache stays stale
+ *  until its normal TTL expiry, never a correctness failure. */
+export function redisSubscribe(channel: string, onMessage: (message: string) => void): void {
+  const base = getRedis();
+  if (!base) return;
+
+  if (subscriberClient === undefined) {
+    if (globalForRedisSub.__redisSub !== undefined) {
+      subscriberClient = globalForRedisSub.__redisSub;
+    } else {
+      const sub = base.duplicate();
+      sub.on("error", () => {
+        // Best-effort; the primary client's error listener already logs once.
+      });
+      subscriberClient = sub;
+      globalForRedisSub.__redisSub = sub;
+    }
+  }
+  if (!subscriberClient) return;
+
+  subscriberClient.subscribe(channel).catch(() => {});
+  subscriberClient.on("message", (ch: string, message: string) => {
+    if (ch === channel) onMessage(message);
+  });
+}
+
 /**
  * Atomically increments `key` and ensures it expires after `ttlSeconds`,
  * returning the new count. Returns null when Redis is disabled or errors, so

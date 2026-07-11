@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { Table, Th, Td, Pill, StateNote } from "@/components/admin/primitives";
+import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ export default function PromptsPage() {
   const [draft, setDraft] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   const { data, error, loading, reload } = useAsync<{ versions: PromptVersionRow[] }>(
     () => api(`/prompts?key=${encodeURIComponent(key)}`),
@@ -50,11 +51,14 @@ export default function PromptsPage() {
 
   const rollback = async (id: number) => {
     setActionError(null);
+    setBusyId(id);
     try {
       await api("/prompts/rollback", { method: "POST", json: { id } });
       reload();
     } catch (e) {
       setActionError(e instanceof AdminApiError ? e.message : "Failed to roll back.");
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -153,9 +157,14 @@ export default function PromptsPage() {
                   <Td>
                     <div className="flex justify-end">
                       {!v.active && (
-                        <Button size="sm" variant="secondary" onClick={() => rollback(v.id)}>
+                        <ConfirmButton
+                          variant="secondary"
+                          disabled={busyId === v.id}
+                          onConfirm={() => rollback(v.id)}
+                          confirmLabel="Roll back?"
+                        >
                           Roll back to this
-                        </Button>
+                        </ConfirmButton>
                       )}
                     </div>
                   </Td>

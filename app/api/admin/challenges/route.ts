@@ -7,7 +7,10 @@ import {
   scoreChallenge,
   resolveEndedChallenges,
   resolveExpiredPending,
+  mapWithConcurrency,
 } from "@/lib/social/challenges";
+
+const SCORE_CONCURRENCY = 8;
 
 const STATUSES = ["pending", "active", "completed", "declined", "cancelled"] as const;
 
@@ -84,8 +87,21 @@ export async function GET(req: NextRequest) {
       : [];
     const userMap = new Map(userRows.map((u) => [u.id, u.username]));
 
-    const list = await Promise.all(
-      rows.map(async (c) => {
+    // Bounded concurrency instead of an unbounded Promise.all — at limit=200
+    // that would fire up to 400 concurrent score queries in one request and
+    // risk exhausting the DB connection pool.
+    const list: Array<
+      (typeof rows)[number] & {
+        challengerUsername: string | null;
+        challengedUsername: string | null;
+        challengerScore: number;
+        challengedScore: number;
+      }
+    > = new Array(rows.length);
+    await mapWithConcurrency(
+      rows.map((c, i) => ({ c, i })),
+      SCORE_CONCURRENCY,
+      async ({ c, i }) => {
         const needsScores = c.status === "active" || c.status === "completed";
         const cached = resolved.get(c.id);
         const [challengerScore, challengedScore] = cached
@@ -96,14 +112,14 @@ export async function GET(req: NextRequest) {
                 scoreChallenge(c.challengedId, c),
               ])
             : [0, 0];
-        return {
+        list[i] = {
           ...c,
           challengerUsername: userMap.get(c.challengerId) ?? null,
           challengedUsername: userMap.get(c.challengedId) ?? null,
           challengerScore,
           challengedScore,
         };
-      })
+      }
     );
 
     return NextResponse.json({ stats, challenges: list });

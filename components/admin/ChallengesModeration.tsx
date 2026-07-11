@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui";
+import { useEffect, useRef, useState } from "react";
 import {
   Table,
   Th,
@@ -52,19 +51,23 @@ export function ChallengesModeration() {
   const [status, setStatus] = useState<(typeof FILTERS)[number]>("all");
   const [actionError, setActionError] = useState<string | null>(null);
   const [finalizeMsg, setFinalizeMsg] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   const { data, error, loading, reload } = useAsync<{ stats: Stats; challenges: AdminChallenge[] }>(
     () => api(`/challenges${status === "all" ? "" : `?status=${status}`}`),
     `admin-challenges:${status}`
   );
 
-  const act = async (fn: () => Promise<unknown>) => {
+  const act = async (id: number, fn: () => Promise<unknown>) => {
     setActionError(null);
+    setBusyId(id);
     try {
       await fn();
       reload();
     } catch (e) {
       setActionError(e instanceof AdminApiError ? e.message : "Action failed.");
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -192,20 +195,21 @@ export function ChallengesModeration() {
                   <Td>
                     <div className="flex flex-wrap items-center justify-end gap-1.5">
                       {c.status === "active" && (
-                        <Button
-                          size="sm"
+                        <ConfirmButton
                           variant="secondary"
-                          onClick={() =>
-                            act(() =>
+                          disabled={busyId === c.id}
+                          onConfirm={() =>
+                            act(c.id, () =>
                               api(`/challenges/${c.id}`, {
                                 method: "PATCH",
                                 json: { action: "end" },
                               })
                             )
                           }
+                          confirmLabel="End now?"
                         >
                           End now
-                        </Button>
+                        </ConfirmButton>
                       )}
                       {(c.status === "active" || c.status === "completed") && (
                         <span className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5">
@@ -214,8 +218,9 @@ export function ChallengesModeration() {
                           </span>
                           <OverrideButton
                             label={`@${a}`}
-                            onClick={() =>
-                              act(() =>
+                            disabled={busyId === c.id}
+                            onConfirm={() =>
+                              act(c.id, () =>
                                 api(`/challenges/${c.id}`, {
                                   method: "PATCH",
                                   json: { action: "override-winner", winnerId: c.challengerId },
@@ -225,8 +230,9 @@ export function ChallengesModeration() {
                           />
                           <OverrideButton
                             label="draw"
-                            onClick={() =>
-                              act(() =>
+                            disabled={busyId === c.id}
+                            onConfirm={() =>
+                              act(c.id, () =>
                                 api(`/challenges/${c.id}`, {
                                   method: "PATCH",
                                   json: { action: "override-winner", winnerId: null },
@@ -236,8 +242,9 @@ export function ChallengesModeration() {
                           />
                           <OverrideButton
                             label={`@${b}`}
-                            onClick={() =>
-                              act(() =>
+                            disabled={busyId === c.id}
+                            onConfirm={() =>
+                              act(c.id, () =>
                                 api(`/challenges/${c.id}`, {
                                   method: "PATCH",
                                   json: { action: "override-winner", winnerId: c.challengedId },
@@ -248,8 +255,9 @@ export function ChallengesModeration() {
                         </span>
                       )}
                       <ConfirmButton
+                        disabled={busyId === c.id}
                         onConfirm={() =>
-                          act(() => api(`/challenges/${c.id}`, { method: "DELETE" }))
+                          act(c.id, () => api(`/challenges/${c.id}`, { method: "DELETE" }))
                         }
                         confirmLabel="Void?"
                       >
@@ -267,13 +275,46 @@ export function ChallengesModeration() {
   );
 }
 
-function OverrideButton({ label, onClick }: { label: string; onClick: () => void }) {
+/** Same two-click confirm as `ConfirmButton`, but sized for the compact inline
+ *  winner-override row instead of the standard `Button`. */
+function OverrideButton({
+  label,
+  onConfirm,
+  disabled,
+}: {
+  label: string;
+  onConfirm: () => void;
+  disabled?: boolean;
+}) {
+  const [armed, setArmed] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    []
+  );
+
   return (
     <button
-      onClick={onClick}
-      className="rounded px-1 text-[11px] text-text-secondary transition-colors hover:text-gold"
+      disabled={disabled}
+      onClick={() => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        if (armed) {
+          setArmed(false);
+          onConfirm();
+        } else {
+          setArmed(true);
+          timerRef.current = setTimeout(() => setArmed(false), 3000);
+        }
+      }}
+      className={cn(
+        "rounded px-1 text-[11px] transition-colors disabled:opacity-50",
+        armed ? "text-error" : "text-text-secondary hover:text-gold"
+      )}
     >
-      {label}
+      {armed ? "confirm?" : label}
     </button>
   );
 }

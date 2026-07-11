@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin/admin-auth";
+import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { rateLimits } from "@/lib/infra/db/schema";
 import { redisEnabled, getRedis } from "@/lib/infra/redis";
 import { counterSnapshot, uptimeSeconds } from "@/lib/infra/metrics";
-import { tokenCache, clearTokenCache, clearJwksCache } from "@/lib/auth/social-auth";
+import { tokenCache, broadcastFlushTokenCache, clearJwksCache } from "@/lib/auth/social-auth";
 
 async function redisStatus(): Promise<"disabled" | "up" | "down"> {
   if (!redisEnabled()) return "disabled";
@@ -40,6 +40,8 @@ type Action = (typeof ACTIONS)[number];
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
+  const limited = await rateLimitAdminMutation(auth);
+  if (limited) return limited;
 
   let body: { action?: string };
   try {
@@ -56,7 +58,7 @@ export async function POST(req: NextRequest) {
   let result: Record<string, unknown> = {};
   switch (action) {
     case "flush-tokens": {
-      result = { cleared: clearTokenCache() };
+      result = { cleared: broadcastFlushTokenCache() };
       break;
     }
     case "flush-jwks": {

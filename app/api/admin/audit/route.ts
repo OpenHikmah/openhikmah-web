@@ -12,23 +12,28 @@ export async function GET(req: NextRequest) {
   const limitParam = Number(req.nextUrl.searchParams.get("limit"));
   const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 500) : 100;
 
-  const rows = await db
-    .select()
-    .from(adminAuditLog)
-    .orderBy(desc(adminAuditLog.createdAt))
-    .limit(limit);
+  try {
+    const rows = await db
+      .select()
+      .from(adminAuditLog)
+      .orderBy(desc(adminAuditLog.createdAt))
+      .limit(limit);
 
-  return NextResponse.json({
-    entries: rows.map((r) => ({
-      id: r.id,
-      adminQfId: r.adminQfId,
-      action: r.action,
-      targetType: r.targetType,
-      targetId: r.targetId,
-      meta: r.meta ? safeParse(r.meta) : null,
-      createdAt: r.createdAt,
-    })),
-  });
+    return NextResponse.json({
+      entries: rows.map((r) => ({
+        id: r.id,
+        adminQfId: r.adminQfId,
+        action: r.action,
+        targetType: r.targetType,
+        targetId: r.targetId,
+        meta: r.meta ? safeParse(r.meta) : null,
+        createdAt: r.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error("admin audit GET db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 function safeParse(s: string): unknown {

@@ -133,6 +133,7 @@ describe("resolveExpiredPending", () => {
   });
 
   it("declines a pending invite past its endsAt", async () => {
+    mockUpdate.mockReturnValue(makeDbChain([{ id: 10 }]));
     const rows = [
       makeChallenge({ id: 10, status: "pending", endsAt: new Date(Date.now() - 1000) }),
     ];

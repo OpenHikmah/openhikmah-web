@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import type { User } from "@/lib/infra/db/schema";
 
-vi.mock("@/lib/admin/admin-auth", () => ({ requireAdmin: vi.fn() }));
+vi.mock("@/lib/admin/admin-auth", () => ({
+  requireAdmin: vi.fn(),
+  rateLimitAdminMutation: vi.fn(() => null),
+}));
 vi.mock("@/lib/admin/admin-audit", () => ({ logAdminAction: vi.fn() }));
 vi.mock("@/lib/quran/verse-resolver", () => ({ resolveVerse: vi.fn() }));
 

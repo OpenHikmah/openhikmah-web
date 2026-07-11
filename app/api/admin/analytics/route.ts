@@ -21,52 +21,59 @@ export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
 
-  const now = new Date();
-  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const searchSince = new Date(now.getTime() - SEARCH_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
+  try {
+    const now = new Date();
+    const todayStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+    );
+    const searchSince = new Date(now.getTime() - SEARCH_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
 
-  const [topVerses, connectionsByKind, dau, popularSearches, zeroResultSearches] =
-    await Promise.all([
-      // "Verses explored": the from-verse of every generated connection is the
-      // verse a user expanded in the canvas (connections are only written on a
-      // cache miss triggered by expansion) — the cheapest accurate proxy without
-      // adding a new event type.
-      db
-        .select({ fromRef: connections.fromRef, count: sql<number>`count(*)::int` })
-        .from(connections)
-        .groupBy(connections.fromRef)
-        .orderBy(desc(sql`count(*)`))
-        .limit(TOP_LIMIT),
-      db
-        .select({ kind: connections.kind, count: sql<number>`count(*)::int` })
-        .from(connections)
-        .groupBy(connections.kind)
-        .orderBy(desc(sql`count(*)`)),
-      db.$count(users, gte(users.lastActiveAt, todayStart)),
-      db
-        .select({ query: searchLog.query, count: sql<number>`count(*)::int` })
-        .from(searchLog)
-        .where(gte(searchLog.createdAt, searchSince))
-        .groupBy(searchLog.query)
-        .orderBy(desc(sql`count(*)`))
-        .limit(TOP_LIMIT),
-      db
-        .select({ query: searchLog.query, count: sql<number>`count(*)::int` })
-        .from(searchLog)
-        .where(sql`${searchLog.zeroResult} AND ${searchLog.createdAt} >= ${searchSince}`)
-        .groupBy(searchLog.query)
-        .orderBy(desc(sql`count(*)`))
-        .limit(TOP_LIMIT),
-    ]);
+    const [topVerses, connectionsByKind, dau, popularSearches, zeroResultSearches] =
+      await Promise.all([
+        // "Verses explored": the from-verse of every generated connection is the
+        // verse a user expanded in the canvas (connections are only written on a
+        // cache miss triggered by expansion) — the cheapest accurate proxy without
+        // adding a new event type.
+        db
+          .select({ fromRef: connections.fromRef, count: sql<number>`count(*)::int` })
+          .from(connections)
+          .groupBy(connections.fromRef)
+          .orderBy(desc(sql`count(*)`))
+          .limit(TOP_LIMIT),
+        db
+          .select({ kind: connections.kind, count: sql<number>`count(*)::int` })
+          .from(connections)
+          .groupBy(connections.kind)
+          .orderBy(desc(sql`count(*)`)),
+        db.$count(users, gte(users.lastActiveAt, todayStart)),
+        db
+          .select({ query: searchLog.query, count: sql<number>`count(*)::int` })
+          .from(searchLog)
+          .where(gte(searchLog.createdAt, searchSince))
+          .groupBy(searchLog.query)
+          .orderBy(desc(sql`count(*)`))
+          .limit(TOP_LIMIT),
+        db
+          .select({ query: searchLog.query, count: sql<number>`count(*)::int` })
+          .from(searchLog)
+          .where(sql`${searchLog.zeroResult} AND ${searchLog.createdAt} >= ${searchSince}`)
+          .groupBy(searchLog.query)
+          .orderBy(desc(sql`count(*)`))
+          .limit(TOP_LIMIT),
+      ]);
 
-  return NextResponse.json({
-    topVerses,
-    connectionsByKind,
-    dau,
-    search: {
-      lookbackDays: SEARCH_LOOKBACK_DAYS,
-      popular: popularSearches,
-      zeroResult: zeroResultSearches,
-    },
-  });
+    return NextResponse.json({
+      topVerses,
+      connectionsByKind,
+      dau,
+      search: {
+        lookbackDays: SEARCH_LOOKBACK_DAYS,
+        popular: popularSearches,
+        zeroResult: zeroResultSearches,
+      },
+    });
+  } catch (err) {
+    console.error("admin analytics GET db error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
