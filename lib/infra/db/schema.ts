@@ -457,6 +457,31 @@ export const featureFlags = pgTable("feature_flags", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ─── Job Runs ──────────────────────────────────────────────────────────────────
+// One row per admin-triggered run of a backfill script (scripts/seed-quran.mjs,
+// scripts/seed-morphology.mjs, scripts/embed-corpus.mjs), so the admin jobs panel
+// can show last-run status without tailing container logs. Written by
+// lib/admin/job-runner.ts, which is also the in-memory source of truth for
+// whether a job is *currently* running (this table only durably records the
+// outcome of runs that have started or finished).
+
+export const jobRuns = pgTable(
+  "job_runs",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    // 'seed-quran' | 'seed-morphology' | 'embed-corpus'
+    jobType: text("job_type").notNull(),
+    // 'running' | 'success' | 'failed'
+    status: text("status").notNull(),
+    triggeredBy: text("triggered_by").notNull(), // admin qfId
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    error: text("error"),
+    logTail: text("log_tail"), // last ~50 lines of stdout/stderr, newline-joined
+  },
+  (t) => [index("job_runs_type_started_idx").on(t.jobType, t.startedAt)]
+);
+
 // ─── Exported types ───────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
@@ -498,3 +523,5 @@ export type PromptVersion = typeof promptVersions.$inferSelect;
 export type NewPromptVersion = typeof promptVersions.$inferInsert;
 export type SearchLogEntry = typeof searchLog.$inferSelect;
 export type NewSearchLogEntry = typeof searchLog.$inferInsert;
+export type JobRun = typeof jobRuns.$inferSelect;
+export type NewJobRun = typeof jobRuns.$inferInsert;
