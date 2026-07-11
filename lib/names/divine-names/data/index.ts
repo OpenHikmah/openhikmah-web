@@ -4,5 +4,5 @@ import { DHAT_NAMES } from "./dhat";
 import { SIFAT_NAMES } from "./sifat";
 
 export const DIVINE_NAMES: DivineName[] = [...DHAT_NAMES, ...SIFAT_NAMES, ...AFAL_NAMES].sort(
-  (a, b) => a.id - b.id,
+  (a, b) => a.id - b.id
 );

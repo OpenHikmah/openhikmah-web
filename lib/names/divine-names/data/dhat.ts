@@ -9,7 +9,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Sovereign",
     category: "dhat",
     root: "م-ل-ك",
-    description: "Absolute dominion over all that exists, unconstrained by any partner, predecessor, or limitation — sovereignty that belongs to the Essence itself.",
+    description:
+      "Absolute dominion over all that exists, unconstrained by any partner, predecessor, or limitation — sovereignty that belongs to the Essence itself.",
   },
   {
     id: 33,
@@ -19,7 +20,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Magnificent",
     category: "dhat",
     root: "ع-ظ-م",
-    description: "A greatness that is beyond all comprehension and comparison — the intellect cannot bound it because it is an attribute of the unlimited Divine Essence.",
+    description:
+      "A greatness that is beyond all comprehension and comparison — the intellect cannot bound it because it is an attribute of the unlimited Divine Essence.",
   },
   {
     id: 36,
@@ -29,7 +31,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Most High",
     category: "dhat",
     root: "ع-ل-و",
-    description: "Transcendent elevation above every limitation and comparison — height that is of the Essence, not spatial or positional.",
+    description:
+      "Transcendent elevation above every limitation and comparison — height that is of the Essence, not spatial or positional.",
   },
   {
     id: 37,
@@ -39,7 +42,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Most Great",
     category: "dhat",
     root: "ك-ب-ر",
-    description: "Greatness that surpasses all measurement; every created greatness is finite and contingent while His is absolute and essential.",
+    description:
+      "Greatness that surpasses all measurement; every created greatness is finite and contingent while His is absolute and essential.",
   },
   {
     id: 41,
@@ -49,7 +53,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Majestic",
     category: "dhat",
     root: "ج-ل-ل",
-    description: "Majesty that generates awe and reverence; the jalal aspect of divinity that is balanced in Islamic spirituality by jamal (beauty).",
+    description:
+      "Majesty that generates awe and reverence; the jalal aspect of divinity that is balanced in Islamic spirituality by jamal (beauty).",
   },
   {
     id: 45,
@@ -59,7 +64,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The All-Encompassing",
     category: "dhat",
     root: "و-س-ع",
-    description: "Boundless in knowledge, mercy, and generosity — an attribute of the Essence that has no border or limit that any created reality can approach.",
+    description:
+      "Boundless in knowledge, mercy, and generosity — an attribute of the Essence that has no border or limit that any created reality can approach.",
   },
   {
     id: 48,
@@ -69,7 +75,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Most Glorious",
     category: "dhat",
     root: "م-ج-د",
-    description: "Glory combining greatness with generosity — a majesty that is not remote or forbidding but radiates outward in gifts and honours upon creation.",
+    description:
+      "Glory combining greatness with generosity — a majesty that is not remote or forbidding but radiates outward in gifts and honours upon creation.",
   },
   {
     id: 51,
@@ -79,7 +86,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Truth",
     category: "dhat",
     root: "ح-ق-ق",
-    description: "The necessary, self-subsisting reality — the only being whose existence is not contingent; all else is real only insofar as it participates in His truth.",
+    description:
+      "The necessary, self-subsisting reality — the only being whose existence is not contingent; all else is real only insofar as it participates in His truth.",
   },
   {
     id: 56,
@@ -89,7 +97,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The All-Praiseworthy",
     category: "dhat",
     root: "ح-م-د",
-    description: "All praise in creation flows toward Him as to its natural source — praise that is not earned but belongs to the Essence as a necessary attribute.",
+    description:
+      "All praise in creation flows toward Him as to its natural source — praise that is not earned but belongs to the Essence as a necessary attribute.",
   },
   {
     id: 63,
@@ -99,7 +108,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Self-Subsisting",
     category: "dhat",
     root: "ق-و-م",
-    description: "He who subsists of Himself and on whom all else subsists — the Maturidi attribute of Qiyam bi-l-nafs (self-subsistence) embodied in this name.",
+    description:
+      "He who subsists of Himself and on whom all else subsists — the Maturidi attribute of Qiyam bi-l-nafs (self-subsistence) embodied in this name.",
   },
   {
     id: 64,
@@ -109,7 +119,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Finder",
     category: "dhat",
     root: "و-ج-د",
-    description: "He who finds and perceives all things with no searching or seeking — a name of the Essence whose awareness precedes every created event.",
+    description:
+      "He who finds and perceives all things with no searching or seeking — a name of the Essence whose awareness precedes every created event.",
   },
   {
     id: 65,
@@ -119,7 +130,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The One",
     category: "dhat",
     root: "و-ح-د",
-    description: "Oneness in essence, attributes, and acts — the foundation of tawhid; no second being shares in or participates in this oneness.",
+    description:
+      "Oneness in essence, attributes, and acts — the foundation of tawhid; no second being shares in or participates in this oneness.",
   },
   {
     id: 66,
@@ -129,7 +141,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Unique",
     category: "dhat",
     root: "و-ح-د",
-    description: "Absolute singularity that admits no composition, division, or partner — the name that Sura Al-Ikhlas uses to negate every conceivable form of association.",
+    description:
+      "Absolute singularity that admits no composition, division, or partner — the name that Sura Al-Ikhlas uses to negate every conceivable form of association.",
   },
   {
     id: 67,
@@ -139,7 +152,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Eternal",
     category: "dhat",
     root: "ص-م-د",
-    description: "The self-sufficient one to whom all creation turns in need — possessing no need of any kind while being the ultimate object of every creature's need.",
+    description:
+      "The self-sufficient one to whom all creation turns in need — possessing no need of any kind while being the ultimate object of every creature's need.",
   },
   {
     id: 72,
@@ -149,7 +163,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The First",
     category: "dhat",
     root: "أ-و-ل",
-    description: "He who precedes all things with no beginning — existence prior to time and before any created reality; the Qidam (eternity a parte ante) of the Essence.",
+    description:
+      "He who precedes all things with no beginning — existence prior to time and before any created reality; the Qidam (eternity a parte ante) of the Essence.",
   },
   {
     id: 73,
@@ -159,7 +174,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Last",
     category: "dhat",
     root: "أ-خ-ر",
-    description: "He who remains after all things — Baqa (eternal permanence); when all created things pass away, only the Divine Essence persists.",
+    description:
+      "He who remains after all things — Baqa (eternal permanence); when all created things pass away, only the Divine Essence persists.",
   },
   {
     id: 74,
@@ -169,7 +185,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Manifest",
     category: "dhat",
     root: "ظ-ه-ر",
-    description: "He who is manifest through His signs, effects, and clear proofs — more evident than any created thing, though not grasped by direct sensory perception.",
+    description:
+      "He who is manifest through His signs, effects, and clear proofs — more evident than any created thing, though not grasped by direct sensory perception.",
   },
   {
     id: 75,
@@ -179,7 +196,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Hidden",
     category: "dhat",
     root: "ب-ط-ن",
-    description: "He who is hidden from direct comprehension — transcendence so complete that the Essence itself is beyond the reach of any created faculty.",
+    description:
+      "He who is hidden from direct comprehension — transcendence so complete that the Essence itself is beyond the reach of any created faculty.",
   },
   {
     id: 83,
@@ -189,7 +207,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "Owner of All Sovereignty",
     category: "dhat",
     root: "م-ل-ك",
-    description: "Absolute ownership of every realm, domain, and kingdom — no sovereignty exists independently; all thrones are merely given in trust and retrieved at will.",
+    description:
+      "Absolute ownership of every realm, domain, and kingdom — no sovereignty exists independently; all thrones are merely given in trust and retrieved at will.",
   },
   {
     id: 84,
@@ -199,7 +218,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "Lord of Majesty and Bounty",
     category: "dhat",
     root: "ج-ل-ل",
-    description: "The pairing of transcendent awe-inspiring majesty (jalal) with active honouring generosity (ikram) — the complete divine character toward which all worship is directed.",
+    description:
+      "The pairing of transcendent awe-inspiring majesty (jalal) with active honouring generosity (ikram) — the complete divine character toward which all worship is directed.",
   },
   {
     id: 87,
@@ -209,7 +229,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Self-Sufficient",
     category: "dhat",
     root: "غ-ن-ي",
-    description: "Absolute richness and independence — needing nothing from creation while being the source from which all created needs are satisfied.",
+    description:
+      "Absolute richness and independence — needing nothing from creation while being the source from which all created needs are satisfied.",
   },
   {
     id: 92,
@@ -219,7 +240,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Light",
     category: "dhat",
     root: "ن-و-ر",
-    description: "The light of the heavens and the earth — not physical light but the ontological illumination by which anything can be known, seen, or guided.",
+    description:
+      "The light of the heavens and the earth — not physical light but the ontological illumination by which anything can be known, seen, or guided.",
   },
   {
     id: 95,
@@ -229,7 +251,8 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The Everlasting",
     category: "dhat",
     root: "ب-ق-ي",
-    description: "Eternal permanence with no end — the Baqa attribute of the divine Essence; all created existence is borrowed and temporary while His is necessary and permanent.",
+    description:
+      "Eternal permanence with no end — the Baqa attribute of the divine Essence; all created existence is borrowed and temporary while His is necessary and permanent.",
   },
   {
     id: 99,
@@ -239,6 +262,7 @@ export const DHAT_NAMES: DivineName[] = [
     meaning: "The God",
     category: "dhat",
     root: "أ-ل-ه",
-    description: "The supreme proper name — Al-Ism al-A'zam (the Greatest Name) that encompasses all divine attributes; the name to which all other names are adjectives.",
+    description:
+      "The supreme proper name — Al-Ism al-A'zam (the Greatest Name) that encompasses all divine attributes; the name to which all other names are adjectives.",
   },
 ];

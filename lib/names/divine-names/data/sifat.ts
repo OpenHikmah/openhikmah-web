@@ -9,7 +9,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Most Gracious",
     category: "sifat",
     root: "ر-ح-م",
-    description: "The all-encompassing mercy that pervades existence; a mercy whose vastness is prior to any creature's merit or request.",
+    description:
+      "The all-encompassing mercy that pervades existence; a mercy whose vastness is prior to any creature's merit or request.",
   },
   {
     id: 2,
@@ -19,7 +20,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Most Merciful",
     category: "sifat",
     root: "ر-ح-م",
-    description: "Mercy directed specifically and actively toward the believers; the realised bestowal flowing from the divine attribute of Rahma.",
+    description:
+      "Mercy directed specifically and actively toward the believers; the realised bestowal flowing from the divine attribute of Rahma.",
   },
   {
     id: 4,
@@ -29,7 +31,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Most Holy",
     category: "sifat",
     root: "ق-د-س",
-    description: "Perfect freedom from every imperfection, deficiency, or resemblance to created things; the Maturidi tanzih par excellence.",
+    description:
+      "Perfect freedom from every imperfection, deficiency, or resemblance to created things; the Maturidi tanzih par excellence.",
   },
   {
     id: 5,
@@ -39,7 +42,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Source of Peace",
     category: "sifat",
     root: "س-ل-م",
-    description: "Allah is free from all defect and the source from which every peace and soundness in creation derives.",
+    description:
+      "Allah is free from all defect and the source from which every peace and soundness in creation derives.",
   },
   {
     id: 8,
@@ -49,7 +53,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Almighty",
     category: "sifat",
     root: "ع-ز-ز",
-    description: "Irresistible might that cannot be overcome; the uniqueness of power that has no peer or equal in the divine or created realms.",
+    description:
+      "Irresistible might that cannot be overcome; the uniqueness of power that has no peer or equal in the divine or created realms.",
   },
   {
     id: 9,
@@ -59,7 +64,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Compeller",
     category: "sifat",
     root: "ج-ب-ر",
-    description: "He who repairs what is broken in creation and compels all things according to His will; the overwhelming restorer whose decree none can repel.",
+    description:
+      "He who repairs what is broken in creation and compels all things according to His will; the overwhelming restorer whose decree none can repel.",
   },
   {
     id: 10,
@@ -69,7 +75,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Supreme in Greatness",
     category: "sifat",
     root: "ك-ب-ر",
-    description: "Greatness that belongs exclusively to Allah; all created greatness is borrowed dignity, while His is the attribute of the Essence.",
+    description:
+      "Greatness that belongs exclusively to Allah; all created greatness is borrowed dignity, while His is the attribute of the Essence.",
   },
   {
     id: 15,
@@ -79,7 +86,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The All-Subduing",
     category: "sifat",
     root: "ق-ه-ر",
-    description: "He before whose power all things are utterly subdued; no king, force, or angel has any independence before His overwhelming dominion.",
+    description:
+      "He before whose power all things are utterly subdued; no king, force, or angel has any independence before His overwhelming dominion.",
   },
   {
     id: 19,
@@ -89,7 +97,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The All-Knowing",
     category: "sifat",
     root: "ع-ل-م",
-    description: "Infinite knowledge encompassing all particulars and universals, past and future, manifest and hidden — one of the seven essential Sifat al-Ma'ani in Maturidi theology.",
+    description:
+      "Infinite knowledge encompassing all particulars and universals, past and future, manifest and hidden — one of the seven essential Sifat al-Ma'ani in Maturidi theology.",
   },
   {
     id: 26,
@@ -99,7 +108,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The All-Hearing",
     category: "sifat",
     root: "س-م-ع",
-    description: "Hearing that encompasses every sound, whisper, and secret thought — one of the seven essential Sifat al-Ma'ani; affirmed without likening it to created hearing.",
+    description:
+      "Hearing that encompasses every sound, whisper, and secret thought — one of the seven essential Sifat al-Ma'ani; affirmed without likening it to created hearing.",
   },
   {
     id: 27,
@@ -109,7 +119,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The All-Seeing",
     category: "sifat",
     root: "ب-ص-ر",
-    description: "Vision that encompasses all things simultaneously — one of the seven Sifat al-Ma'ani; affirmed in a manner befitting divine majesty, free from analogy with created sight.",
+    description:
+      "Vision that encompasses all things simultaneously — one of the seven Sifat al-Ma'ani; affirmed in a manner befitting divine majesty, free from analogy with created sight.",
   },
   {
     id: 28,
@@ -119,7 +130,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Arbitrator",
     category: "sifat",
     root: "ح-ك-م",
-    description: "The final judge whose ruling is always just and definitive — no verdict in creation is truly binding except by reference to His judgment.",
+    description:
+      "The final judge whose ruling is always just and definitive — no verdict in creation is truly binding except by reference to His judgment.",
   },
   {
     id: 29,
@@ -129,7 +141,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Just",
     category: "sifat",
     root: "ع-د-ل",
-    description: "Absolute justice that gives every thing its due — the Maturidi school affirms divine justice while holding that Allah is not constrained by creaturely notions of obligation.",
+    description:
+      "Absolute justice that gives every thing its due — the Maturidi school affirms divine justice while holding that Allah is not constrained by creaturely notions of obligation.",
   },
   {
     id: 30,
@@ -139,7 +152,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Subtle",
     category: "sifat",
     root: "ل-ط-ف",
-    description: "Awareness so fine and care so gentle that it reaches what no created perception can access — the hidden providences that weave through every life.",
+    description:
+      "Awareness so fine and care so gentle that it reaches what no created perception can access — the hidden providences that weave through every life.",
   },
   {
     id: 31,
@@ -149,7 +163,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The All-Aware",
     category: "sifat",
     root: "خ-ب-ر",
-    description: "Thorough awareness of the inner realities and hidden dimensions of all things — knowledge of what lies beneath appearances.",
+    description:
+      "Thorough awareness of the inner realities and hidden dimensions of all things — knowledge of what lies beneath appearances.",
   },
   {
     id: 32,
@@ -159,7 +174,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Forbearing",
     category: "sifat",
     root: "ح-ل-م",
-    description: "He who withholds punishment despite the capacity to act and the cause to do so — forebearance that is an expression of wisdom, not weakness.",
+    description:
+      "He who withholds punishment despite the capacity to act and the cause to do so — forebearance that is an expression of wisdom, not weakness.",
   },
   {
     id: 43,
@@ -169,7 +185,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Watchful",
     category: "sifat",
     root: "ر-ق-ب",
-    description: "The ever-vigilant witness who observes every intention and act — a divine attribute that is both protection for the sincere and warning for the heedless.",
+    description:
+      "The ever-vigilant witness who observes every intention and act — a divine attribute that is both protection for the sincere and warning for the heedless.",
   },
   {
     id: 46,
@@ -179,7 +196,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The All-Wise",
     category: "sifat",
     root: "ح-ك-م",
-    description: "Wisdom that places everything in its perfect position — every divine act, decree, and law proceeds from an infinite wisdom that the created intellect can only partially glimpse.",
+    description:
+      "Wisdom that places everything in its perfect position — every divine act, decree, and law proceeds from an infinite wisdom that the created intellect can only partially glimpse.",
   },
   {
     id: 47,
@@ -189,7 +207,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Most Loving",
     category: "sifat",
     root: "و-د-د",
-    description: "Divine love that is the origin of all affection in creation — a love that initiates and does not merely respond, freely given to the sincere servant.",
+    description:
+      "Divine love that is the origin of all affection in creation — a love that initiates and does not merely respond, freely given to the sincere servant.",
   },
   {
     id: 50,
@@ -199,7 +218,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Witness",
     category: "sifat",
     root: "ش-ه-د",
-    description: "The all-witnessing presence whose testimony is the ultimate ground of truth — nothing is absent from His witnessing, whether in the visible or unseen realms.",
+    description:
+      "The all-witnessing presence whose testimony is the ultimate ground of truth — nothing is absent from His witnessing, whether in the visible or unseen realms.",
   },
   {
     id: 53,
@@ -209,7 +229,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The All-Powerful",
     category: "sifat",
     root: "ق-و-ي",
-    description: "Strength that knows no fatigue, depletion, or diminishment — the power of the Essence itself, which no resistance can affect.",
+    description:
+      "Strength that knows no fatigue, depletion, or diminishment — the power of the Essence itself, which no resistance can affect.",
   },
   {
     id: 54,
@@ -219,7 +240,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Firm",
     category: "sifat",
     root: "م-ت-ن",
-    description: "Absolute firmness in power and resolution — divine will and capacity are unshakeable, and no created force can cause the slightest wavering in His decree.",
+    description:
+      "Absolute firmness in power and resolution — divine will and capacity are unshakeable, and no created force can cause the slightest wavering in His decree.",
   },
   {
     id: 57,
@@ -229,7 +251,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The All-Enumerating",
     category: "sifat",
     root: "ح-ص-ي",
-    description: "The knowledge that counts and records every particular without the slightest omission — not a leaf falls, nor a thought arises, outside this precise divine enumeration.",
+    description:
+      "The knowledge that counts and records every particular without the slightest omission — not a leaf falls, nor a thought arises, outside this precise divine enumeration.",
   },
   {
     id: 62,
@@ -239,7 +262,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Ever-Living",
     category: "sifat",
     root: "ح-ي-ي",
-    description: "Life that is not preceded by non-existence and not followed by cessation — the essential divine life that sustains all contingent life; one of the seven Sifat al-Ma'ani.",
+    description:
+      "Life that is not preceded by non-existence and not followed by cessation — the essential divine life that sustains all contingent life; one of the seven Sifat al-Ma'ani.",
   },
   {
     id: 68,
@@ -249,7 +273,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The All-Capable",
     category: "sifat",
     root: "ق-د-ر",
-    description: "Unlimited power over all possible things — one of the seven Sifat al-Ma'ani; the Maturidi school affirms that divine power does not extend to logical impossibilities, but this is a limit of logic, not of power.",
+    description:
+      "Unlimited power over all possible things — one of the seven Sifat al-Ma'ani; the Maturidi school affirms that divine power does not extend to logical impossibilities, but this is a limit of logic, not of power.",
   },
   {
     id: 69,
@@ -259,7 +284,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The All-Determining",
     category: "sifat",
     root: "ق-د-ر",
-    description: "He who exercises His power with decisive authority — a name that emphasises the active, sovereign exercise of the divine power.",
+    description:
+      "He who exercises His power with decisive authority — a name that emphasises the active, sovereign exercise of the divine power.",
   },
   {
     id: 77,
@@ -269,7 +295,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Most Exalted",
     category: "sifat",
     root: "ع-ل-و",
-    description: "He who is supremely exalted above every comparison, attribution, or limitation — the ultimate expression of tanzih (transcendence) in divine names.",
+    description:
+      "He who is supremely exalted above every comparison, attribution, or limitation — the ultimate expression of tanzih (transcendence) in divine names.",
   },
   {
     id: 82,
@@ -279,7 +306,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Most Compassionate",
     category: "sifat",
     root: "ر-أ-ف",
-    description: "A compassion more intense than mercy — the tenderness of the divine care that acts to remove hardship before it overwhelms the beloved creature.",
+    description:
+      "A compassion more intense than mercy — the tenderness of the divine care that acts to remove hardship before it overwhelms the beloved creature.",
   },
   {
     id: 97,
@@ -289,7 +317,8 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Guide to the Right Path",
     category: "sifat",
     root: "ر-ش-د",
-    description: "He whose every act is perfectly well-directed and guided — wisdom so complete that nothing He does is wasteful, misdirected, or improvised.",
+    description:
+      "He whose every act is perfectly well-directed and guided — wisdom so complete that nothing He does is wasteful, misdirected, or improvised.",
   },
   {
     id: 98,
@@ -299,6 +328,7 @@ export const SIFAT_NAMES: DivineName[] = [
     meaning: "The Most Patient",
     category: "sifat",
     root: "ص-ب-ر",
-    description: "He who does not hasten punishment despite transgression — divine patience that gives creatures time to return, and that should inspire the believer's own sabr.",
+    description:
+      "He who does not hasten punishment despite transgression — divine patience that gives creatures time to return, and that should inspire the believer's own sabr.",
   },
 ];

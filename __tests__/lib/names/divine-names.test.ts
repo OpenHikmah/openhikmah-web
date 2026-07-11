@@ -5,7 +5,7 @@ import {
   getNameBySlug,
   getNamesByCategory,
   type NameCategory,
-} from "@/lib/divine-names";
+} from "@/lib/names/divine-names";
 import { AFAL_NAMES } from "@/lib/names/divine-names/data/afal";
 import { DHAT_NAMES } from "@/lib/names/divine-names/data/dhat";
 import { SIFAT_NAMES } from "@/lib/names/divine-names/data/sifat";

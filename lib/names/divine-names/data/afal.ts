@@ -9,7 +9,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Guardian of Faith",
     category: "af'al",
     root: "أ-م-ن",
-    description: "He who grants security to His creation and ratifies His own promise — the Originator of all trust and safety.",
+    description:
+      "He who grants security to His creation and ratifies His own promise — the Originator of all trust and safety.",
   },
   {
     id: 7,
@@ -19,7 +20,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Overseer",
     category: "af'al",
     root: "ه-ي-م",
-    description: "The all-watchful guardian who holds sovereign oversight over every affair — nothing transpires outside His encompassing awareness.",
+    description:
+      "The all-watchful guardian who holds sovereign oversight over every affair — nothing transpires outside His encompassing awareness.",
   },
   {
     id: 11,
@@ -29,7 +31,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Creator",
     category: "af'al",
     root: "خ-ل-ق",
-    description: "The sole originator who brings things into existence by will and command — creation belongs exclusively to His act, not to any secondary cause.",
+    description:
+      "The sole originator who brings things into existence by will and command — creation belongs exclusively to His act, not to any secondary cause.",
   },
   {
     id: 12,
@@ -39,7 +42,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Originator",
     category: "af'al",
     root: "ب-ر-أ",
-    description: "He who distinguishes and separates created things from one another, assigning to each its own nature and form.",
+    description:
+      "He who distinguishes and separates created things from one another, assigning to each its own nature and form.",
   },
   {
     id: 13,
@@ -49,7 +53,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Fashioner of Forms",
     category: "af'al",
     root: "ص-و-ر",
-    description: "He who gives every created thing its unique form and image according to a wisdom that transcends created imagination.",
+    description:
+      "He who gives every created thing its unique form and image according to a wisdom that transcends created imagination.",
   },
   {
     id: 14,
@@ -59,7 +64,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The All-Forgiving",
     category: "af'al",
     root: "غ-ف-ر",
-    description: "The one who repeatedly and abundantly covers sins with His forgiveness — a forgiveness that is an act of pure grace without diminishing His justice.",
+    description:
+      "The one who repeatedly and abundantly covers sins with His forgiveness — a forgiveness that is an act of pure grace without diminishing His justice.",
   },
   {
     id: 16,
@@ -69,7 +75,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Bestower",
     category: "af'al",
     root: "و-ه-ب",
-    description: "The one who gives abundantly without any expectation of return — His bestowal is pure generosity from an essence that has no need.",
+    description:
+      "The one who gives abundantly without any expectation of return — His bestowal is pure generosity from an essence that has no need.",
   },
   {
     id: 17,
@@ -79,7 +86,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The All-Provider",
     category: "af'al",
     root: "ر-ز-ق",
-    description: "The ultimate sustainer of all created things — both outer provision of sustenance and inner provision of spiritual capacity.",
+    description:
+      "The ultimate sustainer of all created things — both outer provision of sustenance and inner provision of spiritual capacity.",
   },
   {
     id: 18,
@@ -89,7 +97,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Opener",
     category: "af'al",
     root: "ف-ت-ح",
-    description: "The one who opens closed matters, grants victory, and decrees judgment between the creation — all doors of mercy and provision open by His leave alone.",
+    description:
+      "The one who opens closed matters, grants victory, and decrees judgment between the creation — all doors of mercy and provision open by His leave alone.",
   },
   {
     id: 20,
@@ -99,7 +108,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Withholder",
     category: "af'al",
     root: "ق-ب-ض",
-    description: "He who constricts and withholds according to wisdom — trials, scarcity, and contraction of the heart are acts that serve the greater divine order.",
+    description:
+      "He who constricts and withholds according to wisdom — trials, scarcity, and contraction of the heart are acts that serve the greater divine order.",
   },
   {
     id: 21,
@@ -109,7 +119,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Extender",
     category: "af'al",
     root: "ب-س-ط",
-    description: "He who expands provision, ease, and the heart's capacity — always paired with Al-Qabid so that expansion and contraction reveal one sovereign wisdom.",
+    description:
+      "He who expands provision, ease, and the heart's capacity — always paired with Al-Qabid so that expansion and contraction reveal one sovereign wisdom.",
   },
   {
     id: 22,
@@ -119,7 +130,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Abaser",
     category: "af'al",
     root: "خ-ف-ض",
-    description: "He who lowers the arrogant and the unjust; the one in whose hand every station rises or falls according to divine wisdom and justice.",
+    description:
+      "He who lowers the arrogant and the unjust; the one in whose hand every station rises or falls according to divine wisdom and justice.",
   },
   {
     id: 23,
@@ -129,7 +141,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Exalter",
     category: "af'al",
     root: "ر-ف-ع",
-    description: "He who elevates whomever He wills among His creation — raising the believers in this life and the next as an act of pure divine favour.",
+    description:
+      "He who elevates whomever He wills among His creation — raising the believers in this life and the next as an act of pure divine favour.",
   },
   {
     id: 24,
@@ -139,7 +152,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Bestower of Honour",
     category: "af'al",
     root: "ع-ز-ز",
-    description: "He who grants might and dignity to whomever He chooses — all true honour in creation is a reflection of His bestowal, not an intrinsic quality of the creature.",
+    description:
+      "He who grants might and dignity to whomever He chooses — all true honour in creation is a reflection of His bestowal, not an intrinsic quality of the creature.",
   },
   {
     id: 25,
@@ -149,7 +163,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Humiliator",
     category: "af'al",
     root: "ذ-ل-ل",
-    description: "He who brings low the rebellious and the proud — a reminder that no created greatness is self-sustaining, and all dignity depends on divine permission.",
+    description:
+      "He who brings low the rebellious and the proud — a reminder that no created greatness is self-sustaining, and all dignity depends on divine permission.",
   },
   {
     id: 34,
@@ -159,7 +174,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Forgiving",
     category: "af'al",
     root: "غ-ف-ر",
-    description: "The depth of forgiveness that completely covers and conceals sins — bestowed as an act of His free will and mercy, not as a debt owed to the sinner.",
+    description:
+      "The depth of forgiveness that completely covers and conceals sins — bestowed as an act of His free will and mercy, not as a debt owed to the sinner.",
   },
   {
     id: 35,
@@ -169,7 +185,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Most Appreciative",
     category: "af'al",
     root: "ش-ك-ر",
-    description: "He who multiplies the reward for small deeds with unbounded generosity — gratitude from the Divine that reflects the limitless nature of His giving.",
+    description:
+      "He who multiplies the reward for small deeds with unbounded generosity — gratitude from the Divine that reflects the limitless nature of His giving.",
   },
   {
     id: 38,
@@ -179,7 +196,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Preserver",
     category: "af'al",
     root: "ح-ف-ظ",
-    description: "He who guards all things from loss and preserves the records of every deed — the entire created order is held in existence only through His preserving act.",
+    description:
+      "He who guards all things from loss and preserves the records of every deed — the entire created order is held in existence only through His preserving act.",
   },
   {
     id: 39,
@@ -189,7 +207,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Sustainer",
     category: "af'al",
     root: "ق-و-ت",
-    description: "He who sustains and nourishes every creature with exactly what it needs — combining perfect knowledge of need with perfect power to fulfil it.",
+    description:
+      "He who sustains and nourishes every creature with exactly what it needs — combining perfect knowledge of need with perfect power to fulfil it.",
   },
   {
     id: 40,
@@ -199,7 +218,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Reckoner",
     category: "af'al",
     root: "ح-س-ب",
-    description: "The all-sufficient reckoner who takes precise account of every atom's weight of deed — the one to whom all returns for final accountability.",
+    description:
+      "The all-sufficient reckoner who takes precise account of every atom's weight of deed — the one to whom all returns for final accountability.",
   },
   {
     id: 42,
@@ -209,7 +229,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Most Generous",
     category: "af'al",
     root: "ك-ر-م",
-    description: "Generosity so complete that He gives without need, withholds without injustice, and exceeds every expectation with His gifts.",
+    description:
+      "Generosity so complete that He gives without need, withholds without injustice, and exceeds every expectation with His gifts.",
   },
   {
     id: 44,
@@ -219,7 +240,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Responsive",
     category: "af'al",
     root: "ج-و-ب",
-    description: "He who responds to every supplication — the response may be immediate fulfilment, a better alternative, or stored reward, but no sincere call goes unheard.",
+    description:
+      "He who responds to every supplication — the response may be immediate fulfilment, a better alternative, or stored reward, but no sincere call goes unheard.",
   },
   {
     id: 49,
@@ -229,7 +251,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Resurrector",
     category: "af'al",
     root: "ب-ع-ث",
-    description: "He who raises the dead and sends prophets — the power of origination reasserted: as He created the first time, so He recreates without the slightest difficulty.",
+    description:
+      "He who raises the dead and sends prophets — the power of origination reasserted: as He created the first time, so He recreates without the slightest difficulty.",
   },
   {
     id: 52,
@@ -239,7 +262,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Trustee",
     category: "af'al",
     root: "و-ك-ل",
-    description: "The disposer of affairs for all who entrust themselves to Him — tawakkul (reliance) is the creature's response to this divine name.",
+    description:
+      "The disposer of affairs for all who entrust themselves to Him — tawakkul (reliance) is the creature's response to this divine name.",
   },
   {
     id: 55,
@@ -249,7 +273,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Protecting Friend",
     category: "af'al",
     root: "و-ل-ي",
-    description: "The patron and ally who takes the believer under His guardianship — divine friendship that transforms the life of the one who draws near.",
+    description:
+      "The patron and ally who takes the believer under His guardianship — divine friendship that transforms the life of the one who draws near.",
   },
   {
     id: 58,
@@ -259,7 +284,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Originator",
     category: "af'al",
     root: "ب-د-أ",
-    description: "He who begins creation without precedent or model — the initial act of bringing forth that demonstrates unlimited creative power.",
+    description:
+      "He who begins creation without precedent or model — the initial act of bringing forth that demonstrates unlimited creative power.",
   },
   {
     id: 59,
@@ -269,7 +295,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Restorer",
     category: "af'al",
     root: "ع-و-د",
-    description: "He who returns creation to Himself after its passage through time — the resurrection and return that is the completion of the divine originating act.",
+    description:
+      "He who returns creation to Himself after its passage through time — the resurrection and return that is the completion of the divine originating act.",
   },
   {
     id: 60,
@@ -279,7 +306,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Giver of Life",
     category: "af'al",
     root: "ح-ي-ي",
-    description: "The sole originator of life in all its forms — physical life, spiritual vitality, and the life of the resurrection all belong to His act alone.",
+    description:
+      "The sole originator of life in all its forms — physical life, spiritual vitality, and the life of the resurrection all belong to His act alone.",
   },
   {
     id: 61,
@@ -289,7 +317,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Taker of Life",
     category: "af'al",
     root: "م-و-ت",
-    description: "He who decrees the death of every living thing — paired with Al-Muhyi to affirm that life and death are entirely in His hand, neither random nor outside His will.",
+    description:
+      "He who decrees the death of every living thing — paired with Al-Muhyi to affirm that life and death are entirely in His hand, neither random nor outside His will.",
   },
   {
     id: 70,
@@ -299,7 +328,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Expediter",
     category: "af'al",
     root: "ق-د-م",
-    description: "He who brings forward whomever and whatever He wills — advancing the believers, the prophets, and the causes that serve His purpose.",
+    description:
+      "He who brings forward whomever and whatever He wills — advancing the believers, the prophets, and the causes that serve His purpose.",
   },
   {
     id: 71,
@@ -309,7 +339,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Delayer",
     category: "af'al",
     root: "أ-خ-ر",
-    description: "He who postpones and delays according to wisdom — paired with Al-Muqaddim to show that all timing belongs to the divine will, not to chance.",
+    description:
+      "He who postpones and delays according to wisdom — paired with Al-Muqaddim to show that all timing belongs to the divine will, not to chance.",
   },
   {
     id: 76,
@@ -319,7 +350,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Governor",
     category: "af'al",
     root: "و-ل-ي",
-    description: "He who governs and administers the entire created order — the sovereign management of the cosmos that proceeds from His unlimited knowledge and will.",
+    description:
+      "He who governs and administers the entire created order — the sovereign management of the cosmos that proceeds from His unlimited knowledge and will.",
   },
   {
     id: 78,
@@ -329,7 +361,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Source of Goodness",
     category: "af'al",
     root: "ب-ر-ر",
-    description: "The origin of every form of goodness and beneficence — all that is good in creation is a trace of the divine al-Birr radiating outward.",
+    description:
+      "The origin of every form of goodness and beneficence — all that is good in creation is a trace of the divine al-Birr radiating outward.",
   },
   {
     id: 79,
@@ -339,7 +372,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Acceptor of Repentance",
     category: "af'al",
     root: "ت-و-ب",
-    description: "He who ceaselessly turns toward the repentant with acceptance — the divine turning precedes, enables, and completes the human turning; both the initiator and receiver of tawba.",
+    description:
+      "He who ceaselessly turns toward the repentant with acceptance — the divine turning precedes, enables, and completes the human turning; both the initiator and receiver of tawba.",
   },
   {
     id: 80,
@@ -349,7 +383,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Avenger",
     category: "af'al",
     root: "ن-ق-م",
-    description: "He who executes justice against the unjust — divine retribution that is not rage but the measured correction of the cosmic moral order.",
+    description:
+      "He who executes justice against the unjust — divine retribution that is not rage but the measured correction of the cosmic moral order.",
   },
   {
     id: 81,
@@ -359,7 +394,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Pardoner",
     category: "af'al",
     root: "ع-ف-و",
-    description: "He who erases sins completely — not merely covering them as Al-Ghafur does but effacing them entirely so they leave no trace in the divine record.",
+    description:
+      "He who erases sins completely — not merely covering them as Al-Ghafur does but effacing them entirely so they leave no trace in the divine record.",
   },
   {
     id: 85,
@@ -369,7 +405,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Equitable",
     category: "af'al",
     root: "ق-س-ط",
-    description: "He who deals with perfect fairness — equity in judgment, proportion in reward and recompense, and the source of all just dealings in the social order.",
+    description:
+      "He who deals with perfect fairness — equity in judgment, proportion in reward and recompense, and the source of all just dealings in the social order.",
   },
   {
     id: 86,
@@ -379,7 +416,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Gatherer",
     category: "af'al",
     root: "ج-م-ع",
-    description: "He who gathers all things for the Day of Assembly — the gathering of dispersed realities into one moment of accountability and completion.",
+    description:
+      "He who gathers all things for the Day of Assembly — the gathering of dispersed realities into one moment of accountability and completion.",
   },
   {
     id: 88,
@@ -389,7 +427,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Enricher",
     category: "af'al",
     root: "غ-ن-ي",
-    description: "He who removes need and bestows sufficiency upon whomever He wills — enrichment of the body, spirit, and heart all flow from this divine act.",
+    description:
+      "He who removes need and bestows sufficiency upon whomever He wills — enrichment of the body, spirit, and heart all flow from this divine act.",
   },
   {
     id: 89,
@@ -399,7 +438,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Preventer",
     category: "af'al",
     root: "م-ن-ع",
-    description: "He who withholds what would harm and prevents what is not due — the prevention that is itself a mercy, though the creature may not perceive it as such.",
+    description:
+      "He who withholds what would harm and prevents what is not due — the prevention that is itself a mercy, though the creature may not perceive it as such.",
   },
   {
     id: 90,
@@ -409,7 +449,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Distresser",
     category: "af'al",
     root: "ض-ر-ر",
-    description: "He who sends trial and hardship by His will — in Maturidi thought, harm as well as benefit originates solely from the divine act, affirming tawhid in all circumstances.",
+    description:
+      "He who sends trial and hardship by His will — in Maturidi thought, harm as well as benefit originates solely from the divine act, affirming tawhid in all circumstances.",
   },
   {
     id: 91,
@@ -419,7 +460,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Benefiter",
     category: "af'al",
     root: "ن-ف-ع",
-    description: "He who creates and directs all benefit — paired with Ad-Darr to affirm that both benefit and harm come from the same divine will that is entirely wise and just.",
+    description:
+      "He who creates and directs all benefit — paired with Ad-Darr to affirm that both benefit and harm come from the same divine will that is entirely wise and just.",
   },
   {
     id: 93,
@@ -429,7 +471,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Guide",
     category: "af'al",
     root: "ه-د-ي",
-    description: "The sovereign guide who directs whomever He wills to the straight path — divine guidance (tawfiq) is an act from Him, while human choice operates within this framework.",
+    description:
+      "The sovereign guide who directs whomever He wills to the straight path — divine guidance (tawfiq) is an act from Him, while human choice operates within this framework.",
   },
   {
     id: 94,
@@ -439,7 +482,8 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Incomparable Originator",
     category: "af'al",
     root: "ب-د-ع",
-    description: "He who creates in ways that have no precedent or parallel — every act of creation is unprecedented because it flows from an essence that is itself incomparable.",
+    description:
+      "He who creates in ways that have no precedent or parallel — every act of creation is unprecedented because it flows from an essence that is itself incomparable.",
   },
   {
     id: 96,
@@ -449,6 +493,7 @@ export const AFAL_NAMES: DivineName[] = [
     meaning: "The Inheritor",
     category: "af'al",
     root: "و-ر-ث",
-    description: "He to whom all returns after the passing of every created owner — the final and only enduring possessor when all created claims have expired.",
+    description:
+      "He to whom all returns after the passing of every created owner — the final and only enduring possessor when all created claims have expired.",
   },
 ];
