@@ -6,6 +6,9 @@ import {
   getNamesByCategory,
   type NameCategory,
 } from "@/lib/names/divine-names";
+import { AFAL_NAMES } from "@/lib/names/divine-names/data/afal";
+import { DHAT_NAMES } from "@/lib/names/divine-names/data/dhat";
+import { SIFAT_NAMES } from "@/lib/names/divine-names/data/sifat";
 
 describe("DIVINE_NAMES", () => {
   it("contains exactly 99 entries", () => {
@@ -53,6 +56,30 @@ describe("DIVINE_NAMES", () => {
       const names = DIVINE_NAMES.filter((n) => n.category === cat);
       expect(names.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("divine name data modules", () => {
+  const categoryModules: Array<{ category: NameCategory; names: typeof DIVINE_NAMES }> = [
+    { category: "dhat", names: DHAT_NAMES },
+    { category: "sifat", names: SIFAT_NAMES },
+    { category: "af'al", names: AFAL_NAMES },
+  ];
+
+  it("keeps each split data module scoped to one category", () => {
+    for (const { category, names } of categoryModules) {
+      expect(names.length).toBeGreaterThan(0);
+      expect(names.every((name) => name.category === category)).toBe(true);
+    }
+  });
+
+  it("combines split data modules into canonical id order", () => {
+    const combined = [...DHAT_NAMES, ...SIFAT_NAMES, ...AFAL_NAMES];
+    const sorted = [...combined].sort((a, b) => a.id - b.id);
+
+    expect(combined).toHaveLength(99);
+    expect(new Set(combined.map((name) => name.id)).size).toBe(99);
+    expect(DIVINE_NAMES.map((name) => name.slug)).toEqual(sorted.map((name) => name.slug));
   });
 });
 
