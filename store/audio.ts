@@ -38,6 +38,12 @@ function getAudio(): HTMLAudioElement {
   return _audio!;
 }
 
+// Monotonically increasing generation counter. Each play call captures the
+// current token; stale .then/.catch callbacks from superseded requests
+// check the token and skip their state updates, preventing race conditions
+// when the user switches tracks faster than a play() promise settles.
+let playGen = 0;
+
 function loadAndPlay(verse: AudioVerse, onEnded: () => void) {
   const a = getAudio();
   a.onended = onEnded;
@@ -55,6 +61,7 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
   queueIndex: 0,
 
   playVerse: (verse) => {
+    const token = ++playGen;
     set({
       currentRef: verse.ref,
       currentSurahName: verse.surahName,
@@ -64,13 +71,18 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
       queueIndex: 0,
     });
     loadAndPlay(verse, () => get()._onEnded())
-      .then(() => set({ isLoading: false }))
-      .catch(() => set({ isPlaying: false, isLoading: false }));
+      .then(() => {
+        if (token === playGen) set({ isLoading: false });
+      })
+      .catch(() => {
+        if (token === playGen) set({ isPlaying: false, isLoading: false });
+      });
   },
 
   playGraph: (verses) => {
     if (verses.length === 0) return;
     const first = verses[0];
+    const token = ++playGen;
     set({
       currentRef: first.ref,
       currentSurahName: first.surahName,
@@ -80,8 +92,12 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
       queueIndex: 0,
     });
     loadAndPlay(first, () => get()._onEnded())
-      .then(() => set({ isLoading: false }))
-      .catch(() => set({ isPlaying: false, isLoading: false }));
+      .then(() => {
+        if (token === playGen) set({ isLoading: false });
+      })
+      .catch(() => {
+        if (token === playGen) set({ isPlaying: false, isLoading: false });
+      });
   },
 
   pause: () => {
@@ -120,6 +136,7 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
       return;
     }
     const verse = queue[nextIdx];
+    const token = ++playGen;
     set({
       currentRef: verse.ref,
       currentSurahName: verse.surahName,
@@ -127,8 +144,12 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
       isLoading: true,
     });
     loadAndPlay(verse, () => get()._onEnded())
-      .then(() => set({ isLoading: false }))
-      .catch(() => set({ isPlaying: false, isLoading: false }));
+      .then(() => {
+        if (token === playGen) set({ isLoading: false });
+      })
+      .catch(() => {
+        if (token === playGen) set({ isPlaying: false, isLoading: false });
+      });
   },
 
   prev: () => {
@@ -136,6 +157,7 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
     const prevIdx = queueIndex - 1;
     if (prevIdx < 0) return;
     const verse = queue[prevIdx];
+    const token = ++playGen;
     set({
       currentRef: verse.ref,
       currentSurahName: verse.surahName,
@@ -143,8 +165,12 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
       isLoading: true,
     });
     loadAndPlay(verse, () => get()._onEnded())
-      .then(() => set({ isLoading: false }))
-      .catch(() => set({ isPlaying: false, isLoading: false }));
+      .then(() => {
+        if (token === playGen) set({ isLoading: false });
+      })
+      .catch(() => {
+        if (token === playGen) set({ isPlaying: false, isLoading: false });
+      });
   },
 
   _onEnded: () => {
