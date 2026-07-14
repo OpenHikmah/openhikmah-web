@@ -12,6 +12,7 @@ import {
   Check,
   AlertCircle,
   LogIn,
+  Download,
 } from "lucide-react";
 import { Panel, useReactFlow } from "@xyflow/react";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,13 @@ import { useAudioStore } from "@/store/audio";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 import { buildShareUrl } from "@/hooks/useCanvasPersistence";
 import { buildAuthUrl } from "@/lib/auth/pkce";
+import {
+  exportCanvasToPng,
+  exportCanvasToPdf,
+  downloadDataUrl,
+  downloadBlob,
+} from "@/lib/canvas/canvas-export";
+import { ExportMenu } from "./ExportMenu";
 import type { AudioVerse } from "@/store/audio";
 import type { Verse } from "@/types/quran";
 
@@ -68,6 +76,9 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(false);
 
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
@@ -135,6 +146,26 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
       // Building the auth URL failed (e.g. crypto unavailable) — re-enable the
       // button instead of leaving it stuck on "signing in".
       setSigningIn(false);
+    }
+  };
+
+  const handleExport = async (format: "png" | "pdf") => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const stamp = new Date().toISOString().slice(0, 10);
+      if (format === "png") {
+        const dataUrl = await exportCanvasToPng(nodes);
+        downloadDataUrl(dataUrl, `hikmah-canvas-${stamp}.png`);
+      } else {
+        const blob = await exportCanvasToPdf(nodes);
+        downloadBlob(blob, `hikmah-canvas-${stamp}.pdf`);
+      }
+    } catch {
+      setExportError(true);
+      setTimeout(() => setExportError(false), 2500);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -212,6 +243,27 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
             Sign in to save
           </ToolbarBtn>
         )}
+
+        <div className="relative">
+          <ToolbarBtn
+            onClick={() => setExportMenuOpen((v) => !v)}
+            disabled={exporting || nodes.length === 0}
+            active={exportMenuOpen}
+            className={exportError ? "text-error" : undefined}
+          >
+            {exporting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : exportError ? (
+              <AlertCircle className="h-3.5 w-3.5" />
+            ) : (
+              <Download className="h-3.5 w-3.5" />
+            )}
+            {exporting ? "Exporting…" : exportError ? "Failed" : "Export"}
+          </ToolbarBtn>
+          {exportMenuOpen && (
+            <ExportMenu onSelect={handleExport} onClose={() => setExportMenuOpen(false)} />
+          )}
+        </div>
 
         <ToolbarBtn onClick={() => reactFlow.fitView({ padding: 0.35, maxZoom: 1, duration: 400 })}>
           <Maximize2 className="h-3.5 w-3.5" />
