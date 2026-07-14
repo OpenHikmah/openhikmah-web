@@ -1,3 +1,4 @@
+import "@/lib/env";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Amiri } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
