@@ -7,6 +7,11 @@ import { isValidRef } from "@/lib/quran/quran-corpus";
 import { jsonError, parseJson } from "@/lib/infra/http";
 import { rateLimitOrNull } from "@/lib/infra/rate-limit";
 
+// A study note is free text, not a serialized payload (contrast with
+// workspace's 512KB canvas cap) — bounded generously for a long personal
+// reflection while still closing the unbounded-text DB bloat gap.
+const MAX_NOTE_LENGTH = 10_000;
+
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
@@ -49,6 +54,9 @@ export async function POST(req: NextRequest) {
   }
   if (!note) {
     return jsonError("Missing note", 400);
+  }
+  if (note.length > MAX_NOTE_LENGTH) {
+    return jsonError(`Note too long (max ${MAX_NOTE_LENGTH} characters)`, 400);
   }
 
   try {

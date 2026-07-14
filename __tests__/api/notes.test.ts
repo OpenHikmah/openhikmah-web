@@ -144,6 +144,19 @@ describe("POST /api/notes", () => {
     expect((await POST(req("POST", { ref: "2:255" }))).status).toBe(400);
   });
 
+  it("400 when note exceeds the max length", async () => {
+    authed();
+    const res = await POST(req("POST", { ref: "2:255", note: "x".repeat(10_001) }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/too long/i);
+  });
+
+  it("201 when note is exactly at the max length", async () => {
+    authed();
+    const res = await POST(req("POST", { ref: "2:255", note: "x".repeat(10_000) }));
+    expect(res.status).toBe(201);
+  });
+
   it("201 when note is created", async () => {
     authed();
     const res = await POST(req("POST", { ref: "2:255", note: "reflection" }));
