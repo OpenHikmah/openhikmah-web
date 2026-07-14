@@ -18,7 +18,7 @@ jobs:
     name: Lint · Type-check · Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -47,7 +47,7 @@ jobs:
     # GitHub-hosted ubuntu runners have a running Docker daemon, so
     # Testcontainers spins up Postgres without extra setup.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -80,7 +80,7 @@ jobs:
       NEXT_PUBLIC_QF_AUTH_BASE: https://placeholder.example.com
       DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -101,7 +101,7 @@ jobs:
 
       - name: Check out base branch for bundle comparison
         if: github.event_name == 'pull_request'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         continue-on-error: true
         with:
           persist-credentials: false
@@ -191,7 +191,7 @@ jobs:
       NEXT_PUBLIC_APP_URL: http://localhost:3100
       NEXT_PUBLIC_QF_AUTH_BASE: https://placeholder.example.com
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
