@@ -108,14 +108,53 @@ describe("GET /api/social/friends", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns empty array when user has no friends", async () => {
+  it("returns { items: [], hasMore: false } when user has no friends", async () => {
     authedAs(makeUser());
     mockSelect.mockReturnValue(makeDbChain([]));
     const res = await GET(makeGetReq());
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
-    expect(body).toHaveLength(0);
+    expect(Array.isArray(body.items)).toBe(true);
+    expect(body.items).toHaveLength(0);
+    expect(body.hasMore).toBe(false);
+  });
+
+  it("paginates via limit/offset and reports hasMore", async () => {
+    authedAs(makeUser({ id: 1 }));
+    // Route asks for limit+1 rows to detect hasMore; give it limit+1 = 2 for limit=1.
+    mockSelect
+      .mockReturnValueOnce(
+        makeDbChain([
+          { id: 1, requesterId: 1, addresseeId: 2, status: "accepted", createdAt: new Date() },
+          { id: 2, requesterId: 1, addresseeId: 3, status: "accepted", createdAt: new Date() },
+        ])
+      )
+      .mockReturnValueOnce(makeDbChain([{ id: 2, username: "friend2", currentStreak: 1 }]));
+    const req = new NextRequest("http://localhost/api/social/friends?limit=1&offset=0", {
+      headers: { Authorization: "Bearer valid-token" },
+    });
+    const res = await GET(req);
+    const body = await res.json();
+    expect(body.items).toHaveLength(1);
+    expect(body.hasMore).toBe(true);
+  });
+
+  it("hasMore is false on the last page", async () => {
+    authedAs(makeUser({ id: 1 }));
+    mockSelect
+      .mockReturnValueOnce(
+        makeDbChain([
+          { id: 1, requesterId: 1, addresseeId: 2, status: "accepted", createdAt: new Date() },
+        ])
+      )
+      .mockReturnValueOnce(makeDbChain([{ id: 2, username: "friend2", currentStreak: 1 }]));
+    const req = new NextRequest("http://localhost/api/social/friends?limit=1&offset=0", {
+      headers: { Authorization: "Bearer valid-token" },
+    });
+    const res = await GET(req);
+    const body = await res.json();
+    expect(body.items).toHaveLength(1);
+    expect(body.hasMore).toBe(false);
   });
 });
 

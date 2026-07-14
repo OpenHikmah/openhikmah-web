@@ -41,7 +41,11 @@ export default function SocialPage() {
 
   const [tab, setTab] = useState<Tab>("leaderboard");
   const [friends, setFriends] = useState<unknown[]>([]);
+  const [friendsHasMore, setFriendsHasMore] = useState(false);
+  const [loadingMoreFriends, setLoadingMoreFriends] = useState(false);
   const [leaderboard, setLeaderboard] = useState<unknown[]>([]);
+  const [leaderboardHasMore, setLeaderboardHasMore] = useState(false);
+  const [loadingMoreLeaderboard, setLoadingMoreLeaderboard] = useState(false);
   const [challengesList, setChallengesList] = useState<EnrichedChallenge[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [prefill, setPrefill] = useState<ChallengePrefill | null>(null);
@@ -86,10 +90,11 @@ export default function SocialPage() {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (res.ok) {
-        const data = await res.json();
-        setFriends(data);
+        const data: { items: unknown[]; hasMore: boolean } = await res.json();
+        setFriends(data.items);
+        setFriendsHasMore(data.hasMore);
         // Keep the header badge in sync immediately after any friend action.
-        setPendingFriendCount(countPendingReceived(data));
+        setPendingFriendCount(countPendingReceived(data.items));
         setFriendsError(false);
       } else {
         setFriendsError(true);
@@ -101,6 +106,23 @@ export default function SocialPage() {
     }
   }, [accessToken, setPendingFriendCount]);
 
+  const loadMoreFriends = useCallback(async () => {
+    if (!accessToken || loadingMoreFriends) return;
+    setLoadingMoreFriends(true);
+    try {
+      const res = await fetch(`/api/social/friends?offset=${friends.length}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.ok) {
+        const data: { items: unknown[]; hasMore: boolean } = await res.json();
+        setFriends((prev) => [...prev, ...data.items]);
+        setFriendsHasMore(data.hasMore);
+      }
+    } finally {
+      setLoadingMoreFriends(false);
+    }
+  }, [accessToken, friends.length, loadingMoreFriends]);
+
   const fetchLeaderboard = useCallback(async () => {
     if (!accessToken) return;
     setLoadingLeaderboard(true);
@@ -109,7 +131,9 @@ export default function SocialPage() {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (res.ok) {
-        setLeaderboard(await res.json());
+        const data: { items: unknown[]; hasMore: boolean } = await res.json();
+        setLeaderboard(data.items);
+        setLeaderboardHasMore(data.hasMore);
         setLeaderboardError(false);
       } else {
         setLeaderboardError(true);
@@ -120,6 +144,23 @@ export default function SocialPage() {
       setLoadingLeaderboard(false);
     }
   }, [accessToken]);
+
+  const loadMoreLeaderboard = useCallback(async () => {
+    if (!accessToken || loadingMoreLeaderboard) return;
+    setLoadingMoreLeaderboard(true);
+    try {
+      const res = await fetch(`/api/social/leaderboard?offset=${leaderboard.length}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.ok) {
+        const data: { items: unknown[]; hasMore: boolean } = await res.json();
+        setLeaderboard((prev) => [...prev, ...data.items]);
+        setLeaderboardHasMore(data.hasMore);
+      }
+    } finally {
+      setLoadingMoreLeaderboard(false);
+    }
+  }, [accessToken, leaderboard.length, loadingMoreLeaderboard]);
 
   const fetchChallenges = useCallback(async () => {
     if (!accessToken) return;
@@ -174,10 +215,11 @@ export default function SocialPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingFriends(true);
     fetch("/api/social/friends", { headers: { Authorization: `Bearer ${accessToken}` }, signal })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => {
-        setFriends(data);
-        setPendingFriendCount(countPendingReceived(data));
+      .then((r) => (r.ok ? r.json() : { items: [], hasMore: false }))
+      .then((data: { items: unknown[]; hasMore: boolean }) => {
+        setFriends(data.items);
+        setFriendsHasMore(data.hasMore);
+        setPendingFriendCount(countPendingReceived(data.items));
       })
       .catch(() => {})
       .finally(() => setLoadingFriends(false));
@@ -187,8 +229,11 @@ export default function SocialPage() {
       headers: { Authorization: `Bearer ${accessToken}` },
       signal,
     })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setLeaderboard(data))
+      .then((r) => (r.ok ? r.json() : { items: [], hasMore: false }))
+      .then((data: { items: unknown[]; hasMore: boolean }) => {
+        setLeaderboard(data.items);
+        setLeaderboardHasMore(data.hasMore);
+      })
       .catch(() => {})
       .finally(() => setLoadingLeaderboard(false));
 
@@ -297,13 +342,26 @@ export default function SocialPage() {
                     <Loader2 className="h-4 w-4 animate-spin text-teal" />
                   </div>
                 ) : (
-                  <FriendList
-                    friends={friends as Parameters<typeof FriendList>[0]["friends"]}
-                    onUpdate={() => {
-                      fetchFriends();
-                      fetchLeaderboard();
-                    }}
-                  />
+                  <>
+                    <FriendList
+                      friends={friends as Parameters<typeof FriendList>[0]["friends"]}
+                      onUpdate={() => {
+                        fetchFriends();
+                        fetchLeaderboard();
+                      }}
+                    />
+                    {friendsHasMore && (
+                      <div className="flex justify-center pt-2">
+                        <button
+                          onClick={loadMoreFriends}
+                          disabled={loadingMoreFriends}
+                          className="cursor-pointer text-xs text-teal underline disabled:cursor-wait disabled:opacity-50"
+                        >
+                          {loadingMoreFriends ? "Loading…" : "Load more"}
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -353,6 +411,17 @@ export default function SocialPage() {
                   <LeaderboardTable
                     entries={leaderboard as Parameters<typeof LeaderboardTable>[0]["entries"]}
                   />
+                )}
+                {!loadingLeaderboard && leaderboardHasMore && (
+                  <div className="flex justify-center pt-2">
+                    <button
+                      onClick={loadMoreLeaderboard}
+                      disabled={loadingMoreLeaderboard}
+                      className="cursor-pointer text-xs text-teal underline disabled:cursor-wait disabled:opacity-50"
+                    >
+                      {loadingMoreLeaderboard ? "Loading…" : "Load more"}
+                    </button>
+                  </div>
                 )}
                 {!loadingLeaderboard && leaderboard.length <= 1 && (
                   <p className="text-center text-xs text-text-muted">

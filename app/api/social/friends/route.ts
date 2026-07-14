@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { friendships, users } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
 import { rateLimitOrNull } from "@/lib/infra/rate-limit";
-import { isUniqueViolation } from "@/lib/infra/http";
+import { isUniqueViolation, parsePagination } from "@/lib/infra/http";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 
   const { userId } = authed;
+  const { limit, offset } = parsePagination(req);
 
+  // Fetch one extra row to detect `hasMore` without a separate count query.
   const rows = await db
     .select({
       id: friendships.id,
@@ -24,10 +26,15 @@ export async function GET(req: NextRequest) {
     .from(friendships)
     .innerJoin(users, eq(users.id, friendships.requesterId))
     .where(or(eq(friendships.requesterId, userId), eq(friendships.addresseeId, userId)))
-    .limit(500);
+    .orderBy(desc(friendships.createdAt))
+    .limit(limit + 1)
+    .offset(offset);
+
+  const hasMore = rows.length > limit;
+  const page = rows.slice(0, limit);
 
   // Enrich with the friend's username (the other side)
-  const friendIds = rows.map((r) => (r.requesterId === userId ? r.addresseeId : r.requesterId));
+  const friendIds = page.map((r) => (r.requesterId === userId ? r.addresseeId : r.requesterId));
 
   const friendUsers =
     friendIds.length > 0
@@ -43,7 +50,7 @@ export async function GET(req: NextRequest) {
 
   const friendMap = new Map(friendUsers.map((u) => [u.id, u]));
 
-  const result = rows.map((r) => {
+  const items = page.map((r) => {
     const friendId = r.requesterId === userId ? r.addresseeId : r.requesterId;
     const friend = friendMap.get(friendId);
     return {
@@ -57,7 +64,7 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  return NextResponse.json(result);
+  return NextResponse.json({ items, hasMore });
 }
 
 export async function POST(req: NextRequest) {

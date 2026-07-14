@@ -87,13 +87,16 @@ export function Header({ onSearchOpen }: HeaderProps) {
   // Poll for incoming friend requests every 60 s while signed in
   useEffect(() => {
     if (!accessToken || !userId) return;
+    // limit=200 (the pagination max) rather than the default page size: this
+    // poll only needs an accurate pending-request count, and defaulting to a
+    // small page could undercount for a user with many friends.
     const load = () =>
-      fetch("/api/social/friends", {
+      fetch("/api/social/friends?limit=200", {
         headers: { Authorization: `Bearer ${accessToken}` },
       })
-        .then((r) => (r.ok ? r.json() : []))
-        .then((data: { status: string; direction: string }[]) => {
-          const count = data.filter(
+        .then((r) => (r.ok ? r.json() : { items: [] }))
+        .then((data: { items: { status: string; direction: string }[] }) => {
+          const count = data.items.filter(
             (f) => f.status === "pending" && f.direction === "received"
           ).length;
           setPendingFriendCount(count);
