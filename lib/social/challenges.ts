@@ -79,7 +79,7 @@ export async function mapWithConcurrency<T>(
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
-const RESOLVE_CONCURRENCY = 8;
+export const RESOLVE_CONCURRENCY = 8;
 
 /**
  * Finalize any `active` challenges in `rows` whose window has ended: compute both
