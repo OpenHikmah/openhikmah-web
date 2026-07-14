@@ -245,10 +245,24 @@ async function verifiedJwtSub(token: string): Promise<string | null> {
   // are the classic JWT signature-bypass vectors.
   if (header.alg !== "RS256") return null;
 
-  // Reject expired tokens. Fail closed like every other check in this
-  // function: a missing or non-numeric exp is treated as invalid, not as
-  // "no expiry."
+  // Reject expired tokens. Fail closed like every other check — a missing or
+  // non-numeric exp is treated as invalid, not as "no expiry."
   if (typeof payload.exp !== "number" || payload.exp * 1000 <= Date.now()) return null;
+
+  // Validate audience (aud) — reject cross-client token replay.
+  // NextAuth / QF can issue tokens for multiple clients; the middle-tier API
+  // must only accept tokens whose audience includes OUR client ID.
+  const qfClientId = process.env.NEXT_PUBLIC_QF_CLIENT_ID;
+  if (qfClientId && payload.aud !== undefined) {
+    const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+    if (!audiences.some((a) => String(a) === qfClientId)) return null;
+  }
+
+  // Validate issuer (iss) — reject tokens minted by a different auth domain.
+  // QF uses the auth base URL (e.g. "https://oauth2.quran.foundation") as the
+  // issuer claim. If the token was issued by a different auth provider, refuse it.
+  const qfAuthBase = process.env.QF_AUTH_BASE;
+  if (qfAuthBase && typeof payload.iss === "string" && payload.iss !== qfAuthBase) return null;
 
   const keys = await fetchJwks();
   if (keys.length === 0) return null; // can't verify → caller uses userinfo
