@@ -11,6 +11,12 @@ export const contentType = OG_CONTENT_TYPE;
 export const dynamic = "force-dynamic";
 
 // Runs in the Node runtime (default) so the verse DB read works.
+//
+// The verse only changes once per UTC day, so the response is cached at the
+// edge for an hour (and served stale for up to a day while revalidating)
+// instead of hitting the DB on every crawler/browser fetch.
+const CACHE_HEADERS = { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" };
+
 export default async function Image() {
   const verse = await getVerseOfDay().catch(() => null);
 
@@ -21,7 +27,7 @@ export default async function Image() {
         body: "Explore the Qur'an as a connected graph.",
         footer: "openhikmah.com",
       }),
-      { ...size }
+      { ...size, headers: CACHE_HEADERS }
     );
   }
 
@@ -32,6 +38,6 @@ export default async function Image() {
       title: verse.surahName,
       body: clampBody(verse.translation),
     }),
-    { ...size }
+    { ...size, headers: CACHE_HEADERS }
   );
 }
