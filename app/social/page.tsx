@@ -221,7 +221,7 @@ export default function SocialPage() {
         setFriendsHasMore(data.hasMore);
         setPendingFriendCount(countPendingReceived(data.items));
       })
-      .catch(() => {})
+      .catch((e) => console.error("social: friends fetch failed", e))
       .finally(() => setLoadingFriends(false));
 
     setLoadingLeaderboard(true);
@@ -234,7 +234,7 @@ export default function SocialPage() {
         setLeaderboard(data.items);
         setLeaderboardHasMore(data.hasMore);
       })
-      .catch(() => {})
+      .catch((e) => console.error("social: leaderboard fetch failed", e))
       .finally(() => setLoadingLeaderboard(false));
 
     setLoadingChallenges(true);
@@ -244,7 +244,7 @@ export default function SocialPage() {
         setChallengesList(data);
         setPendingChallengeCount(countIncomingChallenges(data, userId));
       })
-      .catch(() => {})
+      .catch((e) => console.error("social: challenges fetch failed", e))
       .finally(() => setLoadingChallenges(false));
 
     fetch("/api/social/challenge-suggestions", {
@@ -253,7 +253,7 @@ export default function SocialPage() {
     })
       .then((r) => (r.ok ? r.json() : { suggestions: [] }))
       .then((data: { suggestions: Suggestion[] }) => setSuggestions(data.suggestions))
-      .catch(() => {});
+      .catch((e) => console.error("social: challenge-suggestions fetch failed", e));
 
     return () => ctrl.abort();
   }, [accessToken, userId, setPendingFriendCount, setPendingChallengeCount]);

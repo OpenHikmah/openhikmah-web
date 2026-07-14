@@ -80,7 +80,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
       .then((data) => {
         if (data?.streak !== undefined) bumpStreak(data.streak, data.longestStreak);
       })
-      .catch(() => {});
+      .catch((e) => console.error("header: streak hydration failed", e));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, userId]);
 
@@ -101,7 +101,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
           ).length;
           setPendingFriendCount(count);
         })
-        .catch(() => {});
+        .catch((e) => console.error("header: friend-request poll failed", e));
     load();
     const interval = setInterval(load, 60_000);
     return () => clearInterval(interval);

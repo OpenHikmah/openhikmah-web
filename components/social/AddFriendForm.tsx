@@ -43,7 +43,7 @@ export function AddFriendForm({ onAdded }: Props) {
       })
         .then((r) => (r.ok ? r.json() : []))
         .then((data: SearchResult[]) => setResults(data))
-        .catch(() => {})
+        .catch((e) => console.error("user-search: fetch failed", e))
         .finally(() => setSearching(false));
     }, 300);
     return () => {
