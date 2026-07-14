@@ -11,6 +11,12 @@ export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
 export const dynamic = "force-dynamic";
 
+// A canvas's shared data never changes once inserted, so a hit can be cached
+// forever; a miss/error is cached briefly in case the row appears shortly
+// after (e.g. replication lag) rather than being stuck for a year.
+const HIT_CACHE = { "Cache-Control": "public, immutable, no-transform, max-age=31536000" };
+const MISS_CACHE = { "Cache-Control": "public, max-age=300" };
+
 export default async function Image({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -20,7 +26,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
         eyebrow: "Open Hikmah",
         body: "Explore the Qur'an as a connected graph.",
       }),
-      { ...OG_SIZE }
+      { ...OG_SIZE, headers: MISS_CACHE }
     );
 
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) {
@@ -56,6 +62,6 @@ export default async function Image({ params }: { params: Promise<{ id: string }
       title: first.verse.surahName,
       body: clampBody(first.verse.translation),
     }),
-    { ...OG_SIZE }
+    { ...OG_SIZE, headers: HIT_CACHE }
   );
 }
