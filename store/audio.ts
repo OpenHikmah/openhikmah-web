@@ -71,8 +71,12 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
       queueIndex: 0,
     });
     loadAndPlay(verse, () => get()._onEnded())
-      .then(() => { if (token === playGen) set({ isLoading: false }); })
-      .catch(() => { if (token === playGen) set({ isPlaying: false, isLoading: false }); });
+      .then(() => {
+        if (token === playGen) set({ isLoading: false });
+      })
+      .catch(() => {
+        if (token === playGen) set({ isPlaying: false, isLoading: false });
+      });
   },
 
   playGraph: (verses) => {
@@ -88,8 +92,12 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
       queueIndex: 0,
     });
     loadAndPlay(first, () => get()._onEnded())
-      .then(() => { if (token === playGen) set({ isLoading: false }); })
-      .catch(() => { if (token === playGen) set({ isPlaying: false, isLoading: false }); });
+      .then(() => {
+        if (token === playGen) set({ isLoading: false });
+      })
+      .catch(() => {
+        if (token === playGen) set({ isPlaying: false, isLoading: false });
+      });
   },
 
   pause: () => {
@@ -136,8 +144,12 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
       isLoading: true,
     });
     loadAndPlay(verse, () => get()._onEnded())
-      .then(() => { if (token === playGen) set({ isLoading: false }); })
-      .catch(() => { if (token === playGen) set({ isPlaying: false, isLoading: false }); });
+      .then(() => {
+        if (token === playGen) set({ isLoading: false });
+      })
+      .catch(() => {
+        if (token === playGen) set({ isPlaying: false, isLoading: false });
+      });
   },
 
   prev: () => {
@@ -153,8 +165,12 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
       isLoading: true,
     });
     loadAndPlay(verse, () => get()._onEnded())
-      .then(() => { if (token === playGen) set({ isLoading: false }); })
-      .catch(() => { if (token === playGen) set({ isPlaying: false, isLoading: false }); });
+      .then(() => {
+        if (token === playGen) set({ isLoading: false });
+      })
+      .catch(() => {
+        if (token === playGen) set({ isPlaying: false, isLoading: false });
+      });
   },
 
   _onEnded: () => {
