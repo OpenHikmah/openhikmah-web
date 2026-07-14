@@ -55,6 +55,32 @@ export function clientKey(req: Request): string {
   return IP_PATTERN.test(candidate) ? candidate : "unknown";
 }
 
+export interface Pagination {
+  limit: number;
+  offset: number;
+}
+
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 200;
+
+/**
+ * Parses and clamps `limit`/`offset` query params for list endpoints.
+ * Invalid, missing, or out-of-range input is clamped to a sane value rather
+ * than rejected — pagination controls a response shape, not a validity
+ * boundary that should 400 the request.
+ */
+export function parsePagination(req: NextRequest): Pagination {
+  const params = req.nextUrl.searchParams;
+  const rawLimit = Number(params.get("limit"));
+  const rawOffset = Number(params.get("offset"));
+  const limit =
+    Number.isFinite(rawLimit) && rawLimit > 0
+      ? Math.min(Math.floor(rawLimit), MAX_LIMIT)
+      : DEFAULT_LIMIT;
+  const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
+  return { limit, offset };
+}
+
 /** Postgres unique-violation, possibly wrapped by the driver under `cause`. */
 export function isUniqueViolation(err: unknown): boolean {
   const code =

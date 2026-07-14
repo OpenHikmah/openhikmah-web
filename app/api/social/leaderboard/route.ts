@@ -4,12 +4,14 @@ import { db } from "@/lib/infra/db";
 import { friendships, users } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
 import { effectiveStreak } from "@/lib/social/streak";
+import { parsePagination } from "@/lib/infra/http";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 
   const { userId } = authed;
+  const { limit, offset } = parsePagination(req);
 
   // Get all accepted friend IDs
   const friendRows = await db
@@ -31,8 +33,11 @@ export async function GET(req: NextRequest) {
 
   // Include self on leaderboard
   const allIds = [userId, ...friendIds];
-  if (allIds.length === 0) return NextResponse.json([]);
+  if (allIds.length === 0) return NextResponse.json({ items: [], hasMore: false });
 
+  // Bounded by allIds.length (a WHERE...IN over a fixed id list can't return
+  // more rows than ids given) — no arbitrary row cap needed here, unlike a
+  // plain unbounded table scan.
   const rows = await db
     .select({
       id: users.id,
@@ -43,11 +48,12 @@ export async function GET(req: NextRequest) {
       lastActivityDate: users.lastActivityDate,
     })
     .from(users)
-    .where(or(...allIds.map((id) => eq(users.id, id))))
-    .limit(500);
+    .where(or(...allIds.map((id) => eq(users.id, id))));
 
   // Rank by the *effective* (decayed) streak so broken streaks don't sit at the
   // top stale, with deterministic tie-breakers: longest streak, then username.
+  // Ranking requires the full set (rank depends on every row's position), so
+  // pagination is applied to the already-ranked list, not the DB query.
   const ranked = rows
     .map((u) => ({ ...u, streak: effectiveStreak(u.currentStreak, u.lastActivityDate) }))
     .sort(
@@ -57,15 +63,18 @@ export async function GET(req: NextRequest) {
         a.username.localeCompare(b.username)
     );
 
-  return NextResponse.json(
-    ranked.map((u, i) => ({
-      rank: i + 1,
+  const page = ranked.slice(offset, offset + limit);
+
+  return NextResponse.json({
+    items: page.map((u, i) => ({
+      rank: offset + i + 1,
       id: u.id,
       username: u.username,
       displayName: u.displayName,
       streak: u.streak,
       longestStreak: u.longestStreak,
       isYou: u.id === userId,
-    }))
-  );
+    })),
+    hasMore: offset + limit < ranked.length,
+  });
 }

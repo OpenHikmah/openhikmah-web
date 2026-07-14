@@ -93,7 +93,7 @@ describe("GET /api/social/leaderboard", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns an array", async () => {
+  it("returns { items, hasMore }", async () => {
     authedAs(makeUser({ id: 1 }));
     mockSelect
       .mockReturnValueOnce(makeDbChain([]))
@@ -105,7 +105,8 @@ describe("GET /api/social/leaderboard", () => {
     const res = await GET(makeReq());
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
+    expect(Array.isArray(body.items)).toBe(true);
+    expect(body.hasMore).toBe(false);
   });
 
   it("self is included on leaderboard with isYou: true", async () => {
@@ -119,7 +120,7 @@ describe("GET /api/social/leaderboard", () => {
       );
     const res = await GET(makeReq());
     const body = await res.json();
-    const selfRow = body.find((r: { id: number }) => r.id === 1);
+    const selfRow = body.items.find((r: { id: number }) => r.id === 1);
     expect(selfRow).toBeDefined();
     expect(selfRow.isYou).toBe(true);
   });
@@ -140,7 +141,7 @@ describe("GET /api/social/leaderboard", () => {
     );
     const res = await GET(makeReq());
     const body = await res.json();
-    expect(body[0]).toMatchObject({
+    expect(body.items[0]).toMatchObject({
       rank: 1,
       streak: 7,
       longestStreak: 12,
@@ -176,8 +177,8 @@ describe("GET /api/social/leaderboard", () => {
       );
     const res = await GET(makeReq());
     const body = await res.json();
-    expect(body[0]).toMatchObject({ id: 1, rank: 1, streak: 3 });
-    expect(body[1]).toMatchObject({ id: 2, rank: 2, streak: 0 });
+    expect(body.items[0]).toMatchObject({ id: 1, rank: 1, streak: 3 });
+    expect(body.items[1]).toMatchObject({ id: 2, rank: 2, streak: 0 });
   });
 
   it("breaks ties deterministically by longest streak then username", async () => {
@@ -207,8 +208,8 @@ describe("GET /api/social/leaderboard", () => {
     const res = await GET(makeReq());
     const body = await res.json();
     // Equal current streak → higher longest streak wins.
-    expect(body[0]).toMatchObject({ id: 2, rank: 1 });
-    expect(body[1]).toMatchObject({ id: 1, rank: 2 });
+    expect(body.items[0]).toMatchObject({ id: 2, rank: 1 });
+    expect(body.items[1]).toMatchObject({ id: 1, rank: 2 });
   });
 
   it("friends are included alongside self", async () => {
@@ -223,10 +224,55 @@ describe("GET /api/social/leaderboard", () => {
       );
     const res = await GET(makeReq());
     const body = await res.json();
-    expect(body).toHaveLength(2);
-    const friendRow = body.find((r: { id: number }) => r.id === 2);
+    expect(body.items).toHaveLength(2);
+    const friendRow = body.items.find((r: { id: number }) => r.id === 2);
     expect(friendRow).toBeDefined();
     expect(friendRow.isYou).toBe(false);
     expect(friendRow.username).toBe("friend99");
+  });
+
+  it("paginates via limit/offset and reports hasMore", async () => {
+    authedAs(makeUser({ id: 1 }));
+    const rows = Array.from({ length: 3 }, (_, i) => ({
+      id: i + 1,
+      username: `user${i + 1}`,
+      displayName: null,
+      currentStreak: 10 - i,
+      longestStreak: 10 - i,
+      lastActivityDate: today,
+    }));
+    mockSelect.mockReturnValueOnce(makeDbChain([])).mockReturnValueOnce(makeDbChain(rows));
+
+    const req = new NextRequest("http://localhost/api/social/leaderboard?limit=2&offset=0", {
+      headers: { Authorization: "Bearer valid-token" },
+    });
+    const res = await GET(req);
+    const body = await res.json();
+    expect(body.items).toHaveLength(2);
+    expect(body.hasMore).toBe(true);
+    expect(body.items[0].rank).toBe(1);
+    expect(body.items[1].rank).toBe(2);
+  });
+
+  it("hasMore is false on the last page", async () => {
+    authedAs(makeUser({ id: 1 }));
+    const rows = Array.from({ length: 3 }, (_, i) => ({
+      id: i + 1,
+      username: `user${i + 1}`,
+      displayName: null,
+      currentStreak: 10 - i,
+      longestStreak: 10 - i,
+      lastActivityDate: today,
+    }));
+    mockSelect.mockReturnValueOnce(makeDbChain([])).mockReturnValueOnce(makeDbChain(rows));
+
+    const req = new NextRequest("http://localhost/api/social/leaderboard?limit=2&offset=2", {
+      headers: { Authorization: "Bearer valid-token" },
+    });
+    const res = await GET(req);
+    const body = await res.json();
+    expect(body.items).toHaveLength(1);
+    expect(body.hasMore).toBe(false);
+    expect(body.items[0].rank).toBe(3);
   });
 });
