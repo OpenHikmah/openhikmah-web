@@ -245,8 +245,10 @@ async function verifiedJwtSub(token: string): Promise<string | null> {
   // are the classic JWT signature-bypass vectors.
   if (header.alg !== "RS256") return null;
 
-  // Reject expired tokens.
-  if (typeof payload.exp === "number" && payload.exp * 1000 <= Date.now()) return null;
+  // Reject expired tokens. Fail closed like every other check in this
+  // function: a missing or non-numeric exp is treated as invalid, not as
+  // "no expiry."
+  if (typeof payload.exp !== "number" || payload.exp * 1000 <= Date.now()) return null;
 
   const keys = await fetchJwks();
   if (keys.length === 0) return null; // can't verify → caller uses userinfo

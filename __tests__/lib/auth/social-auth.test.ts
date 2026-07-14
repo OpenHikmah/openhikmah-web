@@ -98,6 +98,20 @@ describe("requireUser — JWT signature verification", () => {
     expect("status" in res && (res as Response).status).toBe(401);
   });
 
+  it("rejects a validly-signed token whose payload omits exp entirely (fails closed)", async () => {
+    mockLimit.mockResolvedValue([user]); // even if a row existed, we must not reach it
+    const token = makeJwt({ sub: "qf-sub-123" });
+    const res = await requireUser(reqWith(token));
+    expect("status" in res && (res as Response).status).toBe(401);
+  });
+
+  it("rejects a validly-signed token whose exp is non-numeric (fails closed)", async () => {
+    mockLimit.mockResolvedValue([user]);
+    const token = makeJwt({ sub: "qf-sub-123", exp: "not-a-number" });
+    const res = await requireUser(reqWith(token));
+    expect("status" in res && (res as Response).status).toBe(401);
+  });
+
   it("rejects the alg=none bypass", async () => {
     mockLimit.mockResolvedValue([user]);
     const token = makeJwt({ sub: "qf-sub-123", exp: farFuture }, { alg: "none", sign: false });
