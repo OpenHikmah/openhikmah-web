@@ -14,7 +14,7 @@ const MAX_VERSES = 24;
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ root: string }> }) {
   const { root: rawRoot } = await params;
-  const root = decodeURIComponent(rawRoot ?? "").trim();
+  const root = (rawRoot ?? "").trim();
 
   if (!root) {
     return NextResponse.json({ error: "Missing root" }, { status: 400 });
