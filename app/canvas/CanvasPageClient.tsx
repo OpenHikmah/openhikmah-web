@@ -63,7 +63,7 @@ function VerseLoader() {
         url.searchParams.delete("verse");
         window.history.replaceState(null, "", url.toString());
       })
-      .catch(() => {});
+      .catch((e) => console.error("canvas: incoming verse fetch failed", e));
   }, [searchParams, addVerseNode, setPendingAutoExpand]);
 
   return null;

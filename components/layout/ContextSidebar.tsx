@@ -93,7 +93,7 @@ function NotesSection({ verseRef }: { verseRef: string }) {
         setNotes(data);
         setLoaded(true);
       })
-      .catch(() => {});
+      .catch((e) => console.error("sidebar: notes fetch failed", e));
   }, [open, verseRef, accessToken, loaded]);
 
   const save = async () => {
@@ -127,7 +127,7 @@ function NotesSection({ verseRef }: { verseRef: string }) {
     await fetch(`/api/notes/${id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${accessToken}` },
-    }).catch(() => {});
+    }).catch((e) => console.error("sidebar: note delete failed", e));
     setNotes((prev) => prev.filter((n) => n.id !== id));
   };
 

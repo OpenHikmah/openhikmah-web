@@ -235,7 +235,7 @@ export async function POST(req: NextRequest) {
           lt(challenges.createdAt, cutoff)
         )
       )
-      .catch(() => {});
+      .catch((e) => console.error("challenges: cleanup prune failed", e));
   }
 
   return NextResponse.json(inserted, { status: 201 });

@@ -69,7 +69,7 @@ export function AccountMenu() {
     await fetch("/api/auth/signout", {
       method: "POST",
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-    }).catch(() => {});
+    }).catch((e) => console.error("signout: POST failed", e));
     clearAuth();
   };
 

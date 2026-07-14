@@ -24,7 +24,7 @@ export function StreakBadge() {
           bumpStreak(data.streak, data.longestStreak);
         }
       })
-      .catch(() => {});
+      .catch((e) => console.error("streak: failed to fetch streak", e));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, userId]);
 
