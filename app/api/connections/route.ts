@@ -6,6 +6,11 @@ import { clientKey } from "@/lib/infra/http";
 import type { EdgeKind } from "@/types/quran";
 
 const MAX_EXCLUDE_REFS = 100;
+// A single verse's Arabic text and translation are at most a few hundred
+// characters even for the longest ayahs — this is a generous but bounded cap
+// to close the unbounded-prompt-into-AI-call gap without risking false
+// rejections on legitimate verses.
+const MAX_TEXT_LENGTH = 5000;
 
 export async function POST(req: NextRequest) {
   let body: {
@@ -33,6 +38,10 @@ export async function POST(req: NextRequest) {
 
   if (!isValidRef(fromRef)) {
     return NextResponse.json({ error: "Invalid fromRef" }, { status: 400 });
+  }
+
+  if (arabicText.length > MAX_TEXT_LENGTH || translation.length > MAX_TEXT_LENGTH) {
+    return NextResponse.json({ error: "arabicText/translation too long" }, { status: 400 });
   }
 
   let excludeRefs: string[] = [];

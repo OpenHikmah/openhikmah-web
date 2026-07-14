@@ -154,6 +154,29 @@ describe("POST /api/connections", () => {
     expect(mockConsume).not.toHaveBeenCalled();
   });
 
+  it("returns 400 when arabicText exceeds the max length, without calling the AI path", async () => {
+    const req = makeRequest({
+      fromRef: "1:1",
+      kind: "thematic",
+      arabicText: "x".repeat(5001),
+      translation: "trans",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(mockConsume).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when translation exceeds the max length", async () => {
+    const req = makeRequest({
+      fromRef: "1:1",
+      kind: "thematic",
+      arabicText: "text",
+      translation: "x".repeat(5001),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
   it("returns 400 for a malformed fromRef", async () => {
     const req = makeRequest({
       fromRef: "garbage",
