@@ -9,7 +9,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ r
   if (authed instanceof NextResponse) return authed;
 
   const { ref } = await params;
-  const verseRef = decodeURIComponent(ref);
+  const verseRef = ref;
 
   try {
     await db
