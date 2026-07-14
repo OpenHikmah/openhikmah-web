@@ -28,7 +28,9 @@ function SessionRestorer() {
       if (!res.ok) {
         try {
           sessionStorage.removeItem("__devToken");
-        } catch (e) { console.error("dev: failed to clear __devToken", e); }
+        } catch (e) {
+          console.error("dev: failed to clear __devToken", e);
+        }
         console.warn("dev login failed — token rejected");
         return;
       }
@@ -37,7 +39,9 @@ function SessionRestorer() {
       // access token is in-memory only by design).
       try {
         sessionStorage.setItem("__devToken", token);
-      } catch (e) { console.error("dev: failed to persist __devToken", e); }
+      } catch (e) {
+        console.error("dev: failed to persist __devToken", e);
+      }
       const p = (await res.json()) as { id?: number; username?: string };
       if (p.id && p.username) setProfile({ userId: p.id, username: p.username });
       console.warn("dev login set — navigate to /admin");
@@ -46,7 +50,9 @@ function SessionRestorer() {
     let saved: string | null = null;
     try {
       saved = sessionStorage.getItem("__devToken");
-    } catch (e) { console.error("dev: failed to read __devToken", e); }
+    } catch (e) {
+      console.error("dev: failed to read __devToken", e);
+    }
     if (saved) void w.__devLogin(saved);
   }, [setTokens, setProfile]);
 
