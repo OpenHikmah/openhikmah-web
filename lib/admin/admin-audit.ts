@@ -1,5 +1,6 @@
 import { db } from "@/lib/infra/db";
 import { adminAuditLog } from "@/lib/infra/db/schema";
+import { incr } from "@/lib/infra/metrics";
 
 /**
  * Serialize `meta` defensively: a BigInt or circular reference must not throw and
@@ -40,5 +41,6 @@ export async function logAdminAction(entry: {
     });
   } catch (err) {
     console.error("Failed to write admin audit log:", entry.action, err);
+    incr("admin_audit_write_failed");
   }
 }
