@@ -54,7 +54,11 @@ const { mockRedisEnabled, mockGetRedis, mockRedisStatus } = vi.hoisted(() => {
     }),
   };
 });
-vi.mock("@/lib/infra/redis", () => ({ redisEnabled: mockRedisEnabled, getRedis: mockGetRedis, redisStatus: mockRedisStatus }));
+vi.mock("@/lib/infra/redis", () => ({
+  redisEnabled: mockRedisEnabled,
+  getRedis: mockGetRedis,
+  redisStatus: mockRedisStatus,
+}));
 
 const { mockCounterSnapshot, mockUptimeSeconds } = vi.hoisted(() => ({
   mockCounterSnapshot: vi.fn(() => ({})),
