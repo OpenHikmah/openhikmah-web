@@ -252,13 +252,17 @@ async function verifiedJwtSub(token: string): Promise<string | null> {
     return null;
   }
 
-  // Validate audience (aud) — reject cross-client token replay.
-  // NextAuth / QF can issue tokens for multiple clients; the middle-tier API
-  // must only accept tokens whose audience includes OUR client ID.
+  // Validate audience (aud) — reject cross-client token replay, when the token
+  // actually carries an audience claim. QF's Hydra instance does NOT populate
+  // `aud` on access tokens (confirmed: claims_supported is just ["sub"] in its
+  // OIDC discovery doc, and real production tokens arrive with no aud claim at
+  // all) — so a claim that's entirely ABSENT can't be evidence of anything and
+  // must not be treated as a rejection. A claim that IS present but doesn't
+  // include our client ID is still rejected: that's the actual cross-client
+  // replay case this check exists for.
   const qfClientId = process.env.NEXT_PUBLIC_QF_CLIENT_ID;
-  if (qfClientId) {
-    const audiences: unknown[] =
-      payload.aud === undefined ? [] : Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+  if (qfClientId && payload.aud !== undefined) {
+    const audiences: unknown[] = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
     if (!audiences.some((a) => String(a) === qfClientId)) {
       console.warn("jwt rejected: aud mismatch", { expected: qfClientId, actual: audiences });
       return null;
@@ -424,7 +428,11 @@ async function resolveQfIdFromUserinfo(accessToken: string): Promise<string | nu
     return null;
   }
 
-  const endpoints = [`${qfAuthBase}/oauth2/userinfo`, `${qfAuthBase}/auth/v1/me`];
+  // QF's real OIDC discovery doc (`${qfAuthBase}/.well-known/openid-configuration`)
+  // advertises `userinfo_endpoint` as `${qfAuthBase}/userinfo` — verified directly
+  // against production. The previously-guessed `/oauth2/userinfo` and `/auth/v1/me`
+  // paths 404 on QF's real server and never worked.
+  const endpoints = [`${qfAuthBase}/userinfo`];
 
   for (const url of endpoints) {
     try {
