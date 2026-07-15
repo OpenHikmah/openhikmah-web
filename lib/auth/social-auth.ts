@@ -253,8 +253,9 @@ async function verifiedJwtSub(token: string): Promise<string | null> {
   // NextAuth / QF can issue tokens for multiple clients; the middle-tier API
   // must only accept tokens whose audience includes OUR client ID.
   const qfClientId = process.env.NEXT_PUBLIC_QF_CLIENT_ID;
-  if (qfClientId && payload.aud !== undefined) {
-    const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+  if (qfClientId) {
+    const audiences: unknown[] =
+      payload.aud === undefined ? [] : Array.isArray(payload.aud) ? payload.aud : [payload.aud];
     if (!audiences.some((a) => String(a) === qfClientId)) return null;
   }
 
