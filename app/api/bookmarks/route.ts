@@ -5,6 +5,7 @@ import { bookmarks } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { jsonError, parseJson } from "@/lib/infra/http";
+import { rateLimitOrNull } from "@/lib/infra/rate-limit";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
@@ -30,6 +31,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
+
+  const limited = await rateLimitOrNull("bookmark:" + authed.userId, "Too many bookmarks");
+  if (limited) return limited;
 
   const body = await parseJson<{ ref?: string }>(req);
   if (!body) return jsonError("Invalid request body", 400);
