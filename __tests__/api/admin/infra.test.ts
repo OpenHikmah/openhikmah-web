@@ -37,7 +37,7 @@ vi.mock("@/lib/infra/db", () => ({ db: { $count: mockCount, delete: mockDelete }
 
 const { mockRedisEnabled, mockGetRedis, mockRedisStatus } = vi.hoisted(() => {
   const enabled = vi.fn(() => false);
-  const get = vi.fn(() => null);
+  const get = vi.fn<() => { ping: () => Promise<string> } | null>(() => null);
   return {
     mockRedisEnabled: enabled,
     mockGetRedis: get,
