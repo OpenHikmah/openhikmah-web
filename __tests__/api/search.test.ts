@@ -274,15 +274,15 @@ describe("GET /api/search", () => {
     expect((await res.json()).results[0].ref).toBe("2:1");
   });
 
-  it("does not rate-limit the keyword search response itself", async () => {
+  it("rate-limits the keyword search response when the search budget is exhausted", async () => {
     mockFetch.mockResolvedValueOnce(
       quranComResponse([{ verse_key: "1:1", translations: [{ text: "In the name of God" }] }])
     );
-    mockConsume.mockResolvedValue(false); // search-log budget exhausted
+    mockConsume.mockResolvedValue(false);
     const res = await GET(makeSearchReq("mercy"));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(429);
     const body = await res.json();
-    expect(body.results[0].ref).toBe("1:1");
+    expect(body.error).toBe("Too many search requests");
   });
 
   it("rate-limits the search-log write on the keyword path, within budget", async () => {

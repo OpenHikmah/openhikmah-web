@@ -1,7 +1,6 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { MiniPlayer } from "@/components/audio/MiniPlayer";
 import { TooltipProvider } from "@/components/ui";
 import { useAuthStore } from "@/store/auth";
@@ -106,25 +105,11 @@ function SessionRestorer() {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 60 * 1000,
-            retry: 1,
-          },
-        },
-      })
-  );
-
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider delayDuration={300}>
-        <SessionRestorer />
-        {children}
-        <MiniPlayer />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <TooltipProvider delayDuration={300}>
+      <SessionRestorer />
+      {children}
+      <MiniPlayer />
+    </TooltipProvider>
   );
 }
