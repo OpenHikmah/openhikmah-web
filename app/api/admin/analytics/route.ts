@@ -7,6 +7,22 @@ import { connections, users, searchLog } from "@/lib/infra/db/schema";
 const TOP_LIMIT = 10;
 const SEARCH_LOOKBACK_DAYS = 30;
 
+type SectionKey =
+  "topVerses" | "connectionsByKind" | "dau" | "popularSearches" | "zeroResultSearches";
+
+/** Unwraps a settled query result, recording a per-section error instead of failing the whole response. */
+function settle<T>(
+  result: PromiseSettledResult<T>,
+  key: SectionKey,
+  errors: Partial<Record<SectionKey, string>>,
+  fallback: T
+): T {
+  if (result.status === "fulfilled") return result.value;
+  console.error(`admin analytics GET db error (${key}):`, result.reason);
+  errors[key] = "Failed to load";
+  return fallback;
+}
+
 /**
  * Product-usage analytics for the admin panel: top verses explored, connection
  * volume by kind, DAU, and popular / zero-result search queries. Distinct from
@@ -28,8 +44,8 @@ export async function GET(req: NextRequest) {
     );
     const searchSince = new Date(now.getTime() - SEARCH_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
 
-    const [topVerses, connectionsByKind, dau, popularSearches, zeroResultSearches] =
-      await Promise.all([
+    const [topVersesR, connectionsByKindR, dauR, popularSearchesR, zeroResultSearchesR] =
+      await Promise.allSettled([
         // "Verses explored": the from-verse of every generated connection is the
         // verse a user expanded in the canvas (connections are only written on a
         // cache miss triggered by expansion) — the cheapest accurate proxy without
@@ -62,6 +78,13 @@ export async function GET(req: NextRequest) {
           .limit(TOP_LIMIT),
       ]);
 
+    const errors: Partial<Record<SectionKey, string>> = {};
+    const topVerses = settle(topVersesR, "topVerses", errors, []);
+    const connectionsByKind = settle(connectionsByKindR, "connectionsByKind", errors, []);
+    const dau = settle(dauR, "dau", errors, 0);
+    const popularSearches = settle(popularSearchesR, "popularSearches", errors, []);
+    const zeroResultSearches = settle(zeroResultSearchesR, "zeroResultSearches", errors, []);
+
     return NextResponse.json({
       topVerses,
       connectionsByKind,
@@ -71,6 +94,7 @@ export async function GET(req: NextRequest) {
         popular: popularSearches,
         zeroResult: zeroResultSearches,
       },
+      errors: Object.keys(errors).length ? errors : undefined,
     });
   } catch (err) {
     console.error("admin analytics GET db error:", err);
