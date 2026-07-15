@@ -4,6 +4,7 @@ import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { nameContent } from "@/lib/infra/db/schema";
+import { safeParse } from "@/lib/infra/http";
 
 const KINDS = ["verses", "reflection", "pairings"] as const;
 
@@ -111,13 +112,5 @@ export async function DELETE(req: NextRequest) {
   } catch (err) {
     console.error("admin names DELETE db error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-}
-
-function safeParse(s: string): unknown {
-  try {
-    return JSON.parse(s);
-  } catch {
-    return s;
   }
 }

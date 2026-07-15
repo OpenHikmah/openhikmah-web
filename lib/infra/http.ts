@@ -81,6 +81,18 @@ export function parsePagination(req: NextRequest): Pagination {
   return { limit, offset };
 }
 
+/**
+ * Parse a JSON string, returning the raw string on failure. Useful for
+ * admin list endpoints where DB columns store JSON-encoded values.
+ */
+export function safeParse(s: string): unknown {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return s;
+  }
+}
+
 /** Postgres unique-violation, possibly wrapped by the driver under `cause`. */
 export function isUniqueViolation(err: unknown): boolean {
   const code =
