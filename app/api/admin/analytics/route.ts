@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, gte, desc } from "drizzle-orm";
+import { sql, gte, desc, and, eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin/admin-auth";
 import { db } from "@/lib/infra/db";
 import { connections, users, searchLog } from "@/lib/infra/db/schema";
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
         db
           .select({ query: searchLog.query, count: sql<number>`count(*)::int` })
           .from(searchLog)
-          .where(sql`${searchLog.zeroResult} AND ${searchLog.createdAt} >= ${searchSince}`)
+          .where(and(eq(searchLog.zeroResult, true), gte(searchLog.createdAt, searchSince)))
           .groupBy(searchLog.query)
           .orderBy(desc(sql`count(*)`))
           .limit(TOP_LIMIT),
