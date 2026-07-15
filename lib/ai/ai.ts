@@ -85,7 +85,19 @@ async function embedViaRest(texts: string[]): Promise<number[][]> {
     throw new Error(`Embedding request failed: ${res.status} ${detail}`);
   }
   const data = (await res.json()) as { embeddings?: Array<{ values: number[] }> };
-  return (data.embeddings ?? []).map((e) => e.values);
+  if (!data.embeddings || data.embeddings.length !== texts.length) {
+    throw new Error(
+      `Embedding response missing embeddings: expected ${texts.length}, got ${data.embeddings?.length ?? 0}`
+    );
+  }
+  return data.embeddings.map((e, i) => {
+    if (!e.values || e.values.length !== EMBEDDING_DIMENSIONS) {
+      throw new Error(
+        `Embedding ${i} has invalid shape: expected ${EMBEDDING_DIMENSIONS} dims, got ${e.values?.length ?? 0}`
+      );
+    }
+    return e.values;
+  });
 }
 
 /** Embeds a single piece of text into a fixed-length semantic vector. */

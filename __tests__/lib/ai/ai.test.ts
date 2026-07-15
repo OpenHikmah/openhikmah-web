@@ -11,6 +11,12 @@ function jsonResponse(json: unknown, ok = true, status = 200) {
   } as Response;
 }
 
+function vec768(...seed: number[]): number[] {
+  const v = Array<number>(EMBEDDING_DIMENSIONS).fill(0);
+  for (let i = 0; i < seed.length && i < v.length; i++) v[i] = seed[i];
+  return v;
+}
+
 describe("embeddings", () => {
   beforeEach(() => {
     process.env.GEMINI_API_KEY = "test-key";
@@ -22,13 +28,14 @@ describe("embeddings", () => {
   });
 
   it("embed() returns the vector for a single text and requests 768 dims", async () => {
+    const expected = vec768(0.1, 0.2, 0.3);
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(jsonResponse({ embeddings: [{ values: [0.1, 0.2, 0.3] }] }));
+      .mockResolvedValue(jsonResponse({ embeddings: [{ values: expected }] }));
     vi.stubGlobal("fetch", fetchMock);
 
     const v = await embed("patience");
-    expect(v).toEqual([0.1, 0.2, 0.3]);
+    expect(v).toEqual(expected);
 
     const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
     expect(body.requests[0].content.parts[0].text).toBe("patience");
@@ -36,16 +43,19 @@ describe("embeddings", () => {
   });
 
   it("embedBatch() preserves input order", async () => {
+    const a = vec768(1);
+    const b = vec768(2);
+    const c = vec768(3);
     vi.stubGlobal(
       "fetch",
       vi
         .fn()
         .mockResolvedValue(
-          jsonResponse({ embeddings: [{ values: [1] }, { values: [2] }, { values: [3] }] })
+          jsonResponse({ embeddings: [{ values: a }, { values: b }, { values: c }] })
         )
     );
     const out = await embedBatch(["a", "b", "c"]);
-    expect(out).toEqual([[1], [2], [3]]);
+    expect(out).toEqual([a, b, c]);
   });
 
   it("embedBatch() short-circuits on empty input without calling the API", async () => {
