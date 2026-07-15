@@ -143,6 +143,20 @@ export function redisSubscribe(channel: string, onMessage: (message: string) => 
   });
 }
 
+/** Health-check the Redis connection. Returns "disabled" when Redis is
+ *  unconfigured or unreachable, "up" when PONG responds, or "down" on error. */
+export async function redisStatus(): Promise<"disabled" | "up" | "down"> {
+  if (!redisEnabled()) return "disabled";
+  try {
+    const client = getRedis();
+    if (!client) return "disabled";
+    const pong = await client.ping();
+    return pong === "PONG" ? "up" : "down";
+  } catch {
+    return "down";
+  }
+}
+
 /**
  * Atomically increments `key` and ensures it expires after `ttlSeconds`,
  * returning the new count. Returns null when Redis is disabled or errors, so

@@ -5,6 +5,7 @@ import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { featureFlags } from "@/lib/infra/db/schema";
 import { invalidateFlagCache, validateFlagType } from "@/lib/admin/feature-flags";
+import { safeParse } from "@/lib/infra/http";
 
 const KEY_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
 
@@ -107,13 +108,5 @@ export async function DELETE(req: NextRequest) {
   } catch (err) {
     console.error("admin flags DELETE db error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-}
-
-function safeParse(s: string): unknown {
-  try {
-    return JSON.parse(s);
-  } catch {
-    return s;
   }
 }

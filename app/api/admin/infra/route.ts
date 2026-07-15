@@ -3,19 +3,9 @@ import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { rateLimits } from "@/lib/infra/db/schema";
-import { redisEnabled, getRedis } from "@/lib/infra/redis";
+import { redisStatus } from "@/lib/infra/redis";
 import { counterSnapshot, uptimeSeconds } from "@/lib/infra/metrics";
 import { tokenCache, broadcastFlushTokenCache, clearJwksCache } from "@/lib/auth/social-auth";
-
-async function redisStatus(): Promise<"disabled" | "up" | "down"> {
-  if (!redisEnabled()) return "disabled";
-  try {
-    const pong = await getRedis()?.ping();
-    return pong === "PONG" ? "up" : "down";
-  } catch {
-    return "down";
-  }
-}
 
 /** Infrastructure snapshot: process metrics, cache sizes, Redis + rate-limit state. */
 export async function GET(req: NextRequest) {

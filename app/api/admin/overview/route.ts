@@ -3,20 +3,8 @@ import { sql, gte, eq, isNotNull } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin/admin-auth";
 import { db } from "@/lib/infra/db";
 import { users, connections, curatedVotd, aiGenerations } from "@/lib/infra/db/schema";
-import { redisEnabled, getRedis } from "@/lib/infra/redis";
+import { redisStatus } from "@/lib/infra/redis";
 import { votdDateKey } from "@/lib/quran/verse-of-day";
-
-async function redisStatus(): Promise<"disabled" | "up" | "down"> {
-  if (!redisEnabled()) return "disabled";
-  try {
-    const client = getRedis();
-    if (!client) return "disabled";
-    const pong = await client.ping();
-    return pong === "PONG" ? "up" : "down";
-  } catch {
-    return "down";
-  }
-}
 
 /** Dashboard snapshot for the Overview page. */
 export async function GET(req: NextRequest) {

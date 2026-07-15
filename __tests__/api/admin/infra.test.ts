@@ -35,11 +35,30 @@ const { mockCount, mockDelete } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/infra/db", () => ({ db: { $count: mockCount, delete: mockDelete } }));
 
-const { mockRedisEnabled, mockGetRedis } = vi.hoisted(() => ({
-  mockRedisEnabled: vi.fn(() => false),
-  mockGetRedis: vi.fn(() => null),
+const { mockRedisEnabled, mockGetRedis, mockRedisStatus } = vi.hoisted(() => {
+  const enabled = vi.fn(() => false);
+  const get = vi.fn<() => { ping: () => Promise<string> } | null>(() => null);
+  return {
+    mockRedisEnabled: enabled,
+    mockGetRedis: get,
+    mockRedisStatus: vi.fn(async () => {
+      if (!enabled()) return "disabled";
+      const client = get();
+      if (!client) return "disabled";
+      try {
+        const pong = await client.ping();
+        return pong === "PONG" ? "up" : "down";
+      } catch {
+        return "down";
+      }
+    }),
+  };
+});
+vi.mock("@/lib/infra/redis", () => ({
+  redisEnabled: mockRedisEnabled,
+  getRedis: mockGetRedis,
+  redisStatus: mockRedisStatus,
 }));
-vi.mock("@/lib/infra/redis", () => ({ redisEnabled: mockRedisEnabled, getRedis: mockGetRedis }));
 
 const { mockCounterSnapshot, mockUptimeSeconds } = vi.hoisted(() => ({
   mockCounterSnapshot: vi.fn(() => ({})),
