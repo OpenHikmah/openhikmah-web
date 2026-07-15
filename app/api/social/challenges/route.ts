@@ -68,13 +68,9 @@ export async function GET(req: NextRequest) {
     // (e.g. a challenge still in progress). Using mapWithConcurrency keeps the
     // round trips bounded instead of N*2 concurrent queries.
     const needsScoring = rows.filter(
-      (c) =>
-        (c.status === "active" || c.status === "completed") && !resolvedScores.has(c.id),
+      (c) => (c.status === "active" || c.status === "completed") && !resolvedScores.has(c.id)
     );
-    const computedScores = new Map<
-      number,
-      { challengerScore: number; challengedScore: number }
-    >();
+    const computedScores = new Map<number, { challengerScore: number; challengedScore: number }>();
     if (needsScoring.length > 0) {
       await mapWithConcurrency(needsScoring, RESOLVE_CONCURRENCY, async (c) => {
         const [challengerScore, challengedScore] = await Promise.all([
