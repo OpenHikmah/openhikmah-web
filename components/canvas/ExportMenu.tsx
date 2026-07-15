@@ -15,7 +15,7 @@ const OPTIONS: Array<{
   description: string;
   icon: typeof ImageIcon;
 }> = [
-  { format: "png", label: "PNG", description: "Image, transparent background", icon: ImageIcon },
+  { format: "png", label: "PNG", description: "Image, current theme background", icon: ImageIcon },
   { format: "pdf", label: "PDF", description: "Single-page document", icon: FileText },
 ];
 
