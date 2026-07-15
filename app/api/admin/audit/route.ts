@@ -3,6 +3,7 @@ import { desc } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin/admin-auth";
 import { db } from "@/lib/infra/db";
 import { adminAuditLog } from "@/lib/infra/db/schema";
+import { safeParse } from "@/lib/infra/http";
 
 /** Most-recent admin actions (newest first). `?limit=` caps the page (default 100). */
 export async function GET(req: NextRequest) {
@@ -33,13 +34,5 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error("admin audit GET db error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-}
-
-function safeParse(s: string): unknown {
-  try {
-    return JSON.parse(s);
-  } catch {
-    return s;
   }
 }
