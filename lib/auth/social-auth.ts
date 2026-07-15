@@ -247,7 +247,10 @@ async function verifiedJwtSub(token: string): Promise<string | null> {
 
   // Reject expired tokens. Fail closed like every other check — a missing or
   // non-numeric exp is treated as invalid, not as "no expiry."
-  if (typeof payload.exp !== "number" || payload.exp * 1000 <= Date.now()) return null;
+  if (typeof payload.exp !== "number" || payload.exp * 1000 <= Date.now()) {
+    console.warn("jwt rejected: expired or missing exp", { exp: payload.exp });
+    return null;
+  }
 
   // Validate audience (aud) — reject cross-client token replay.
   // NextAuth / QF can issue tokens for multiple clients; the middle-tier API
@@ -256,17 +259,26 @@ async function verifiedJwtSub(token: string): Promise<string | null> {
   if (qfClientId) {
     const audiences: unknown[] =
       payload.aud === undefined ? [] : Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-    if (!audiences.some((a) => String(a) === qfClientId)) return null;
+    if (!audiences.some((a) => String(a) === qfClientId)) {
+      console.warn("jwt rejected: aud mismatch", { expected: qfClientId, actual: audiences });
+      return null;
+    }
   }
 
   // Validate issuer (iss) — reject tokens minted by a different auth domain.
   // QF uses the auth base URL (e.g. "https://oauth2.quran.foundation") as the
   // issuer claim. If the token was issued by a different auth provider, refuse it.
   const qfAuthBase = process.env.QF_AUTH_BASE;
-  if (qfAuthBase && (typeof payload.iss !== "string" || payload.iss !== qfAuthBase)) return null;
+  if (qfAuthBase && (typeof payload.iss !== "string" || payload.iss !== qfAuthBase)) {
+    console.warn("jwt rejected: iss mismatch", { expected: qfAuthBase, actual: payload.iss });
+    return null;
+  }
 
   const keys = await fetchJwks();
-  if (keys.length === 0) return null; // can't verify → caller uses userinfo
+  if (keys.length === 0) {
+    console.warn("jwt rejected: no JWKS available");
+    return null; // can't verify → caller uses userinfo
+  }
 
   const candidates = header.kid ? keys.filter((k) => k.kid === header.kid) : keys;
   const signingInput = Buffer.from(`${parts[0]}.${parts[1]}`);
@@ -289,6 +301,7 @@ async function verifiedJwtSub(token: string): Promise<string | null> {
     }
   }
 
+  console.warn("jwt rejected: signature verification failed against all JWKS candidates");
   return null; // signature did not verify against any key
 }
 
@@ -348,14 +361,27 @@ export async function requireUser(req: NextRequest): Promise<AuthedUser | NextRe
   }
 
   // Stage 2 — QF userinfo slow path (handles opaque tokens and qfId format mismatches)
+  let userinfoQfId: string | null = null;
   if (!user) {
-    const qfId = await resolveQfIdFromUserinfo(token);
-    if (qfId) {
-      [user] = await db.select().from(users).where(eq(users.qfId, qfId)).limit(1);
+    userinfoQfId = await resolveQfIdFromUserinfo(token);
+    if (userinfoQfId) {
+      [user] = await db.select().from(users).where(eq(users.qfId, userinfoQfId)).limit(1);
     }
   }
 
   if (!user) {
+    console.warn("requireUser rejected: no user resolved", {
+      jwtSub,
+      userinfoQfId,
+      reason:
+        jwtSub && !userinfoQfId
+          ? "jwt sub had no matching users row and userinfo fallback also found nothing"
+          : !jwtSub && userinfoQfId
+            ? "jwt verification failed but userinfo resolved a qfId with no matching users row"
+            : !jwtSub && !userinfoQfId
+              ? "both jwt verification and userinfo fallback failed to resolve any qfId"
+              : "jwt sub resolved but no matching users row (qfId format mismatch?)",
+    });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -393,7 +419,10 @@ export async function resolveQfId(accessToken: string): Promise<string | null> {
  */
 async function resolveQfIdFromUserinfo(accessToken: string): Promise<string | null> {
   const qfAuthBase = process.env.QF_AUTH_BASE ?? "";
-  if (!qfAuthBase) return null;
+  if (!qfAuthBase) {
+    console.warn("userinfo fallback skipped: QF_AUTH_BASE is unset");
+    return null;
+  }
 
   const endpoints = [`${qfAuthBase}/oauth2/userinfo`, `${qfAuthBase}/auth/v1/me`];
 
@@ -403,12 +432,19 @@ async function resolveQfIdFromUserinfo(accessToken: string): Promise<string | nu
         headers: { Authorization: `Bearer ${accessToken}` },
         signal: AbortSignal.timeout(5000),
       });
-      if (!res.ok) continue;
+      if (!res.ok) {
+        console.warn("userinfo fallback: endpoint returned non-ok", { url, status: res.status });
+        continue;
+      }
       const data = (await res.json()) as Record<string, unknown>;
       const sub = (data.sub ?? data.id ?? data.user_id ?? data.userId) as string | undefined;
       if (sub) return String(sub);
-    } catch {
-      // Try next endpoint
+      console.warn("userinfo fallback: response had no recognizable sub/id field", {
+        url,
+        keys: Object.keys(data),
+      });
+    } catch (err) {
+      console.warn("userinfo fallback: request failed", { url, err });
     }
   }
 
