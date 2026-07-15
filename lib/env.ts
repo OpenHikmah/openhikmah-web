@@ -79,9 +79,7 @@ export function getAdminQfIds(): string[] {
 export function getAiProvider(): "claude" | "gemini" {
   const provider = env("AI_PROVIDER", "claude") as "claude" | "gemini";
   if (provider !== "claude" && provider !== "gemini") {
-    throw new Error(
-      `AI_PROVIDER must be "claude" or "gemini", got "${provider}"`
-    );
+    throw new Error(`AI_PROVIDER must be "claude" or "gemini", got "${provider}"`);
   }
   if (provider === "claude") {
     requireEnv("ANTHROPIC_API_KEY");
