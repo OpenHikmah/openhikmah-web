@@ -143,4 +143,21 @@ describe("GET /api/admin/analytics", () => {
     expect(body.search.zeroResult).toEqual([{ query: "xyzzy", count: 2 }]);
     expect(body.errors).toEqual({ dau: "Failed to load" });
   });
+
+  it("returns 503 when every query fails, instead of a 200 full of empty defaults", async () => {
+    mockSelect.mockReturnValue(makeDbErrorChain(new Error("db down")));
+    mockCount.mockImplementation(() => Promise.reject(new Error("db down")));
+
+    const res = await GET(req());
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.error).toBe("All analytics queries failed");
+    expect(body.errors).toEqual({
+      topVerses: "Failed to load",
+      connectionsByKind: "Failed to load",
+      dau: "Failed to load",
+      popularSearches: "Failed to load",
+      zeroResultSearches: "Failed to load",
+    });
+  });
 });

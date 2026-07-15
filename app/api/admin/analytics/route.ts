@@ -10,6 +10,8 @@ const SEARCH_LOOKBACK_DAYS = 30;
 type SectionKey =
   "topVerses" | "connectionsByKind" | "dau" | "popularSearches" | "zeroResultSearches";
 
+const SECTION_COUNT = 5;
+
 /** Unwraps a settled query result, recording a per-section error instead of failing the whole response. */
 function settle<T>(
   result: PromiseSettledResult<T>,
@@ -85,7 +87,7 @@ export async function GET(req: NextRequest) {
     const popularSearches = settle(popularSearchesR, "popularSearches", errors, []);
     const zeroResultSearches = settle(zeroResultSearchesR, "zeroResultSearches", errors, []);
 
-    return NextResponse.json({
+    const body = {
       topVerses,
       connectionsByKind,
       dau,
@@ -95,7 +97,17 @@ export async function GET(req: NextRequest) {
         zeroResult: zeroResultSearches,
       },
       errors: Object.keys(errors).length ? errors : undefined,
-    });
+    };
+
+    // All 5 queries failing means the DB itself is unreachable/down, not a
+    // one-off issue with a single query — surface that as a real outage
+    // (so uptime/alerting keyed on status code still catches it) rather than
+    // a 200 full of empty defaults.
+    if (Object.keys(errors).length === SECTION_COUNT) {
+      return NextResponse.json({ ...body, error: "All analytics queries failed" }, { status: 503 });
+    }
+
+    return NextResponse.json(body);
   } catch (err) {
     console.error("admin analytics GET db error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
