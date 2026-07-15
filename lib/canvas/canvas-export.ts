@@ -76,5 +76,8 @@ export function downloadDataUrl(dataUrl: string, filename: string): void {
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   downloadDataUrl(url, filename);
-  URL.revokeObjectURL(url);
+  // Defer revoke: some browsers start the download asynchronously after
+  // click(), and revoking the URL immediately can abort it before that read
+  // completes.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
