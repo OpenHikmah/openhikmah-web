@@ -42,10 +42,15 @@ function b64url(obj: unknown): string {
 
 function makeJwt(
   payload: object,
-  opts: { kid?: string; alg?: string; sign?: boolean } = {}
+  opts: { kid?: string; alg?: string; sign?: boolean; noAud?: boolean } = {}
 ): string {
+  const merged = { ...payload };
+  // The vitest setup sets NEXT_PUBLIC_QF_CLIENT_ID, so every JWT that goes
+  // through verifiedJwtSub must include a matching aud claim. Tests that
+  // deliberately test missing-aud rejection pass noAud:true.
+  if (!opts.noAud) (merged as Record<string, unknown>).aud = "test-client-id";
   const header = { alg: opts.alg ?? "RS256", typ: "JWT", kid: opts.kid ?? KID };
-  const body = `${b64url(header)}.${b64url(payload)}`;
+  const body = `${b64url(header)}.${b64url(merged)}`;
   if (opts.sign === false) return `${body}.not-a-real-signature`;
   const sig = cryptoSign("RSA-SHA256", Buffer.from(body), privateKey).toString("base64url");
   return `${body}.${sig}`;
@@ -82,6 +87,13 @@ describe("requireUser — JWT signature verification", () => {
     const token = makeJwt({ sub: "qf-sub-123", exp: farFuture });
     const res = await requireUser(reqWith(token));
     expect("userId" in res && res.userId).toBe(7);
+  });
+
+  it("rejects a token with a missing aud claim (fails closed)", async () => {
+    mockLimit.mockResolvedValue([user]);
+    const token = makeJwt({ sub: "qf-sub-123", exp: farFuture }, { noAud: true });
+    const res = await requireUser(reqWith(token));
+    expect("status" in res && (res as Response).status).toBe(401);
   });
 
   it("rejects a token whose signature does not verify (tampered)", async () => {
