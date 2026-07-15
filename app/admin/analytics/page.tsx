@@ -5,6 +5,9 @@ import { StatTile, Table, Th, Td, StateNote } from "@/components/admin/primitive
 import { useAdminFetch } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 
+type AnalyticsSectionKey =
+  "topVerses" | "connectionsByKind" | "dau" | "popularSearches" | "zeroResultSearches";
+
 interface AnalyticsResponse {
   topVerses: { fromRef: string; count: number }[];
   connectionsByKind: { kind: string; count: number }[];
@@ -14,6 +17,7 @@ interface AnalyticsResponse {
     popular: { query: string; count: number }[];
     zeroResult: { query: string; count: number }[];
   };
+  errors?: Partial<Record<AnalyticsSectionKey, string>>;
 }
 
 export default function AnalyticsPage() {
@@ -35,6 +39,14 @@ export default function AnalyticsPage() {
 
         {data && (
           <>
+            {(data.errors?.dau || data.errors?.connectionsByKind) && (
+              <StateNote tone="error">
+                {[data.errors?.dau && "DAU", data.errors?.connectionsByKind && "connection counts"]
+                  .filter(Boolean)
+                  .join(" and ")}{" "}
+                failed to load.
+              </StateNote>
+            )}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <StatTile label="DAU" value={data.dau} hint="Active in the last 24h" />
               {data.connectionsByKind.map((k) => (
@@ -48,7 +60,9 @@ export default function AnalyticsPage() {
             </div>
 
             <Section title="Top verses explored" subtitle="By generated-connection volume">
-              {data.topVerses.length === 0 ? (
+              {data.errors?.topVerses ? (
+                <StateNote tone="error">Failed to load.</StateNote>
+              ) : data.topVerses.length === 0 ? (
                 <StateNote>No connections generated yet.</StateNote>
               ) : (
                 <Table>
@@ -71,7 +85,9 @@ export default function AnalyticsPage() {
             </Section>
 
             <Section title="Popular searches" subtitle={`Last ${data.search.lookbackDays} days`}>
-              {data.search.popular.length === 0 ? (
+              {data.errors?.popularSearches ? (
+                <StateNote tone="error">Failed to load.</StateNote>
+              ) : data.search.popular.length === 0 ? (
                 <StateNote>No searches logged yet.</StateNote>
               ) : (
                 <Table>
@@ -94,7 +110,9 @@ export default function AnalyticsPage() {
             </Section>
 
             <Section title="Zero-result searches" subtitle="Feeds directly into content & curation">
-              {data.search.zeroResult.length === 0 ? (
+              {data.errors?.zeroResultSearches ? (
+                <StateNote tone="error">Failed to load.</StateNote>
+              ) : data.search.zeroResult.length === 0 ? (
                 <StateNote>No zero-result searches in this window.</StateNote>
               ) : (
                 <Table>
