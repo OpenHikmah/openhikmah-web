@@ -8,9 +8,7 @@ import { clientKey } from "@/lib/infra/http";
 import { logSearchQuery } from "@/lib/infra/search-log";
 import sanitizeHtml from "sanitize-html";
 
-// Semantic similarity has no natural cutoff across the whole corpus (every verse
-// has *some* similarity score), so we cap how many ranked matches we'll ever
-// paginate through — otherwise "page 40" would show near-random, irrelevant verses.
+const MAX_QUERY_LENGTH = 200;
 const SEMANTIC_RESULT_CAP = 100;
 
 interface KeywordSearchResult {
@@ -86,10 +84,8 @@ async function hydrate(
 
 /**
  * Records a search query for analytics, but only within a per-client budget.
- * The search endpoints are unauthenticated and intentionally unrate-limited
- * for the keyword path, so gating the *write* (not the response) keeps
- * scripted/spam traffic from growing search_log unbounded while still
- * serving results normally.
+ * Gating the *write* (not the response) keeps scripted/spam traffic from
+ * growing search_log unbounded while still serving results normally.
  */
 async function maybeLogSearchQuery(
   req: NextRequest,
@@ -118,6 +114,9 @@ export async function GET(req: NextRequest) {
   if (!q) {
     return NextResponse.json({ error: "Missing query" }, { status: 400 });
   }
+  if (q.length > MAX_QUERY_LENGTH) {
+    return NextResponse.json({ error: "Query too long" }, { status: 400 });
+  }
 
   if (/^\d+:\d+$/.test(q)) {
     const verse = await getVerse(q);
@@ -140,7 +139,6 @@ export async function GET(req: NextRequest) {
   // per-IP limit. In all of those we fall back to free keyword search so "by meaning"
   // is never blank, and it self-upgrades to true semantic results once embeddings exist.
   if (req.nextUrl.searchParams.get("mode") === "meaning") {
-    // The embedding call costs quota, so rate-limit it per client IP (keyword is free).
     const allowed = await consume(`search:${clientKey(req)}`);
     if (allowed) {
       try {
@@ -165,13 +163,16 @@ export async function GET(req: NextRequest) {
         console.error("Semantic search route error:", err);
       }
     }
-    // No semantic results (empty / error / rate-limited) → keyword fallback.
     const { results, total } = await keywordSearch(q, page, pageSize);
     const response: SearchResponse = { results, total, page, pageSize };
     await maybeLogSearchQuery(req, q, "keyword", total);
     return NextResponse.json(response, { headers: { "x-search-fallback": "keyword" } });
   }
 
+  const allowed = await consume(`search:${clientKey(req)}`);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many search requests" }, { status: 429 });
+  }
   const { results, total } = await keywordSearch(q, page, pageSize);
   const response: SearchResponse = { results, total, page, pageSize };
   await maybeLogSearchQuery(req, q, "keyword", total);
