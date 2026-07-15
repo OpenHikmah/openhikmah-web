@@ -106,7 +106,10 @@ describe("requireUser — JWT signature verification", () => {
 
   it("rejects a token with a mismatched iss claim", async () => {
     mockLimit.mockResolvedValue([user]);
-    const token = makeJwt({ sub: "qf-sub-123", exp: farFuture, iss: "https://wrong-issuer.test" }, { noIss: true });
+    const token = makeJwt(
+      { sub: "qf-sub-123", exp: farFuture, iss: "https://wrong-issuer.test" },
+      { noIss: true }
+    );
     const res = await requireUser(reqWith(token));
     expect("status" in res && (res as Response).status).toBe(401);
   });
