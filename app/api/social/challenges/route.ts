@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq, gte, lt, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, or } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { challenges, challengeSuggestions, friendships, users } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
 import {
   DURATIONS,
+  RESOLVE_CONCURRENCY,
+  mapWithConcurrency,
   scoreChallenge,
   resolveEndedChallenges,
   resolveExpiredPending,
@@ -19,35 +21,27 @@ export async function GET(req: NextRequest) {
   try {
     const now = new Date();
 
-    // Resolve EVERY ended-but-still-active challenge for this user first, unbounded
-    // by the display cap below — otherwise a stale one sitting beyond the newest 200
-    // rows would never be finalized. This self-heals on read, like the admin
-    // "finalize ended" route. Returns the scores it computed so we can reuse them.
-    const endedActive = await db
+    // Single query for all expired challenges (active or pending) instead of two
+    // separate SELECTs — halves the self-heal query overhead on every GET.
+    const expired = await db
       .select()
       .from(challenges)
       .where(
         and(
           or(eq(challenges.challengerId, userId), eq(challenges.challengedId, userId)),
-          eq(challenges.status, "active"),
+          inArray(challenges.status, ["active", "pending"]),
           lt(challenges.endsAt, now)
         )
       );
-    const resolvedScores = await resolveEndedChallenges(endedActive, now);
 
-    // Same self-heal for `pending` invites nobody acted on — otherwise an
-    // ignored invite permanently blocks the pair from a new challenge.
-    const expiredPending = await db
-      .select()
-      .from(challenges)
-      .where(
-        and(
-          or(eq(challenges.challengerId, userId), eq(challenges.challengedId, userId)),
-          eq(challenges.status, "pending"),
-          lt(challenges.endsAt, now)
-        )
-      );
-    await resolveExpiredPending(expiredPending, now);
+    const resolvedScores = await resolveEndedChallenges(
+      expired.filter((c) => c.status === "active"),
+      now
+    );
+    await resolveExpiredPending(
+      expired.filter((c) => c.status === "pending"),
+      now
+    );
 
     // Bound the per-user challenge list for the response (newest first). 200 is far
     // above any real user's volume; statuses are current after the resolution above.
@@ -69,28 +63,35 @@ export async function GET(req: NextRequest) {
         : [];
     const userMap = new Map(userRows.map((u) => [u.id, u.username]));
 
-    // Enrich with scores for active + completed challenges; reuse cached scores where available.
-    const enriched = await Promise.all(
-      rows.map(async (c) => {
-        const needsScores = c.status === "active" || c.status === "completed";
-        const cached = resolvedScores.get(c.id);
-        const [challengerScore, challengedScore] = cached
-          ? [cached.challengerScore, cached.challengedScore]
-          : needsScores
-            ? await Promise.all([
-                scoreChallenge(c.challengerId, c),
-                scoreChallenge(c.challengedId, c),
-              ])
-            : [0, 0];
-        return {
-          ...c,
-          challengerUsername: userMap.get(c.challengerId) ?? null,
-          challengedUsername: userMap.get(c.challengedId) ?? null,
-          challengerScore,
-          challengedScore,
-        };
-      })
+    // Build a complete scores map: cached from the self-heal above, plus freshly
+    // computed for any active/completed challenge the self-heal didn't touch
+    // (e.g. a challenge still in progress). Using mapWithConcurrency keeps the
+    // round trips bounded instead of N*2 concurrent queries.
+    const needsScoring = rows.filter(
+      (c) => (c.status === "active" || c.status === "completed") && !resolvedScores.has(c.id)
     );
+    const computedScores = new Map<number, { challengerScore: number; challengedScore: number }>();
+    if (needsScoring.length > 0) {
+      await mapWithConcurrency(needsScoring, RESOLVE_CONCURRENCY, async (c) => {
+        const [challengerScore, challengedScore] = await Promise.all([
+          scoreChallenge(c.challengerId, c),
+          scoreChallenge(c.challengedId, c),
+        ]);
+        computedScores.set(c.id, { challengerScore, challengedScore });
+      });
+    }
+    const allScores = new Map([...resolvedScores, ...computedScores]);
+
+    const enriched = rows.map((c) => {
+      const s = allScores.get(c.id) ?? { challengerScore: 0, challengedScore: 0 };
+      return {
+        ...c,
+        challengerUsername: userMap.get(c.challengerId) ?? null,
+        challengedUsername: userMap.get(c.challengedId) ?? null,
+        challengerScore: s.challengerScore,
+        challengedScore: s.challengedScore,
+      };
+    });
 
     return NextResponse.json(enriched);
   } catch (err) {
