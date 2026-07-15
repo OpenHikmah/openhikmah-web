@@ -96,6 +96,20 @@ describe("requireUser — JWT signature verification", () => {
     expect("status" in res && (res as Response).status).toBe(401);
   });
 
+  it("rejects a token with a missing iss claim (fails closed)", async () => {
+    mockLimit.mockResolvedValue([user]);
+    const token = makeJwt({ sub: "qf-sub-123", exp: farFuture });
+    const res = await requireUser(reqWith(token));
+    expect("status" in res && (res as Response).status).toBe(401);
+  });
+
+  it("rejects a token with a mismatched iss claim", async () => {
+    mockLimit.mockResolvedValue([user]);
+    const token = makeJwt({ sub: "qf-sub-123", exp: farFuture, iss: "https://wrong-issuer.test" });
+    const res = await requireUser(reqWith(token));
+    expect("status" in res && (res as Response).status).toBe(401);
+  });
+
   it("rejects a token whose signature does not verify (tampered)", async () => {
     mockLimit.mockResolvedValue([user]); // even if a row existed, we must not reach it
     const token = makeJwt({ sub: "qf-sub-123", exp: farFuture }, { sign: false });

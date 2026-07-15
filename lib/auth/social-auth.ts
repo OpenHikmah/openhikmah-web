@@ -263,7 +263,7 @@ async function verifiedJwtSub(token: string): Promise<string | null> {
   // QF uses the auth base URL (e.g. "https://oauth2.quran.foundation") as the
   // issuer claim. If the token was issued by a different auth provider, refuse it.
   const qfAuthBase = process.env.QF_AUTH_BASE;
-  if (qfAuthBase && typeof payload.iss === "string" && payload.iss !== qfAuthBase) return null;
+  if (qfAuthBase && (typeof payload.iss !== "string" || payload.iss !== qfAuthBase)) return null;
 
   const keys = await fetchJwks();
   if (keys.length === 0) return null; // can't verify → caller uses userinfo
