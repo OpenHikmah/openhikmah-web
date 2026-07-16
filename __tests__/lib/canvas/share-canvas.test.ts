@@ -51,8 +51,14 @@ describe("isValidNode", () => {
     expect(isValidNode(nodeWith({ ref: "1:1", surahName: "x", translation: 1 }))).toBe(false);
   });
 
-  it("rejects a malformed shared-canvas payload attempting prototype pollution", () => {
-    const malicious = JSON.parse('{"verse": {"ref": "1:1", "__proto__": {"polluted": true}}}');
-    expect(isValidNode(malicious)).toBe(false);
+  it("ignores extra/unexpected fields and validates only ref/surahName/translation", () => {
+    // A `__proto__` key from JSON.parse is just an own data property, not the
+    // object's actual prototype — this asserts isValidNode doesn't get tripped
+    // up by it either way, as long as the three required fields are present.
+    const withExtraField = JSON.parse(
+      '{"verse": {"ref": "1:1", "surahName": "x", "translation": "y", "__proto__": {"polluted": true}}}'
+    );
+    expect(isValidNode(withExtraField)).toBe(true);
+    expect(Object.getPrototypeOf(withExtraField.verse)).toBe(Object.prototype);
   });
 });
