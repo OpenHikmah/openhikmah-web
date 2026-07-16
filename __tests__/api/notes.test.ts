@@ -25,16 +25,28 @@ function makeDbChain(resolveWith: unknown = []) {
   return chain;
 }
 
-const { mockSelect, mockInsert, mockRateLimitOrNull } = vi.hoisted(() => ({
-  mockSelect: vi.fn(() => makeDbChain([])),
-  mockInsert: vi.fn(() => makeDbChain([])),
-  mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
-}));
+const { mockSelect, mockInsert, mockRateLimitOrNull, mockResolveFriendMentions } = vi.hoisted(
+  () => ({
+    mockSelect: vi.fn(() => makeDbChain([])),
+    mockInsert: vi.fn(() => makeDbChain([])),
+    mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
+    mockResolveFriendMentions: vi.fn(async () => [] as Array<{ id: number; username: string }>),
+  })
+);
 
 vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect, insert: mockInsert } }));
 vi.mock("@/lib/infra/rate-limit", () => ({
   rateLimitOrNull: mockRateLimitOrNull,
 }));
+// Real parseMentionedUsernames (pure), mocked resolveFriendMentions (db-backed)
+// so mention tests don't need to mock the full friends/users query chain.
+vi.mock("@/lib/social/mentions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/social/mentions")>();
+  return {
+    parseMentionedUsernames: actual.parseMentionedUsernames,
+    resolveFriendMentions: mockResolveFriendMentions,
+  };
+});
 
 import { GET, POST } from "@/app/api/notes/route";
 import { requireUser } from "@/lib/auth/social-auth";
@@ -109,6 +121,8 @@ describe("POST /api/notes", () => {
     mockInsert.mockReturnValue(makeDbChain([{ id: 1, verseRef: "2:255", note: "hi" }]));
     mockRateLimitOrNull.mockReset();
     mockRateLimitOrNull.mockResolvedValue(null);
+    mockResolveFriendMentions.mockReset();
+    mockResolveFriendMentions.mockResolvedValue([]);
   });
 
   it("401 when unauthenticated", async () => {
@@ -162,5 +176,28 @@ describe("POST /api/notes", () => {
     const res = await POST(req("POST", { ref: "2:255", note: "reflection" }));
     expect(res.status).toBe(201);
     expect(mockInsert).toHaveBeenCalled();
+  });
+
+  it("does not resolve mentions when the note has no @mentions", async () => {
+    authed();
+    await POST(req("POST", { ref: "2:255", note: "no mentions here" }));
+    expect(mockResolveFriendMentions).not.toHaveBeenCalled();
+  });
+
+  it("inserts a note_mentions row for each resolved friend mention", async () => {
+    authed();
+    mockResolveFriendMentions.mockResolvedValue([{ id: 2, username: "bob" }]);
+    const res = await POST(req("POST", { ref: "2:255", note: "thanks @bob" }));
+    expect(res.status).toBe(201);
+    expect(mockResolveFriendMentions).toHaveBeenCalledWith(1, ["bob"]);
+    // First insert() call is the note itself; the second is the mentions batch.
+    expect(mockInsert).toHaveBeenCalledTimes(2);
+  });
+
+  it("still returns 201 when mention resolution throws (best-effort, non-fatal)", async () => {
+    authed();
+    mockResolveFriendMentions.mockRejectedValue(new Error("db down"));
+    const res = await POST(req("POST", { ref: "2:255", note: "thanks @bob" }));
+    expect(res.status).toBe(201);
   });
 });

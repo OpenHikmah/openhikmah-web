@@ -7,6 +7,7 @@ import {
   Award,
   FolderOpen,
   Trophy,
+  AtSign,
   LogOut,
   LogIn,
   ChevronDown,
@@ -25,6 +26,7 @@ export function AccountMenu() {
   const streak = useSocialStore((s) => s.streak);
   const longestStreak = useSocialStore((s) => s.longestStreak);
   const pendingFriendCount = useSocialStore((s) => s.pendingFriendCount);
+  const pendingMentionCount = useSocialStore((s) => s.pendingMentionCount);
 
   const [open, setOpen] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
@@ -191,6 +193,14 @@ export function AccountMenu() {
               {pendingFriendCount > 0 && (
                 <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-gold px-1 text-[10px] font-bold text-bg">
                   {pendingFriendCount > 9 ? "9+" : pendingFriendCount}
+                </span>
+              )}
+            </Link>
+            <Link href="/mentions" onClick={() => setOpen(false)} className={linkRow}>
+              <AtSign /> Mentions
+              {pendingMentionCount > 0 && (
+                <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-gold px-1 text-[10px] font-bold text-bg">
+                  {pendingMentionCount > 9 ? "9+" : pendingMentionCount}
                 </span>
               )}
             </Link>

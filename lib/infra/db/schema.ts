@@ -208,6 +208,30 @@ export const verseNotes = pgTable(
   (t) => [index("verse_notes_user_ref_idx").on(t.userId, t.verseRef)]
 );
 
+// @username mentions parsed out of a verse note at save time — friends-only
+// (resolved against the mentioning user's accepted friends, see
+// app/api/notes/route.ts), notifying the mentioned user. `noteId` cascades so
+// a deleted note takes its mentions with it.
+export const noteMentions = pgTable(
+  "note_mentions",
+  {
+    id: serial("id").primaryKey(),
+    noteId: integer("note_id")
+      .notNull()
+      .references(() => verseNotes.id, { onDelete: "cascade" }),
+    mentioningUserId: integer("mentioning_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    mentionedUserId: integer("mentioned_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    verseRef: text("verse_ref").notNull(),
+    read: boolean("read").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("note_mentions_mentioned_user_read_idx").on(t.mentionedUserId, t.read)]
+);
+
 // ─── Quran Corpus (local) ─────────────────────────────────────────────────────
 // The full Quran, seeded once. Replaces per-request fetches to alquran.cloud /
 // quran.com — see lib/quran-corpus.ts. Keyed by "surah:ayah".
@@ -495,6 +519,8 @@ export type NewChallengeSuggestion = typeof challengeSuggestions.$inferInsert;
 export type SharedCanvas = typeof sharedCanvases.$inferSelect;
 export type VerseNote = typeof verseNotes.$inferSelect;
 export type NewVerseNote = typeof verseNotes.$inferInsert;
+export type NoteMention = typeof noteMentions.$inferSelect;
+export type NewNoteMention = typeof noteMentions.$inferInsert;
 export type Bookmark = typeof bookmarks.$inferSelect;
 export type NewBookmark = typeof bookmarks.$inferInsert;
 export type SavedWorkspace = typeof savedWorkspaces.$inferSelect;

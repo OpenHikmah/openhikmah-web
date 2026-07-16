@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
-import { verseNotes } from "@/lib/infra/db/schema";
+import { noteMentions, verseNotes } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { jsonError, parseJson } from "@/lib/infra/http";
 import { rateLimitOrNull } from "@/lib/infra/rate-limit";
+import { parseMentionedUsernames, resolveFriendMentions } from "@/lib/social/mentions";
 
 // A study note is free text, not a serialized payload (contrast with
 // workspace's 512KB canvas cap) — bounded generously for a long personal
@@ -65,9 +66,43 @@ export async function POST(req: NextRequest) {
       .values({ userId: authed.userId, verseRef: ref, note })
       .returning();
 
+    await notifyMentions(inserted.id, authed.userId, ref, note);
+
     return NextResponse.json(inserted, { status: 201 });
   } catch (err) {
     console.error("notes POST db error:", err);
     return jsonError("Internal server error", 500);
+  }
+}
+
+/**
+ * Parses @username tokens out of a saved note and creates a mention row for
+ * each one that resolves to an accepted friend of the note's author (mentions
+ * are friends-only — see lib/social/mentions.ts). Best-effort: a mention
+ * failure must never fail the note save it's attached to.
+ */
+async function notifyMentions(
+  noteId: number,
+  mentioningUserId: number,
+  verseRef: string,
+  note: string
+): Promise<void> {
+  try {
+    const usernames = parseMentionedUsernames(note);
+    if (usernames.length === 0) return;
+
+    const mentioned = await resolveFriendMentions(mentioningUserId, usernames);
+    if (mentioned.length === 0) return;
+
+    await db.insert(noteMentions).values(
+      mentioned.map((u) => ({
+        noteId,
+        mentioningUserId,
+        mentionedUserId: u.id,
+        verseRef,
+      }))
+    );
+  } catch (err) {
+    console.error("notes POST: failed to record mentions:", err);
   }
 }
