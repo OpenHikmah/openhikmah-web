@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Search,
   Share2,
@@ -79,6 +79,22 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(false);
+  const exportContainerRef = useRef<HTMLDivElement>(null);
+
+  // Close on any click outside the export button/menu — panning the canvas,
+  // clicking a node, or clicking the minimap would otherwise leave it open
+  // (ReactFlow's onPaneClick only resets node-expansion state, not this).
+  // Mirrors the outside-click handling in components/layout/AccountMenu.tsx.
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (exportContainerRef.current && !exportContainerRef.current.contains(e.target as Node)) {
+        setExportMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [exportMenuOpen]);
 
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
@@ -244,7 +260,7 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
           </ToolbarBtn>
         )}
 
-        <div className="relative">
+        <div className="relative" ref={exportContainerRef}>
           <ToolbarBtn
             onClick={() => setExportMenuOpen((v) => !v)}
             disabled={exporting || nodes.length === 0}
