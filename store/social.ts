@@ -15,12 +15,14 @@ interface SocialStore {
   longestStreak: number;
   pendingFriendCount: number;
   pendingChallengeCount: number;
+  pendingMentionCount: number;
 
   setProfile: (profile: SocialProfile) => void;
   clearSocial: () => void;
   bumpStreak: (newStreak: number, newLongest?: number) => void;
   setPendingFriendCount: (count: number) => void;
   setPendingChallengeCount: (count: number) => void;
+  setPendingMentionCount: (count: number) => void;
 }
 
 export const useSocialStore = create<SocialStore>()(
@@ -32,6 +34,7 @@ export const useSocialStore = create<SocialStore>()(
       longestStreak: 0,
       pendingFriendCount: 0,
       pendingChallengeCount: 0,
+      pendingMentionCount: 0,
 
       setProfile: ({ userId, username }) => set({ userId, username }),
 
@@ -43,6 +46,7 @@ export const useSocialStore = create<SocialStore>()(
           longestStreak: 0,
           pendingFriendCount: 0,
           pendingChallengeCount: 0,
+          pendingMentionCount: 0,
         }),
 
       bumpStreak: (newStreak, newLongest) =>
@@ -54,6 +58,8 @@ export const useSocialStore = create<SocialStore>()(
       setPendingFriendCount: (count) => set({ pendingFriendCount: count }),
 
       setPendingChallengeCount: (count) => set({ pendingChallengeCount: count }),
+
+      setPendingMentionCount: (count) => set({ pendingMentionCount: count }),
     }),
     {
       name: "open-hikmah-social",

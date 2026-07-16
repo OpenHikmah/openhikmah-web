@@ -196,7 +196,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
   const accessToken = useAuthStore((s) => s.accessToken);
 
   const userId = useSocialStore((s) => s.userId);
-  const { bumpStreak, setPendingFriendCount } = useSocialStore();
+  const { bumpStreak, setPendingFriendCount, setPendingMentionCount } = useSocialStore();
 
   const playGraph = useAudioStore((s) => s.playGraph);
   const audioCurrentRef = useAudioStore((s) => s.currentRef);
@@ -234,6 +234,23 @@ export function Header({ onSearchOpen }: HeaderProps) {
           setPendingFriendCount(count);
         })
         .catch((e) => console.error("header: friend-request poll failed", e));
+    load();
+    const interval = setInterval(load, 60_000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken, userId]);
+
+  // Poll for unread @mentions every 60 s while signed in — same cadence and
+  // pattern as the friend-request poll above.
+  useEffect(() => {
+    if (!accessToken || !userId) return;
+    const load = () =>
+      fetch("/api/social/mentions?limit=1", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+        .then((r) => (r.ok ? r.json() : { unreadCount: 0 }))
+        .then((data: { unreadCount: number }) => setPendingMentionCount(data.unreadCount))
+        .catch((e) => console.error("header: mention poll failed", e));
     load();
     const interval = setInterval(load, 60_000);
     return () => clearInterval(interval);
