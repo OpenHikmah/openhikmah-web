@@ -19,6 +19,16 @@ export default defineConfig({
       reporter: ["text", "lcov"],
       include: ["lib/**", "store/**", "app/api/**"],
       exclude: ["node_modules", ".next"],
+      // Floor set a few points below the baseline measured 2026-07-16
+      // (statements 66.93%, branches 68.25%, functions 63.26%, lines 68.71%)
+      // so it catches regressions without blocking on day-to-day fluctuation.
+      // Ratchet these up over time as coverage improves.
+      thresholds: {
+        statements: 65,
+        branches: 65,
+        functions: 60,
+        lines: 65,
+      },
     },
   },
 });

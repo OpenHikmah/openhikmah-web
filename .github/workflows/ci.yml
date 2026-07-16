@@ -14,6 +14,32 @@ permissions:
   contents: read
 
 jobs:
+  secret-scan:
+    name: Secret Scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz \
+            | tar -xz -C /usr/local/bin gitleaks
+
+          # Scan only the commits being introduced by this push/PR, not the
+          # entire history — history may contain long-settled findings that
+          # are already public and don't need to be re-surfaced on every run.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            RANGE="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          elif [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            RANGE="${{ github.event.before }}..${{ github.event.after }}"
+          else
+            RANGE="-1"
+          fi
+          gitleaks detect --source . --redact --log-opts="$RANGE"
+
   lint-typecheck-test:
     name: Lint · Type-check · Test
     runs-on: ubuntu-latest
@@ -33,13 +59,13 @@ jobs:
         run: bun run format:check
 
       - name: Lint
-        run: bun run lint
+        run: bun run lint -- --max-warnings=0
 
       - name: Type-check
         run: bun run typecheck
 
-      - name: Test
-        run: bun run test:ci
+      - name: Test (with coverage)
+        run: bun run test:coverage
 
   integration:
     name: Integration (Testcontainers)

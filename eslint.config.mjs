@@ -14,6 +14,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Agent skill examples — not project code
     ".agents/**",
+    ".claude/**",
   ]),
   {
     // Recognize the underscore convention for intentionally-unused bindings
