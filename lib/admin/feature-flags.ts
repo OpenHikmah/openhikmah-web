@@ -80,6 +80,11 @@ const KNOWN_FLAG_TYPES: Record<string, FlagType> = {
   mutation_window_seconds: "number",
 };
 
+/** Exported so the admin UI can warn before deleting a key with real runtime effect. */
+export const KNOWN_OPERATIONAL_FLAG_KEYS: ReadonlySet<string> = new Set(
+  Object.keys(KNOWN_FLAG_TYPES)
+);
+
 /**
  * Checks `value`'s JS type against a known flag key's expected type. Returns
  * an error message on mismatch, or null when the key is unknown (unrestricted)
