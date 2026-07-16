@@ -27,7 +27,18 @@ jobs:
         run: |
           curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz \
             | tar -xz -C /usr/local/bin gitleaks
-          gitleaks detect --source . --redact
+
+          # Scan only the commits being introduced by this push/PR, not the
+          # entire history — history may contain long-settled findings that
+          # are already public and don't need to be re-surfaced on every run.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            RANGE="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          elif [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            RANGE="${{ github.event.before }}..${{ github.event.after }}"
+          else
+            RANGE="-1"
+          fi
+          gitleaks detect --source . --redact --log-opts="$RANGE"
 
   lint-typecheck-test:
     name: Lint · Type-check · Test
