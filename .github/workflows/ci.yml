@@ -14,6 +14,20 @@ permissions:
   contents: read
 
 jobs:
+  secret-scan:
+    name: Secret Scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   lint-typecheck-test:
     name: Lint · Type-check · Test
     runs-on: ubuntu-latest
@@ -33,13 +47,13 @@ jobs:
         run: bun run format:check
 
       - name: Lint
-        run: bun run lint
+        run: bun run lint -- --max-warnings=0
 
       - name: Type-check
         run: bun run typecheck
 
-      - name: Test
-        run: bun run test:ci
+      - name: Test (with coverage)
+        run: bun run test:coverage
 
   integration:
     name: Integration (Testcontainers)
