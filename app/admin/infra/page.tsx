@@ -123,7 +123,7 @@ export default function InfraPage() {
                   variant="danger"
                   disabled={busy}
                   onConfirm={() => run("reset-ratelimits")}
-                  confirmLabel="Reset limits?"
+                  confirmLabel="Reset ALL rate limits for every user and IP?"
                 >
                   Reset rate limits
                 </ConfirmButton>
