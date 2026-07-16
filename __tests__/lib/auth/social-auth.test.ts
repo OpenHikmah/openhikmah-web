@@ -90,9 +90,19 @@ describe("requireUser — JWT signature verification", () => {
     expect("userId" in res && res.userId).toBe(7);
   });
 
-  it("rejects a token with a missing aud claim (fails closed)", async () => {
+  it("accepts a token with no aud claim at all (QF's real tokens never carry one)", async () => {
     mockLimit.mockResolvedValue([user]);
     const token = makeJwt({ sub: "qf-sub-123", exp: farFuture }, { noAud: true });
+    const res = await requireUser(reqWith(token));
+    expect("userId" in res && res.userId).toBe(7);
+  });
+
+  it("rejects a token whose aud claim is present but doesn't include our client id", async () => {
+    mockLimit.mockResolvedValue([user]);
+    const token = makeJwt(
+      { sub: "qf-sub-123", exp: farFuture, aud: "some-other-client-id" },
+      { noAud: true }
+    );
     const res = await requireUser(reqWith(token));
     expect("status" in res && (res as Response).status).toBe(401);
   });
