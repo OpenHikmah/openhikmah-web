@@ -1,0 +1,8 @@
+# Known historic secrets in commit ba7b85fd (2026-05-19), already replaced with
+# placeholders at HEAD. Real values still live in git history until rotated with
+# Quran Foundation and purged from history — tracked separately by the repo owner.
+# Do not add new entries here without equivalent triage; this file allowlists
+# already-known findings, it does not suppress scanning for new ones.
+ba7b85fd625705fa6ee4c9c9b39b8885a567cb86:.env.example:generic-api-key:23
+ba7b85fd625705fa6ee4c9c9b39b8885a567cb86:.env.example:generic-api-key:29
+ba7b85fd625705fa6ee4c9c9b39b8885a567cb86:README.md:generic-api-key:149
