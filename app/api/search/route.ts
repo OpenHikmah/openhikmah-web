@@ -14,9 +14,14 @@ const SEMANTIC_RESULT_CAP = 100;
 interface KeywordSearchResult {
   results: SearchResult[];
   total: number;
+  /** True when the upstream call itself failed (network error, non-2xx) — as opposed
+   *  to succeeding with genuinely zero matches. The client needs this distinction:
+   *  "the search broke" and "nothing matched" call for different user-facing copy. */
+  failed?: boolean;
 }
 
-/** Keyword search via the quran.com full-text API. Returns empty on any failure. */
+/** Keyword search via the quran.com full-text API. Returns empty (and `failed: true`)
+ *  on any failure, rather than treating it identically to a real zero-result search. */
 async function keywordSearch(
   q: string,
   page: number,
@@ -30,7 +35,7 @@ async function keywordSearch(
     });
     if (!res.ok) {
       console.error(`Search API error: ${res.status} ${res.statusText}`);
-      return { results: [], total: 0 };
+      return { results: [], total: 0, failed: true };
     }
     const data = await res.json();
     const rawResults = (data?.search?.results ?? []) as Array<{
@@ -62,7 +67,7 @@ async function keywordSearch(
     };
   } catch (err) {
     console.error("Keyword search error:", err);
-    return { results: [], total: 0 };
+    return { results: [], total: 0, failed: true };
   }
 }
 
@@ -163,18 +168,25 @@ export async function GET(req: NextRequest) {
         console.error("Semantic search route error:", err);
       }
     }
-    const { results, total } = await keywordSearch(q, page, pageSize);
+    const { results, total, failed } = await keywordSearch(q, page, pageSize);
     const response: SearchResponse = { results, total, page, pageSize };
     await maybeLogSearchQuery(req, q, "keyword", total);
-    return NextResponse.json(response, { headers: { "x-search-fallback": "keyword" } });
+    return NextResponse.json(response, {
+      headers: {
+        "x-search-fallback": "keyword",
+        ...(failed ? { "x-search-error": "keyword-unavailable" } : {}),
+      },
+    });
   }
 
   const allowed = await consume(`search:${clientKey(req)}`);
   if (!allowed) {
     return NextResponse.json({ error: "Too many search requests" }, { status: 429 });
   }
-  const { results, total } = await keywordSearch(q, page, pageSize);
+  const { results, total, failed } = await keywordSearch(q, page, pageSize);
   const response: SearchResponse = { results, total, page, pageSize };
   await maybeLogSearchQuery(req, q, "keyword", total);
-  return NextResponse.json(response);
+  return NextResponse.json(response, {
+    headers: failed ? { "x-search-error": "keyword-unavailable" } : {},
+  });
 }

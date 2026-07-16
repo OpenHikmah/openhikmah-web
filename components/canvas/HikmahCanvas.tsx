@@ -13,6 +13,7 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { X } from "lucide-react";
 import { VerseNode } from "./VerseNode";
 import { HikmahEdge } from "./HikmahEdge";
 import { CanvasLegend } from "./CanvasLegend";
@@ -21,6 +22,7 @@ import { useCanvasStore } from "@/store/canvas";
 import { useActivityTracker } from "@/hooks/useActivityTracker";
 import { useCanvasPersistence } from "@/hooks/useCanvasPersistence";
 import { findFreeSlot, NODE_WIDTH, NODE_HEIGHT } from "@/lib/canvas/canvas-layout";
+import { cn } from "@/lib/utils";
 import type { ConnectionResult, Verse } from "@/types/quran";
 
 const nodeTypes = { verse: VerseNode };
@@ -55,7 +57,20 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
   const reactFlow = useReactFlow();
   const expandingRef = useRef(false);
   const mountedRef = useRef(true);
-  const [expansionError, setExpansionError] = useState<string | null>(null);
+  const [expansionNotice, setExpansionNotice] = useState<{
+    message: string;
+    kind: "error" | "info";
+  } | null>(null);
+
+  // The mobile bottom bar (in Header, outside this ReactFlowProvider) can't call
+  // useReactFlow() directly, so it asks for a fit via the store instead.
+  const fitRequestToken = useCanvasStore((s) => s.fitRequestToken);
+  useEffect(() => {
+    if (fitRequestToken === 0) return;
+    reactFlow.fitView({ padding: 0.35, maxZoom: 1, duration: 400 });
+    // reactFlow's identity changes across renders; only fitRequestToken should retrigger this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitRequestToken]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -169,12 +184,13 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
         const exhausted = err instanceof ExhaustedExpansionError;
         if (!exhausted) console.error("Expansion failed:", err);
         if (mountedRef.current) {
-          setExpansionError(
-            exhausted
+          setExpansionNotice({
+            message: exhausted
               ? "No more connections of this type."
-              : "Could not find connections. Try a different type."
-          );
-          setTimeout(() => setExpansionError(null), 3500);
+              : "Could not find connections. Try a different type.",
+            kind: exhausted ? "info" : "error",
+          });
+          setTimeout(() => setExpansionNotice(null), 6000);
         }
       } finally {
         if (mountedRef.current) setExpandingNode(null);
@@ -262,9 +278,24 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
 
   return (
     <div className="w-full h-full">
-      {expansionError && (
-        <div className="pointer-events-none absolute bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-md border border-border bg-surface-raised px-4 py-2 font-mono text-xs text-text-muted md:bottom-6">
-          {expansionError}
+      {expansionNotice && (
+        <div
+          role="status"
+          className={cn(
+            "absolute bottom-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-md border px-4 py-2 text-xs shadow-floating md:bottom-6",
+            expansionNotice.kind === "error"
+              ? "border-error/40 bg-surface-raised text-error"
+              : "border-teal/40 bg-surface-raised text-teal"
+          )}
+        >
+          <span className="font-mono">{expansionNotice.message}</span>
+          <button
+            onClick={() => setExpansionNotice(null)}
+            className="text-text-muted hover:text-text-primary"
+            aria-label="Dismiss"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       )}
 
