@@ -14,6 +14,17 @@ import type { SearchResponse, SearchResult } from "@/types/quran";
 
 const PAGE_SIZE = 20;
 
+// Curated starting points for the empty state — natural-language topics search
+// best in "meaning" mode, so chips navigate there rather than defaulting to Keyword.
+const EXAMPLE_SEARCHES = [
+  "2:255 — Ayat al-Kursi",
+  "Patience",
+  "Mercy",
+  "Gratitude",
+  "Forgiveness",
+  "The Night Journey",
+];
+
 function buildHref(q: string, mode: SearchMode, page: number) {
   const params = new URLSearchParams({ q, type: mode, page: String(page) });
   return `/search?${params.toString()}`;
@@ -32,6 +43,12 @@ export function SearchPageClient() {
   const [loading, setLoading] = useState(!!q.trim());
   const [error, setError] = useState(false);
   const [fellBackToKeyword, setFellBackToKeyword] = useState(false);
+  // Keyword search calls an upstream API — this distinguishes "the search itself
+  // failed" from a genuine zero-match result, which call for different copy.
+  const [keywordUnavailable, setKeywordUnavailable] = useState(false);
+  // Bumped by the "Try again" button so the fetch effect re-runs even when
+  // q/mode/page are unchanged (router.replace to the same URL is a no-op).
+  const [retryCount, setRetryCount] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -62,6 +79,7 @@ export function SearchPageClient() {
     setLoading(true);
     setError(false);
     setFellBackToKeyword(false);
+    setKeywordUnavailable(false);
 
     fetch(
       `/api/search?q=${encodeURIComponent(trimmed)}${
@@ -75,6 +93,7 @@ export function SearchPageClient() {
         setFellBackToKeyword(
           mode === "meaning" && res.headers.get("x-search-fallback") === "keyword"
         );
+        setKeywordUnavailable(res.headers.get("x-search-error") === "keyword-unavailable");
         setData(json);
       })
       .catch((err) => {
@@ -88,7 +107,7 @@ export function SearchPageClient() {
       });
 
     return () => controller.abort();
-  }, [q, mode, page]);
+  }, [q, mode, page, retryCount]);
 
   const navigate = useCallback(
     (nextQ: string, nextMode: SearchMode, nextPage: number) => {
@@ -133,9 +152,27 @@ export function SearchPageClient() {
         <SearchModeToggle mode={mode} onChange={(m) => navigate(q, m, 1)} className="mb-6" />
 
         {!q.trim() ? (
-          <div className="py-20 text-center">
+          <div className="py-16 text-center">
             <Search className="mx-auto mb-4 h-8 w-8 text-text-muted/40" />
-            <p className="text-sm text-text-muted">Enter a search term to get started.</p>
+            <p className="mb-6 text-sm text-text-muted">Enter a search term to get started.</p>
+            <div className="mx-auto flex max-w-md flex-wrap justify-center gap-2">
+              {EXAMPLE_SEARCHES.map((example) => {
+                // Ref-shaped examples (e.g. "2:255 — Ayat al-Kursi") search fine in either
+                // mode; plain topics only work in "meaning" mode.
+                const isRef = /^\d+:\d+/.test(example);
+                const [term] = example.split(" — ");
+                return (
+                  <button
+                    key={example}
+                    type="button"
+                    onClick={() => navigate(term, isRef ? "keyword" : "meaning", 1)}
+                    className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-bright"
+                  >
+                    {example}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         ) : loading ? (
           <div className="space-y-3">
@@ -158,8 +195,31 @@ export function SearchPageClient() {
           <div className="py-20 text-center">
             <BookOpen className="mx-auto mb-4 h-8 w-8 text-text-muted/40" />
             <p className="text-sm text-text-muted">
-              {mode === "meaning" ? "No verses matched that meaning." : "No results found."}
+              {keywordUnavailable
+                ? "Search is temporarily unavailable."
+                : mode === "meaning"
+                  ? "No verses matched that meaning."
+                  : "No exact matches."}
             </p>
+            {keywordUnavailable ? (
+              <button
+                type="button"
+                onClick={() => setRetryCount((c) => c + 1)}
+                className="mt-3 text-sm text-teal-bright hover:underline"
+              >
+                Try again →
+              </button>
+            ) : (
+              mode === "keyword" && (
+                <button
+                  type="button"
+                  onClick={() => navigate(q, "meaning", 1)}
+                  className="mt-3 text-sm text-teal-bright hover:underline"
+                >
+                  Try &ldquo;By meaning&rdquo; search instead →
+                </button>
+              )
+            )}
           </div>
         ) : (
           <>
@@ -169,7 +229,8 @@ export function SearchPageClient() {
             </p>
             {fellBackToKeyword && (
               <p className="mb-4 text-xs text-text-muted">
-                Showing keyword matches — semantic search is warming up.
+                Meaning-based results aren&rsquo;t ready for this query yet — showing keyword
+                matches instead.
               </p>
             )}
             <div className="space-y-3">

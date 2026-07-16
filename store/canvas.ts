@@ -87,6 +87,7 @@ interface CanvasStore {
   newlyAddedNodeId: string | null;
   viewport: CanvasViewport;
   sidebarWidth: number;
+  fitRequestToken: number;
 
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
@@ -105,6 +106,10 @@ interface CanvasStore {
   setPendingPanToNode: (nodeId: string | null) => void;
   setNewlyAddedNode: (nodeId: string | null) => void;
   setSidebarWidth: (width: number) => void;
+  /** Bumps `fitRequestToken` — components that render the ReactFlow instance (which
+   * may live outside the caller's tree, e.g. the mobile bar in Header) watch this
+   * to trigger `fitView()` without needing direct access to the ReactFlow instance. */
+  requestFit: () => void;
   hasNode: (ref: string) => boolean;
   getNodeByRef: (ref: string) => Node | undefined;
   getNodeById: (id: string) => Node | undefined;
@@ -139,6 +144,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   newlyAddedNodeId: null,
   viewport: { x: 0, y: 0, zoom: 1 },
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
+  fitRequestToken: 0,
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
@@ -199,6 +205,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setPendingAutoExpand: (nodeId) => set({ pendingAutoExpand: nodeId }),
   setPendingPanToNode: (nodeId) => set({ pendingPanToNodeId: nodeId }),
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
+  requestFit: () => set((s) => ({ fitRequestToken: s.fitRequestToken + 1 })),
 
   setNewlyAddedNode: (nodeId) => {
     if (newlyAddedTimeout) clearTimeout(newlyAddedTimeout);
