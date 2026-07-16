@@ -12,6 +12,7 @@ import {
   FileText,
   Loader2,
   Check,
+  AlertCircle,
 } from "lucide-react";
 import { useCanvasStore, serializeCanvas } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
@@ -20,7 +21,7 @@ import { useAudioStore } from "@/store/audio";
 import type { AudioVerse } from "@/store/audio";
 import type { Verse } from "@/types/quran";
 import { buildShareUrl } from "@/hooks/useCanvasPersistence";
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useRef, forwardRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 import {
@@ -38,23 +39,20 @@ interface HeaderProps {
 }
 
 /** A thumb-sized icon+label button for the mobile bottom action bar (≥56px tap target). */
-function BarButton({
-  icon,
-  label,
-  onClick,
-  active,
-  disabled,
-  danger,
-}: {
-  icon: ReactNode;
-  label: string;
-  onClick: () => void;
-  active?: boolean;
-  disabled?: boolean;
-  danger?: boolean;
-}) {
+const BarButton = forwardRef<
+  HTMLButtonElement,
+  {
+    icon: ReactNode;
+    label: string;
+    onClick: () => void;
+    active?: boolean;
+    disabled?: boolean;
+    danger?: boolean;
+  }
+>(function BarButton({ icon, label, onClick, active, disabled, danger }, ref) {
   return (
     <button
+      ref={ref}
       onClick={onClick}
       disabled={disabled}
       className={cn(
@@ -68,7 +66,7 @@ function BarButton({
       <span>{label}</span>
     </button>
   );
-}
+});
 
 const LEGEND_ITEMS: Array<{ label: string; className: string }> = [
   { label: "Theme", className: "bg-theme-edge" },
@@ -85,7 +83,9 @@ function MoreSheet({
   onSave,
   saving,
   saved,
+  saveError,
   canSave,
+  triggerRef,
 }: {
   onClose: () => void;
   onExport: (format: "png" | "pdf") => void;
@@ -93,17 +93,29 @@ function MoreSheet({
   onSave: (() => void) | null;
   saving: boolean;
   saved: boolean;
+  saveError: boolean;
   canSave: boolean;
+  /** The "More" bar button that opens this sheet — excluded from the outside-click
+   *  check, otherwise tapping it to close the sheet immediately reopens it (the
+   *  mousedown-driven close runs before the button's own click-toggle handler). */
+  triggerRef: React.RefObject<HTMLElement | null>;
 }) {
   const sheetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
-      if (sheetRef.current && !sheetRef.current.contains(e.target as Node)) onClose();
+      const target = e.target as Node;
+      if (
+        sheetRef.current &&
+        !sheetRef.current.contains(target) &&
+        !triggerRef.current?.contains(target)
+      ) {
+        onClose();
+      }
     };
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
-  }, [onClose]);
+  }, [onClose, triggerRef]);
 
   return (
     <div
@@ -120,11 +132,19 @@ function MoreSheet({
             <Loader2 className="h-4 w-4 shrink-0 animate-spin text-text-muted" />
           ) : saved ? (
             <Check className="h-4 w-4 shrink-0 text-teal" />
+          ) : saveError ? (
+            <AlertCircle className="h-4 w-4 shrink-0 text-error" />
           ) : (
             <Save className="h-4 w-4 shrink-0 text-text-muted" />
           )}
-          <span className="text-sm font-medium text-text-primary">
-            {saving ? "Saving…" : saved ? "Saved" : "Save workspace"}
+          <span className={cn("text-sm font-medium text-text-primary", saveError && "text-error")}>
+            {saving
+              ? "Saving…"
+              : saved
+                ? "Saved"
+                : saveError
+                  ? "Save failed — try again"
+                  : "Save workspace"}
           </span>
         </button>
       )}
@@ -164,6 +184,8 @@ export function Header({ onSearchOpen }: HeaderProps) {
   const [exportError, setExportError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
 
   const reset = useCanvasStore((s) => s.reset);
   const nodes = useCanvasStore((s) => s.nodes);
@@ -283,7 +305,13 @@ export function Header({ onSearchOpen }: HeaderProps) {
           setSaved(false);
           setMoreOpen(false);
         }, 1200);
+      } else {
+        setSaveError(true);
+        setTimeout(() => setSaveError(false), 2500);
       }
+    } catch {
+      setSaveError(true);
+      setTimeout(() => setSaveError(false), 2500);
     } finally {
       setSaving(false);
     }
@@ -310,7 +338,9 @@ export function Header({ onSearchOpen }: HeaderProps) {
               onSave={accessToken ? handleSave : null}
               saving={saving}
               saved={saved}
+              saveError={saveError}
               canSave={nodes.length > 0}
+              triggerRef={moreButtonRef}
             />
           )}
           <div className="fixed inset-x-0 bottom-0 z-40 flex md:hidden bg-surface/95 backdrop-blur border-t border-border pb-[env(safe-area-inset-bottom)]">
@@ -330,6 +360,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
               active={copied}
             />
             <BarButton
+              ref={moreButtonRef}
               icon={exportError ? <RotateCcw /> : <MoreHorizontal />}
               label={exportError ? "Failed" : "More"}
               onClick={() => setMoreOpen((v) => !v)}
