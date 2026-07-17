@@ -3,25 +3,24 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { useAuthStore } from "@/store/auth";
 
 // The single source of primary section navigation, rendered inline in the
-// global header row. Bookmarks only appears here once signed in — it isn't
-// duplicated in the AccountMenu dropdown, so there's exactly one home for it.
+// global header row. Bookmarks is always visible — guests can bookmark
+// verses in localStorage and sync them on sign-in.
 const ITEMS = [
   { href: "/canvas", label: "Canvas" },
   { href: "/search", label: "Search" },
-  { href: "/names", label: "Asma’ul Husna" },
+  { href: "/names", label: "Asma'ul Husna" },
+  { href: "/bookmarks", label: "Bookmarks" },
 ] as const;
 
 export function HeaderNavLinks() {
   const pathname = usePathname();
-  const accessToken = useAuthStore((s) => s.accessToken);
 
   const isActive = (href: string) =>
     href === "/canvas" ? pathname === "/canvas" : pathname.startsWith(href);
 
-  const items = accessToken ? [...ITEMS, { href: "/bookmarks", label: "Bookmarks" }] : ITEMS;
+  const items = ITEMS;
 
   return (
     <nav className="hidden md:flex h-full items-center gap-0.5">

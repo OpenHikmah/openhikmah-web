@@ -67,7 +67,7 @@ query.
 - **Audio** — Play all canvas verses in Qur'an order with a single button.
 - **99 Divine Names** — Full Asma'ul Husna with Arabic script, root morphology, taxonomy, verse
   feed, and contemplative reflections.
-- **Bookmarks** — Save verses to your account; syncs across devices via the Quran Foundation API.
+- **Bookmarks** — Save verses locally without signing in, or to your account for cross-device sync.
 - **Social** — Daily engagement streaks, a friends leaderboard, and head-to-head challenges
   (24h / 48h / 7d).
 

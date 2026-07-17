@@ -6,6 +6,10 @@ import { useCanvasStore, serializeCanvas, type SavedCanvas } from "@/store/canva
 /** localStorage key for the in-progress canvas. Exported so the home screen can
  *  surface a "continue where you left off" entry without re-deriving the key. */
 export const CANVAS_STORAGE_KEY = "open-hikmah-canvas";
+
+/** localStorage flag set after a guest's canvas has been merged into the user's
+ *  cloud workspaces, preventing duplicate merges on re-login. */
+const MERGE_FLAG_KEY = "open-hikmah-guest-merged";
 const LS_KEY = CANVAS_STORAGE_KEY;
 
 export async function buildShareUrl(canvas: SavedCanvas): Promise<string> {
@@ -24,6 +28,41 @@ export async function buildShareUrl(canvas: SavedCanvas): Promise<string> {
   url.hash = "";
   url.searchParams.set("share", id);
   return url.toString();
+}
+
+/**
+ * Merges a guest's local canvas into the authenticated user's cloud workspaces.
+ * Called once after OAuth sign-in or session restore. Idempotent — skips if the
+ * merge has already completed (tracked via localStorage flag) or if there is no
+ * local canvas data.
+ */
+export async function mergeGuestWorkspace(accessToken: string): Promise<void> {
+  try {
+    if (localStorage.getItem(MERGE_FLAG_KEY)) return;
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return;
+    const saved: SavedCanvas = JSON.parse(raw);
+    if (saved?.v !== 1 || !saved.nodes || saved.nodes.length === 0) return;
+
+    const count = saved.nodes.length;
+    const date = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const name = `${count} verse${count === 1 ? "" : "s"} — ${date}`;
+
+    const res = await fetch("/api/workspace", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ name, data: saved, nodeCount: count }),
+    });
+
+    if (res.ok) {
+      localStorage.setItem(MERGE_FLAG_KEY, "1");
+    }
+  } catch {
+    // Non-fatal — guest canvas survives in localStorage for next attempt.
+  }
 }
 
 export function useCanvasPersistence() {

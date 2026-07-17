@@ -116,18 +116,20 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
                 : "Search a verse and map its connections"
             }
           />
-          <QuickLink
-            href="/workspaces"
-            icon={FolderOpen}
-            title="Saved canvases"
-            subtitle={
-              savedCount !== null
-                ? `${savedCount} saved canvas${savedCount === 1 ? "" : "es"}`
-                : savedCountError
-                  ? "Couldn't load your saved canvases"
-                  : "Your saved graphs"
-            }
-          />
+          {accessToken && (
+            <QuickLink
+              href="/workspaces"
+              icon={FolderOpen}
+              title="Saved canvases"
+              subtitle={
+                savedCount !== null
+                  ? `${savedCount} saved canvas${savedCount === 1 ? "" : "es"}`
+                  : savedCountError
+                    ? "Couldn't load your saved canvases"
+                    : "Your saved graphs"
+              }
+            />
+          )}
           <QuickLink
             href="/bookmarks"
             icon={Heart}

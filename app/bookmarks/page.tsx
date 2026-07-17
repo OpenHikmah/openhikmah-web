@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Heart, Trash2, Network } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
-import { AuthShell } from "@/components/layout/AuthShell";
+import { LandingHeader } from "@/components/layout/LandingHeader";
 import { Card, IconButton, Tooltip, iconButtonVariants } from "@/components/ui";
 import type { Verse } from "@/types/quran";
 
@@ -46,8 +46,9 @@ export default function BookmarksPage() {
   }, [bookmarks.join(",")]);
 
   return (
-    <AuthShell>
-      <div className="mx-auto w-full max-w-2xl">
+    <div className="flex min-h-dvh flex-col bg-bg">
+      <LandingHeader />
+      <div className="mx-auto w-full max-w-2xl flex-1">
         {/* Page header */}
         <div className="mb-8 flex items-center gap-3">
           <Heart className="h-5 w-5 text-gold" />
@@ -144,6 +145,6 @@ export default function BookmarksPage() {
           </div>
         )}
       </div>
-    </AuthShell>
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import { MiniPlayer } from "@/components/audio/MiniPlayer";
 import { TooltipProvider } from "@/components/ui";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
+import { mergeGuestWorkspace } from "@/hooks/useCanvasPersistence";
 
 function SessionRestorer() {
   const setTokens = useAuthStore((s) => s.setTokens);
@@ -81,6 +82,7 @@ function SessionRestorer() {
         const [profileRes] = await Promise.all([
           fetch("/api/social/me", { headers: { Authorization: `Bearer ${accessToken}` } }),
           loadRemoteBookmarks(),
+          mergeGuestWorkspace(accessToken),
         ]);
 
         if (profileRes.ok) {
