@@ -7,8 +7,7 @@ Thank you for your interest in contributing. Open Hikmah is a theological sensem
 - [Getting Started](#getting-started)
 - [Branch and Commit Conventions](#branch-and-commit-conventions)
 - [Running Tests](#running-tests)
-- [Code Style](#code-style)
-- [Theological Standards](#theological-standards)
+- [Code Style and Theological Standards](#code-style-and-theological-standards)
 - [Submitting a Pull Request](#submitting-a-pull-request)
 - [Reporting Bugs](#reporting-bugs)
 - [Feature Requests](#feature-requests)
@@ -54,7 +53,7 @@ chore(deps): bump @anthropic-ai/sdk to 0.97.0
 docs(names): add theological notes for Sifat al-Af'al
 ```
 
-**Do not add `Co-Authored-By` lines** to commits.
+**Do not add `Co-Authored-By` lines** to commits. See [`AGENTS.md`](AGENTS.md#ai-attribution-policy) for the full AI attribution policy, including when a `Generated-By` trailer is required.
 
 ---
 
@@ -89,32 +88,9 @@ CI runs automatically on every push via GitHub Actions (`.github/workflows/ci.ym
 
 ---
 
-## Code Style
+## Code Style and Theological Standards
 
-- **TypeScript strict mode** — no `any`, no `ts-ignore` without a comment explaining why
-- **No comments** unless the _why_ is non-obvious (a hidden constraint, a Quran API quirk, a security invariant)
-- **No feature flags or backwards-compatibility shims** — change the code directly
-- **No error handling for impossible scenarios** — trust Next.js and TypeScript guarantees; only validate at system boundaries
-
-* Run `bun run lint` and `bun run format:check` before pushing; the CI will reject lint/format failures
-
-File structure follows Next.js App Router conventions. New API routes go under `app/api/`, new pages under `app/`, shared logic under `lib/`, Zustand stores under `store/`.
-
----
-
-## Theological Standards
-
-All AI prompts, divine name descriptions, and verse connections must:
-
-1. **Stay within the Maturidi/Hanafi tradition** — This is the theological framework of the project. Don't introduce Ash'ari-only positions without noting the difference, and don't conflate schools.
-
-2. **Maintain strict Tanzih (transcendence)** — Never describe divine attributes in ways that imply physical form, spatial location, or resemblance to created things (Tashbih). The prompts in `app/api/connections/route.ts` include this constraint explicitly.
-
-3. **Use verified verse references** — Never fabricate a Quran verse reference. If Claude returns a reference that cannot be verified via the alquran.cloud API, the system will reject it. In tests, use known valid refs (e.g. `2:255`, `1:1`, `112:1`).
-
-4. **Handle Quranic text as sacred data** — Even in test fixtures and mock data, use real or plausible Arabic text. Don't use placeholder strings like `"lorem ipsum"` for Arabic fields.
-
-5. **Attribute translations correctly** — The project uses `en.sahih` (Saheeh International) from alquran.cloud. If you add a new translation source, document it clearly.
+These are now defined canonically in [`AGENTS.md`](AGENTS.md) at the repo root (the shared guide for both AI coding agents and human contributors) — see its "Code Style" and "Theological Standards" sections. Read it before opening a PR that touches source code, AI prompts, divine-name data, or verse connections.
 
 ---
 

@@ -1,0 +1,11 @@
+# Aider config
+#
+# Read AGENTS.md at the repo root first — it is the single source of truth for
+# this repo's coding agent guidance. The read-only file below is a condensed
+# mirror of its highest-stakes rules for tools that don't reliably follow
+# cross-file references; if it drifts from AGENTS.md, AGENTS.md wins.
+# (Condensed copies of the same summary also live in .github/copilot-instructions.md,
+# .cursor/rules/agents.mdc, .windsurfrules, .clinerules — update all of them together.)
+
+read:
+  - AGENTS.md
