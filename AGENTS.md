@@ -73,6 +73,15 @@ Describe the theological implications of any AI prompt change in the PR (see the
 - **Code-level disclosure for large AI-generated contributions.** When an agent generates a whole new file, or a block of roughly 30+ lines, with minimal human review or editing, the commit message must carry a `Generated-By: <tool-name>` trailer (e.g. `Generated-By: Claude Code`). This is a plain-text disclosure trailer, distinct from `Co-Authored-By` — it does not trigger GitHub's co-author UI. Don't add inline "AI-generated" comments in source files; that conflicts with the no-unnecessary-comments code style rule above. The commit trailer is the disclosure mechanism.
 - **Condensed copies exist** in the tool-specific pointer files (`.github/copilot-instructions.md`, `.cursor/rules/agents.mdc`, `.windsurfrules`, `.clinerules`, `.aider.conf.yml`) for tools that can't import this file directly. If you change this policy, update those too — see the note in each file.
 
+## Guardrails
+
+- **Scope discipline** — no dependency additions/upgrades without flagging them in the PR description; no new abstractions or config layers for one-off use, reuse existing patterns in `lib/`; never skip git hooks (`--no-verify`, `--force`, etc.) without explicit user instruction.
+- **Database / migrations** — schema changes must be reversible and exercised via `bun run test:integration` (Testcontainers), not just unit tests.
+- **Auth / security surface** — treat `lib/auth/`, `app/callback/`, the PKCE flow, and `app/api/admin/` as high-risk (matches existing `CODEOWNERS` gating). Changes there must be called out explicitly in the PR description, not just left to pass CI silently. No new secrets/env vars committed; no loosening of CSP or auth checks without justification in the PR.
+- **Error handling** — no silent `catch` blocks. A failure should surface loudly, especially around parsing AI responses, where silently falling back could produce wrong theological content instead of a visible error.
+- **Testing bar** — new logic requires new tests in the same PR, not left for CI to catch after the fact.
+- **AI-specific correctness** — never "fix" a failing theological/verse-reference test by loosening the validation; only by fixing the underlying data or prompt. This is the failure mode most specific to this repo: an agent under test pressure weakening a real guardrail.
+
 ## Available tooling
 
 MCP servers configured for this repo (`.mcp.json`, `.claude.json`): `codegraph` (tree-sitter-parsed knowledge graph of every symbol/edge/file) and `sequential-thinking`. If your agent supports MCP, prefer these over grep/read for structural questions. Claude Code-specific usage rules for CodeGraph live in `CLAUDE.md` — read that file if you're Claude Code; other MCP-capable agents should discover the same tools via their own MCP client.

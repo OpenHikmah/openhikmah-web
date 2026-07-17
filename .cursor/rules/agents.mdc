@@ -13,5 +13,8 @@ Read `AGENTS.md` at the repo root first — it is the single source of truth for
 - **No feature flags or backwards-compatibility shims** — change the code directly.
 - **No error handling for impossible scenarios** — only validate at system boundaries.
 - **Theological standards** (binding on any prompt, divine-name, or verse-connection change): stay within the Maturidi/Hanafi tradition; maintain strict Tanzih (never imply physical form or spatial location for divine attributes — see `app/api/connections/route.ts`); never fabricate a Quran verse reference; treat Quranic text as sacred data even in test fixtures (no "lorem ipsum" for Arabic fields); attribute translations correctly (`en.sahih` / Saheeh International from alquran.cloud).
+- **No silent `catch` blocks** — failures must surface loudly, not fall back silently.
+- **Auth/security surface** (`lib/auth/`, `app/callback/`, `app/api/admin/`) and DB migrations are high-risk — call out explicitly in the PR, never skip git hooks without explicit instruction.
+- **Never loosen theological/verse-reference validation** to make a failing test pass — fix the underlying data or prompt instead.
 
 Full detail, rationale, and setup/testing commands: see `AGENTS.md`.
