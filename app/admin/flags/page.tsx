@@ -6,6 +6,7 @@ import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
+import { KNOWN_OPERATIONAL_FLAG_KEYS } from "@/lib/admin/feature-flag-keys";
 
 interface Flag {
   key: string;
@@ -249,10 +250,12 @@ export default function FlagsPage() {
             </label>
             <label className="space-y-1.5">
               <span className="text-xs text-text-secondary">Value (JSON)</span>
-              <Input
+              <textarea
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 placeholder='e.g. 60 or {"model":"x"}'
+                rows={4}
+                className="w-full rounded-md border border-border bg-bg px-3 py-2 font-mono text-xs text-text-primary focus:border-gold-muted"
               />
             </label>
           </div>
@@ -305,7 +308,11 @@ export default function FlagsPage() {
                       <ConfirmButton
                         disabled={busyKey === f.key}
                         onConfirm={() => remove(f.key)}
-                        confirmLabel="Delete?"
+                        confirmLabel={
+                          KNOWN_OPERATIONAL_FLAG_KEYS.has(f.key)
+                            ? `Delete ${f.key}? Reverts to code default immediately.`
+                            : "Delete?"
+                        }
                       >
                         Delete
                       </ConfirmButton>
