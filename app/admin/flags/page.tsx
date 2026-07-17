@@ -6,7 +6,7 @@ import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
-import { KNOWN_OPERATIONAL_FLAG_KEYS } from "@/lib/admin/feature-flags";
+import { KNOWN_OPERATIONAL_FLAG_KEYS } from "@/lib/admin/feature-flag-keys";
 
 interface Flag {
   key: string;
