@@ -1,0 +1,17 @@
+# Copilot instructions
+
+Read `AGENTS.md` at the repo root first — it is the single source of truth for this repo's coding agent guidance. This file is a condensed mirror of its highest-stakes rules for tools that don't reliably follow cross-file references; if it drifts from `AGENTS.md`, `AGENTS.md` wins. (Condensed copies of this block also live in `.cursor/rules/agents.mdc`, `.windsurfrules`, `.clinerules`, `.aider.conf.yml` — update all of them together.)
+
+## Critical rules
+
+- **No `Co-Authored-By` trailers in commits.** For large AI-generated contributions (a whole new file, or ~30+ lines with minimal human review), add a `Generated-By: <tool-name>` trailer instead.
+- **TypeScript strict mode** — no `any`, no `ts-ignore` without a comment explaining why.
+- **No comments** unless the _why_ is non-obvious.
+- **No feature flags or backwards-compatibility shims** — change the code directly.
+- **No error handling for impossible scenarios** — only validate at system boundaries.
+- **Theological standards** (binding on any prompt, divine-name, or verse-connection change): stay within the Maturidi/Hanafi tradition; maintain strict Tanzih (never imply physical form or spatial location for divine attributes — see `app/api/connections/route.ts`); never fabricate a Quran verse reference; treat Quranic text as sacred data even in test fixtures (no "lorem ipsum" for Arabic fields); attribute translations correctly (`en.sahih` / Saheeh International from alquran.cloud).
+- **No silent `catch` blocks** — failures must surface loudly, not fall back silently.
+- **Auth/security surface** (`lib/auth/`, `app/callback/`, `app/api/admin/`) and DB migrations are high-risk — call out explicitly in the PR, never skip git hooks without explicit instruction.
+- **Never loosen theological/verse-reference validation** to make a failing test pass — fix the underlying data or prompt instead.
+
+Full detail, rationale, and setup/testing commands: see `AGENTS.md`.

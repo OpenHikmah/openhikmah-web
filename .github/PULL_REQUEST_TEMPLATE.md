@@ -21,6 +21,7 @@
 - [ ] Claude prompt modified — described below
 - [ ] New/updated divine name descriptions — verified against Maturidi/Hanafi sources
 - [ ] Changes to theological framing — described below
+- [ ] Contains AI-generated file(s)/block(s) with minimal human review — `Generated-By` trailer added per [AGENTS.md](../AGENTS.md#ai-attribution-policy)
 
 **Details** (if applicable):
 <!-- Describe any changes to prompts, expected output format, or theological framing. Note any deviations from or additions to the Maturidi/Hanafi tradition. -->
