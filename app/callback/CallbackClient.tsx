@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
+import { mergeGuestWorkspace } from "@/hooks/useCanvasPersistence";
 import { Loader2 } from "lucide-react";
 
 interface Props {
@@ -73,6 +74,7 @@ export function CallbackClient({ code, state, error }: Props) {
         }
 
         await loadRemoteBookmarks();
+        await mergeGuestWorkspace(accessToken);
 
         router.replace(isNewUser ? "/onboarding" : "/");
       })
