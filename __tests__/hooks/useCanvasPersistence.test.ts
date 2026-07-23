@@ -115,8 +115,7 @@ describe("mergeGuestWorkspace", () => {
     await mergeGuestWorkspace("tok_abc");
 
     const body = JSON.parse(
-      (globalThis.fetch as ReturnType<typeof vi.spyOn>).mock.calls[0][1]!
-        .body as string,
+      (globalThis.fetch as ReturnType<typeof vi.spyOn>).mock.calls[0][1]!.body as string
     );
     expect(body.name).toMatch(/1 verse\b/);
     expect(body.nodeCount).toBe(1);
