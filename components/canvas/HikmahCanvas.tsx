@@ -21,7 +21,12 @@ import { CanvasToolbar } from "./CanvasToolbar";
 import { useCanvasStore } from "@/store/canvas";
 import { useActivityTracker } from "@/hooks/useActivityTracker";
 import { useCanvasPersistence } from "@/hooks/useCanvasPersistence";
-import { findFreeSlot, NODE_WIDTH, NODE_HEIGHT } from "@/lib/canvas/canvas-layout";
+import {
+  findFreeSlot,
+  NODE_WIDTH,
+  NODE_HEIGHT,
+  buildExistingNodeEdge,
+} from "@/lib/canvas/canvas-layout";
 import { cn } from "@/lib/utils";
 import type { ConnectionResult, Verse } from "@/types/quran";
 
@@ -96,6 +101,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
   const setSidebarContent = useCanvasStore((s) => s.setSidebarContent);
   const setViewport = useCanvasStore((s) => s.setViewport);
   const getNodeById = useCanvasStore((s) => s.getNodeById);
+  const getNodeByRef = useCanvasStore((s) => s.getNodeByRef);
   const hasNode = useCanvasStore((s) => s.hasNode);
   const getExpansionRefs = useCanvasStore((s) => s.getExpansionRefs);
 
@@ -135,7 +141,16 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
           if (!mountedRef.current) break;
 
           const conn = connections[i];
-          if (hasNode(conn.ref)) continue;
+          if (hasNode(conn.ref)) {
+            // Verse is already on the canvas elsewhere — draw the edge the AI
+            // identified instead of silently dropping the connection, but
+            // don't add a duplicate node. addConnectionEdge itself dedupes
+            // repeat source/target pairs, so re-expanding is a safe no-op.
+            const existing = getNodeByRef(conn.ref);
+            const edge = existing && buildExistingNodeEdge(nodeId, existing.id, conn);
+            if (edge) addConnectionEdge(edge);
+            continue;
+          }
 
           // Fan out radially, then nudge off any collision with the live graph
           // (including siblings added moments ago in this same expansion).
@@ -197,7 +212,15 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
         expandingRef.current = false;
       }
     },
-    [addVerseNode, addConnectionEdge, setExpandingNode, hasNode, getExpansionRefs, reactFlow]
+    [
+      addVerseNode,
+      addConnectionEdge,
+      setExpandingNode,
+      hasNode,
+      getNodeByRef,
+      getExpansionRefs,
+      reactFlow,
+    ]
   );
 
   useEffect(() => {

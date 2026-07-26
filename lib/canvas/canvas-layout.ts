@@ -8,6 +8,8 @@
  * node-sized steps and returns the nearest grid slot that overlaps nothing.
  */
 
+import type { CanvasEdge, EdgeKind } from "@/types/quran";
+
 export interface XY {
   x: number;
   y: number;
@@ -104,5 +106,31 @@ export function viewportCenter(
   return {
     x: (screenW / 2 - viewport.x) / zoom,
     y: (screenH / 2 - viewport.y) / zoom,
+  };
+}
+
+/**
+ * Builds the edge to draw when an expansion's connection target already
+ * exists as a node elsewhere on the canvas, instead of silently dropping the
+ * connection (the AI still identified a real relationship, it's just not a
+ * new node). Returns null for a self-loop — a source node's own ref showing
+ * up as a "connection" to itself, which should draw nothing.
+ */
+export function buildExistingNodeEdge(
+  sourceNodeId: string,
+  existingNodeId: string,
+  conn: { kind: EdgeKind; reason: string }
+): CanvasEdge | null {
+  if (existingNodeId === sourceNodeId) return null;
+  return {
+    id: `edge-${sourceNodeId}-${existingNodeId}`,
+    source: sourceNodeId,
+    target: existingNodeId,
+    type: "hikmah",
+    data: {
+      kind: conn.kind,
+      label: conn.reason.slice(0, 60),
+      reason: conn.reason,
+    },
   };
 }
