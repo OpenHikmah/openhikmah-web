@@ -21,7 +21,10 @@ echo "==> Ensuring database and redis are running..."
 $COMPOSE up -d db redis
 
 echo "==> Running database migrations (one-shot, before the app starts)..."
-$COMPOSE run --rm app sh -c "bun scripts/migrate.mjs && bun scripts/ensure-tables.mjs"
+# --name avoids colliding with the still-running `open-hikmah-app` container
+# (fixed container_name in docker-compose.yml) — the old app container isn't
+# stopped until `up -d app` below replaces it.
+$COMPOSE run --rm --name open-hikmah-migrate app sh -c "bun scripts/migrate.mjs && bun scripts/ensure-tables.mjs"
 
 echo "==> Starting app container..."
 $COMPOSE up -d app
