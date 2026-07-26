@@ -66,7 +66,7 @@ function del(query?: string) {
 beforeEach(() => {
   vi.mocked(requireAdmin).mockResolvedValue(admin);
   mockSelect.mockReturnValue(makeDbChain([]));
-  mockUpdate.mockReturnValue(makeDbChain([]));
+  mockUpdate.mockClear().mockReturnValue(makeDbChain([]));
   mockDelete.mockReturnValue(makeDbChain([]));
   vi.mocked(logAdminAction).mockClear();
 });
@@ -130,19 +130,123 @@ describe("PATCH /api/admin/names", () => {
 
   it("returns 404 when there's no cached row for that slug/kind", async () => {
     mockUpdate.mockReturnValue(makeDbChain([]));
-    const res = await PATCH(patch({ slug: "ar-rahman", kind: "verses", data: { a: 1 } }));
+    const res = await PATCH(patch({ slug: "ar-rahman", kind: "verses", data: [] }));
     expect(res.status).toBe(404);
   });
 
   it("updates the cached content and logs the action", async () => {
     mockUpdate.mockReturnValue(makeDbChain([{ slug: "ar-rahman", kind: "verses" }]));
-    const res = await PATCH(patch({ slug: "ar-rahman", kind: "verses", data: { a: 1 } }));
+    const validVerse = [
+      {
+        ref: "2:255",
+        surah: 2,
+        ayah: 255,
+        arabicText: "arabic",
+        translation: "translation",
+        surahName: "Al-Baqarah",
+        surahNameArabic: "البقرة",
+        reason: "reason",
+      },
+    ];
+    const res = await PATCH(patch({ slug: "ar-rahman", kind: "verses", data: validVerse }));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.data).toEqual({ a: 1 });
+    expect(body.data).toEqual(validVerse);
     expect(logAdminAction).toHaveBeenCalledWith(
       expect.objectContaining({ action: "name.edit", targetId: "ar-rahman/verses" })
     );
+  });
+
+  it("rejects verses data that isn't an array of the expected shape", async () => {
+    const res = await PATCH(patch({ slug: "ar-rahman", kind: "verses", data: { a: 1 } }));
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("rejects verses data with a wrong field type (surah as string)", async () => {
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "verses",
+        data: [
+          {
+            ref: "2:255",
+            surah: "2",
+            ayah: 255,
+            arabicText: "a",
+            translation: "t",
+            surahName: "s",
+            surahNameArabic: "s",
+            reason: "r",
+          },
+        ],
+      })
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("accepts a valid reflection (plain string)", async () => {
+    mockUpdate.mockReturnValue(makeDbChain([{ slug: "ar-rahman", kind: "reflection" }]));
+    const res = await PATCH(
+      patch({ slug: "ar-rahman", kind: "reflection", data: "A believer's reflection." })
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("rejects a reflection that isn't a string", async () => {
+    const res = await PATCH(patch({ slug: "ar-rahman", kind: "reflection", data: { text: "x" } }));
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("accepts valid pairings", async () => {
+    mockUpdate.mockReturnValue(makeDbChain([{ slug: "ar-rahman", kind: "pairings" }]));
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "pairings",
+        data: [
+          {
+            name: "ar-rahim",
+            transliteration: "Ar-Rahim",
+            arabic: "الرَّحِيم",
+            explanation: "Balances mercy in general and specific senses.",
+          },
+        ],
+      })
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("rejects pairings missing a required field", async () => {
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "pairings",
+        data: [{ transliteration: "Ar-Rahim", arabic: "الرَّحِيم" }],
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a pairing with an empty name (unresolved slug reference, see PR #89)", async () => {
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "pairings",
+        data: [
+          {
+            name: "",
+            transliteration: "Ar-Rahim",
+            arabic: "الرَّحِيم",
+            explanation: "Balances mercy in general and specific senses.",
+          },
+        ],
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 
