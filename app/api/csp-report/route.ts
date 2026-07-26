@@ -21,13 +21,8 @@ interface ReportsApiEntry {
  * structured summary and bumps a counter; never reflects the payload back.
  */
 export async function POST(req: NextRequest) {
-  const contentLength = req.headers.get("content-length");
-  if (contentLength && Number(contentLength) > MAX_BODY_BYTES) {
-    return new NextResponse(null, { status: 413 });
-  }
-
-  const text = await req.text();
-  if (text.length > MAX_BODY_BYTES) {
+  const text = await readCappedBody(req, MAX_BODY_BYTES);
+  if (text === null) {
     return new NextResponse(null, { status: 413 });
   }
 
@@ -46,6 +41,30 @@ export async function POST(req: NextRequest) {
   }
 
   return new NextResponse(null, { status: 204 });
+}
+
+/**
+ * Reads the request body as a stream, aborting as soon as it exceeds
+ * `maxBytes` instead of trusting the attacker-controlled `Content-Length`
+ * header and materializing the full body before checking its size.
+ */
+async function readCappedBody(req: NextRequest, maxBytes: number): Promise<string | null> {
+  const reader = req.body?.getReader();
+  if (!reader) return "";
+
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf-8");
 }
 
 function extractViolations(parsed: unknown): Record<string, unknown>[] {
