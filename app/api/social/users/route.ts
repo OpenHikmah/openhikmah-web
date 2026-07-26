@@ -3,6 +3,9 @@ import { and, eq, ne, or, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { friendships, users } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
+import { rateLimitOrNull } from "@/lib/infra/rate-limit";
+
+const MAX_QUERY_LENGTH = 50;
 
 /**
  * User search for the add-friend flow: case-insensitive partial username match,
@@ -14,8 +17,15 @@ export async function GET(req: NextRequest) {
   if (authed instanceof NextResponse) return authed;
 
   const { userId } = authed;
+
+  const limited = await rateLimitOrNull(`user-search:${userId}`, "Too many search requests");
+  if (limited) return limited;
+
   const q = req.nextUrl.searchParams.get("q")?.trim();
   if (!q) return NextResponse.json([]);
+  if (q.length > MAX_QUERY_LENGTH) {
+    return NextResponse.json({ error: "Query too long" }, { status: 400 });
+  }
 
   const matches = await db
     .select({ id: users.id, username: users.username, displayName: users.displayName })

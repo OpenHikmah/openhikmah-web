@@ -2,8 +2,23 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/infra/db";
 import { sharedCanvases } from "@/lib/infra/db/schema";
 import { eq } from "drizzle-orm";
+import { clientKey } from "@/lib/infra/http";
+import { rateLimitOrNull } from "@/lib/infra/rate-limit";
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+// Public, unauthenticated route over a UUID keyspace — rate limit per-IP to
+// bound both DB load and brute-force ID guessing, matching POST /api/share.
+const SHARE_GET_LIMIT = 60;
+const SHARE_GET_WINDOW_SECONDS = 60 * 60;
+
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const limited = await rateLimitOrNull(
+    `share-get:${clientKey(req)}`,
+    "Too many requests",
+    SHARE_GET_LIMIT,
+    SHARE_GET_WINDOW_SECONDS
+  );
+  if (limited) return limited;
+
   const { id } = await params;
 
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) {

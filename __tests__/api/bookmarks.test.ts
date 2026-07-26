@@ -8,6 +8,11 @@ vi.mock("@/lib/auth/social-auth", () => ({
   requireUser: vi.fn(),
 }));
 
+const { mockRateLimitOrNull } = vi.hoisted(() => ({
+  mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
+}));
+vi.mock("@/lib/infra/rate-limit", () => ({ rateLimitOrNull: mockRateLimitOrNull }));
+
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
@@ -215,6 +220,19 @@ describe("DELETE /api/bookmarks/[ref]", () => {
   beforeEach(() => {
     mockDelete.mockReset();
     mockDelete.mockReturnValue(makeDbChain([]));
+    mockRateLimitOrNull.mockReset().mockResolvedValue(null);
+  });
+
+  it("returns 429 when the rate limiter reports over-limit, without deleting", async () => {
+    authedUser();
+    mockRateLimitOrNull.mockResolvedValue(
+      NextResponse.json({ error: "Too many bookmarks" }, { status: 429 })
+    );
+    const res = await DELETE(deleteReq(), {
+      params: Promise.resolve({ ref: "2%3A255" }),
+    });
+    expect(res.status).toBe(429);
+    expect(mockDelete).not.toHaveBeenCalled();
   });
 
   function deleteReq(withToken = true) {
