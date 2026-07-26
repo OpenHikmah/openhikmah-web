@@ -92,11 +92,12 @@ describe("GET /api/social/users", () => {
     expect(body).toEqual([]);
   });
 
-  it("rejects a query over the max length with 400", async () => {
+  it("rejects a query over the max length with 400, without consuming rate-limit budget", async () => {
     vi.mocked(requireUser).mockResolvedValue({ userId: 1, user: makeUser() });
     const res = await GET(req("a".repeat(51)));
     expect(res.status).toBe(400);
     expect(mockSelect).not.toHaveBeenCalled();
+    expect(mockRateLimitOrNull).not.toHaveBeenCalled();
   });
 
   it("derives the relationship status for each match", async () => {
