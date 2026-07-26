@@ -45,8 +45,8 @@ function isValidVerses(data: unknown): boolean {
       v as Record<string, unknown>;
     return (
       isNonEmptyString(ref) &&
-      typeof surah === "number" &&
-      typeof ayah === "number" &&
+      Number.isFinite(surah) &&
+      Number.isFinite(ayah) &&
       isNonEmptyString(arabicText) &&
       isNonEmptyString(translation) &&
       isNonEmptyString(surahName) &&

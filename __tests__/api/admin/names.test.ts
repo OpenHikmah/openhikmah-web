@@ -56,6 +56,16 @@ function patch(body: unknown) {
     body: JSON.stringify(body),
   });
 }
+
+// JSON.stringify(Infinity) is "null", so a normal `patch()` call can't produce
+// a non-finite number over the wire — send the raw JSON text instead.
+function patchRawBody(rawJson: string) {
+  return new NextRequest("http://localhost/api/admin/names", {
+    method: "PATCH",
+    headers: { Authorization: "Bearer t", "Content-Type": "application/json" },
+    body: rawJson,
+  });
+}
 function del(query?: string) {
   const url = query
     ? `http://localhost/api/admin/names?${query}`
@@ -183,6 +193,30 @@ describe("PATCH /api/admin/names", () => {
       })
     );
     expect(res.status).toBe(400);
+  });
+
+  it("rejects verses data with a non-finite surah (overflowing numeric literal)", async () => {
+    // 1e400 is valid JSON but overflows to Infinity on parse — JSON.stringify()
+    // can't produce this (it serializes Infinity as "null"), so the raw body
+    // is written out directly rather than built via patch().
+    const rawBody = `{
+      "slug": "ar-rahman",
+      "kind": "verses",
+      "data": [{
+        "ref": "2:255",
+        "surah": 1e400,
+        "ayah": 255,
+        "arabicText": "a",
+        "translation": "t",
+        "surahName": "s",
+        "surahNameArabic": "s",
+        "reason": "r"
+      }]
+    }`;
+
+    const res = await PATCH(patchRawBody(rawBody));
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("accepts a valid reflection (plain string)", async () => {
