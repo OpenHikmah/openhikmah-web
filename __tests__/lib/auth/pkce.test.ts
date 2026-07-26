@@ -1,5 +1,39 @@
-import { describe, it, expect } from "vitest";
-import { buildAuthUrl } from "@/lib/auth/pkce";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { buildAuthUrl, randomString } from "@/lib/auth/pkce";
+
+const PKCE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+
+describe("randomString", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("returns a string of the requested length using only the PKCE alphabet", () => {
+    const s = randomString(64);
+    expect(s).toHaveLength(64);
+    expect([...s].every((c) => PKCE_CHARS.includes(c))).toBe(true);
+  });
+
+  it("rejects and redraws out-of-range bytes instead of using them (modulo bias fix)", () => {
+    // 198 = MAX_UNBIASED_BYTE (largest multiple of 66 <= 256). Each draw pulls a
+    // 2-byte batch (length=2): batch 1 has one out-of-range byte (255) and one
+    // in-range byte (0 -> 'A'); batch 2 has one out-of-range byte (200) and one
+    // in-range byte (1 -> 'B'). The out-of-range bytes must never appear, and a
+    // second draw must happen since the first only yields one accepted char.
+    const batches = [
+      [255, 0],
+      [200, 1],
+    ];
+    let call = 0;
+    vi.spyOn(crypto, "getRandomValues").mockImplementation(((arr: Uint8Array) => {
+      arr.set(batches[call]);
+      call++;
+      return arr;
+    }) as typeof crypto.getRandomValues);
+
+    const s = randomString(2);
+    expect(s).toBe("AB");
+    expect(call).toBe(2); // had to redraw a second batch to get the 2nd character
+  });
+});
 
 describe("buildAuthUrl", () => {
   it("returns an object with url, codeVerifier, and state", async () => {
