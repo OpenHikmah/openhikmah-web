@@ -229,6 +229,25 @@ describe("PATCH /api/admin/names", () => {
     expect(res.status).toBe(400);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
+
+  it("rejects a pairing with an empty name (unresolved slug reference, see PR #89)", async () => {
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "pairings",
+        data: [
+          {
+            name: "",
+            transliteration: "Ar-Rahim",
+            arabic: "الرَّحِيم",
+            explanation: "Balances mercy in general and specific senses.",
+          },
+        ],
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
 });
 
 describe("DELETE /api/admin/names", () => {

@@ -9,13 +9,16 @@ import { safeParse } from "@/lib/infra/http";
 const KINDS = ["verses", "reflection", "pairings"] as const;
 type Kind = (typeof KINDS)[number];
 
-function isStringField(v: unknown): v is string {
-  return typeof v === "string";
+// Non-empty (not just typeof) — PR #89's review on the pairings AI-generation
+// route flagged that an empty `name` (unresolved slug reference) still got
+// cached and served; admin edits must be held to the same bar.
+function isNonEmptyString(v: unknown): v is string {
+  return typeof v === "string" && v.trim() !== "";
 }
 
 /** `reflection` is a single AI-generated paragraph (see app/api/names/[slug]/reflection/route.ts). */
 function isValidReflection(data: unknown): boolean {
-  return typeof data === "string";
+  return isNonEmptyString(data);
 }
 
 /** `pairings` shape from app/api/names/[slug]/pairings/route.ts's Pairing type. */
@@ -25,10 +28,10 @@ function isValidPairings(data: unknown): boolean {
     if (typeof p !== "object" || p === null) return false;
     const { name, transliteration, arabic, explanation } = p as Record<string, unknown>;
     return (
-      isStringField(name) &&
-      isStringField(transliteration) &&
-      isStringField(arabic) &&
-      isStringField(explanation)
+      isNonEmptyString(name) &&
+      isNonEmptyString(transliteration) &&
+      isNonEmptyString(arabic) &&
+      isNonEmptyString(explanation)
     );
   });
 }
@@ -41,14 +44,14 @@ function isValidVerses(data: unknown): boolean {
     const { ref, surah, ayah, arabicText, translation, surahName, surahNameArabic, reason } =
       v as Record<string, unknown>;
     return (
-      isStringField(ref) &&
+      isNonEmptyString(ref) &&
       typeof surah === "number" &&
       typeof ayah === "number" &&
-      isStringField(arabicText) &&
-      isStringField(translation) &&
-      isStringField(surahName) &&
-      isStringField(surahNameArabic) &&
-      isStringField(reason)
+      isNonEmptyString(arabicText) &&
+      isNonEmptyString(translation) &&
+      isNonEmptyString(surahName) &&
+      isNonEmptyString(surahNameArabic) &&
+      isNonEmptyString(reason)
     );
   });
 }
