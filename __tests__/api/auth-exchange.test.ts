@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+
+const { mockRateLimitOrNull } = vi.hoisted(() => ({
+  mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
+}));
+vi.mock("@/lib/infra/rate-limit", () => ({ rateLimitOrNull: mockRateLimitOrNull }));
+
 import { POST } from "@/app/api/auth/exchange/route";
 
 const mockFetch = vi.fn();
@@ -14,7 +20,19 @@ function makeReq(body: object) {
 }
 
 describe("POST /api/auth/exchange", () => {
-  beforeEach(() => mockFetch.mockReset());
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockRateLimitOrNull.mockReset().mockResolvedValue(null);
+  });
+
+  it("returns 429 when the rate limiter reports over-limit, without calling the token endpoint", async () => {
+    mockRateLimitOrNull.mockResolvedValue(
+      NextResponse.json({ error: "Too many requests" }, { status: 429 })
+    );
+    const res = await POST(makeReq({ code: "auth-code", codeVerifier: "verifier" }));
+    expect(res.status).toBe(429);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
 
   it("returns 400 for malformed JSON body", async () => {
     const req = new NextRequest("http://localhost/api/auth/exchange", {

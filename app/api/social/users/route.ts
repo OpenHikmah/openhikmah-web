@@ -3,6 +3,14 @@ import { and, eq, ne, or, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { friendships, users } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
+import { rateLimitOrNull } from "@/lib/infra/rate-limit";
+
+const MAX_QUERY_LENGTH = 50;
+
+// Read-only typeahead search, not a mutation — given its own budget rather
+// than the shared MUTATION_LIMIT (scoped to writes like friend requests/notes).
+const USER_SEARCH_LIMIT = 30;
+const USER_SEARCH_WINDOW_SECONDS = 60;
 
 /**
  * User search for the add-friend flow: case-insensitive partial username match,
@@ -14,8 +22,20 @@ export async function GET(req: NextRequest) {
   if (authed instanceof NextResponse) return authed;
 
   const { userId } = authed;
+
   const q = req.nextUrl.searchParams.get("q")?.trim();
   if (!q) return NextResponse.json([]);
+  if (q.length > MAX_QUERY_LENGTH) {
+    return NextResponse.json({ error: "Query too long" }, { status: 400 });
+  }
+
+  const limited = await rateLimitOrNull(
+    `user-search:${userId}`,
+    "Too many search requests",
+    USER_SEARCH_LIMIT,
+    USER_SEARCH_WINDOW_SECONDS
+  );
+  if (limited) return limited;
 
   const matches = await db
     .select({ id: users.id, username: users.username, displayName: users.displayName })

@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { htmlToTafsirBlocks } from "@/lib/quran/tafsir";
+import { clientKey } from "@/lib/infra/http";
+import { rateLimitOrNull } from "@/lib/infra/rate-limit";
 
 // English "Ibn Kathir (Abridged)" on the quran.com API. The previous source
 // (alquran.cloud en.ibn-kathir) doesn't exist there and silently fell back to
 // the plain Arabic Qur'an text, so the panel showed the verse, not tafsir (#54).
 const IBN_KATHIR_EN = 169;
+
+// Public, unauthenticated route that hits a third-party API on cache misses —
+// rate limit per-IP so one caller can't amplify load onto api.quran.com.
+const TAFSIR_LIMIT = 60;
+const TAFSIR_WINDOW_SECONDS = 60;
 
 /**
  * English Ibn Kathir tafsir for a verse, sourced from quran.com and returned as
@@ -14,9 +21,17 @@ const IBN_KATHIR_EN = 169;
  * unavailable" rather than erroring.
  */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ surah: string; ayah: string }> }
 ) {
+  const limited = await rateLimitOrNull(
+    `tafsir:${clientKey(req)}`,
+    "Too many requests",
+    TAFSIR_LIMIT,
+    TAFSIR_WINDOW_SECONDS
+  );
+  if (limited) return limited;
+
   const { surah, ayah } = await params;
   const ref = `${parseInt(surah, 10)}:${parseInt(ayah, 10)}`;
 

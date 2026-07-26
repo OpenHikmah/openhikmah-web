@@ -4,6 +4,11 @@ import type { User } from "@/lib/infra/db/schema";
 
 vi.mock("@/lib/auth/social-auth", () => ({ requireUser: vi.fn() }));
 
+const { mockRateLimitOrNull } = vi.hoisted(() => ({
+  mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
+}));
+vi.mock("@/lib/infra/rate-limit", () => ({ rateLimitOrNull: mockRateLimitOrNull }));
+
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
@@ -61,6 +66,17 @@ describe("GET /api/social/users", () => {
   beforeEach(() => {
     vi.mocked(requireUser).mockReset();
     mockSelect.mockReturnValue(makeDbChain([]));
+    mockRateLimitOrNull.mockReset().mockResolvedValue(null);
+  });
+
+  it("returns 429 when the rate limiter reports over-limit", async () => {
+    vi.mocked(requireUser).mockResolvedValue({ userId: 1, user: makeUser() });
+    mockRateLimitOrNull.mockResolvedValue(
+      NextResponse.json({ error: "Too many search requests" }, { status: 429 })
+    );
+    const res = await GET(req("ali"));
+    expect(res.status).toBe(429);
+    expect(mockSelect).not.toHaveBeenCalled();
   });
 
   it("returns 401 when unauthorized", async () => {
@@ -74,6 +90,13 @@ describe("GET /api/social/users", () => {
     vi.mocked(requireUser).mockResolvedValue({ userId: 1, user: makeUser() });
     const body = await (await GET(req())).json();
     expect(body).toEqual([]);
+  });
+
+  it("rejects a query over the max length with 400", async () => {
+    vi.mocked(requireUser).mockResolvedValue({ userId: 1, user: makeUser() });
+    const res = await GET(req("a".repeat(51)));
+    expect(res.status).toBe(400);
+    expect(mockSelect).not.toHaveBeenCalled();
   });
 
   it("derives the relationship status for each match", async () => {

@@ -3,6 +3,14 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { users } from "@/lib/infra/db/schema";
 import { resolveQfId } from "@/lib/auth/social-auth";
+import { rateLimitOrNull } from "@/lib/infra/rate-limit";
+import { clientKey } from "@/lib/infra/http";
+
+// Unauthenticated (pre-login) route — each request triggers an outbound
+// Basic-auth call to the QF token endpoint, so it's keyed per-IP rather than
+// per-user like the mutation routes.
+const EXCHANGE_LIMIT = 20;
+const EXCHANGE_WINDOW_SECONDS = 10 * 60;
 
 function generateUsername(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -13,6 +21,14 @@ function generateUsername(): string {
 }
 
 export async function POST(req: NextRequest) {
+  const limited = await rateLimitOrNull(
+    `auth-exchange:${clientKey(req)}`,
+    "Too many requests",
+    EXCHANGE_LIMIT,
+    EXCHANGE_WINDOW_SECONDS
+  );
+  if (limited) return limited;
+
   let body: { code?: string; codeVerifier?: string };
   try {
     body = await req.json();

@@ -46,6 +46,7 @@ vi.mock("@/lib/infra/rate-limit", () => ({
 }));
 
 import { POST } from "@/app/api/share/route";
+import { GET } from "@/app/api/share/[id]/route";
 import Image from "@/app/api/share/[id]/opengraph-image";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -105,6 +106,39 @@ describe("POST /api/share", () => {
     const res = await POST(postReq({ v: 1, nodes: [{ verse: validVerse }] }));
     expect(res.status).toBe(429);
     expect(mockInsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/share/[id]", () => {
+  function getReq(id: string) {
+    return GET(new Request(`http://localhost/api/share/${id}`), {
+      params: Promise.resolve({ id }),
+    });
+  }
+
+  it("returns 429 when the rate limiter reports over-limit", async () => {
+    mockRateLimitOrNull.mockResolvedValue(
+      NextResponse.json({ error: "Too many requests" }, { status: 429 })
+    );
+    const res = await getReq(VALID_ID);
+    expect(res.status).toBe(429);
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
+
+  it("returns the stored canvas for a valid id", async () => {
+    mockSelect.mockReturnValue(
+      makeDbChain([
+        { id: VALID_ID, data: JSON.stringify({ v: 1, nodes: [{ verse: validVerse }] }) },
+      ])
+    );
+    const res = await getReq(VALID_ID);
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 404 for a malformed id without querying the db", async () => {
+    const res = await getReq("not-a-uuid");
+    expect(res.status).toBe(404);
+    expect(mockSelect).not.toHaveBeenCalled();
   });
 });
 
