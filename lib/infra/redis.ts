@@ -115,10 +115,25 @@ export function redisPublish(channel: string, message: string): void {
 let subscriberClient: Redis | null | undefined;
 const globalForRedisSub = globalThis as unknown as { __redisSub?: Redis | null };
 
+// Registered handlers per channel, keyed the same globalThis way as
+// subscriberClient so a hot-reload (which re-evaluates this module but reuses
+// the persisted client) keeps dispatching to handlers registered before the
+// reload, instead of silently orphaning them.
+type ChannelHandlers = Map<string, Set<(message: string) => void>>;
+const globalForRedisSubHandlers = globalThis as unknown as { __redisSubHandlers?: ChannelHandlers };
+function channelHandlers(): ChannelHandlers {
+  if (!globalForRedisSubHandlers.__redisSubHandlers) {
+    globalForRedisSubHandlers.__redisSubHandlers = new Map();
+  }
+  return globalForRedisSubHandlers.__redisSubHandlers;
+}
+
 /** Subscribes `onMessage` to `channel`; no-ops when Redis is disabled. Safe to
- *  call multiple times for different channels — they share one subscriber
- *  connection. Best-effort: a missed message just means a cache stays stale
- *  until its normal TTL expiry, never a correctness failure. */
+ *  call multiple times — for the same channel or different ones — they share
+ *  one subscriber connection and one underlying "message" listener, dispatched
+ *  to every handler registered for that channel. Best-effort: a missed message
+ *  just means a cache stays stale until its normal TTL expiry, never a
+ *  correctness failure. */
 export function redisSubscribe(channel: string, onMessage: (message: string) => void): void {
   const base = getRedis();
   if (!base) return;
@@ -137,10 +152,30 @@ export function redisSubscribe(channel: string, onMessage: (message: string) => 
   }
   if (!subscriberClient) return;
 
+  const handlers = channelHandlers();
+  let forChannel = handlers.get(channel);
+  if (!forChannel) {
+    forChannel = new Set();
+    handlers.set(channel, forChannel);
+  }
+  forChannel.add(onMessage);
+
+  // SUBSCRIBE is issued on every call (not deduped) so a failed attempt (e.g.
+  // Redis unreachable at startup) self-heals on the next call for the same
+  // channel, matching the pre-fix behavior — Redis/ioredis treat a repeat
+  // SUBSCRIBE to an already-subscribed channel as a no-op.
   subscriberClient.subscribe(channel).catch(() => {});
-  subscriberClient.on("message", (ch: string, message: string) => {
-    if (ch === channel) onMessage(message);
-  });
+
+  // Register the dispatcher at most once per subscriber client — otherwise
+  // every call would stack another "message" listener, each redundantly
+  // re-invoking every registered handler per message.
+  if (subscriberClient.listenerCount("message") === 0) {
+    subscriberClient.on("message", (ch: string, message: string) => {
+      channelHandlers()
+        .get(ch)
+        ?.forEach((handler) => handler(message));
+    });
+  }
 }
 
 /** Health-check the Redis connection. Returns "disabled" when Redis is
