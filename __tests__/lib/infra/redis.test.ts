@@ -170,12 +170,15 @@ describe("redisSubscribe", () => {
     expect(subscriberClient().listenerCount("message")).toBe(1);
   });
 
-  it("subscribes to the underlying channel only once even if called repeatedly for it", async () => {
+  it("re-issues SUBSCRIBE on every call (self-heals a failed earlier attempt) without stacking listeners", async () => {
     const r = await import("@/lib/infra/redis");
     r.redisSubscribe("chan-a", vi.fn());
     r.redisSubscribe("chan-a", vi.fn());
-    expect(behavior.subscribe).toHaveBeenCalledTimes(1);
+    expect(behavior.subscribe).toHaveBeenCalledTimes(2);
     expect(behavior.subscribe).toHaveBeenCalledWith("chan-a");
+    // The listener dedup (not the subscribe call) is what actually prevents
+    // the redundant-dispatch bug this fix targets:
+    expect(subscriberClient().listenerCount("message")).toBe(1);
   });
 
   it("dispatches an incoming message to every handler registered for that channel", async () => {

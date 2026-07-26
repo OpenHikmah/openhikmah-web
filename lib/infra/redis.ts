@@ -157,9 +157,14 @@ export function redisSubscribe(channel: string, onMessage: (message: string) => 
   if (!forChannel) {
     forChannel = new Set();
     handlers.set(channel, forChannel);
-    subscriberClient.subscribe(channel).catch(() => {});
   }
   forChannel.add(onMessage);
+
+  // SUBSCRIBE is issued on every call (not deduped) so a failed attempt (e.g.
+  // Redis unreachable at startup) self-heals on the next call for the same
+  // channel, matching the pre-fix behavior — Redis/ioredis treat a repeat
+  // SUBSCRIBE to an already-subscribed channel as a no-op.
+  subscriberClient.subscribe(channel).catch(() => {});
 
   // Register the dispatcher at most once per subscriber client — otherwise
   // every call would stack another "message" listener, each redundantly
