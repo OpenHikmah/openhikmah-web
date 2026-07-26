@@ -13,8 +13,10 @@ export function useMobileNavVisible(): boolean {
   const pathname = usePathname();
   const nodeCount = useCanvasStore((s) => s.nodes.length);
 
-  // Mirrors MobileNavBar's own hideMobileTabs condition: hidden only on a
-  // populated canvas, where the Header's mobile action bar takes over instead.
+  // Hidden only once the canvas has nodes — that's when the Header's mobile
+  // action bar takes over the bottom edge (and the two fixed bars would
+  // otherwise collide). On an empty canvas the tabs stay, so mobile users can
+  // still navigate away (the EmptyState is centred and isn't obscured).
   const hideMobileTabs = pathname === "/canvas" && nodeCount > 0;
   return !hideMobileTabs;
 }

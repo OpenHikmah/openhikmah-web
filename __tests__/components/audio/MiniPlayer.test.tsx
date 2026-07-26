@@ -1,20 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MiniPlayer } from "@/components/audio/MiniPlayer";
-import { useAudioStore } from "@/store/audio";
+import { useAudioStore, type AudioVerse } from "@/store/audio";
 
 const { mockMobileNavVisible } = vi.hoisted(() => ({ mockMobileNavVisible: vi.fn() }));
 vi.mock("@/hooks/useMobileNavVisible", () => ({
   useMobileNavVisible: mockMobileNavVisible,
 }));
 
+const verse: AudioVerse = { ref: "2:255", surah: 2, ayah: 255, surahName: "Al-Baqarah" };
+
 function seedPlaying() {
   useAudioStore.setState({
-    currentRef: "2:255",
-    currentSurahName: "Al-Baqarah",
+    currentRef: verse.ref,
+    currentSurahName: verse.surahName,
     isPlaying: true,
     isLoading: false,
-    queue: [{ ref: "2:255" }] as never,
+    queue: [verse],
     queueIndex: 0,
   });
 }
