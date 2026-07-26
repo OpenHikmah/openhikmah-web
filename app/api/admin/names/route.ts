@@ -7,6 +7,57 @@ import { nameContent } from "@/lib/infra/db/schema";
 import { safeParse } from "@/lib/infra/http";
 
 const KINDS = ["verses", "reflection", "pairings"] as const;
+type Kind = (typeof KINDS)[number];
+
+function isStringField(v: unknown): v is string {
+  return typeof v === "string";
+}
+
+/** `reflection` is a single AI-generated paragraph (see app/api/names/[slug]/reflection/route.ts). */
+function isValidReflection(data: unknown): boolean {
+  return typeof data === "string";
+}
+
+/** `pairings` shape from app/api/names/[slug]/pairings/route.ts's Pairing type. */
+function isValidPairings(data: unknown): boolean {
+  if (!Array.isArray(data)) return false;
+  return data.every((p) => {
+    if (typeof p !== "object" || p === null) return false;
+    const { name, transliteration, arabic, explanation } = p as Record<string, unknown>;
+    return (
+      isStringField(name) &&
+      isStringField(transliteration) &&
+      isStringField(arabic) &&
+      isStringField(explanation)
+    );
+  });
+}
+
+/** `verses` shape from app/api/names/[slug]/verses/route.ts's NameVerse type. */
+function isValidVerses(data: unknown): boolean {
+  if (!Array.isArray(data)) return false;
+  return data.every((v) => {
+    if (typeof v !== "object" || v === null) return false;
+    const { ref, surah, ayah, arabicText, translation, surahName, surahNameArabic, reason } =
+      v as Record<string, unknown>;
+    return (
+      isStringField(ref) &&
+      typeof surah === "number" &&
+      typeof ayah === "number" &&
+      isStringField(arabicText) &&
+      isStringField(translation) &&
+      isStringField(surahName) &&
+      isStringField(surahNameArabic) &&
+      isStringField(reason)
+    );
+  });
+}
+
+const VALIDATORS: Record<Kind, (data: unknown) => boolean> = {
+  reflection: isValidReflection,
+  pairings: isValidPairings,
+  verses: isValidVerses,
+};
 
 /** All cached 99-Names AI content rows (slug + kind), for review/override. */
 export async function GET(req: NextRequest) {
@@ -56,6 +107,9 @@ export async function PATCH(req: NextRequest) {
   }
   if (body.data === undefined) {
     return NextResponse.json({ error: "Missing data" }, { status: 400 });
+  }
+  if (!VALIDATORS[kind as Kind](body.data)) {
+    return NextResponse.json({ error: `Invalid data shape for kind "${kind}"` }, { status: 400 });
   }
 
   try {
