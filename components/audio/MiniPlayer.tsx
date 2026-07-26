@@ -3,6 +3,8 @@
 import { useAudioStore } from "@/store/audio";
 import { Play, Pause, SkipBack, SkipForward, X, Loader2, Volume2 } from "lucide-react";
 import { IconButton } from "@/components/ui";
+import { useMobileNavVisible } from "@/hooks/useMobileNavVisible";
+import { cn } from "@/lib/utils";
 
 export function MiniPlayer() {
   const {
@@ -18,6 +20,7 @@ export function MiniPlayer() {
     next,
     prev,
   } = useAudioStore();
+  const mobileNavVisible = useMobileNavVisible();
 
   if (!currentRef) return null;
 
@@ -26,7 +29,14 @@ export function MiniPlayer() {
   const queueLabel = queue.length > 1 ? ` (${queueIndex + 1}/${queue.length})` : "";
 
   return (
-    <div className="fixed bottom-4 left-1/2 z-50 flex min-w-[280px] -translate-x-1/2 items-center gap-3 rounded-xl border border-border bg-surface-raised px-4 py-2.5 shadow-floating">
+    <div
+      className={cn(
+        "fixed bottom-4 left-1/2 z-50 flex min-w-[280px] -translate-x-1/2 items-center gap-3 rounded-xl border border-border bg-surface-raised px-4 py-2.5 shadow-floating",
+        // MobileNavBar (md:hidden, min-h-[58px] + safe-area inset) sits on the
+        // bottom edge below md — offset above it instead of overlapping.
+        mobileNavVisible && "max-md:bottom-[calc(58px+env(safe-area-inset-bottom)+16px)]"
+      )}
+    >
       {/* Icon */}
       <Volume2 className="h-3.5 w-3.5 shrink-0 text-teal" />
 
