@@ -14,8 +14,17 @@ git pull origin main
 echo "==> Tagging current image as :previous (for rollback)..."
 docker tag open-hikmah-app:latest open-hikmah-app:previous 2>/dev/null || true
 
-echo "==> Building new image and starting containers..."
-$COMPOSE up -d --build
+echo "==> Building new app image..."
+$COMPOSE build app
+
+echo "==> Ensuring database and redis are running..."
+$COMPOSE up -d db redis
+
+echo "==> Running database migrations (one-shot, before the app starts)..."
+$COMPOSE run --rm app sh -c "bun scripts/migrate.mjs && bun scripts/ensure-tables.mjs"
+
+echo "==> Starting app container..."
+$COMPOSE up -d app
 
 echo "==> Waiting for health check (up to 60s)..."
 HEALTHY=false

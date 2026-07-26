@@ -69,6 +69,8 @@ COPY --from=deps /app/node_modules/@google/generative-ai ./node_modules/@google/
 
 USER nextjs
 EXPOSE 3000
-# Run pending migrations (idempotent) then start the server.
-# This ensures new tables are always created on deploy without a manual step.
-CMD ["sh", "-c", "bun scripts/migrate.mjs && bun scripts/ensure-tables.mjs && bun server.js"]
+# Migrations run as a one-shot step in scripts/deploy.sh before this container
+# starts, not here — running migrate.mjs from every replica's CMD would race
+# multiple `drizzle-orm/postgres-js/migrator` runs against the same DB once
+# there's ever more than one app replica.
+CMD ["bun", "server.js"]
