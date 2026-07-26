@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { getRedis, redisEnabled } from "@/lib/infra/redis";
 import { counterSnapshot, uptimeSeconds } from "@/lib/infra/metrics";
+import { requireAdmin } from "@/lib/admin/admin-auth";
 
 // Live probes must not be cached.
 export const dynamic = "force-dynamic";
@@ -34,10 +35,14 @@ async function probeDb(): Promise<{ ok: boolean; latencyMs?: number }> {
 
 /**
  * Lightweight observability surface: process uptime, Redis/DB reachability, and
- * the in-process counters (cache hit rates, rate-limit blocks, AI calls). Returns
- * JSON; intended to be scraped or eyeballed. Exposes no secrets or user data.
+ * the in-process counters (cache hit rates, rate-limit blocks, AI calls). Gated
+ * behind requireAdmin — like /api/admin/infra — since rate-limit and AI-call
+ * counters are operational signals, not something anonymous callers should see.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if (auth instanceof NextResponse) return auth;
+
   const [redis, database] = await Promise.all([probeRedis(), probeDb()]);
   return NextResponse.json({
     uptimeSeconds: uptimeSeconds(),
