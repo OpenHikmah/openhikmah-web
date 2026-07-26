@@ -9,15 +9,31 @@ const behavior = vi.hoisted(() => ({
   del: vi.fn(),
   ping: vi.fn(),
   multiExec: vi.fn(),
+  subscribe: vi.fn((..._args: unknown[]) => Promise.resolve()),
 }));
 
 vi.mock("ioredis", () => {
+  // Minimal inline emitter (avoids importing "node:events" inside a hoisted
+  // vi.mock factory) — just enough for redisSubscribe's on()/emit()/listenerCount().
   class MockRedis {
+    private listeners = new Map<string, Set<(...args: unknown[]) => void>>();
     constructor(...args: unknown[]) {
       behavior.ctor(...args);
     }
-    on() {
+    on(event: string, handler: (...args: unknown[]) => void) {
+      let set = this.listeners.get(event);
+      if (!set) {
+        set = new Set();
+        this.listeners.set(event, set);
+      }
+      set.add(handler);
       return this;
+    }
+    emit(event: string, ...args: unknown[]) {
+      this.listeners.get(event)?.forEach((handler) => handler(...args));
+    }
+    listenerCount(event: string) {
+      return this.listeners.get(event)?.size ?? 0;
     }
     get(...a: unknown[]) {
       return behavior.get(...a);
@@ -39,6 +55,12 @@ vi.mock("ioredis", () => {
       };
       return chain;
     }
+    subscribe(...a: unknown[]) {
+      return behavior.subscribe(...a);
+    }
+    duplicate() {
+      return new MockRedis();
+    }
   }
   return { default: MockRedis };
 });
@@ -48,6 +70,8 @@ vi.mock("ioredis", () => {
 beforeEach(() => {
   vi.resetModules();
   delete (globalThis as { __redis?: unknown }).__redis;
+  delete (globalThis as { __redisSub?: unknown }).__redisSub;
+  delete (globalThis as { __redisSubHandlers?: unknown }).__redisSubHandlers;
   delete process.env.REDIS_URL;
   behavior.ctor.mockReset();
   behavior.get.mockReset();
@@ -55,6 +79,7 @@ beforeEach(() => {
   behavior.del.mockReset();
   behavior.ping.mockReset();
   behavior.multiExec.mockReset();
+  behavior.subscribe.mockReset().mockReturnValue(Promise.resolve());
 });
 
 describe("lib/redis — disabled (no REDIS_URL)", () => {
@@ -121,5 +146,51 @@ describe("lib/redis — enabled, but every call errors (fail-open)", () => {
     behavior.multiExec.mockResolvedValue(undefined);
     const r = await import("@/lib/infra/redis");
     expect(await r.redisIncrWithTtl("k", 60)).toBeNull();
+  });
+});
+
+describe("redisSubscribe", () => {
+  beforeEach(() => {
+    process.env.REDIS_URL = "redis://localhost:6379";
+  });
+
+  interface MockSubscriber {
+    emit(event: string, ...args: unknown[]): void;
+    listenerCount(event: string): number;
+  }
+  function subscriberClient(): MockSubscriber {
+    return (globalThis as { __redisSub?: MockSubscriber }).__redisSub!;
+  }
+
+  it("registers only one underlying 'message' listener across repeated calls", async () => {
+    const r = await import("@/lib/infra/redis");
+    r.redisSubscribe("chan-a", vi.fn());
+    r.redisSubscribe("chan-a", vi.fn());
+    r.redisSubscribe("chan-b", vi.fn());
+    expect(subscriberClient().listenerCount("message")).toBe(1);
+  });
+
+  it("subscribes to the underlying channel only once even if called repeatedly for it", async () => {
+    const r = await import("@/lib/infra/redis");
+    r.redisSubscribe("chan-a", vi.fn());
+    r.redisSubscribe("chan-a", vi.fn());
+    expect(behavior.subscribe).toHaveBeenCalledTimes(1);
+    expect(behavior.subscribe).toHaveBeenCalledWith("chan-a");
+  });
+
+  it("dispatches an incoming message to every handler registered for that channel", async () => {
+    const r = await import("@/lib/infra/redis");
+    const handlerA1 = vi.fn();
+    const handlerA2 = vi.fn();
+    const handlerB = vi.fn();
+    r.redisSubscribe("chan-a", handlerA1);
+    r.redisSubscribe("chan-a", handlerA2);
+    r.redisSubscribe("chan-b", handlerB);
+
+    subscriberClient().emit("message", "chan-a", "hello");
+
+    expect(handlerA1).toHaveBeenCalledWith("hello");
+    expect(handlerA2).toHaveBeenCalledWith("hello");
+    expect(handlerB).not.toHaveBeenCalled();
   });
 });
