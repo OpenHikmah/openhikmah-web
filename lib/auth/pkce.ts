@@ -1,8 +1,22 @@
-function randomString(length: number): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => chars[b % chars.length]).join("");
+const PKCE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+// Largest multiple of chars.length that fits in a byte (198 for 66 chars) —
+// bytes >= this are rejected and redrawn so every character is drawn with
+// exactly equal probability, instead of `b % chars.length` biasing the first
+// `256 % chars.length` characters toward a slightly higher probability.
+const MAX_UNBIASED_BYTE = Math.floor(256 / PKCE_CHARS.length) * PKCE_CHARS.length;
+
+/** Exported for unit testing the rejection-sampling logic directly. */
+export function randomString(length: number): string {
+  const result: string[] = [];
+  const batch = new Uint8Array(length);
+  while (result.length < length) {
+    crypto.getRandomValues(batch);
+    for (const b of batch) {
+      if (result.length >= length) break;
+      if (b < MAX_UNBIASED_BYTE) result.push(PKCE_CHARS[b % PKCE_CHARS.length]);
+    }
+  }
+  return result.join("");
 }
 
 // OAuth scopes the QF client is approved for — hardcoded (the scope is public; it
