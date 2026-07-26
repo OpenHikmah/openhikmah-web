@@ -25,7 +25,7 @@ import {
   findFreeSlot,
   NODE_WIDTH,
   NODE_HEIGHT,
-  buildExistingNodeEdge,
+  buildConnectionEdge,
 } from "@/lib/canvas/canvas-layout";
 import { cn } from "@/lib/utils";
 import type { ConnectionResult, Verse } from "@/types/quran";
@@ -147,7 +147,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
             // don't add a duplicate node. addConnectionEdge itself dedupes
             // repeat source/target pairs, so re-expanding is a safe no-op.
             const existing = getNodeByRef(conn.ref);
-            const edge = existing && buildExistingNodeEdge(nodeId, existing.id, conn);
+            const edge = existing && buildConnectionEdge(nodeId, existing.id, conn);
             if (edge) addConnectionEdge(edge);
             continue;
           }
@@ -178,17 +178,8 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
           const pos = findFreeSlot(existing, target, { labelObstacles });
           const newId = addVerseNode(conn as unknown as Verse, pos);
 
-          addConnectionEdge({
-            id: `edge-${nodeId}-${newId}`,
-            source: nodeId,
-            target: newId,
-            type: "hikmah",
-            data: {
-              kind: conn.kind,
-              label: conn.reason.slice(0, 60),
-              reason: conn.reason,
-            },
-          });
+          const newEdge = buildConnectionEdge(nodeId, newId, conn);
+          if (newEdge) addConnectionEdge(newEdge);
         }
 
         if (mountedRef.current) {

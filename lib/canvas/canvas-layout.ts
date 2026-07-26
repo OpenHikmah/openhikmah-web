@@ -1,5 +1,6 @@
 /**
- * Collision-aware node placement for the canvas.
+ * Layout and edge-construction helpers for the canvas, extracted out of
+ * HikmahCanvas.tsx for unit testability.
  *
  * Verse nodes are a fixed width (`w-72` = 288px) and roughly fixed height. When a
  * new node is added — whether by searching a verse onto a populated canvas or by
@@ -110,22 +111,22 @@ export function viewportCenter(
 }
 
 /**
- * Builds the edge to draw when an expansion's connection target already
- * exists as a node elsewhere on the canvas, instead of silently dropping the
- * connection (the AI still identified a real relationship, it's just not a
- * new node). Returns null for a self-loop — a source node's own ref showing
- * up as a "connection" to itself, which should draw nothing.
+ * Builds the edge for an expansion connection, whether its target is a
+ * freshly-added node or one that already existed elsewhere on the canvas (the
+ * AI still identified a real relationship even when no new node is created).
+ * Returns null for a self-loop — a source node's own ref showing up as a
+ * "connection" to itself, which should draw nothing.
  */
-export function buildExistingNodeEdge(
+export function buildConnectionEdge(
   sourceNodeId: string,
-  existingNodeId: string,
+  targetNodeId: string,
   conn: { kind: EdgeKind; reason: string }
 ): CanvasEdge | null {
-  if (existingNodeId === sourceNodeId) return null;
+  if (targetNodeId === sourceNodeId) return null;
   return {
-    id: `edge-${sourceNodeId}-${existingNodeId}`,
+    id: `edge-${sourceNodeId}-${targetNodeId}`,
     source: sourceNodeId,
-    target: existingNodeId,
+    target: targetNodeId,
     type: "hikmah",
     data: {
       kind: conn.kind,

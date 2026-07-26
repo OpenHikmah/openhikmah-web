@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   findFreeSlot,
   viewportCenter,
-  buildExistingNodeEdge,
+  buildConnectionEdge,
   NODE_WIDTH,
   NODE_HEIGHT,
   NODE_GAP,
@@ -86,11 +86,11 @@ describe("viewportCenter", () => {
   });
 });
 
-describe("buildExistingNodeEdge", () => {
+describe("buildConnectionEdge", () => {
   const conn = { kind: "thematic" as const, reason: "Both describe divine mercy." };
 
   it("builds an edge from the source node to the existing node", () => {
-    const edge = buildExistingNodeEdge("node-a", "node-b", conn);
+    const edge = buildConnectionEdge("node-a", "node-b", conn);
     expect(edge).toEqual({
       id: "edge-node-a-node-b",
       source: "node-a",
@@ -102,12 +102,12 @@ describe("buildExistingNodeEdge", () => {
 
   it("truncates the label to 60 characters but keeps the full reason", () => {
     const longReason = "x".repeat(100);
-    const edge = buildExistingNodeEdge("node-a", "node-b", { kind: "root", reason: longReason });
+    const edge = buildConnectionEdge("node-a", "node-b", { kind: "root", reason: longReason });
     expect(edge!.data.label).toHaveLength(60);
     expect(edge!.data.reason).toBe(longReason);
   });
 
   it("returns null for a self-loop (existing node is the source itself)", () => {
-    expect(buildExistingNodeEdge("node-a", "node-a", conn)).toBeNull();
+    expect(buildConnectionEdge("node-a", "node-a", conn)).toBeNull();
   });
 });
