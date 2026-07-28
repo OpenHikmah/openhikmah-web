@@ -1,0 +1,28 @@
+$ next dev
+▲ Next.js 16.2.10 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.45:3000
+- Environments: .env.local
+✓ Ready in 794ms
+
+⨯ Error: Failed query: select "key", "value", "updated_by", "updated_at" from "feature_flags" where "feature_flags"."key" = $1 limit $2
+params: maintenance_mode,1
+    at async readFlag (lib/admin/feature-flags.ts:20:17)
+    at async getFlagBoolean (lib/admin/feature-flags.ts:52:15)
+    at async proxy (proxy.ts:14:23)
+  18 |   if (cached && cached.expiresAt > Date.now()) return cached.value;
+  19 |
+> 20 |   const [row] = await db.select().from(featureFlags).where(eq(featureFlags.key, key)).limi...
+     |                 ^
+  21 |   const value = row?.value ?? null;
+  22 |   cache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
+  23 |   return value; {
+  query: 'select "key", "value", "updated_by", "updated_at" from "feature_flags" where "feature_flags"."key" = $1 limit $2',
+  params: [ 'maintenance_mode', 1 ],
+  [cause]: AggregateError: 
+      at ignore-listed frames {
+    code: 'ECONNREFUSED',
+    [errors]: [ [Error], [Error] ]
+  }
+}
+[?25h
