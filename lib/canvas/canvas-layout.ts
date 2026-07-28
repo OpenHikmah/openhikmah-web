@@ -1,5 +1,6 @@
 /**
- * Collision-aware node placement for the canvas.
+ * Layout and edge-construction helpers for the canvas, extracted out of
+ * HikmahCanvas.tsx for unit testability.
  *
  * Verse nodes are a fixed width (`w-72` = 288px) and roughly fixed height. When a
  * new node is added — whether by searching a verse onto a populated canvas or by
@@ -7,6 +8,8 @@
  * on top of existing nodes. `findFreeSlot` spirals outward from the anchor in
  * node-sized steps and returns the nearest grid slot that overlaps nothing.
  */
+
+import type { CanvasEdge, EdgeKind } from "@/types/quran";
 
 export interface XY {
   x: number;
@@ -104,5 +107,31 @@ export function viewportCenter(
   return {
     x: (screenW / 2 - viewport.x) / zoom,
     y: (screenH / 2 - viewport.y) / zoom,
+  };
+}
+
+/**
+ * Builds the edge for an expansion connection, whether its target is a
+ * freshly-added node or one that already existed elsewhere on the canvas (the
+ * AI still identified a real relationship even when no new node is created).
+ * Returns null for a self-loop — a source node's own ref showing up as a
+ * "connection" to itself, which should draw nothing.
+ */
+export function buildConnectionEdge(
+  sourceNodeId: string,
+  targetNodeId: string,
+  conn: { kind: EdgeKind; reason: string }
+): CanvasEdge | null {
+  if (targetNodeId === sourceNodeId) return null;
+  return {
+    id: `edge-${sourceNodeId}-${targetNodeId}`,
+    source: sourceNodeId,
+    target: targetNodeId,
+    type: "hikmah",
+    data: {
+      kind: conn.kind,
+      label: conn.reason.slice(0, 60),
+      reason: conn.reason,
+    },
   };
 }
