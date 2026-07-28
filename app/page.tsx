@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
+import { WaveBackground } from "@/components/home/WaveBackground";
 import { HomeView } from "@/components/home/HomeView";
 import { getVerseOfDay } from "@/lib/quran/verse-of-day";
 
@@ -31,10 +32,13 @@ export default async function Home({
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-bg">
-      <LandingHeader />
-      <MobileNavBar />
+      <WaveBackground />
+      <div className="relative z-10 flex flex-1 flex-col overflow-hidden">
+        <LandingHeader />
+        <MobileNavBar />
 
-      <HomeView verse={verse} />
+        <HomeView verse={verse} />
+      </div>
     </div>
   );
 }

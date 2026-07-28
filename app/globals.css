@@ -171,6 +171,18 @@
   .node-pulse {
     animation: nodePulse 1.5s ease-out;
   }
+
+  .wave-ocean-1 {
+    animation: ocean-drift-1 24s ease-in-out infinite alternate;
+  }
+
+  .wave-ocean-2 {
+    animation: ocean-drift-2 30s ease-in-out infinite alternate;
+  }
+
+  .wave-ocean-3 {
+    animation: ocean-drift-3 18s ease-in-out infinite alternate;
+  }
 }
 
 @keyframes nodePulse {
@@ -222,5 +234,87 @@
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+/* Drifting radial-gradient blobs for the landing-page ocean-wave background.
+   Each layer moves its gradient-center along a different path to simulate a
+   gentle sea surface from a top-down angle. background-position animation only;
+   the global prefers-reduced-motion rule neutralises it. */
+@keyframes ocean-drift-1 {
+  0% {
+    background-position:
+      0% 0%,
+      100% 100%,
+      50% 50%;
+  }
+  33% {
+    background-position:
+      30% 20%,
+      70% 80%,
+      20% 60%;
+  }
+  66% {
+    background-position:
+      60% 40%,
+      40% 60%,
+      80% 30%;
+  }
+  100% {
+    background-position:
+      100% 100%,
+      0% 0%,
+      50% 50%;
+  }
+}
+
+@keyframes ocean-drift-2 {
+  0% {
+    background-position:
+      100% 100%,
+      0% 0%,
+      50% 50%;
+  }
+  25% {
+    background-position:
+      70% 80%,
+      30% 20%,
+      80% 30%;
+  }
+  50% {
+    background-position:
+      40% 60%,
+      60% 40%,
+      20% 60%;
+  }
+  75% {
+    background-position:
+      20% 30%,
+      80% 70%,
+      60% 20%;
+  }
+  100% {
+    background-position:
+      0% 0%,
+      100% 100%,
+      50% 50%;
+  }
+}
+
+@keyframes ocean-drift-3 {
+  0% {
+    background-position:
+      50% 50%,
+      100% 100%;
+  }
+  50% {
+    background-position:
+      30% 60%,
+      60% 30%;
+  }
+  100% {
+    background-position:
+      80% 40%,
+      20% 80%;
   }
 }
