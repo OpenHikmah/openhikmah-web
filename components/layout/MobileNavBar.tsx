@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutTemplate, Search, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useCanvasStore } from "@/store/canvas";
+import { useMobileNavVisible } from "@/hooks/useMobileNavVisible";
 
 // The mobile bottom tab bar for primary section navigation. Its desktop
 // counterpart lives inline in the header row (see HeaderNavLinks) — the two
@@ -17,20 +17,15 @@ const ITEMS = [
 
 export function MobileNavBar() {
   const pathname = usePathname();
-  const nodeCount = useCanvasStore((s) => s.nodes.length);
+  const visible = useMobileNavVisible();
 
   const items = ITEMS;
 
   const isActive = (href: string) =>
     href === "/canvas" ? pathname === "/canvas" : pathname.startsWith(href);
 
-  // On the canvas, hide the mobile tabs only once it has nodes — that's when the
-  // Header's mobile action bar takes over the bottom edge (and the two fixed bars
-  // would otherwise collide). On an empty canvas the tabs stay, so mobile users
-  // can still navigate away (the EmptyState is centred and isn't obscured).
-  const hideMobileTabs = pathname === "/canvas" && nodeCount > 0;
-
-  if (hideMobileTabs) return null;
+  // See useMobileNavVisible for the hide condition (populated /canvas only).
+  if (!visible) return null;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 flex md:hidden border-t border-border bg-surface/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
