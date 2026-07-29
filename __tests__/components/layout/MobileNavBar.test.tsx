@@ -18,6 +18,14 @@ describe("MobileNavBar", () => {
     expect(screen.getByRole("link", { name: /Search/i })).toBeInTheDocument();
   });
 
+  it("renders exactly 4 tabs and omits Bookmarks", () => {
+    mockUsePathname.mockReturnValue("/search");
+    mockMobileNavVisible.mockReturnValue(true);
+    render(<MobileNavBar />);
+    expect(screen.getAllByRole("link")).toHaveLength(4);
+    expect(screen.queryByRole("link", { name: /Bookmarks/i })).not.toBeInTheDocument();
+  });
+
   it("renders nothing when the shared hook reports hidden", () => {
     mockUsePathname.mockReturnValue("/canvas");
     mockMobileNavVisible.mockReturnValue(false);

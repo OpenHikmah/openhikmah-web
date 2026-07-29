@@ -22,7 +22,29 @@ export function getGlobalAyahNumber(surah: number, ayah: number): number {
   return SURAH_STARTS[surah - 1] + ayah;
 }
 
-/** Al-Afasy 128kbps MP3 from the Islamic Network CDN. */
-export function getAudioUrl(surah: number, ayah: number): string {
-  return `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${getGlobalAyahNumber(surah, ayah)}.mp3`;
+export const DEFAULT_RECITER = "ar.alafasy";
+
+/** Reciter slugs recognized by the Islamic Network CDN, whitelisted so an
+ *  unvalidated preference value can never be interpolated into the URL. */
+export const RECITERS = [
+  { id: "ar.alafasy", label: "Mishary Alafasy" },
+  { id: "ar.abdulbasitmurattal", label: "Abdul Basit (Murattal)" },
+  { id: "ar.husary", label: "Mahmoud Al-Husary" },
+  { id: "ar.minshawi", label: "Mohamed Al-Minshawi" },
+] as const;
+
+const RECITER_IDS = new Set<string>(RECITERS.map((r) => r.id));
+
+export function isValidReciter(reciter: string): boolean {
+  return RECITER_IDS.has(reciter);
+}
+
+/** 128kbps MP3 from the Islamic Network CDN, per reciter. */
+export function getAudioUrl(
+  surah: number,
+  ayah: number,
+  reciter: string = DEFAULT_RECITER
+): string {
+  const safeReciter = isValidReciter(reciter) ? reciter : DEFAULT_RECITER;
+  return `https://cdn.islamic.network/quran/audio/128/${safeReciter}/${getGlobalAyahNumber(surah, ayah)}.mp3`;
 }

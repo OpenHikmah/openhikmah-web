@@ -8,6 +8,8 @@ import {
   FolderOpen,
   Trophy,
   AtSign,
+  Bookmark,
+  Settings,
   LogOut,
   LogIn,
   ChevronDown,
@@ -203,6 +205,17 @@ export function AccountMenu() {
                   {pendingMentionCount > 9 ? "9+" : pendingMentionCount}
                 </span>
               )}
+            </Link>
+            {/* Desktop nav already has Bookmarks — this is the mobile-only entry point since the bottom tab bar dropped it for a 4th tab. */}
+            <Link
+              href="/bookmarks"
+              onClick={() => setOpen(false)}
+              className={cn(linkRow, "md:hidden")}
+            >
+              <Bookmark /> Bookmarks
+            </Link>
+            <Link href="/settings" onClick={() => setOpen(false)} className={linkRow}>
+              <Settings /> Settings
             </Link>
           </div>
 
