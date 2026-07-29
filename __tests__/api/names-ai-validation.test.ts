@@ -100,6 +100,8 @@ describe("names AI routes — model output validation", () => {
       JSON.stringify([
         { ref: "2:300", reason: "out-of-range ayah" },
         { ref: "999:1", reason: "out-of-range surah" },
+        { ref: "1:8", reason: "past Al-Fatihah's 7 ayahs (per-surah bound)" },
+        { ref: "50:46", reason: "past Qaf's 45 ayahs (per-surah bound)" },
         { ref: "2:255", reason: 42 },
         "junk",
       ])
@@ -115,13 +117,15 @@ describe("names AI routes — model output validation", () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([{ ref: "2:255", reason: "Ayat al-Kursi." }, { ref: "0:0" }, null])
     );
+    const ARABIC = "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ";
+    const ENGLISH = "Allah - there is no deity except Him, the Ever-Living.";
     mockFetch.mockImplementation(async (url: unknown) => {
       if (typeof url !== "string") return { ok: false };
-      if (url.includes("api.alquran.cloud"))
-        return {
-          ok: true,
-          json: async () => ({ data: { text: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ" } }),
-        };
+      // Distinct per-edition payloads so a swapped translation source is caught.
+      if (url.includes("ar.alafasy"))
+        return { ok: true, json: async () => ({ data: { text: ARABIC } }) };
+      if (url.includes("en.sahih"))
+        return { ok: true, json: async () => ({ data: { text: ENGLISH } }) };
       return { ok: false };
     });
 
@@ -132,5 +136,7 @@ describe("names AI routes — model output validation", () => {
     expect(body).toHaveLength(1);
     expect(body[0].ref).toBe("2:255");
     expect(body[0].reason).toBe("Ayat al-Kursi.");
+    expect(body[0].arabicText).toBe(ARABIC);
+    expect(body[0].translation).toBe(ENGLISH);
   });
 });

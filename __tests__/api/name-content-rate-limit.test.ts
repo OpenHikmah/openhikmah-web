@@ -86,6 +86,8 @@ describe("names AI routes — per-client rate limiting", () => {
 
       expect(res.status).toBe(429);
       expect(mockConsume).toHaveBeenCalledTimes(1);
+      // The budget must be keyed per client — the core guarantee of this gate.
+      expect(mockConsume).toHaveBeenCalledWith(expect.stringMatching(/^names-gen:.+/));
       expect(mockCallAI).not.toHaveBeenCalled();
     });
 
@@ -115,5 +117,48 @@ describe("names AI routes — per-client rate limiting", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ reflection: "A grounded reflection." });
     expect(mockConsume).toHaveBeenCalledTimes(1);
+  });
+
+  it("pairings: generates normally when the limiter allows", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockConsume.mockResolvedValue(true);
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        {
+          transliteration: "Ar-Rahim",
+          arabic: "الرَّحِيم",
+          explanation: "Mercy paired with mercy.",
+        },
+      ])
+    );
+
+    const res = await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveLength(1);
+    expect(mockConsume).toHaveBeenCalledTimes(1);
+    expect(mockCallAI).toHaveBeenCalledTimes(1);
+  });
+
+  it("verses: generates normally when the limiter allows", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockConsume.mockResolvedValue(true);
+    // quran.com search stays ok:false → AI fallback path; alquran.cloud hydrates.
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "Ayat al-Kursi." }]));
+    mockFetch.mockImplementation(async (url: unknown) => {
+      if (typeof url !== "string") return { ok: false };
+      if (url.includes("api.alquran.cloud"))
+        return { ok: true, json: async () => ({ data: { text: "نص" } }) };
+      return { ok: false };
+    });
+
+    const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveLength(1);
+    expect(mockConsume).toHaveBeenCalledTimes(1);
+    expect(mockCallAI).toHaveBeenCalled();
   });
 });
