@@ -62,3 +62,4 @@ hosting.md
 test-results/
 playwright-report/
 /strix_runs
+server.log
