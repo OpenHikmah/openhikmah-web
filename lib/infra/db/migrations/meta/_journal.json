@@ -127,6 +127,13 @@
       "when": 1784200713179,
       "tag": "0017_violet_gamma_corps",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1785337523680,
+      "tag": "0018_verse_translations",
+      "breakpoints": true
     }
   ]
 }

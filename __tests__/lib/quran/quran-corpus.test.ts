@@ -112,6 +112,38 @@ describe("quran-corpus", () => {
     });
   });
 
+  describe("getVerse with edition", () => {
+    it("uses the joined translation text when an edition row exists", async () => {
+      mockSelect.mockReturnValue(
+        makeDbChain([{ verse: row("2:255", 2, 255), translationText: "Türkçe metin" }])
+      );
+      const verse = await getVerse("2:255", "tr.diyanet");
+      expect(verse?.translation).toBe("Türkçe metin");
+    });
+
+    it("falls back to the base English translation when no edition row exists", async () => {
+      mockSelect.mockReturnValue(
+        makeDbChain([{ verse: row("2:255", 2, 255), translationText: null }])
+      );
+      const verse = await getVerse("2:255", "tr.diyanet");
+      expect(verse?.translation).toBe("text"); // row()'s default translation
+    });
+  });
+
+  describe("getVerses with edition", () => {
+    it("returns a map keyed by ref with per-row translation overrides", async () => {
+      mockSelect.mockReturnValue(
+        makeDbChain([
+          { verse: row("1:1", 1, 1), translationText: "Türkçe 1" },
+          { verse: row("2:255", 2, 255), translationText: null },
+        ])
+      );
+      const map = await getVerses(["1:1", "2:255"], "tr.diyanet");
+      expect(map.get("1:1")?.translation).toBe("Türkçe 1");
+      expect(map.get("2:255")?.translation).toBe("text");
+    });
+  });
+
   describe("existingRefs", () => {
     it("returns the set of refs present in the corpus", async () => {
       mockSelect.mockReturnValue(makeDbChain([{ ref: "1:1" }, { ref: "2:255" }]));
