@@ -32,6 +32,7 @@ export function CallbackClient({ code, state, error }: Props) {
 
     const codeVerifier = sessionStorage.getItem("pkce_code_verifier");
     const expectedState = sessionStorage.getItem("pkce_state");
+    const nonce = sessionStorage.getItem("pkce_nonce");
 
     if (!codeVerifier || !expectedState) {
       setFailReason("Session expired — please try signing in again.");
@@ -56,7 +57,7 @@ export function CallbackClient({ code, state, error }: Props) {
     fetch("/api/auth/exchange", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, codeVerifier }),
+      body: JSON.stringify({ code, codeVerifier, nonce: nonce ?? undefined }),
     })
       .then(async (res) => {
         if (!res.ok) {

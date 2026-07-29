@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { callAI } from "@/lib/ai/ai";
 import { getNameBySlug } from "@/lib/names/divine-names";
 import { getOrGenerateNameContent } from "@/lib/names/name-content";
+import { consume, RateLimitError } from "@/lib/infra/rate-limit";
+import { clientKey } from "@/lib/infra/http";
 
 // Bump to force regeneration after a prompt change.
 const REFLECTION_VERSION = 1;
@@ -30,7 +32,7 @@ Critical rules:
 Example for Al-Razzaq: "The believer's realisation of Al-Razzaq is not to claim any power over provision, but to strive with full effort in lawful means while maintaining absolute certainty in the heart that the outcome belongs solely to Allah. The servant plants, waters, and labours — yet knows that it is Allah who causes the grain to grow."`;
 }
 
-async function getReflection(slug: string): Promise<string> {
+async function getReflection(slug: string, onBeforeGenerate: () => Promise<void>): Promise<string> {
   const name = getNameBySlug(slug);
   if (!name) return "";
   return getOrGenerateNameContent(
@@ -38,11 +40,12 @@ async function getReflection(slug: string): Promise<string> {
     "reflection",
     REFLECTION_VERSION,
     () => callAI(buildPrompt(name.arabic, name.transliteration, name.meaning, name.description)),
-    (s) => s.trim() === ""
+    (s) => s.trim() === "",
+    onBeforeGenerate
   );
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const name = getNameBySlug(slug);
   if (!name) {
@@ -50,9 +53,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
   }
 
   try {
-    const reflection = await getReflection(slug);
+    const reflection = await getReflection(slug, async () => {
+      if (!(await consume(`names-gen:${clientKey(req)}`))) throw new RateLimitError();
+    });
     return NextResponse.json({ reflection });
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return NextResponse.json({ error: "Too many requests — please slow down." }, { status: 429 });
+    }
     console.error("Reflection error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

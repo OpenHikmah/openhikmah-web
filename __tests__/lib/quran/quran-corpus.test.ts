@@ -64,6 +64,14 @@ describe("quran-corpus", () => {
     it("rejects an absurdly large ayah number regardless of surah", () => {
       expect(isValidRef("114:99999")).toBe(false); // An-Nas has only 6 ayahs
     });
+    it("enforces each surah's real ayah count, not just a global ceiling", () => {
+      expect(isValidRef("1:7")).toBe(true); // Al-Fatihah's last ayah
+      expect(isValidRef("1:8")).toBe(false); // Al-Fatihah has only 7
+      expect(isValidRef("114:6")).toBe(true); // An-Nas's last ayah
+      expect(isValidRef("114:7")).toBe(false);
+      expect(isValidRef("50:45")).toBe(true); // Qaf's last ayah
+      expect(isValidRef("50:46")).toBe(false);
+    });
   });
 
   describe("getVerse", () => {

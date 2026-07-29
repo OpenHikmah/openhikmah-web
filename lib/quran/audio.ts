@@ -1,5 +1,6 @@
-// Hafs/Uthmani standard ayah counts per surah (114 surahs, 6236 total)
-const SURAH_LENGTHS: number[] = [
+// Hafs/Uthmani standard ayah counts per surah (114 surahs, 6236 total).
+// Exported for per-surah ref validation in lib/quran/quran-corpus.ts.
+export const SURAH_LENGTHS: number[] = [
   7, 286, 200, 176, 120, 165, 206, 75, 129, 109, 123, 111, 43, 52, 99, 128, 111, 110, 98, 135, 112,
   78, 118, 64, 77, 227, 93, 88, 69, 60, 34, 30, 73, 54, 45, 83, 182, 88, 75, 85, 54, 53, 89, 59, 37,
   35, 38, 29, 18, 45, 60, 49, 62, 55, 78, 96, 29, 22, 24, 13, 14, 11, 11, 18, 12, 12, 30, 52, 52,

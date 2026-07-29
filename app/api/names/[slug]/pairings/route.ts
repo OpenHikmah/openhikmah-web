@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { callAI } from "@/lib/ai/ai";
 import { getNameBySlug, DIVINE_NAMES } from "@/lib/names/divine-names";
 import { getOrGenerateNameContent } from "@/lib/names/name-content";
+import { consume, RateLimitError } from "@/lib/infra/rate-limit";
+import { clientKey } from "@/lib/infra/http";
 
 // Bump to force regeneration after a prompt change.
 const PAIRINGS_VERSION = 1;
@@ -32,7 +34,10 @@ Return ONLY a JSON array:
 ]`;
 }
 
-async function getPairings(slug: string): Promise<Pairing[]> {
+async function getPairings(
+  slug: string,
+  onBeforeGenerate: () => Promise<void>
+): Promise<Pairing[]> {
   const name = getNameBySlug(slug);
   if (!name) return [];
 
@@ -43,7 +48,7 @@ async function getPairings(slug: string): Promise<Pairing[]> {
     async () => {
       const text = await callAI(buildPrompt(name.transliteration, name.arabic, name.meaning));
 
-      let raw: Array<{ transliteration: string; arabic: string; explanation: string }>;
+      let raw: unknown;
       try {
         const match = text.match(/\[[\s\S]*\]/);
         if (!match) {
@@ -58,7 +63,23 @@ async function getPairings(slug: string): Promise<Pairing[]> {
         return [];
       }
 
-      return raw.slice(0, 3).map((p) => {
+      // Parsing successfully does not mean the shape is right — a valid-JSON
+      // response with the wrong structure must degrade to empty, not throw a 500
+      // at the property accesses below.
+      const items = (Array.isArray(raw) ? raw : []).filter(
+        (p): p is { transliteration: string; arabic: string; explanation: string } =>
+          typeof p === "object" &&
+          p !== null &&
+          typeof (p as Record<string, unknown>).transliteration === "string" &&
+          typeof (p as Record<string, unknown>).arabic === "string" &&
+          typeof (p as Record<string, unknown>).explanation === "string"
+      );
+      if (items.length === 0) {
+        console.error(`Pairings: AI response for ${slug} had no validly-shaped entries`);
+        return [];
+      }
+
+      return items.slice(0, 3).map((p) => {
         const match = DIVINE_NAMES.find(
           (n) =>
             n.transliteration.toLowerCase() === p.transliteration.toLowerCase() ||
@@ -72,11 +93,12 @@ async function getPairings(slug: string): Promise<Pairing[]> {
         };
       });
     },
-    (v) => v.length === 0
+    (v) => v.length === 0,
+    onBeforeGenerate
   );
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const name = getNameBySlug(slug);
   if (!name) {
@@ -84,9 +106,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
   }
 
   try {
-    const pairings = await getPairings(slug);
+    const pairings = await getPairings(slug, async () => {
+      if (!(await consume(`names-gen:${clientKey(req)}`))) throw new RateLimitError();
+    });
     return NextResponse.json(pairings);
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return NextResponse.json({ error: "Too many requests — please slow down." }, { status: 429 });
+    }
     console.error("Pairings error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

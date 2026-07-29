@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { callAI } from "@/lib/ai/ai";
 import { getNameBySlug } from "@/lib/names/divine-names";
 import { getSurahName } from "@/lib/quran/surah-names";
+import { isValidRef } from "@/lib/quran/quran-corpus";
 import { getOrGenerateNameContent } from "@/lib/names/name-content";
+import { consume, RateLimitError } from "@/lib/infra/rate-limit";
+import { clientKey } from "@/lib/infra/http";
 import { incr } from "@/lib/infra/metrics";
 import sanitizeHtml from "sanitize-html";
 import type { VerseRef } from "@/types/quran";
@@ -22,10 +25,10 @@ interface NameVerse {
 }
 
 async function fetchVerseData(ref: string): Promise<Omit<NameVerse, "reason"> | null> {
+  if (!isValidRef(ref)) return null;
   const [surahStr, ayahStr] = ref.split(":");
   const surahNum = parseInt(surahStr, 10);
   const ayahNum = parseInt(ayahStr, 10);
-  if (!surahNum || !ayahNum || surahNum < 1 || surahNum > 114 || ayahNum < 1) return null;
 
   try {
     const [arabicRes, translationRes] = await Promise.all([
@@ -103,8 +106,11 @@ Output format:
     const text = await callAI(prompt);
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return new Map();
-    const obj = JSON.parse(match[0]) as Record<string, string>;
-    return new Map(Object.entries(obj));
+    const obj: unknown = JSON.parse(match[0]);
+    if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return new Map();
+    return new Map(
+      Object.entries(obj).filter((e): e is [string, string] => typeof e[1] === "string")
+    );
   } catch (err) {
     // Reasons are best-effort (a default reason is used per verse if missing) —
     // log so a persistently malformed AI response is visible, not silent.
@@ -133,7 +139,17 @@ Return ONLY a JSON array:
     const text = await callAI(prompt);
     const match = text.match(/\[[\s\S]*\]/);
     if (!match) return [];
-    return JSON.parse(match[0]) as Array<{ ref: string; reason: string }>;
+    const raw: unknown = JSON.parse(match[0]);
+    // The model proposes refs from memory here — validate shape AND that each
+    // ref is a real Quran reference before anything downstream touches it.
+    return (Array.isArray(raw) ? raw : []).filter(
+      (item): item is { ref: string; reason: string } =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as Record<string, unknown>).ref === "string" &&
+        isValidRef((item as Record<string, unknown>).ref as string) &&
+        typeof (item as Record<string, unknown>).reason === "string"
+    );
   } catch (err) {
     // Empty result is not cached (it retries), but log the parse failure so a
     // broken prompt surfaces instead of silently re-invoking the AI forever.
@@ -146,7 +162,10 @@ function stripHtml(text: string): string {
   return sanitizeHtml(text, { allowedTags: [], allowedAttributes: {} });
 }
 
-async function getVersesBySlug(slug: string): Promise<NameVerse[]> {
+async function getVersesBySlug(
+  slug: string,
+  onBeforeGenerate: () => Promise<void>
+): Promise<NameVerse[]> {
   const name = getNameBySlug(slug);
   if (!name) return [];
 
@@ -201,11 +220,12 @@ async function getVersesBySlug(slug: string): Promise<NameVerse[]> {
         })
         .filter((v): v is NameVerse => v !== null);
     },
-    (v) => v.length === 0
+    (v) => v.length === 0,
+    onBeforeGenerate
   );
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const name = getNameBySlug(slug);
   if (!name) {
@@ -213,9 +233,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
   }
 
   try {
-    const verses = await getVersesBySlug(slug);
+    const verses = await getVersesBySlug(slug, async () => {
+      if (!(await consume(`names-gen:${clientKey(req)}`))) throw new RateLimitError();
+    });
     return NextResponse.json(verses);
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return NextResponse.json({ error: "Too many requests — please slow down." }, { status: 429 });
+    }
     console.error("Name verses error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

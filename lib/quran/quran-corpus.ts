@@ -2,6 +2,7 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { verses, type VerseRow } from "@/lib/infra/db/schema";
 import { getSurahName } from "@/lib/quran/surah-names";
+import { SURAH_LENGTHS } from "@/lib/quran/audio";
 import type { Verse, VerseRef } from "@/types/quran";
 
 /**
@@ -23,21 +24,17 @@ function rowToVerse(row: VerseRow): Verse {
   };
 }
 
-// The longest surah (2, Al-Baqarah) has 286 ayahs — no surah exceeds this, so
-// it's a safe generous upper bound without needing a full per-surah table.
-// isValidRef intentionally doesn't validate the exact per-surah count; refs
-// that pass this but don't exist (e.g. "114:200") simply fail to resolve
-// downstream (getVerse/getVerses return null/absent), same as any other
-// not-found ref.
-const MAX_AYAH = 286;
-
-/** A syntactically valid verse reference within Quran bounds (surah 1–114). */
+/**
+ * A syntactically valid verse reference within real Quran bounds: surah 1–114
+ * and ayah within that surah's actual Hafs/Uthmani ayah count (so "1:8" is
+ * rejected — Al-Fatihah has 7 ayahs — not just refs beyond a global ceiling).
+ */
 export function isValidRef(ref: string): boolean {
   const match = /^(\d+):(\d+)$/.exec(ref);
   if (!match) return false;
   const surah = parseInt(match[1], 10);
   const ayah = parseInt(match[2], 10);
-  return surah >= 1 && surah <= 114 && ayah >= 1 && ayah <= MAX_AYAH;
+  return surah >= 1 && surah <= 114 && ayah >= 1 && ayah <= SURAH_LENGTHS[surah - 1];
 }
 
 /** Returns the verse for a `"surah:ayah"` ref, or null if not in the corpus. */

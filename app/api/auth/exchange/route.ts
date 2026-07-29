@@ -12,6 +12,26 @@ import { clientKey } from "@/lib/infra/http";
 const EXCHANGE_LIMIT = 20;
 const EXCHANGE_WINDOW_SECONDS = 10 * 60;
 
+// Minimal payload decode for the id_token nonce check. Signature verification
+// is deliberately not done here: the token arrives directly from the QF token
+// endpoint over TLS with HTTP Basic client auth (OIDC Core §3.1.3.7 permits
+// skipping signature validation for tokens received on that direct channel).
+// Do NOT reuse this for tokens that arrive from the browser — those must go
+// through the JWKS-verified path in lib/auth/social-auth.ts.
+function decodeJwtPayload(jwt: string): Record<string, unknown> | null {
+  const parts = jwt.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const parsed: unknown = JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function generateUsername(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
   const bytes = new Uint8Array(8);
@@ -29,7 +49,7 @@ export async function POST(req: NextRequest) {
   );
   if (limited) return limited;
 
-  let body: { code?: string; codeVerifier?: string };
+  let body: { code?: string; codeVerifier?: string; nonce?: string };
   try {
     body = await req.json();
   } catch {
@@ -37,6 +57,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { code, codeVerifier } = body;
+  const nonce = typeof body.nonce === "string" ? body.nonce : undefined;
   if (!code || !codeVerifier) {
     return NextResponse.json({ error: "Missing code or codeVerifier" }, { status: 400 });
   }
@@ -77,7 +98,23 @@ export async function POST(req: NextRequest) {
     const data = (await res.json()) as {
       access_token: string;
       refresh_token?: string;
+      id_token?: string;
     };
+
+    // Verify the OIDC nonce round-trip: the value minted at sign-in start must
+    // come back inside the id_token, binding this token response to the
+    // authorize request that initiated it. Fail closed — we always request the
+    // `openid` scope, so a compliant server always returns an id_token; a
+    // missing or undecodable one is as anomalous as a mismatched nonce, and
+    // continuing would silently skip the check entirely.
+    if (nonce) {
+      const claims = typeof data.id_token === "string" ? decodeJwtPayload(data.id_token) : null;
+      if (!claims || claims.nonce !== nonce) {
+        console.error("Auth exchange: id_token nonce verification failed — rejecting sign-in.");
+        return NextResponse.json({ error: "Nonce verification failed" }, { status: 400 });
+      }
+    }
+
     const accessToken = data.access_token;
     const refreshToken = data.refresh_token ?? null;
     const COOKIE_NAME = "qf_refresh_token";
