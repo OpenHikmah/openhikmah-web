@@ -30,13 +30,20 @@ const inFlight = new Map<string, Promise<unknown>>();
  * persist, leaving the next request free to retry (mirrors how the connection
  * graph only stores non-empty generations). Bumping `version` for a kind forces
  * regeneration after a prompt change.
+ *
+ * `onBeforeGenerate` runs only on a durable-cache miss, before joining or
+ * starting a generation — the seam where routes enforce their per-client
+ * rate limit (cache hits stay unlimited, matching the limiter's contract in
+ * lib/infra/rate-limit.ts). A throw here (RateLimitError) propagates to the
+ * caller and nothing is generated or cached.
  */
 export async function getOrGenerateNameContent<T>(
   slug: string,
   kind: NameContentKind,
   version: number,
   generate: () => Promise<T>,
-  isEmpty: (value: T) => boolean
+  isEmpty: (value: T) => boolean,
+  onBeforeGenerate?: () => Promise<void>
 ): Promise<T> {
   // 1. Durable cache hit (only when the stored version matches the current one).
   const [row] = await db
@@ -55,6 +62,8 @@ export async function getOrGenerateNameContent<T>(
       console.error(`Corrupt name_content row for ${slug}/${kind}, regenerating:`, err);
     }
   }
+
+  if (onBeforeGenerate) await onBeforeGenerate();
 
   // 2. Single-flight: the get→set stays synchronous so two concurrent callers
   // can't both become the leader. `version` is part of the key so a follower can
