@@ -103,20 +103,15 @@ export async function POST(req: NextRequest) {
 
     // Verify the OIDC nonce round-trip: the value minted at sign-in start must
     // come back inside the id_token, binding this token response to the
-    // authorize request that initiated it. A mismatch means the code/token was
-    // not produced by our sign-in attempt — reject and set no session cookie.
+    // authorize request that initiated it. Fail closed — we always request the
+    // `openid` scope, so a compliant server always returns an id_token; a
+    // missing or undecodable one is as anomalous as a mismatched nonce, and
+    // continuing would silently skip the check entirely.
     if (nonce) {
-      if (data.id_token) {
-        const claims = decodeJwtPayload(data.id_token);
-        if (!claims || claims.nonce !== nonce) {
-          console.error("Auth exchange: id_token nonce mismatch — rejecting sign-in.");
-          return NextResponse.json({ error: "Nonce mismatch" }, { status: 400 });
-        }
-      } else {
-        // Fail-soft like the missing-refresh-token case below: a QF-side change
-        // that stops returning id_tokens must degrade to a warning, not brick
-        // sign-in (PKCE + state remain enforced regardless).
-        console.warn("Auth exchange: no id_token in token response — nonce not verifiable.");
+      const claims = typeof data.id_token === "string" ? decodeJwtPayload(data.id_token) : null;
+      if (!claims || claims.nonce !== nonce) {
+        console.error("Auth exchange: id_token nonce verification failed — rejecting sign-in.");
+        return NextResponse.json({ error: "Nonce verification failed" }, { status: 400 });
       }
     }
 

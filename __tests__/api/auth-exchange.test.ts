@@ -159,8 +159,7 @@ describe("POST /api/auth/exchange", () => {
       expect(res.status).toBe(400);
     });
 
-    it("fails soft (200 + warning) when the token response has no id_token", async () => {
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    it("fails closed (400, no cookie) when the token response has no id_token", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ access_token: "access-123", refresh_token: "refresh-456" }),
@@ -169,9 +168,25 @@ describe("POST /api/auth/exchange", () => {
       const res = await POST(
         makeReq({ code: "auth-code", codeVerifier: "verifier", nonce: "expected-nonce" })
       );
-      expect(res.status).toBe(200);
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining("no id_token"));
-      warn.mockRestore();
+      expect(res.status).toBe(400);
+      expect(res.headers.get("set-cookie")).toBeNull();
+    });
+
+    it("fails closed on a non-string id_token", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          access_token: "access-123",
+          refresh_token: "refresh-456",
+          id_token: 12345,
+        }),
+      });
+
+      const res = await POST(
+        makeReq({ code: "auth-code", codeVerifier: "verifier", nonce: "expected-nonce" })
+      );
+      expect(res.status).toBe(400);
+      expect(res.headers.get("set-cookie")).toBeNull();
     });
 
     it("skips the check when the client sends no nonce (legacy in-flight sign-ins)", async () => {
