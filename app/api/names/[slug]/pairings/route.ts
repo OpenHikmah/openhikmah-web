@@ -48,7 +48,7 @@ async function getPairings(
     async () => {
       const text = await callAI(buildPrompt(name.transliteration, name.arabic, name.meaning));
 
-      let raw: Array<{ transliteration: string; arabic: string; explanation: string }>;
+      let raw: unknown;
       try {
         const match = text.match(/\[[\s\S]*\]/);
         if (!match) {
@@ -63,7 +63,23 @@ async function getPairings(
         return [];
       }
 
-      return raw.slice(0, 3).map((p) => {
+      // Parsing successfully does not mean the shape is right — a valid-JSON
+      // response with the wrong structure must degrade to empty, not throw a 500
+      // at the property accesses below.
+      const items = (Array.isArray(raw) ? raw : []).filter(
+        (p): p is { transliteration: string; arabic: string; explanation: string } =>
+          typeof p === "object" &&
+          p !== null &&
+          typeof (p as Record<string, unknown>).transliteration === "string" &&
+          typeof (p as Record<string, unknown>).arabic === "string" &&
+          typeof (p as Record<string, unknown>).explanation === "string"
+      );
+      if (items.length === 0) {
+        console.error(`Pairings: AI response for ${slug} had no validly-shaped entries`);
+        return [];
+      }
+
+      return items.slice(0, 3).map((p) => {
         const match = DIVINE_NAMES.find(
           (n) =>
             n.transliteration.toLowerCase() === p.transliteration.toLowerCase() ||
