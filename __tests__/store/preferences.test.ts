@@ -50,6 +50,14 @@ describe("preferences store", () => {
     expect(getCookie(EDITION_COOKIE)).toBeUndefined();
   });
 
+  it("setUiLocale clears the edition cookie when switching to a locale with no edition set", () => {
+    usePreferencesStore.getState().setQuranEdition("en", "en.sahih");
+    expect(getCookie(EDITION_COOKIE)).toBe("en.sahih");
+
+    usePreferencesStore.getState().setUiLocale("tr");
+    expect(getCookie(EDITION_COOKIE)).toBeUndefined();
+  });
+
   it("setReciter updates the reciter", () => {
     usePreferencesStore.getState().setReciter("ar.husary");
     expect(usePreferencesStore.getState().reciter).toBe("ar.husary");

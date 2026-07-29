@@ -19,7 +19,6 @@ export interface SelectProps {
   "aria-label"?: string;
 }
 
-/** Standard select dropdown: same border/background/focus conventions as Input. */
 export function Select({
   value,
   onValueChange,

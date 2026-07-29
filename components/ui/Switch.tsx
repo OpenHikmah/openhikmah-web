@@ -8,15 +8,16 @@ export interface SwitchProps {
   onCheckedChange: (checked: boolean) => void;
   disabled?: boolean;
   className?: string;
+  id?: string;
   "aria-label"?: string;
 }
 
-/** Standard on/off toggle: same border/background conventions as Input, gold when on. */
 export function Switch({
   checked,
   onCheckedChange,
   disabled,
   className,
+  id,
   "aria-label": ariaLabel,
 }: SwitchProps) {
   return (
@@ -24,6 +25,7 @@ export function Switch({
       checked={checked}
       onCheckedChange={onCheckedChange}
       disabled={disabled}
+      id={id}
       aria-label={ariaLabel}
       className={cn(
         "relative h-6 w-10 shrink-0 rounded-full border border-border bg-surface transition-colors duration-[120ms] data-[state=checked]:border-gold-muted data-[state=checked]:bg-gold disabled:cursor-not-allowed disabled:opacity-50",

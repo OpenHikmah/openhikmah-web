@@ -37,6 +37,20 @@ function setCookie(name: string, value: string) {
   document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=31536000; SameSite=Lax`;
 }
 
+function clearCookie(name: string) {
+  if (typeof document === "undefined") return;
+  document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
+}
+
+// Keeps oh_edition in sync with the active locale: clears it when that
+// locale has no edition set yet, so the server never sees a stale
+// edition left over from a previously active locale.
+function syncEditionCookie(locale: UiLocale, editions: Partial<Record<UiLocale, string>>) {
+  const edition = editions[locale];
+  if (edition) setCookie(EDITION_COOKIE, edition);
+  else clearCookie(EDITION_COOKIE);
+}
+
 export const usePreferencesStore = create<PreferencesStore>()(
   persist(
     (set, get) => ({
@@ -48,8 +62,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
       setUiLocale: (locale) => {
         set({ uiLocale: locale });
         setCookie(LOCALE_COOKIE, locale);
-        const edition = get().quranEditionByLocale[locale];
-        if (edition) setCookie(EDITION_COOKIE, edition);
+        syncEditionCookie(locale, get().quranEditionByLocale);
       },
 
       setQuranEdition: (locale, edition) => {
@@ -76,8 +89,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         setCookie(LOCALE_COOKIE, state.uiLocale);
-        const edition = state.quranEditionByLocale[state.uiLocale];
-        if (edition) setCookie(EDITION_COOKIE, edition);
+        syncEditionCookie(state.uiLocale, state.quranEditionByLocale);
       },
     }
   )

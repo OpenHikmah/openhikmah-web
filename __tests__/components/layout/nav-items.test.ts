@@ -27,5 +27,10 @@ describe("nav-items", () => {
       expect(isNavItemActive("/names/al-hakim", "/names")).toBe(true);
       expect(isNavItemActive("/search", "/names")).toBe(false);
     });
+
+    it("does not match unrelated routes that merely share a prefix", () => {
+      expect(isNavItemActive("/namesake", "/names")).toBe(false);
+      expect(isNavItemActive("/search-results", "/search")).toBe(false);
+    });
   });
 });

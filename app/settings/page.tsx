@@ -104,6 +104,7 @@ export default function SettingsPage() {
               Show minimap
             </label>
             <Switch
+              id="canvas-minimap"
               aria-label="Show canvas minimap"
               checked={canvasPrefs.showMinimap}
               onCheckedChange={(checked) => setCanvasPrefs({ showMinimap: checked })}

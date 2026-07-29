@@ -28,5 +28,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
 ] as const;
 
 export function isNavItemActive(pathname: string, href: string): boolean {
-  return href === "/canvas" ? pathname === "/canvas" : pathname.startsWith(href);
+  return href === "/canvas"
+    ? pathname === href
+    : pathname === href || pathname.startsWith(`${href}/`);
 }

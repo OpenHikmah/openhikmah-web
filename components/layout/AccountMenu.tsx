@@ -85,22 +85,42 @@ export function AccountMenu() {
     );
   }
 
+  const linkRow =
+    "flex items-center gap-3 h-11 px-3 rounded-lg text-[13.5px] text-text-primary transition-colors hover:bg-white/5 [&_svg]:size-[17px] [&_svg]:text-text-secondary";
+
   if (!accessToken) {
     return (
-      <button
-        onClick={signIn}
-        disabled={signingIn}
-        className="inline-flex items-center gap-1.5 rounded-md border border-gold px-3.5 py-1.5 text-[13px] font-semibold text-gold transition-colors duration-[120ms] hover:bg-gold/10 disabled:opacity-60"
-      >
-        {signingIn ? <Loader2 className="size-3.5 animate-spin" /> : <LogIn className="size-3.5" />}
-        {signingIn ? "Signing in…" : "Sign in"}
-      </button>
+      <div className="flex items-center gap-1">
+        {/* Bookmarks/Settings need a mobile entry point independent of auth state:
+            the bottom tab bar drops both, and desktop nav shows Bookmarks
+            regardless of sign-in, so logged-out mobile users must not lose it. */}
+        <Link
+          href="/bookmarks"
+          aria-label="Bookmarks"
+          className={cn(linkRow, "h-9 px-2 md:hidden")}
+        >
+          <Bookmark />
+        </Link>
+        <Link href="/settings" aria-label="Settings" className={cn(linkRow, "h-9 px-2 md:hidden")}>
+          <Settings />
+        </Link>
+        <button
+          onClick={signIn}
+          disabled={signingIn}
+          className="inline-flex items-center gap-1.5 rounded-md border border-gold px-3.5 py-1.5 text-[13px] font-semibold text-gold transition-colors duration-[120ms] hover:bg-gold/10 disabled:opacity-60"
+        >
+          {signingIn ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <LogIn className="size-3.5" />
+          )}
+          {signingIn ? "Signing in…" : "Sign in"}
+        </button>
+      </div>
     );
   }
 
   const initial = (username ?? "?")[0].toUpperCase();
-  const linkRow =
-    "flex items-center gap-3 h-11 px-3 rounded-lg text-[13.5px] text-text-primary transition-colors hover:bg-white/5 [&_svg]:size-[17px] [&_svg]:text-text-secondary";
 
   return (
     <div ref={ref} className="relative">
