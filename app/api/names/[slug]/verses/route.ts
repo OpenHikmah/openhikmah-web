@@ -3,6 +3,8 @@ import { callAI } from "@/lib/ai/ai";
 import { getNameBySlug } from "@/lib/names/divine-names";
 import { getSurahName } from "@/lib/quran/surah-names";
 import { getOrGenerateNameContent } from "@/lib/names/name-content";
+import { consume, RateLimitError } from "@/lib/infra/rate-limit";
+import { clientKey } from "@/lib/infra/http";
 import { incr } from "@/lib/infra/metrics";
 import sanitizeHtml from "sanitize-html";
 import type { VerseRef } from "@/types/quran";
@@ -146,7 +148,10 @@ function stripHtml(text: string): string {
   return sanitizeHtml(text, { allowedTags: [], allowedAttributes: {} });
 }
 
-async function getVersesBySlug(slug: string): Promise<NameVerse[]> {
+async function getVersesBySlug(
+  slug: string,
+  onBeforeGenerate: () => Promise<void>
+): Promise<NameVerse[]> {
   const name = getNameBySlug(slug);
   if (!name) return [];
 
@@ -201,11 +206,12 @@ async function getVersesBySlug(slug: string): Promise<NameVerse[]> {
         })
         .filter((v): v is NameVerse => v !== null);
     },
-    (v) => v.length === 0
+    (v) => v.length === 0,
+    onBeforeGenerate
   );
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const name = getNameBySlug(slug);
   if (!name) {
@@ -213,9 +219,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
   }
 
   try {
-    const verses = await getVersesBySlug(slug);
+    const verses = await getVersesBySlug(slug, async () => {
+      if (!(await consume(`names-gen:${clientKey(req)}`))) throw new RateLimitError();
+    });
     return NextResponse.json(verses);
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return NextResponse.json({ error: "Too many requests — please slow down." }, { status: 429 });
+    }
     console.error("Name verses error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

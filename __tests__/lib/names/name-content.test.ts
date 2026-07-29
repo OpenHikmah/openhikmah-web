@@ -148,6 +148,72 @@ describe("getOrGenerateNameContent", () => {
     expect(c).toBe(a);
   });
 
+  it("calls onBeforeGenerate on a miss, before generate", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    const order: string[] = [];
+    const onBeforeGenerate = vi.fn(async () => {
+      order.push("gate");
+    });
+    const generate = vi.fn(async () => {
+      order.push("generate");
+      return ["x"];
+    });
+
+    const out = await getOrGenerateNameContent(
+      "al-malik",
+      "verses",
+      1,
+      generate,
+      isEmptyArr,
+      onBeforeGenerate
+    );
+
+    expect(out).toEqual(["x"]);
+    expect(onBeforeGenerate).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(["gate", "generate"]);
+  });
+
+  it("does NOT call onBeforeGenerate on a cache hit", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([{ data: JSON.stringify(["cached"]), version: 1 }]));
+    const onBeforeGenerate = vi.fn();
+    const generate = vi.fn();
+
+    const out = await getOrGenerateNameContent(
+      "as-salam",
+      "verses",
+      1,
+      generate,
+      isEmptyArr,
+      onBeforeGenerate
+    );
+
+    expect(out).toEqual(["cached"]);
+    expect(onBeforeGenerate).not.toHaveBeenCalled();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("a throwing onBeforeGenerate propagates, skips generation, and caches nothing", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    const onBeforeGenerate = vi.fn().mockRejectedValue(new Error("rate limited"));
+    const generate = vi.fn();
+
+    await expect(
+      getOrGenerateNameContent("al-malik", "verses", 1, generate, isEmptyArr, onBeforeGenerate)
+    ).rejects.toThrow("rate limited");
+    expect(generate).not.toHaveBeenCalled();
+    expect(mockInsert).not.toHaveBeenCalled();
+
+    // A later allowed call still generates (no stuck lock).
+    const out = await getOrGenerateNameContent(
+      "al-malik",
+      "verses",
+      1,
+      vi.fn().mockResolvedValue(["ok"]),
+      isEmptyArr
+    );
+    expect(out).toEqual(["ok"]);
+  });
+
   it("surfaces a generate() rejection and clears the lock so the next call retries", async () => {
     mockSelect.mockReturnValue(makeSelectChain([])); // miss
     const generate = vi.fn().mockRejectedValueOnce(new Error("boom")).mockResolvedValue(["ok"]);
