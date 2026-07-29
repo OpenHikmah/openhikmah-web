@@ -103,6 +103,91 @@ describe("POST /api/auth/exchange", () => {
     expect(capturedBody!.get("code_verifier")).toBe("my-verifier");
   });
 
+  describe("OIDC nonce verification", () => {
+    function fakeIdToken(payload: object) {
+      const b64url = (s: string) =>
+        Buffer.from(s).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+      return `${b64url(JSON.stringify({ alg: "RS256" }))}.${b64url(JSON.stringify(payload))}.sig`;
+    }
+
+    it("accepts a matching nonce", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          access_token: "access-123",
+          refresh_token: "refresh-456",
+          id_token: fakeIdToken({ nonce: "expected-nonce" }),
+        }),
+      });
+
+      const res = await POST(
+        makeReq({ code: "auth-code", codeVerifier: "verifier", nonce: "expected-nonce" })
+      );
+      expect(res.status).toBe(200);
+      expect((await res.json()).accessToken).toBe("access-123");
+    });
+
+    it("rejects a nonce mismatch with 400 and sets no session cookie", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          access_token: "access-123",
+          refresh_token: "refresh-456",
+          id_token: fakeIdToken({ nonce: "attacker-nonce" }),
+        }),
+      });
+
+      const res = await POST(
+        makeReq({ code: "auth-code", codeVerifier: "verifier", nonce: "expected-nonce" })
+      );
+      expect(res.status).toBe(400);
+      expect(res.headers.get("set-cookie")).toBeNull();
+    });
+
+    it("rejects an undecodable id_token with 400 when a nonce was provided", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          access_token: "access-123",
+          id_token: "not-a-jwt",
+        }),
+      });
+
+      const res = await POST(
+        makeReq({ code: "auth-code", codeVerifier: "verifier", nonce: "expected-nonce" })
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it("fails soft (200 + warning) when the token response has no id_token", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "access-123", refresh_token: "refresh-456" }),
+      });
+
+      const res = await POST(
+        makeReq({ code: "auth-code", codeVerifier: "verifier", nonce: "expected-nonce" })
+      );
+      expect(res.status).toBe(200);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("no id_token"));
+      warn.mockRestore();
+    });
+
+    it("skips the check when the client sends no nonce (legacy in-flight sign-ins)", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          access_token: "access-123",
+          id_token: fakeIdToken({ nonce: "whatever" }),
+        }),
+      });
+
+      const res = await POST(makeReq({ code: "auth-code", codeVerifier: "verifier" }));
+      expect(res.status).toBe(200);
+    });
+  });
+
   it("returns 400 when token endpoint returns non-ok", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
