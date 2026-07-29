@@ -110,8 +110,13 @@ describe("startJob", () => {
 });
 
 describe("JOBS", () => {
-  it("registers exactly the three backfill scripts from issue #114", () => {
-    expect(JOBS.map((j) => j.id)).toEqual(["seed-quran", "seed-morphology", "embed-corpus"]);
+  it("registers the backfill scripts from issue #114 plus seed-translations (#331)", () => {
+    expect(JOBS.map((j) => j.id)).toEqual([
+      "seed-quran",
+      "seed-morphology",
+      "embed-corpus",
+      "seed-translations",
+    ]);
   });
 });
 

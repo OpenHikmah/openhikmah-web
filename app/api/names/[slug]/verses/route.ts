@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callAI } from "@/lib/ai/ai";
 import { getNameBySlug } from "@/lib/names/divine-names";
-import { getSurahName } from "@/lib/quran/surah-names";
 import { isValidRef } from "@/lib/quran/quran-corpus";
+import { resolveVerse } from "@/lib/quran/verse-resolver";
 import { getOrGenerateNameContent } from "@/lib/names/name-content";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
@@ -26,37 +26,15 @@ interface NameVerse {
 
 async function fetchVerseData(ref: string): Promise<Omit<NameVerse, "reason"> | null> {
   if (!isValidRef(ref)) return null;
-  const [surahStr, ayahStr] = ref.split(":");
-  const surahNum = parseInt(surahStr, 10);
-  const ayahNum = parseInt(ayahStr, 10);
-
-  try {
-    const [arabicRes, translationRes] = await Promise.all([
-      fetch(`https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/ar.alafasy`),
-      fetch(`https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/en.sahih`),
-    ]);
-    if (!arabicRes.ok || !translationRes.ok) return null;
-    const [arabicData, translationData] = await Promise.all([
-      arabicRes.json(),
-      translationRes.json(),
-    ]);
-    const [surahName, surahNameArabic] = getSurahName(surahNum);
-    return {
-      ref: ref as VerseRef,
-      surah: surahNum,
-      ayah: ayahNum,
-      arabicText: arabicData.data.text,
-      translation: translationData.data.text,
-      surahName,
-      surahNameArabic,
-    };
-  } catch (err) {
-    // An upstream outage must not look identical to "no verse data" —
-    // log and count it so it's visible on /api/metrics, not silent.
-    console.error(`Name verses: alquran.cloud fetch failed for ${ref}:`, err);
+  const verse = await resolveVerse(ref);
+  if (!verse) {
+    // resolveVerse already logs the underlying corpus/live-fetch failure —
+    // this just keeps the metric so an upstream outage stays visible on
+    // /api/metrics, not silent.
     incr("quran_api_fetch_error");
     return null;
   }
+  return verse;
 }
 
 // Search quran.com for verses containing this name's Arabic text

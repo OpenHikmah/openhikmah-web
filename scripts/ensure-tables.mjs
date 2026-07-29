@@ -64,6 +64,18 @@ try {
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS verses_surah_ayah_idx ON verses (surah, ayah)`;
 
   await sql`
+    CREATE TABLE IF NOT EXISTS verse_translations (
+      ref        text NOT NULL REFERENCES verses(ref) ON DELETE CASCADE,
+      edition    text NOT NULL,
+      language   text NOT NULL,
+      text       text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (ref, edition)
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS verse_translations_edition_idx ON verse_translations (edition)`;
+
+  await sql`
     CREATE TABLE IF NOT EXISTS connections (
       id         serial PRIMARY KEY,
       from_ref   text NOT NULL,

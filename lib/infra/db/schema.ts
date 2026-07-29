@@ -252,6 +252,26 @@ export const verses = pgTable(
   (t) => [uniqueIndex("verses_surah_ayah_idx").on(t.surah, t.ayah)]
 );
 
+// ─── Verse Translations (multi-language) ──────────────────────────────────────
+// One row per (verse, edition). verses.translation stays the en.sahih fallback;
+// getVerse/getVerses COALESCE to it when an edition-specific row is missing.
+export const verseTranslations = pgTable(
+  "verse_translations",
+  {
+    ref: text("ref")
+      .notNull()
+      .references(() => verses.ref, { onDelete: "cascade" }),
+    edition: text("edition").notNull(),
+    language: text("language").notNull(),
+    text: text("text").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.ref, t.edition] }),
+    index("verse_translations_edition_idx").on(t.edition),
+  ]
+);
+
 // ─── Connection Graph (the persistent knowledge graph) ────────────────────────
 // Each row is an AI-generated edge between two verses. Written once on a cache
 // miss (see lib/graph-service.ts) and shared by every subsequent reader, so AI
@@ -527,6 +547,8 @@ export type SavedWorkspace = typeof savedWorkspaces.$inferSelect;
 export type NewSavedWorkspace = typeof savedWorkspaces.$inferInsert;
 export type VerseRow = typeof verses.$inferSelect;
 export type NewVerseRow = typeof verses.$inferInsert;
+export type VerseTranslation = typeof verseTranslations.$inferSelect;
+export type NewVerseTranslation = typeof verseTranslations.$inferInsert;
 export type Connection = typeof connections.$inferSelect;
 export type NewConnection = typeof connections.$inferInsert;
 export type AiGeneration = typeof aiGenerations.$inferSelect;
