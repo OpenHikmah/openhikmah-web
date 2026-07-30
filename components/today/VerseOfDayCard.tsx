@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Network, Volume2, Pause, Heart, Share2, Check } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { Verse } from "@/types/quran";
 import { cn } from "@/lib/utils";
 import { Card, IconButton, Tooltip, ReflectionNote, buttonVariants } from "@/components/ui";
@@ -19,6 +20,7 @@ import { useCopyFeedback } from "@/hooks/useCopyFeedback";
  * admin-curated override (design.md §6.A).
  */
 export function VerseOfDayCard({ verse, reflection }: { verse: Verse; reflection?: string }) {
+  const tCommon = useTranslations("common");
   const playVerse = useAudioStore((s) => s.playVerse);
   const pauseAudio = useAudioStore((s) => s.pause);
   const resumeAudio = useAudioStore((s) => s.resume);
@@ -110,11 +112,11 @@ export function VerseOfDayCard({ verse, reflection }: { verse: Verse; reflection
             </IconButton>
           </Tooltip>
 
-          <Tooltip label={isBookmarked ? "Remove bookmark" : "Bookmark"}>
+          <Tooltip label={isBookmarked ? tCommon("removeBookmark") : tCommon("bookmarkVerse")}>
             <IconButton
               tone="gold"
               onClick={() => toggleBookmark(verse.ref)}
-              aria-label={isBookmarked ? "Remove bookmark" : "Bookmark verse"}
+              aria-label={isBookmarked ? tCommon("removeBookmark") : tCommon("bookmarkVerse")}
               className={cn(isBookmarked && "border-gold-muted text-gold")}
             >
               <Heart fill={isBookmarked ? "currentColor" : "none"} />

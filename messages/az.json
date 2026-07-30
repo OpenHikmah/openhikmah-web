@@ -131,5 +131,49 @@
     "mapOnCanvas": "Lövhədə Xəritələndir",
     "searchVersesAria": "Ayə axtar",
     "nonEnglishHint": "İngilis dilindəki tərcümələr axtarılır — nəticələr interfeys dilindən asılı olmayaraq ingilis dilində göstərilir."
+  },
+  "bookmarks": {
+    "title": "Əlfəcinlər",
+    "emptyTitle": "Hələ əlfəcin yoxdur.",
+    "emptyHint": "Yadda saxlamaq üçün lövhədəki istənilən ayənin ürək işarəsinə toxunun.",
+    "openCanvas": "Lövhəni aç",
+    "openInCanvas": "Lövhədə aç",
+    "couldNotLoadVerse": "Ayə mətni yüklənə bilmədi.",
+    "savedCount": "{count, plural, =0 {Hələ əlfəcin yoxdur} one {# yadda saxlanmış ayə} other {# yadda saxlanmış ayə}}"
+  },
+  "names": {
+    "eyebrow": "Əsmayi-Hüsna",
+    "heroTitle": "Allahın 99 Gözəl Adı",
+    "heroDescription": "Maturidi/Hənəfi təsnifatına görə düzülüb — Sifat əl-Zat, Sifat əl-Məani və Sifat əl-Əf'al. Ayələrini kəşf etmək üçün istənilən ada klikləyin.",
+    "footer": "Adlar Maturidi/Hənəfi ənənəsinə əsaslanır · ayələr Claude tərəfindən təqdim olunur",
+    "allNames": "Bütün Adlar",
+    "allNinetyNine": "Bütün 99",
+    "ofNinetyNine": "99-dan {id}",
+    "root": "Kök: {root}",
+    "versesHeading": "Bu Adın Ayələri",
+    "reflectionLabel": "Möminin Təfəkkürü",
+    "pairingsLabel": "Ümumi Uyğunluqlar",
+    "couldNotLoadVerses": "Ayələr hazırda yüklənə bilmədi.",
+    "findingVerses": "Claude ayələri tapır…",
+    "noVersesFound": "Bu ad üçün ayə tapılmadı.",
+    "connectionLabel": "Əlaqə: ",
+    "mapOnCanvas": "Lövhədə Xəritələndir →",
+    "categoryDhatLabel": "Sifat əl-Zat",
+    "categoryDhatDescription": "Zat Sifətləri — yaradılışdan asılı olmayaraq Allaha məxsus zəruri və əzəli həqiqətlər",
+    "categorySifatLabel": "Sifat əl-Məani",
+    "categorySifatDescription": "Məna Sifətləri — yeddi sübuti sifət (Elm, Qüdrət, İradə, Həyat, Səm', Bəsər, Kəlam) və tənzihi (aşkınlığı) ifadə edən adlar",
+    "categoryAfalLabel": "Sifat əl-Əf'al",
+    "categoryAfalDescription": "Fe'l Sifətləri — Allahın yaratma, ruzi vermə, hidayət etmə, bağışlama kimi yaradılışla olan hökmranlıq əlaqəsini ifadə edən adlar"
+  },
+  "errors": {
+    "routeFailedTitle": "Bu səhifə yüklənmədi",
+    "routeFailedBody": "Gözlənilməz xəta bu bölməni kəsdi. Yenidən cəhd edə və ya geri qayıda bilərsiniz.",
+    "refPrefix": "ref: {digest}",
+    "tryAgain": "Yenidən cəhd et",
+    "home": "Ana səhifə",
+    "loading": "Yüklənir…",
+    "rootTitle": "Nəsə səhv getdi",
+    "rootBody": "Gözlənilməz xəta bu səhifəni kəsdi. Yenidən cəhd edə və ya ana səhifəyə qayıda bilərsiniz.",
+    "todayVerseUnavailable": "Bugünkü ayə hazırda yüklənə bilmədi. Zəhmət olmasa sonra yenidən cəhd edin."
   }
 }

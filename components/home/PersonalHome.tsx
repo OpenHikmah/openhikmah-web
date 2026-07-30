@@ -3,6 +3,7 @@
 import { useEffect, useState, type ComponentType } from "react";
 import Link from "next/link";
 import { Flame, LayoutTemplate, FolderOpen, Heart, ArrowRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { Card } from "@/components/ui";
@@ -40,6 +41,9 @@ function QuickLink({
 }
 
 export function PersonalHome({ verse }: { verse: Verse | null }) {
+  const tNav = useTranslations("nav");
+  const tBookmarks = useTranslations("bookmarks");
+  const tErrors = useTranslations("errors");
   const bookmarks = useAuthStore((s) => s.bookmarks);
   const accessToken = useAuthStore((s) => s.accessToken);
   const username = useSocialStore((s) => s.username);
@@ -106,9 +110,7 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
         {verse ? (
           <VerseOfDayCard verse={verse} />
         ) : (
-          <Card className="p-5 text-sm text-text-muted">
-            Couldn&apos;t load today&apos;s verse right now. Please try again later.
-          </Card>
+          <Card className="p-5 text-sm text-text-muted">{tErrors("todayVerseUnavailable")}</Card>
         )}
 
         <div className="grid gap-3">
@@ -139,12 +141,8 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
           <QuickLink
             href="/bookmarks"
             icon={Heart}
-            title="Bookmarks"
-            subtitle={
-              bookmarks.length > 0
-                ? `${bookmarks.length} saved verse${bookmarks.length === 1 ? "" : "s"}`
-                : "No bookmarks yet"
-            }
+            title={tNav("bookmarks")}
+            subtitle={tBookmarks("savedCount", { count: bookmarks.length })}
           />
         </div>
       </div>

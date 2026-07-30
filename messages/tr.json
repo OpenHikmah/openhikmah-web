@@ -131,5 +131,49 @@
     "mapOnCanvas": "Tuvalde Haritala",
     "searchVersesAria": "Ayet ara",
     "nonEnglishHint": "İngilizce çeviriler aranıyor — sonuçlar arayüz dilinden bağımsız olarak İngilizce gösterilir."
+  },
+  "bookmarks": {
+    "title": "Yer imleri",
+    "emptyTitle": "Henüz yer imi yok.",
+    "emptyHint": "Kaydetmek için tuvaldeki herhangi bir ayetin kalp simgesine dokunun.",
+    "openCanvas": "Tuvali aç",
+    "openInCanvas": "Tuvalde aç",
+    "couldNotLoadVerse": "Ayet metni yüklenemedi.",
+    "savedCount": "{count, plural, =0 {Henüz yer imi yok} one {# kayıtlı ayet} other {# kayıtlı ayet}}"
+  },
+  "names": {
+    "eyebrow": "Esmaü'l Hüsna",
+    "heroTitle": "Allah'ın 99 Güzel İsmi",
+    "heroDescription": "Maturidi/Hanefi taksonomisine göre düzenlenmiştir — Sıfat el-Zat, Sıfat el-Meani ve Sıfat el-Ef'al. Ayetlerini keşfetmek için bir isme tıklayın.",
+    "footer": "İsimler Maturidi/Hanefi geleneğine dayanır · ayetler Claude tarafından sağlanır",
+    "allNames": "Tüm İsimler",
+    "allNinetyNine": "Tüm 99",
+    "ofNinetyNine": "#{id} / 99",
+    "root": "Kök: {root}",
+    "versesHeading": "Bu İsmin Ayetleri",
+    "reflectionLabel": "Müminin Tefekkürü",
+    "pairingsLabel": "Yaygın Eşleşmeler",
+    "couldNotLoadVerses": "Ayetler şu anda yüklenemedi.",
+    "findingVerses": "Claude ayetleri buluyor…",
+    "noVersesFound": "Bu isim için ayet bulunamadı.",
+    "connectionLabel": "Bağlantı: ",
+    "mapOnCanvas": "Tuvalde Haritala →",
+    "categoryDhatLabel": "Sıfat el-Zat",
+    "categoryDhatDescription": "Zâtî Sıfatlar — Allah'a mahsus, yaratılıştan bağımsız olarak zorunlu ve ezelî olarak doğru olan sıfatlar",
+    "categorySifatLabel": "Sıfat el-Meani",
+    "categorySifatDescription": "Meânî Sıfatları — yedi sübûtî sıfat (İlim, Kudret, İrade, Hayat, Sem', Basar, Kelam) ve tenzihi (aşkınlığı) ifade eden isimler",
+    "categoryAfalLabel": "Sıfat el-Ef'al",
+    "categoryAfalDescription": "Fiilî Sıfatlar — Allah'ın yaratma, rızıklandırma, hidayet etme, bağışlama gibi yaratılışla olan egemen ilişkisini ifade eden isimler"
+  },
+  "errors": {
+    "routeFailedTitle": "Bu sayfa yüklenemedi",
+    "routeFailedBody": "Beklenmeyen bir hata bu bölümü kesintiye uğrattı. Tekrar deneyebilir veya geri dönebilirsiniz.",
+    "refPrefix": "ref: {digest}",
+    "tryAgain": "Tekrar dene",
+    "home": "Ana sayfa",
+    "loading": "Yükleniyor…",
+    "rootTitle": "Bir şeyler ters gitti",
+    "rootBody": "Beklenmeyen bir hata bu sayfayı kesintiye uğrattı. Tekrar deneyebilir veya ana sayfaya dönebilirsiniz.",
+    "todayVerseUnavailable": "Bugünün ayeti şu anda yüklenemedi. Lütfen daha sonra tekrar deneyin."
   }
 }

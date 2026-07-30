@@ -29,13 +29,13 @@ describe("i18n messages", () => {
     }
   });
 
-  it("en has every key present in each non-en locale (locales don't add keys silently missing from en)", () => {
+  it("every non-en locale has every key present in en (no locale silently missing a key)", () => {
+    const enKeys = Object.keys(flatten(en));
     for (const locale of LOCALES) {
       if (locale === "en") continue;
-      const enKeys = new Set(Object.keys(flatten(en)));
-      const localeKeys = Object.keys(flatten(MESSAGES[locale]));
-      for (const key of localeKeys) {
-        expect(enKeys.has(key), `en is missing key ${key} used by ${locale}`).toBe(true);
+      const localeKeys = new Set(Object.keys(flatten(MESSAGES[locale])));
+      for (const key of enKeys) {
+        expect(localeKeys.has(key), `${locale} is missing key ${key} present in en`).toBe(true);
       }
     }
   });

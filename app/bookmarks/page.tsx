@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Heart, Trash2, Network } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/store/auth";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { Card, IconButton, Tooltip, iconButtonVariants } from "@/components/ui";
@@ -11,6 +12,8 @@ import type { Verse } from "@/types/quran";
 const verseCache = new Map<string, Verse>();
 
 export default function BookmarksPage() {
+  const t = useTranslations("bookmarks");
+  const tCommon = useTranslations("common");
   const bookmarks = useAuthStore((s) => s.bookmarks);
   const toggleBookmark = useAuthStore((s) => s.toggleBookmark);
   const [verses, setVerses] = useState<Map<string, Verse>>(new Map());
@@ -52,9 +55,12 @@ export default function BookmarksPage() {
         {/* Page header */}
         <div className="mb-8 flex items-center gap-3">
           <Heart className="h-5 w-5 text-gold" />
-          <h1 className="text-lg font-semibold text-text-primary">Bookmarks</h1>
+          <h1 className="text-lg font-semibold text-text-primary">{t("title")}</h1>
           {bookmarks.length > 0 && (
-            <span className="rounded border border-border px-1.5 py-0.5 font-mono text-xs text-text-muted">
+            <span
+              aria-label={t("savedCount", { count: bookmarks.length })}
+              className="rounded border border-border px-1.5 py-0.5 font-mono text-xs text-text-muted"
+            >
               {bookmarks.length}
             </span>
           )}
@@ -63,16 +69,14 @@ export default function BookmarksPage() {
         {bookmarks.length === 0 ? (
           <div className="py-20 text-center">
             <Heart className="mx-auto mb-4 h-8 w-8 text-text-muted/40" />
-            <p className="text-sm text-text-muted">No bookmarks yet.</p>
-            <p className="mt-1 text-xs text-text-muted">
-              Tap the heart icon on any verse in the canvas to save it.
-            </p>
+            <p className="text-sm text-text-muted">{t("emptyTitle")}</p>
+            <p className="mt-1 text-xs text-text-muted">{t("emptyHint")}</p>
             <Link
               href="/canvas"
               className="mt-5 inline-flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm text-text-secondary transition-colors hover:border-gold-muted hover:text-gold"
             >
               <Network className="h-3.5 w-3.5" />
-              Open canvas
+              {t("openCanvas")}
             </Link>
           </div>
         ) : loading ? (
@@ -105,21 +109,21 @@ export default function BookmarksPage() {
                       {verse && <span className="text-xs text-text-muted">{verse.surahName}</span>}
                     </div>
                     <div className="flex items-center gap-1">
-                      <Tooltip label="Open in canvas">
+                      <Tooltip label={t("openInCanvas")}>
                         <Link
                           href={`/canvas?verse=${ref}`}
-                          aria-label="Open in canvas"
+                          aria-label={t("openInCanvas")}
                           className={iconButtonVariants({ tone: "teal", size: "xs" })}
                         >
                           <Network />
                         </Link>
                       </Tooltip>
-                      <Tooltip label="Remove bookmark">
+                      <Tooltip label={tCommon("removeBookmark")}>
                         <IconButton
                           tone="danger"
                           size="xs"
                           onClick={() => toggleBookmark(ref)}
-                          aria-label="Remove bookmark"
+                          aria-label={tCommon("removeBookmark")}
                         >
                           <Trash2 />
                         </IconButton>
@@ -137,7 +141,7 @@ export default function BookmarksPage() {
                       </p>
                     </div>
                   ) : (
-                    <p className="mt-3 text-xs text-text-muted">Could not load verse text.</p>
+                    <p className="mt-3 text-xs text-text-muted">{t("couldNotLoadVerse")}</p>
                   )}
                 </Card>
               );

@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import {
   getNameBySlug,
   DIVINE_NAMES,
-  CATEGORY_LABELS,
+  CATEGORY_LABEL_KEYS,
   type NameCategory,
 } from "@/lib/names/divine-names";
 import { Wordmark } from "@/components/layout/Wordmark";
@@ -46,8 +47,9 @@ export default async function NameDetailPage({ params }: Props) {
   const name = getNameBySlug(slug);
   if (!name) notFound();
 
+  const t = await getTranslations("names");
   const styles = CATEGORY_STYLES[name.category];
-  const categoryLabel = CATEGORY_LABELS[name.category];
+  const categoryLabelKey = CATEGORY_LABEL_KEYS[name.category].label;
 
   const prevName = DIVINE_NAMES.find((n) => n.id === name.id - 1);
   const nextName = DIVINE_NAMES.find((n) => n.id === name.id + 1);
@@ -62,14 +64,14 @@ export default async function NameDetailPage({ params }: Props) {
           className="flex items-center gap-1.5 text-xs text-text-secondary transition-colors hover:text-text-primary"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          <span>All Names</span>
+          <span>{t("allNames")}</span>
         </Link>
       </header>
 
       {/* Name hero */}
       <div className="mx-auto max-w-3xl border-b border-border-subtle px-6 pt-14 pb-12 text-center">
         <div className="mb-6 inline-block rounded border border-border bg-surface-raised px-2 py-1 font-mono text-xs text-text-muted">
-          #{name.id} of 99
+          {t("ofNinetyNine", { id: name.id })}
         </div>
 
         <h1 className="mb-3 font-arabic text-7xl" style={{ color: styles.accent }}>
@@ -82,10 +84,10 @@ export default async function NameDetailPage({ params }: Props) {
 
         <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
           <span className={`rounded px-2.5 py-1 text-xs font-medium ${styles.badge}`}>
-            {categoryLabel.en}
+            {t(categoryLabelKey)}
           </span>
           <span className="rounded border border-border bg-surface-raised px-2.5 py-1 font-mono text-xs text-text-secondary">
-            Root: {name.root}
+            {t("root", { root: name.root })}
           </span>
         </div>
 
@@ -105,7 +107,7 @@ export default async function NameDetailPage({ params }: Props) {
         {/* Verse Feed */}
         <div>
           <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-text-muted">
-            Verses of this Name
+            {t("versesHeading")}
           </h2>
           <NameVerses slug={slug} accent={styles.accent} />
         </div>
@@ -127,7 +129,7 @@ export default async function NameDetailPage({ params }: Props) {
         )}
 
         <Link href="/names" className="text-xs text-text-muted transition-opacity hover:opacity-80">
-          All 99
+          {t("allNinetyNine")}
         </Link>
 
         {nextName ? (

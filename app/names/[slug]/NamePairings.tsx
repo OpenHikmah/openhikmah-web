@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 interface Pairing {
   name: string;
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function NamePairings({ slug, accent }: Props) {
+  const t = useTranslations("names");
   const [pairings, setPairings] = useState<Pairing[] | null>(null);
   const [error, setError] = useState(false);
 
@@ -49,7 +51,7 @@ export function NamePairings({ slug, accent }: Props) {
           className="text-xs font-mono uppercase tracking-widest"
           style={{ color: "var(--color-text-muted)" }}
         >
-          Common Pairings
+          {t("pairingsLabel")}
         </span>
       </div>
 
