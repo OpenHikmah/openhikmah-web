@@ -134,6 +134,13 @@
       "when": 1785337523680,
       "tag": "0018_verse_translations",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1785433310602,
+      "tag": "0019_name_content_locale",
+      "breakpoints": true
     }
   ]
 }

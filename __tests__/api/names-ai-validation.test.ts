@@ -23,10 +23,18 @@ function makeSelectChain(resolveWith: unknown[]) {
   return chain;
 }
 
-const { mockConsume, mockCallAI } = vi.hoisted(() => ({
+const { mockConsume, mockCallAI, mockCookies } = vi.hoisted(() => ({
   mockConsume: vi.fn(),
   mockCallAI: vi.fn(),
+  // The routes now call getUiLocale() (lib/i18n/request-prefs.ts), which reads
+  // next/headers' cookies() — unavailable outside a real Next request scope.
+  // Defaults to no cookie set (→ "en"); individual tests can override.
+  mockCookies: vi.fn(async () => ({
+    get: (_name: string) => undefined as { value: string } | undefined,
+  })),
 }));
+
+vi.mock("next/headers", () => ({ cookies: mockCookies }));
 
 vi.mock("@/lib/infra/db", () => ({
   db: {
@@ -44,6 +52,7 @@ vi.mock("@/lib/ai/ai", () => ({ callAI: mockCallAI }));
 
 import { GET as getPairings } from "@/app/api/names/[slug]/pairings/route";
 import { GET as getVerses } from "@/app/api/names/[slug]/verses/route";
+import { GET as getReflection } from "@/app/api/names/[slug]/reflection/route";
 
 // Stub fetch AFTER static imports so vi.stubGlobal wins over any fetch patch
 // applied during next/server module initialization.
@@ -63,7 +72,14 @@ describe("names AI routes — model output validation", () => {
     mockCallAI.mockReset();
     mockFetch.mockReset();
     mockFetch.mockResolvedValue({ ok: false }); // quran.com search yields no refs
+    mockCookies.mockReset().mockResolvedValue({ get: () => undefined }); // "en" default
   });
+
+  function withLocale(locale: string) {
+    mockCookies.mockResolvedValue({
+      get: (name: string) => (name === "oh_locale" ? { value: locale } : undefined),
+    });
+  }
 
   it("pairings: parseable-but-wrong-shaped JSON (string array) returns empty, not a 500", async () => {
     mockCallAI.mockResolvedValue(JSON.stringify(["Ar-Rahim", "Al-Malik"]));
@@ -138,5 +154,77 @@ describe("names AI routes — model output validation", () => {
     expect(body[0].reason).toBe("Ayat al-Kursi.");
     expect(body[0].arabicText).toBe(ARABIC);
     expect(body[0].translation).toBe(ENGLISH);
+  });
+
+  it("reflection: no language directive for the default (English) locale", async () => {
+    mockCallAI.mockResolvedValue("A reflection paragraph.");
+    await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));
+    const prompt = mockCallAI.mock.calls[0][0] as string;
+    expect(prompt).not.toMatch(/write the reflection in/i);
+    expect(prompt).toMatch(/strict tanzih/i);
+  });
+
+  it("reflection: appends a language directive for a non-English locale, keeping Tanzih rules", async () => {
+    withLocale("tr");
+    mockCallAI.mockResolvedValue("Bir yansıma paragrafı.");
+    await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));
+    const prompt = mockCallAI.mock.calls[0][0] as string;
+    expect(prompt).toMatch(/write the reflection in turkish/i);
+    expect(prompt).toMatch(/strict tanzih/i);
+  });
+
+  it("pairings: no language directive for the default (English) locale", async () => {
+    mockCallAI.mockResolvedValue(JSON.stringify([]));
+    await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
+    const prompt = mockCallAI.mock.calls[0][0] as string;
+    expect(prompt).not.toMatch(/write each "explanation" in/i);
+  });
+
+  it("pairings: appends a language directive for a non-English locale", async () => {
+    withLocale("ru");
+    mockCallAI.mockResolvedValue(JSON.stringify([]));
+    await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
+    const prompt = mockCallAI.mock.calls[0][0] as string;
+    expect(prompt).toMatch(/write each "explanation" in russian/i);
+  });
+
+  function mockVerseFetch() {
+    mockFetch.mockImplementation(async (url: unknown) => {
+      if (typeof url !== "string") return { ok: false };
+      if (url.includes("ar.alafasy"))
+        return { ok: true, json: async () => ({ data: { text: "نص عربي" } }) };
+      if (url.includes("en.sahih"))
+        return { ok: true, json: async () => ({ data: { text: "English text" } }) };
+      return { ok: false };
+    });
+  }
+
+  it("verses: selection stays English-only and untranslated for the default locale", async () => {
+    mockVerseFetch();
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "Ayat al-Kursi." }]));
+    const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+    const body = await res.json();
+    expect(body[0].reason).toBe("Ayat al-Kursi.");
+    expect(mockCallAI).toHaveBeenCalledTimes(1); // only the fallback-verses call, no translation pass
+  });
+
+  it("verses: translates only the reason for a non-English locale, leaving the verse selection unchanged", async () => {
+    withLocale("az");
+    mockVerseFetch();
+    mockCallAI
+      .mockResolvedValueOnce(JSON.stringify([{ ref: "2:255", reason: "Ayat al-Kursi." }]))
+      .mockResolvedValueOnce("Ayat əl-Kürsi.");
+
+    const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveLength(1);
+    expect(body[0].ref).toBe("2:255"); // selection unchanged
+    expect(body[0].reason).toBe("Ayat əl-Kürsi."); // reason translated
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
+    const translatePrompt = mockCallAI.mock.calls[1][0] as string;
+    expect(translatePrompt).toMatch(/translate the following sentence into azerbaijani/i);
+    expect(translatePrompt).toMatch(/strict tanzih/i);
   });
 });

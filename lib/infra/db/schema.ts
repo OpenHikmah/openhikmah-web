@@ -391,13 +391,37 @@ export const nameContent = pgTable(
   {
     slug: text("slug").notNull(),
     kind: text("kind").$type<NameContentKind>().notNull(),
+    // Locale the AI-generated `data` was written in. Defaults to "en" so
+    // existing rows keep their identity unchanged under the extended PK below.
+    // The "verses" kind is always written under "en" — verse *selection* stays
+    // locale-independent (see name_verse_reasons for the per-locale part).
+    locale: text("locale").notNull().default("en"),
     data: text("data").notNull(),
     model: text("model"),
     version: integer("version").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.slug, t.kind] })]
+  (t) => [primaryKey({ columns: [t.slug, t.kind, t.locale] })]
+);
+
+// Locale-specific translations of a name_content "verses" entry's per-verse
+// `reason` field. Kept separate from name_content rather than folded into its
+// PK because the verse *selection* for a name must stay identical across
+// locales (an AI re-selection per locale could surface a different verse set
+// for the same name) — only the reason text is localized, as a translation
+// of the canonical English reason, not a fresh generation.
+export const nameVerseReasons = pgTable(
+  "name_verse_reasons",
+  {
+    slug: text("slug").notNull(),
+    ref: text("ref").notNull(),
+    locale: text("locale").notNull(),
+    reason: text("reason").notNull(),
+    model: text("model"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.slug, t.ref, t.locale] })]
 );
 
 // ─── Curated Verse of the Day ─────────────────────────────────────────────────
@@ -561,6 +585,8 @@ export type WordMorphology = typeof wordMorphology.$inferSelect;
 export type NewWordMorphology = typeof wordMorphology.$inferInsert;
 export type NameContent = typeof nameContent.$inferSelect;
 export type NewNameContent = typeof nameContent.$inferInsert;
+export type NameVerseReason = typeof nameVerseReasons.$inferSelect;
+export type NewNameVerseReason = typeof nameVerseReasons.$inferInsert;
 export type CuratedVotd = typeof curatedVotd.$inferSelect;
 export type NewCuratedVotd = typeof curatedVotd.$inferInsert;
 export type AdminAuditEntry = typeof adminAuditLog.$inferSelect;

@@ -3,10 +3,12 @@ import { callAI } from "@/lib/ai/ai";
 import { getNameBySlug } from "@/lib/names/divine-names";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
-import { getOrGenerateNameContent } from "@/lib/names/name-content";
+import { getOrGenerateNameContent, getOrGenerateVerseReason } from "@/lib/names/name-content";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import { incr } from "@/lib/infra/metrics";
+import { getUiLocale } from "@/lib/i18n/request-prefs";
+import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
 import sanitizeHtml from "sanitize-html";
 import type { VerseRef } from "@/types/quran";
 
@@ -140,16 +142,31 @@ function stripHtml(text: string): string {
   return sanitizeHtml(text, { allowedTags: [], allowedAttributes: {} });
 }
 
+// Translates (not re-derives) a verse's canonical English `reason` into the
+// target language, so the underlying theological justification stays exactly
+// what was already generated and validated in English.
+async function translateReason(reason: string, language: string): Promise<string> {
+  const prompt = `Translate the following sentence into ${language}. Preserve its meaning exactly — do not add, remove, or alter any theological claim, and maintain strict Tanzih (divine transcendence). Return ONLY the translated sentence, with no quotation marks, labels, or explanation.
+
+Sentence: "${reason}"`;
+  const translated = await callAI(prompt);
+  return translated.trim();
+}
+
 async function getVersesBySlug(
   slug: string,
+  locale: Locale,
   onBeforeGenerate: () => Promise<void>
 ): Promise<NameVerse[]> {
   const name = getNameBySlug(slug);
   if (!name) return [];
 
-  return getOrGenerateNameContent(
+  const verses = await getOrGenerateNameContent(
     slug,
     "verses",
+    // Verse selection is always cached/generated as "en" regardless of the
+    // requester's locale — see name_verse_reasons below for why.
+    "en",
     VERSES_VERSION,
     async (): Promise<NameVerse[]> => {
       // Try actual quran.com search first
@@ -201,6 +218,25 @@ async function getVersesBySlug(
     (v) => v.length === 0,
     onBeforeGenerate
   );
+
+  if (locale === "en" || verses.length === 0) return verses;
+
+  // Localize only the per-verse reason text (a translation of the canonical
+  // English reason, cached in name_verse_reasons) — the verse list itself
+  // stays exactly as selected above, so it never differs by locale.
+  const language = LOCALE_LANGUAGE_NAME[locale];
+  const localizedReasons = await Promise.all(
+    verses.map((v) =>
+      getOrGenerateVerseReason(
+        slug,
+        v.ref,
+        locale,
+        () => translateReason(v.reason, language),
+        onBeforeGenerate
+      )
+    )
+  );
+  return verses.map((v, i) => ({ ...v, reason: localizedReasons[i] }));
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
@@ -211,7 +247,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   }
 
   try {
-    const verses = await getVersesBySlug(slug, async () => {
+    const locale = await getUiLocale();
+    const verses = await getVersesBySlug(slug, locale, async () => {
       if (!(await consume(`names-gen:${clientKey(req)}`))) throw new RateLimitError();
     });
     return NextResponse.json(verses);

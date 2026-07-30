@@ -35,6 +35,10 @@ vi.mock("@/lib/infra/db", () => ({
     insert: () => ({ values: () => ({ onConflictDoUpdate: async () => undefined }) }),
   },
 }));
+// The routes now call getUiLocale() (lib/i18n/request-prefs.ts), which reads
+// next/headers' cookies() — unavailable outside a real Next request scope.
+// No cookie set here means it resolves to the "en" default.
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
 
 vi.mock("@/lib/infra/rate-limit", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/infra/rate-limit")>();

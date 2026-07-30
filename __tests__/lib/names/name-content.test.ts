@@ -22,20 +22,27 @@ function makeSelectChain(resolveWith: unknown[]) {
   return chain;
 }
 
-const { mockSelect, mockInsert, mockValues, mockOnConflict } = vi.hoisted(() => {
-  const mockOnConflict = vi.fn().mockResolvedValue(undefined);
-  const mockValues = vi.fn((..._args: unknown[]) => ({ onConflictDoUpdate: mockOnConflict }));
-  return {
-    mockSelect: vi.fn(),
-    mockInsert: vi.fn(() => ({ values: mockValues })),
-    mockValues,
-    mockOnConflict,
-  };
-});
+const { mockSelect, mockInsert, mockValues, mockOnConflict, mockOnConflictDoNothing } = vi.hoisted(
+  () => {
+    const mockOnConflict = vi.fn().mockResolvedValue(undefined);
+    const mockOnConflictDoNothing = vi.fn().mockResolvedValue(undefined);
+    const mockValues = vi.fn((..._args: unknown[]) => ({
+      onConflictDoUpdate: mockOnConflict,
+      onConflictDoNothing: mockOnConflictDoNothing,
+    }));
+    return {
+      mockSelect: vi.fn(),
+      mockInsert: vi.fn(() => ({ values: mockValues })),
+      mockValues,
+      mockOnConflict,
+      mockOnConflictDoNothing,
+    };
+  }
+);
 
 vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect, insert: mockInsert } }));
 
-import { getOrGenerateNameContent } from "@/lib/names/name-content";
+import { getOrGenerateNameContent, getOrGenerateVerseReason } from "@/lib/names/name-content";
 
 const isEmptyArr = (v: unknown[]) => v.length === 0;
 
@@ -45,13 +52,14 @@ describe("getOrGenerateNameContent", () => {
     mockInsert.mockClear();
     mockValues.mockClear();
     mockOnConflict.mockClear();
+    mockOnConflictDoNothing.mockClear();
   });
 
   it("returns the cached value on a hit WITHOUT generating", async () => {
     mockSelect.mockReturnValue(makeSelectChain([{ data: JSON.stringify(["cached"]), version: 1 }]));
     const generate = vi.fn();
 
-    const out = await getOrGenerateNameContent("as-salam", "verses", 1, generate, isEmptyArr);
+    const out = await getOrGenerateNameContent("as-salam", "verses", "en", 1, generate, isEmptyArr);
 
     expect(out).toEqual(["cached"]);
     expect(generate).not.toHaveBeenCalled();
@@ -62,21 +70,41 @@ describe("getOrGenerateNameContent", () => {
     mockSelect.mockReturnValue(makeSelectChain([])); // no row
     const generate = vi.fn().mockResolvedValue(["a", "b"]);
 
-    const out = await getOrGenerateNameContent("al-malik", "verses", 2, generate, isEmptyArr);
+    const out = await getOrGenerateNameContent("al-malik", "verses", "en", 2, generate, isEmptyArr);
 
     expect(generate).toHaveBeenCalledTimes(1);
     expect(out).toEqual(["a", "b"]);
     expect(mockInsert).toHaveBeenCalledTimes(1);
     const values = mockValues.mock.calls[0][0] as Record<string, unknown>;
-    expect(values).toMatchObject({ slug: "al-malik", kind: "verses", version: 2 });
+    expect(values).toMatchObject({ slug: "al-malik", kind: "verses", locale: "en", version: 2 });
     expect(JSON.parse(values.data as string)).toEqual(["a", "b"]);
+  });
+
+  it("keys the cache by locale — a Turkish miss doesn't reuse or clobber the English row", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // no row for this (slug, kind, locale)
+    const generate = vi.fn().mockResolvedValue("bir yansıma");
+
+    const out = await getOrGenerateNameContent(
+      "ar-rahman",
+      "reflection",
+      "tr",
+      1,
+      generate,
+      (s: string) => s.trim() === ""
+    );
+
+    expect(out).toBe("bir yansıma");
+    const values = mockValues.mock.calls[0][0] as Record<string, unknown>;
+    expect(values).toMatchObject({ slug: "ar-rahman", kind: "reflection", locale: "tr" });
+    const target = mockOnConflict.mock.calls[0][0].target as unknown[];
+    expect(target).toHaveLength(3); // [slug, kind, locale] — not the old 2-column PK
   });
 
   it("regenerates when the stored version is older than the current version", async () => {
     mockSelect.mockReturnValue(makeSelectChain([{ data: JSON.stringify(["old"]), version: 1 }]));
     const generate = vi.fn().mockResolvedValue(["new"]);
 
-    const out = await getOrGenerateNameContent("al-malik", "verses", 2, generate, isEmptyArr);
+    const out = await getOrGenerateNameContent("al-malik", "verses", "en", 2, generate, isEmptyArr);
 
     expect(generate).toHaveBeenCalledTimes(1);
     expect(out).toEqual(["new"]);
@@ -87,7 +115,7 @@ describe("getOrGenerateNameContent", () => {
     mockSelect.mockReturnValue(makeSelectChain([{ data: "{not json", version: 1 }]));
     const generate = vi.fn().mockResolvedValue(["recovered"]);
 
-    const out = await getOrGenerateNameContent("al-malik", "verses", 1, generate, isEmptyArr);
+    const out = await getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr);
 
     expect(generate).toHaveBeenCalledTimes(1);
     expect(out).toEqual(["recovered"]);
@@ -97,7 +125,7 @@ describe("getOrGenerateNameContent", () => {
     mockSelect.mockReturnValue(makeSelectChain([]));
     const generate = vi.fn().mockResolvedValue([]);
 
-    const out = await getOrGenerateNameContent("al-malik", "verses", 1, generate, isEmptyArr);
+    const out = await getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr);
 
     expect(out).toEqual([]);
     expect(generate).toHaveBeenCalledTimes(1);
@@ -113,6 +141,7 @@ describe("getOrGenerateNameContent", () => {
     const out = await getOrGenerateNameContent(
       "ar-rahman",
       "reflection",
+      "en",
       1,
       generate,
       (s: string) => s.trim() === ""
@@ -133,9 +162,9 @@ describe("getOrGenerateNameContent", () => {
     );
 
     const all = Promise.all([
-      getOrGenerateNameContent("al-malik", "verses", 1, generate, isEmptyArr),
-      getOrGenerateNameContent("al-malik", "verses", 1, generate, isEmptyArr),
-      getOrGenerateNameContent("al-malik", "verses", 1, generate, isEmptyArr),
+      getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr),
+      getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr),
+      getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr),
     ]);
 
     await new Promise((r) => setTimeout(r, 0));
@@ -162,6 +191,7 @@ describe("getOrGenerateNameContent", () => {
     const out = await getOrGenerateNameContent(
       "al-malik",
       "verses",
+      "en",
       1,
       generate,
       isEmptyArr,
@@ -181,6 +211,7 @@ describe("getOrGenerateNameContent", () => {
     const out = await getOrGenerateNameContent(
       "as-salam",
       "verses",
+      "en",
       1,
       generate,
       isEmptyArr,
@@ -198,7 +229,15 @@ describe("getOrGenerateNameContent", () => {
     const generate = vi.fn();
 
     await expect(
-      getOrGenerateNameContent("al-malik", "verses", 1, generate, isEmptyArr, onBeforeGenerate)
+      getOrGenerateNameContent(
+        "al-malik",
+        "verses",
+        "en",
+        1,
+        generate,
+        isEmptyArr,
+        onBeforeGenerate
+      )
     ).rejects.toThrow("rate limited");
     expect(generate).not.toHaveBeenCalled();
     expect(mockInsert).not.toHaveBeenCalled();
@@ -207,6 +246,7 @@ describe("getOrGenerateNameContent", () => {
     const out = await getOrGenerateNameContent(
       "al-malik",
       "verses",
+      "en",
       1,
       vi.fn().mockResolvedValue(["ok"]),
       isEmptyArr
@@ -219,11 +259,111 @@ describe("getOrGenerateNameContent", () => {
     const generate = vi.fn().mockRejectedValueOnce(new Error("boom")).mockResolvedValue(["ok"]);
 
     await expect(
-      getOrGenerateNameContent("al-malik", "verses", 1, generate, isEmptyArr)
+      getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr)
     ).rejects.toThrow("boom");
     // lock released in finally → fresh call regenerates
-    const out = await getOrGenerateNameContent("al-malik", "verses", 1, generate, isEmptyArr);
+    const out = await getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr);
     expect(out).toEqual(["ok"]);
     expect(generate).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("getOrGenerateVerseReason", () => {
+  beforeEach(() => {
+    mockSelect.mockReset();
+    mockInsert.mockClear();
+    mockValues.mockClear();
+    mockOnConflict.mockClear();
+    mockOnConflictDoNothing.mockClear();
+  });
+
+  it("returns a cached translation without calling generate", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([{ reason: "zaten çevrilmiş" }]));
+    const generate = vi.fn();
+
+    const out = await getOrGenerateVerseReason("ar-rahman", "2:255", "tr", generate);
+
+    expect(out).toBe("zaten çevrilmiş");
+    expect(generate).not.toHaveBeenCalled();
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("on a miss, translates and persists (insert, not upsert)", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // no row
+    const generate = vi.fn().mockResolvedValue("çevrilmiş sebep");
+
+    const out = await getOrGenerateVerseReason("ar-rahman", "2:255", "tr", generate);
+
+    expect(out).toBe("çevrilmiş sebep");
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    const values = mockValues.mock.calls[0][0] as Record<string, unknown>;
+    expect(values).toMatchObject({
+      slug: "ar-rahman",
+      ref: "2:255",
+      locale: "tr",
+      reason: "çevrilmiş sebep",
+    });
+    expect(mockOnConflictDoNothing).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not persist an empty translation", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    const generate = vi.fn().mockResolvedValue("");
+
+    const out = await getOrGenerateVerseReason("ar-rahman", "2:255", "tr", generate);
+
+    expect(out).toBe("");
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("calls onBeforeGenerate on a miss, before generate", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    const order: string[] = [];
+    const onBeforeGenerate = vi.fn(async () => {
+      order.push("gate");
+    });
+    const generate = vi.fn(async () => {
+      order.push("generate");
+      return "çeviri";
+    });
+
+    await getOrGenerateVerseReason("ar-rahman", "2:255", "tr", generate, onBeforeGenerate);
+
+    expect(onBeforeGenerate).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(["gate", "generate"]);
+  });
+
+  it("does NOT call onBeforeGenerate on a cache hit", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([{ reason: "cached" }]));
+    const onBeforeGenerate = vi.fn();
+
+    await getOrGenerateVerseReason("ar-rahman", "2:255", "tr", vi.fn(), onBeforeGenerate);
+
+    expect(onBeforeGenerate).not.toHaveBeenCalled();
+  });
+
+  it("coalesces concurrent identical first-loads into ONE translation call", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // always a miss
+    let release!: (v: string) => void;
+    const generate = vi.fn(
+      () =>
+        new Promise<string>((res) => {
+          release = res;
+        })
+    );
+
+    const all = Promise.all([
+      getOrGenerateVerseReason("ar-rahman", "2:255", "tr", generate),
+      getOrGenerateVerseReason("ar-rahman", "2:255", "tr", generate),
+    ]);
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(generate).toHaveBeenCalledTimes(1);
+
+    release("sonuç");
+    const [a, b] = await all;
+    expect(a).toBe("sonuç");
+    expect(b).toBe("sonuç");
   });
 });
