@@ -77,6 +77,7 @@ export default async function StoryDetailPage({ params }: Props) {
           const verses = chapter.verseRefs
             .map((ref) => verseMap.get(ref))
             .filter((v): v is Verse => v !== undefined);
+          const missingCount = chapter.verseRefs.length - verses.length;
 
           return (
             <section key={chapter.id}>
@@ -90,6 +91,13 @@ export default async function StoryDetailPage({ params }: Props) {
                   <StoryVerseCard key={verse.ref} verse={verse} />
                 ))}
               </div>
+
+              {missingCount > 0 && (
+                <p className="mt-3 text-xs text-text-muted">
+                  {missingCount} verse{missingCount === 1 ? "" : "s"} in this chapter couldn&apos;t
+                  be loaded right now — please try again later.
+                </p>
+              )}
 
               <div className="mt-5">
                 <OpenOnCanvasButton verses={verses} />

@@ -98,7 +98,7 @@ export const YUSUF_STORY: Story = {
       id: "the-brothers-return",
       title: { en: "The cup in the brother's bag" },
       narrative: {
-        en: "Famine brings Yusuf's brothers to Egypt for grain, and he recognizes them though they do not recognize him. He asks them to bring their youngest brother next time, and secretly returns their goods with their supplies to draw them back. When they return with Benjamin, Yusuf reveals himself to him privately. He then plants a gold cup in Benjamin's bag and has him accused of theft, so that under Egyptian law Benjamin must stay with him. The brothers protest, and the eldest — bound by an earlier oath to their father — refuses to leave without him, and stays behind while the others return to Yaqub with the news.",
+        en: "Famine brings Yusuf's brothers to Egypt for grain, and he recognizes them though they do not recognize him. He asks them to bring their youngest brother next time, and secretly returns their goods with their supplies to draw them back. When they return with Benjamin, Yusuf reveals himself to him privately. He then has a cup placed in Benjamin's bag and has the caravan accused of theft. When the brothers are asked what the penalty should be if the accused is a liar, they answer with their own people's custom — that the one in whose bag it is found shall himself be the penalty — not knowing the cup will be found with Benjamin. The Quran notes this could not have happened under the king's own law except that God willed it. The brothers protest, and the eldest — bound by an earlier oath to their father — refuses to leave without him, and stays behind while the others return to Yaqub with the news.",
       },
       verseRefs: [
         "12:58",

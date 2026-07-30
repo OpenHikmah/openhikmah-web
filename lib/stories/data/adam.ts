@@ -22,9 +22,9 @@ export const ADAM_STORY: Story = {
       id: "the-refusal-of-iblis",
       title: { en: "The one who refused to bow" },
       narrative: {
-        en: "God commands the angels to prostrate before Adam, and all of them do — except Iblis, who refuses out of arrogance, arguing he is superior because he was created from fire while Adam was created from clay. God expels him, but Iblis asks for, and is granted, a reprieve until the Day of Resurrection, vowing to waylay Adam's descendants from every direction. It is a warning placed at the very start of human history: enmity from Iblis is named explicitly, not left implicit.",
+        en: "God commands the angels to prostrate before Adam, and they all do — except Iblis, who is of the jinn rather than one of the angels, and refuses out of arrogance, arguing he is superior because he was created from fire while Adam was created from clay. God expels him, but Iblis asks for, and is granted, a reprieve until the Day of Resurrection, vowing to waylay Adam's descendants from every direction. It is a warning placed at the very start of human history: enmity from Iblis is named explicitly, not left implicit.",
       },
-      verseRefs: ["2:34", "7:11", "7:12", "7:13", "7:14", "7:15", "7:16", "7:17", "7:18"],
+      verseRefs: ["2:34", "7:11", "7:12", "7:13", "7:14", "7:15", "7:16", "7:17", "7:18", "18:50"],
     },
     {
       id: "the-garden-and-return",

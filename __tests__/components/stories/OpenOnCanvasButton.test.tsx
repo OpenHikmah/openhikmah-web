@@ -13,16 +13,38 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mockPush }) }));
 import { useCanvasStore } from "@/store/canvas";
 import { OpenOnCanvasButton } from "@/app/stories/[slug]/OpenOnCanvasButton";
 
+const VERSE_TEXT: Record<string, { arabicText: string; translation: string }> = {
+  "12:4": {
+    arabicText:
+      "إِذْ قَالَ يُوسُفُ لِأَبِيهِ يَا أَبَتِ إِنِّي رَأَيْتُ أَحَدَ عَشَرَ كَوْكَبًا وَالشَّمْسَ وَالْقَمَرَ رَأَيْتُهُمْ لِي سَاجِدِينَ",
+    translation:
+      '[Of these stories mention] when Joseph said to his father, "O my father, indeed I have seen [in a dream] eleven stars and the sun and the moon; I saw them prostrating to me."',
+  },
+  "12:5": {
+    arabicText:
+      "قَالَ يَا بُنَيَّ لَا تَقْصُصْ رُؤْيَاكَ عَلَىٰ إِخْوَتِكَ فَيَكِيدُوا لَكَ كَيْدًا ۖ إِنَّ الشَّيْطَانَ لِلْإِنسَانِ عَدُوٌّ مُّبِينٌ",
+    translation:
+      'He said, "O my son, do not relate your vision to your brothers or they will contrive against you a plan. Indeed Satan, to man, is a manifest enemy.',
+  },
+  "12:6": {
+    arabicText:
+      "وَكَذَٰلِكَ يَجْتَبِيكَ رَبُّكَ وَيُعَلِّمُكَ مِن تَأْوِيلِ الْأَحَادِيثِ وَيُتِمُّ نِعْمَتَهُ عَلَيْكَ وَعَلَىٰ آلِ يَعْقُوبَ كَمَا أَتَمَّهَا عَلَىٰ أَبَوَيْكَ مِن قَبْلُ إِبْرَاهِيمَ وَإِسْحَاقَ ۚ إِنَّ رَبَّكَ عَلِيمٌ حَكِيمٌ",
+    translation:
+      'And thus will your Lord choose you and teach you the interpretation of narratives [i.e., events or dreams] and complete His favor upon you and upon the family of Jacob, as He completed it upon your fathers before, Abraham and Isaac. Indeed, your Lord is Knowing and Wise."',
+  },
+};
+
 function verse(ref: string): Verse {
   const [s, a] = ref.split(":");
+  const text = VERSE_TEXT[ref];
   return {
     surah: Number(s),
     ayah: Number(a),
     ref: ref as Verse["ref"],
-    arabicText: "نص",
-    translation: "text",
-    surahName: "Surah",
-    surahNameArabic: "سورة",
+    arabicText: text.arabicText,
+    translation: text.translation,
+    surahName: "Yusuf",
+    surahNameArabic: "يوسف",
   };
 }
 
