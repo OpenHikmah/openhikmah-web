@@ -1,11 +1,9 @@
-"use client";
-
 import { Loader2 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 
 /** Shared body for route-segment `loading.tsx` boundaries. */
-export function RouteLoading() {
-  const t = useTranslations("errors");
+export async function RouteLoading() {
+  const t = await getTranslations("errors");
 
   return (
     <div
