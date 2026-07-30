@@ -2,14 +2,21 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import type { Verse } from "@/types/quran";
 
-const { mockSearchByMeaning, mockConsume, mockGetVerse, mockGetVerses, mockLogSearchQuery } =
-  vi.hoisted(() => ({
-    mockSearchByMeaning: vi.fn(),
-    mockConsume: vi.fn(async () => true),
-    mockGetVerse: vi.fn(),
-    mockGetVerses: vi.fn(async () => new Map()),
-    mockLogSearchQuery: vi.fn(async () => undefined),
-  }));
+const {
+  mockSearchByMeaning,
+  mockConsume,
+  mockGetVerse,
+  mockGetVerses,
+  mockLogSearchQuery,
+  mockGetQuranEdition,
+} = vi.hoisted(() => ({
+  mockSearchByMeaning: vi.fn(),
+  mockConsume: vi.fn(async () => true),
+  mockGetVerse: vi.fn(),
+  mockGetVerses: vi.fn(async () => new Map()),
+  mockLogSearchQuery: vi.fn(async () => undefined),
+  mockGetQuranEdition: vi.fn(async () => "en.sahih"),
+}));
 vi.mock("@/lib/quran/semantic-search", () => ({ searchByMeaning: mockSearchByMeaning }));
 vi.mock("@/lib/infra/rate-limit", () => ({
   consume: mockConsume,
@@ -21,6 +28,7 @@ vi.mock("@/lib/quran/quran-corpus", () => ({
   getVerses: mockGetVerses,
 }));
 vi.mock("@/lib/infra/search-log", () => ({ logSearchQuery: mockLogSearchQuery }));
+vi.mock("@/lib/i18n/request-prefs", () => ({ getQuranEdition: mockGetQuranEdition }));
 
 import { GET } from "@/app/api/search/route";
 
@@ -73,6 +81,8 @@ describe("GET /api/search", () => {
     mockGetVerses.mockResolvedValue(new Map());
     mockLogSearchQuery.mockReset();
     mockLogSearchQuery.mockResolvedValue(undefined);
+    mockGetQuranEdition.mockReset();
+    mockGetQuranEdition.mockResolvedValue("en.sahih");
   });
 
   it("returns 400 when query is missing", async () => {
@@ -297,5 +307,21 @@ describe("GET /api/search", () => {
     mockConsume.mockResolvedValue(false);
     await GET(makeSearchReq("mercy"));
     expect(mockLogSearchQuery).not.toHaveBeenCalled();
+  });
+
+  it("resolves ref-format queries against the caller's cookie-selected edition", async () => {
+    mockGetQuranEdition.mockResolvedValue("ru.kuliev");
+    mockGetVerse.mockResolvedValueOnce(verse("2:255", "Аллах - нет божества, кроме Него."));
+    await GET(makeSearchReq("2:255"));
+    expect(mockGetVerse).toHaveBeenCalledWith("2:255", "ru.kuliev");
+  });
+
+  it("hydrates keyword-search results against the caller's cookie-selected edition", async () => {
+    mockGetQuranEdition.mockResolvedValue("az.mammadaliyev");
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([{ verse_key: "2:30", translations: [{ text: "..." }] }])
+    );
+    await GET(makeSearchReq("mercy"));
+    expect(mockGetVerses).toHaveBeenCalledWith(["2:30"], "az.mammadaliyev");
   });
 });

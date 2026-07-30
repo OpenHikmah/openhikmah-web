@@ -58,7 +58,7 @@ describe("getVerseOfDay override seam", () => {
     const verse = { ref: "2:255" } as never;
     vi.mocked(resolveVerse).mockResolvedValue(verse);
     const result = await getCuratedVerseOfDay(new Date("2026-06-04T00:00:00Z"));
-    expect(vi.mocked(resolveVerse)).toHaveBeenCalledWith("2:255");
+    expect(vi.mocked(resolveVerse)).toHaveBeenCalledWith("2:255", undefined);
     expect(result).toBe(verse);
   });
 
@@ -67,7 +67,15 @@ describe("getVerseOfDay override seam", () => {
     vi.mocked(resolveVerse).mockResolvedValue(verse);
     const date = new Date("2026-06-04T00:00:00Z");
     const result = await getVerseOfDay(date);
-    expect(vi.mocked(resolveVerse)).toHaveBeenCalledWith(verseOfDayRef(date));
+    expect(vi.mocked(resolveVerse)).toHaveBeenCalledWith(verseOfDayRef(date), undefined);
     expect(result).toBe(verse);
+  });
+
+  it("passes the requested edition through to resolveVerse", async () => {
+    const verse = { ref: "2:255" } as never;
+    vi.mocked(resolveVerse).mockResolvedValue(verse);
+    const date = new Date("2026-06-04T00:00:00Z");
+    await getVerseOfDay(date, "tr.diyanet");
+    expect(vi.mocked(resolveVerse)).toHaveBeenCalledWith(verseOfDayRef(date), "tr.diyanet");
   });
 });

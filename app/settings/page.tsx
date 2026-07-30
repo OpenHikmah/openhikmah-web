@@ -4,6 +4,7 @@ import { Settings as SettingsIcon } from "lucide-react";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { Card, Select, Switch, type SelectOption } from "@/components/ui";
 import { RECITERS } from "@/lib/quran/audio";
+import { DEFAULT_EDITION_BY_LOCALE as EDITION_BY_LOCALE } from "@/lib/i18n/config";
 import { usePreferencesStore, type UiLocale } from "@/store/preferences";
 
 const LOCALE_OPTIONS: SelectOption[] = [
@@ -13,15 +14,16 @@ const LOCALE_OPTIONS: SelectOption[] = [
   { value: "az", label: "Azərbaycan dili" },
 ];
 
-// Default edition + translator attribution per locale (alquran.cloud codes).
-// Only one edition per non-English locale ships in v1; alternates (Diyanet
-// Vakfı, Abu Adel, etc.) are a follow-up once the multi-language epic's
-// translation storage (verse_translations table) is seeded.
-const DEFAULT_EDITION_BY_LOCALE: Record<UiLocale, { edition: string; attribution: string }> = {
-  en: { edition: "en.sahih", attribution: "Saheeh International" },
-  tr: { edition: "tr.diyanet", attribution: "Diyanet İşleri" },
-  ru: { edition: "ru.kuliev", attribution: "Elmir Kuliev" },
-  az: { edition: "az.mammadaliyev", attribution: "Mammadaliyev & Bunyadov" },
+// Translator attribution per locale, shown alongside the edition code from
+// lib/i18n/config's DEFAULT_EDITION_BY_LOCALE (the whitelisted source of
+// truth for the codes themselves). Only one edition per non-English locale
+// ships in v1; alternates (Diyanet Vakfı, Abu Adel, etc.) are a follow-up
+// once lib/i18n/config's VALID_EDITIONS grows beyond the four defaults.
+const ATTRIBUTION_BY_LOCALE: Record<UiLocale, string> = {
+  en: "Saheeh International",
+  tr: "Diyanet İşleri",
+  ru: "Elmir Kuliev",
+  az: "Mammadaliyev & Bunyadov",
 };
 
 const RECITER_OPTIONS: SelectOption[] = RECITERS.map((r) => ({ value: r.id, label: r.label }));
@@ -54,8 +56,9 @@ export default function SettingsPage() {
   const canvasPrefs = usePreferencesStore((s) => s.canvasPrefs);
   const setCanvasPrefs = usePreferencesStore((s) => s.setCanvasPrefs);
 
-  const activeEditionDefault = DEFAULT_EDITION_BY_LOCALE[uiLocale];
-  const activeEdition = quranEditionByLocale[uiLocale] ?? activeEditionDefault.edition;
+  const activeEditionDefault = EDITION_BY_LOCALE[uiLocale];
+  const activeAttribution = ATTRIBUTION_BY_LOCALE[uiLocale];
+  const activeEdition = quranEditionByLocale[uiLocale] ?? activeEditionDefault;
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
@@ -77,15 +80,13 @@ export default function SettingsPage() {
 
         <SettingsSection
           title="Quran translation"
-          description={`Currently ${DEFAULT_EDITION_BY_LOCALE[uiLocale].attribution} (${activeEdition}).`}
+          description={`Currently ${activeAttribution} (${activeEdition}).`}
         >
           <Select
             aria-label="Quran translation edition"
             value={activeEdition}
             onValueChange={(v) => setQuranEdition(uiLocale, v)}
-            options={[
-              { value: activeEditionDefault.edition, label: activeEditionDefault.attribution },
-            ]}
+            options={[{ value: activeEditionDefault, label: activeAttribution }]}
           />
         </SettingsSection>
 

@@ -26,6 +26,27 @@ test.describe("settings page", () => {
   });
 });
 
+test.describe("language switching", () => {
+  test("switching language via the header popover persists across reload", async ({ page }) => {
+    await page.goto("/search");
+
+    await page.getByRole("button", { name: /change language/i }).click();
+    await page.getByRole("button", { name: "Türkçe" }).click();
+
+    // /settings reads the same preferences store — its Interface language
+    // select reflects the switch made via the header popover.
+    await page.goto("/settings");
+    await expect(page.getByRole("combobox", { name: /interface language/i })).toHaveText("Türkçe");
+
+    // The store persists to localStorage and re-syncs the oh_locale cookie on
+    // rehydration, so the choice survives a full reload, not just client nav.
+    await page.reload();
+    await expect(page.getByRole("combobox", { name: /interface language/i })).toHaveText("Türkçe");
+    const cookies = await page.context().cookies();
+    expect(cookies.find((c) => c.name === "oh_locale")?.value).toBe("tr");
+  });
+});
+
 test.describe("mobile bottom nav", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 

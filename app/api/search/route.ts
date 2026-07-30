@@ -6,7 +6,11 @@ import { getVerse, getVerses } from "@/lib/quran/quran-corpus";
 import { consume, SEARCH_LOG_LIMIT, SEARCH_LOG_WINDOW_SECONDS } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import { logSearchQuery } from "@/lib/infra/search-log";
+import { getQuranEdition } from "@/lib/i18n/request-prefs";
 import sanitizeHtml from "sanitize-html";
+
+// Keyword/ref search results vary on the oh_edition cookie.
+export const dynamic = "force-dynamic";
 
 const MAX_QUERY_LENGTH = 200;
 const SEMANTIC_RESULT_CAP = 100;
@@ -25,7 +29,8 @@ interface KeywordSearchResult {
 async function keywordSearch(
   q: string,
   page: number,
-  pageSize: number
+  pageSize: number,
+  edition: string
 ): Promise<KeywordSearchResult> {
   try {
     const url = `https://api.quran.com/api/v4/search?q=${encodeURIComponent(q)}&size=${pageSize}&language=en&page=${page}`;
@@ -62,7 +67,7 @@ async function keywordSearch(
         };
       });
     return {
-      results: await hydrate(results),
+      results: await hydrate(results, edition),
       total: data?.search?.total_results ?? results.length,
     };
   } catch (err) {
@@ -74,9 +79,13 @@ async function keywordSearch(
 /** Fills in `arabicText`/`translation` from our own corpus so the full-text view
  *  always shows the same text as the rest of the app, regardless of source. */
 async function hydrate(
-  partial: Array<Omit<SearchResult, "arabicText" | "translation">>
+  partial: Array<Omit<SearchResult, "arabicText" | "translation">>,
+  edition: string
 ): Promise<SearchResult[]> {
-  const verseMap = await getVerses(partial.map((r) => r.ref));
+  const verseMap = await getVerses(
+    partial.map((r) => r.ref),
+    edition
+  );
   return partial.map((r) => {
     const verse = verseMap.get(r.ref);
     return {
@@ -123,8 +132,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Query too long" }, { status: 400 });
   }
 
+  const edition = await getQuranEdition();
+
   if (/^\d+:\d+$/.test(q)) {
-    const verse = await getVerse(q);
+    const verse = await getVerse(q, edition);
     const [surahName, surahNameArabic] = getSurahName(parseInt(q.split(":")[0], 10));
     const result: SearchResult = {
       ref: q as VerseRef,
@@ -168,7 +179,7 @@ export async function GET(req: NextRequest) {
         console.error("Semantic search route error:", err);
       }
     }
-    const { results, total, failed } = await keywordSearch(q, page, pageSize);
+    const { results, total, failed } = await keywordSearch(q, page, pageSize, edition);
     const response: SearchResponse = { results, total, page, pageSize };
     await maybeLogSearchQuery(req, q, "keyword", total);
     return NextResponse.json(response, {
@@ -183,7 +194,7 @@ export async function GET(req: NextRequest) {
   if (!allowed) {
     return NextResponse.json({ error: "Too many search requests" }, { status: 429 });
   }
-  const { results, total, failed } = await keywordSearch(q, page, pageSize);
+  const { results, total, failed } = await keywordSearch(q, page, pageSize, edition);
   const response: SearchResponse = { results, total, page, pageSize };
   await maybeLogSearchQuery(req, q, "keyword", total);
   return NextResponse.json(response, {

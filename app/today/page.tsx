@@ -3,6 +3,7 @@ import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
 import { VerseOfDayCard } from "@/components/today/VerseOfDayCard";
 import { getVerseOfDayWithReflection } from "@/lib/quran/verse-of-day";
+import { getQuranEdition } from "@/lib/i18n/request-prefs";
 
 export const metadata: Metadata = {
   title: "Verse of the Day — Open Hikmah",
@@ -17,7 +18,8 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
-  const today = await getVerseOfDayWithReflection().catch(() => null);
+  const edition = await getQuranEdition();
+  const today = await getVerseOfDayWithReflection(undefined, edition).catch(() => null);
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg">

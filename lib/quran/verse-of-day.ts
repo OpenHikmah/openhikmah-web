@@ -195,7 +195,8 @@ export function votdDateKey(date: Date = new Date()): string {
  * algorithmic pick always remains as the always-on fallback.
  */
 export async function getCuratedVerseOfDayEntry(
-  date: Date = new Date()
+  date: Date = new Date(),
+  edition?: string
 ): Promise<{ verse: Verse; reflection: string | null } | null> {
   try {
     const [row] = await db
@@ -204,7 +205,7 @@ export async function getCuratedVerseOfDayEntry(
       .where(eq(curatedVotd.date, votdDateKey(date)))
       .limit(1);
     if (!row) return null;
-    const verse = await resolveVerse(row.verseRef);
+    const verse = await resolveVerse(row.verseRef, edition);
     if (!verse) return null;
     return { verse, reflection: row.reflection ?? null };
   } catch (err) {
@@ -217,16 +218,22 @@ export async function getCuratedVerseOfDayEntry(
  * Admin-curated override verse for a given day, or null when none is set. The
  * algorithmic pick is the always-on fallback; the card UI is identical either way.
  */
-export async function getCuratedVerseOfDay(date: Date = new Date()): Promise<Verse | null> {
-  const entry = await getCuratedVerseOfDayEntry(date);
+export async function getCuratedVerseOfDay(
+  date: Date = new Date(),
+  edition?: string
+): Promise<Verse | null> {
+  const entry = await getCuratedVerseOfDayEntry(date, edition);
   return entry?.verse ?? null;
 }
 
 /** Resolves today's verse (full text). Null only if it can't be resolved at all. */
-export async function getVerseOfDay(date: Date = new Date()): Promise<Verse | null> {
-  const curated = await getCuratedVerseOfDay(date);
+export async function getVerseOfDay(
+  date: Date = new Date(),
+  edition?: string
+): Promise<Verse | null> {
+  const curated = await getCuratedVerseOfDay(date, edition);
   if (curated) return curated;
-  return resolveVerse(verseOfDayRef(date));
+  return resolveVerse(verseOfDayRef(date), edition);
 }
 
 /**
@@ -234,10 +241,11 @@ export async function getVerseOfDay(date: Date = new Date()): Promise<Verse | nu
  * to the algorithmic pick (with no reflection) when no curated entry exists.
  */
 export async function getVerseOfDayWithReflection(
-  date: Date = new Date()
+  date: Date = new Date(),
+  edition?: string
 ): Promise<{ verse: Verse; reflection: string | null } | null> {
-  const curated = await getCuratedVerseOfDayEntry(date);
+  const curated = await getCuratedVerseOfDayEntry(date, edition);
   if (curated) return curated;
-  const verse = await resolveVerse(verseOfDayRef(date));
+  const verse = await resolveVerse(verseOfDayRef(date), edition);
   return verse ? { verse, reflection: null } : null;
 }
