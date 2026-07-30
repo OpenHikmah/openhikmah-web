@@ -2,6 +2,7 @@
 
 import { memo } from "react";
 import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
+import { useTranslations } from "next-intl";
 import type { Verse, EdgeKind } from "@/types/quran";
 import { useCanvasStore } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
@@ -16,6 +17,8 @@ type VerseNodeData = Verse & { isRoot?: boolean; isLoading?: boolean };
 
 function VerseNodeInner({ id, data, selected }: NodeProps) {
   const verse = data as unknown as VerseNodeData;
+  const t = useTranslations("canvas");
+  const tCommon = useTranslations("common");
 
   const expandingNodeId = useCanvasStore((s) => s.expandingNodeId);
   const openExpandNodeId = useCanvasStore((s) => s.openExpandNodeId);
@@ -108,12 +111,12 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
       />
 
       {hasDuplicate && (
-        <Tooltip label="Also open elsewhere on canvas — click to jump">
+        <Tooltip label={t("duplicateTooltip")}>
           <button
             type="button"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={jumpToDuplicate}
-            aria-label="Jump to duplicate verse card"
+            aria-label={t("jumpToDuplicate")}
             className="absolute -top-2 -left-2 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-gold bg-surface-raised text-gold shadow-sm transition-colors hover:bg-gold/10"
           >
             <Copy className="h-3 w-3" />
@@ -133,7 +136,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
             >
               {verse.ref}
             </span>
-            <Tooltip label={isThisPlaying ? "Pause recitation" : "Play recitation"}>
+            <Tooltip label={isThisPlaying ? t("pauseRecitation") : t("playRecitation")}>
               <IconButton
                 size="xs"
                 tone="teal"
@@ -153,7 +156,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
                     });
                   }
                 }}
-                aria-label={isThisPlaying ? "Pause recitation" : "Play recitation"}
+                aria-label={isThisPlaying ? t("pauseRecitation") : t("playRecitation")}
                 className={cn(
                   "max-md:size-11 max-md:[&_svg]:size-5",
                   currentRef === verse.ref && "border-teal text-teal"
@@ -162,7 +165,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
                 <Volume2 />
               </IconButton>
             </Tooltip>
-            <Tooltip label={isBookmarked ? "Remove bookmark" : "Bookmark verse"}>
+            <Tooltip label={isBookmarked ? tCommon("removeBookmark") : tCommon("bookmarkVerse")}>
               <IconButton
                 size="xs"
                 tone="gold"
@@ -171,7 +174,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
                   e.stopPropagation();
                   toggleBookmark(verse.ref);
                 }}
-                aria-label={isBookmarked ? "Remove bookmark" : "Bookmark verse"}
+                aria-label={isBookmarked ? tCommon("removeBookmark") : tCommon("bookmarkVerse")}
                 className={cn(
                   "max-md:size-11 max-md:[&_svg]:size-5",
                   isBookmarked && "border-gold-muted text-gold"
@@ -198,7 +201,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
-        <Tooltip label="Expand connections">
+        <Tooltip label={t("expandConnections")}>
           <IconButton
             size="xs"
             tone="teal"
@@ -208,7 +211,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
               setOpenExpandNodeId(expandMenuOpen ? null : id);
             }}
             disabled={isExpanding}
-            aria-label="Expand connections"
+            aria-label={t("expandConnections")}
             className={cn(
               "max-md:size-11 max-md:[&_svg]:size-5",
               expandMenuOpen && "border-teal text-teal"

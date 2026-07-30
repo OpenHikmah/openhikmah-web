@@ -1,6 +1,8 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { renderWithIntl as render } from "../../test-utils/render-with-intl";
 import { useCanvasStore } from "@/store/canvas";
+import { useAuthStore } from "@/store/auth";
 import type { Verse, VerseRef } from "@/types/quran";
 
 vi.mock("@xyflow/react", () => ({
@@ -64,5 +66,47 @@ describe("CanvasToolbar export menu", () => {
 
     fireEvent.click(toggle);
     expect(screen.queryByRole("button", { name: /PNG/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("CanvasToolbar save workspace name", () => {
+  beforeEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    useAuthStore.setState({ accessToken: "test-token" as any });
+  });
+
+  it("pluralizes the ICU-formatted verse count in the saved workspace name", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    useCanvasStore.setState({ nodes: [verseNode() as any], edges: [] });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<CanvasToolbar onSearchOpen={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.name).toMatch(/^1 verse — /);
+
+    vi.unstubAllGlobals();
+  });
+
+  it("uses the plural form for more than one verse", async () => {
+    useCanvasStore.setState({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      nodes: [verseNode(), { ...verseNode(), id: "n2" }] as any,
+      edges: [],
+    });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<CanvasToolbar onSearchOpen={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.name).toMatch(/^2 verses — /);
+
+    vi.unstubAllGlobals();
   });
 });

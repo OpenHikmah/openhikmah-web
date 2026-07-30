@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { screen, fireEvent, act } from "@testing-library/react";
+import { renderWithIntl } from "../../test-utils/render-with-intl";
 import { describe, expect, it, vi } from "vitest";
 import { ExpandMenu } from "@/components/canvas/ExpandMenu";
 
@@ -17,7 +18,7 @@ function Harness({ initialOpen = true }: { initialOpen?: boolean }) {
 
 describe("ExpandMenu", () => {
   it("traps Tab within the three options, wrapping last to first and first to last", async () => {
-    render(<Harness />);
+    renderWithIntl(<Harness />);
     const options = screen.getAllByRole("button", { name: /By / });
     expect(options).toHaveLength(3);
     const [first, , last] = options;
@@ -33,13 +34,13 @@ describe("ExpandMenu", () => {
   });
 
   it("focuses the first option on open", () => {
-    render(<Harness />);
+    renderWithIntl(<Harness />);
     const options = screen.getAllByRole("button", { name: /By / });
     expect(document.activeElement).toBe(options[0]);
   });
 
   it("returns focus to the trigger when the menu closes", async () => {
-    render(<Harness initialOpen={false} />);
+    renderWithIntl(<Harness initialOpen={false} />);
     const trigger = screen.getByTestId("trigger");
     await act(async () => {
       trigger.focus();

@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState } from "react";
 import { FocusScope } from "@radix-ui/react-focus-scope";
+import { useTranslations } from "next-intl";
 import type { EdgeKind } from "@/types/quran";
 
 interface ExpandMenuProps {
@@ -12,35 +13,36 @@ interface ExpandMenuProps {
 
 const OPTIONS: Array<{
   kind: EdgeKind;
-  label: string;
-  description: string;
+  labelKey: "byTheme" | "byRoot" | "byContrast";
+  descriptionKey: "byThemeDescription" | "byRootDescription" | "byContrastDescription";
   color: string;
   icon: string;
 }> = [
   {
     kind: "thematic",
-    label: "By Theme",
-    description: "Same theological meaning",
+    labelKey: "byTheme",
+    descriptionKey: "byThemeDescription",
     color: "var(--color-teal)",
     icon: "◈",
   },
   {
     kind: "root",
-    label: "By Root Word",
-    description: "Shared Arabic root",
+    labelKey: "byRoot",
+    descriptionKey: "byRootDescription",
     color: "var(--color-gold)",
     icon: "ع",
   },
   {
     kind: "contrast",
-    label: "By Contrast",
-    description: "Opposing concept",
+    labelKey: "byContrast",
+    descriptionKey: "byContrastDescription",
     color: "var(--color-contrast-edge)",
     icon: "↔",
   },
 ];
 
 export function ExpandMenu({ onSelect, onClose, existingCounts }: ExpandMenuProps) {
+  const t = useTranslations("canvas");
   const menuRef = useRef<HTMLDivElement>(null);
   const [openUp, setOpenUp] = useState(false);
 
@@ -92,12 +94,15 @@ export function ExpandMenu({ onSelect, onClose, existingCounts }: ExpandMenuProp
               </span>
               <div className="min-w-0">
                 <p className="text-xs font-medium text-text-primary">
-                  {opt.label}
+                  {t(opt.labelKey)}
                   {!!existingCounts?.[opt.kind] && (
-                    <span className="text-text-muted"> ({existingCounts[opt.kind]} found)</span>
+                    <span className="text-text-muted">
+                      {" "}
+                      {t("foundCount", { count: existingCounts[opt.kind] ?? 0 })}
+                    </span>
                   )}
                 </p>
-                <p className="text-xs text-text-muted">{opt.description}</p>
+                <p className="text-xs text-text-muted">{t(opt.descriptionKey)}</p>
               </div>
             </button>
           ))}

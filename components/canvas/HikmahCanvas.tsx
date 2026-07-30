@@ -14,6 +14,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { VerseNode } from "./VerseNode";
 import { HikmahEdge } from "./HikmahEdge";
 import { CanvasLegend } from "./CanvasLegend";
@@ -57,6 +58,7 @@ function radialPos(
 }
 
 function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
+  const t = useTranslations("canvas");
   useActivityTracker();
   useCanvasPersistence();
 
@@ -64,7 +66,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
   const expandingRef = useRef(false);
   const mountedRef = useRef(true);
   const [expansionNotice, setExpansionNotice] = useState<{
-    message: string;
+    messageKey: "noMoreConnections" | "connectionsFailed";
     kind: "error" | "info";
   } | null>(null);
 
@@ -193,9 +195,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
         if (!exhausted) console.error("Expansion failed:", err);
         if (mountedRef.current) {
           setExpansionNotice({
-            message: exhausted
-              ? "No more connections of this type."
-              : "Could not find connections. Try a different type.",
+            messageKey: exhausted ? "noMoreConnections" : "connectionsFailed",
             kind: exhausted ? "info" : "error",
           });
           setTimeout(() => setExpansionNotice(null), 6000);
@@ -304,11 +304,11 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
               : "border-teal/40 bg-surface-raised text-teal"
           )}
         >
-          <span className="font-mono">{expansionNotice.message}</span>
+          <span className="font-mono">{t(expansionNotice.messageKey)}</span>
           <button
             onClick={() => setExpansionNotice(null)}
             className="text-text-muted hover:text-text-primary"
-            aria-label="Dismiss"
+            aria-label={t("dismiss")}
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -350,7 +350,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
               <MiniMap
                 pannable
                 zoomable
-                ariaLabel="Canvas minimap"
+                ariaLabel={t("minimapAria")}
                 nodeColor={(n: Node) =>
                   (n.data as { isRoot?: boolean })?.isRoot
                     ? "var(--color-gold)"
