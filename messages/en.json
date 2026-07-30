@@ -126,7 +126,7 @@
     "searchUnavailable": "Search is temporarily unavailable.",
     "tryAgain": "Try again →",
     "tryByMeaning": "Try \"By meaning\" search instead →",
-    "showingResults": "Showing {count, plural, one {# result} other {# results}} for \"{query}\"",
+    "showingResults": "Showing <b>{count, plural, one {# result} other {# results}}</b> for \"{query}\"",
     "meaningFallbackNotice": "Meaning-based results aren't ready for this query yet — showing keyword matches instead.",
     "mapOnCanvas": "Map on Canvas",
     "searchVersesAria": "Search verses",

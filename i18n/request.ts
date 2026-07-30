@@ -9,7 +9,7 @@ export default getRequestConfig(async () => {
     // any given visitor's, and an unset value makes next-intl warn on every
     // render that formats a date (e.g. CanvasToolbar/Header's saved-workspace
     // name). UTC keeps SSR output deterministic; exact wall-clock time isn't
-    // load-bearing for the short relative dates shown here.
+    // load-bearing for the short dates shown here.
     timeZone: "UTC",
     messages: (await import(`../messages/${locale}.json`)).default,
   };

@@ -126,7 +126,7 @@
     "searchUnavailable": "Arama geçici olarak kullanılamıyor.",
     "tryAgain": "Tekrar dene →",
     "tryByMeaning": "Bunun yerine \"Anlama göre\" aramayı deneyin →",
-    "showingResults": "\"{query}\" için {count, plural, one {# sonuç} other {# sonuç}} gösteriliyor",
+    "showingResults": "\"{query}\" için <b>{count, plural, one {# sonuç} other {# sonuç}}</b> gösteriliyor",
     "meaningFallbackNotice": "Bu sorgu için anlam bazlı sonuçlar henüz hazır değil — bunun yerine anahtar kelime sonuçları gösteriliyor.",
     "mapOnCanvas": "Tuvalde Haritala",
     "searchVersesAria": "Ayet ara",

@@ -126,7 +126,7 @@
     "searchUnavailable": "Поиск временно недоступен.",
     "tryAgain": "Попробовать снова →",
     "tryByMeaning": "Попробуйте поиск «По смыслу» →",
-    "showingResults": "Показано {count, plural, one {# результат} few {# результата} many {# результатов} other {# результата}} для «{query}»",
+    "showingResults": "Показано <b>{count, plural, one {# результат} few {# результата} many {# результатов} other {# результата}}</b> для «{query}»",
     "meaningFallbackNotice": "Результаты по смыслу для этого запроса ещё не готовы — показаны результаты по ключевым словам.",
     "mapOnCanvas": "Отобразить на холсте",
     "searchVersesAria": "Найти аяты",

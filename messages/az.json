@@ -126,7 +126,7 @@
     "searchUnavailable": "Axtarış müvəqqəti əlçatan deyil.",
     "tryAgain": "Yenidən cəhd et →",
     "tryByMeaning": "Bunun əvəzinə \"Mənaya görə\" axtarışı sınayın →",
-    "showingResults": "\"{query}\" üçün {count, plural, one {# nəticə} other {# nəticə}} göstərilir",
+    "showingResults": "\"{query}\" üçün <b>{count, plural, one {# nəticə} other {# nəticə}}</b> göstərilir",
     "meaningFallbackNotice": "Bu sorğu üçün məna əsaslı nəticələr hələ hazır deyil — bunun əvəzinə açar söz nəticələri göstərilir.",
     "mapOnCanvas": "Lövhədə Xəritələndir",
     "searchVersesAria": "Ayə axtar",

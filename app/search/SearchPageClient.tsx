@@ -18,7 +18,9 @@ const PAGE_SIZE = 20;
 
 // Curated starting points for the empty state — natural-language topics search
 // best in "meaning" mode, so chips navigate there rather than defaulting to Keyword.
-// Kept untranslated, same convention as SearchDialog's SEED_VERSES.
+// Kept untranslated: "meaning" search only matches against the English corpus
+// (see the nonEnglishHint message), so a translated chip would search for a
+// phrase the backend can't match.
 const EXAMPLE_SEARCHES = [
   "2:255 — Ayat al-Kursi",
   "Patience",
@@ -225,7 +227,11 @@ export function SearchPageClient() {
         ) : (
           <>
             <p className="mb-4 text-sm text-text-muted">
-              {t("showingResults", { count: data.total, query: q })}
+              {t.rich("showingResults", {
+                count: data.total,
+                query: q,
+                b: (chunks) => <span className="font-medium text-text-primary">{chunks}</span>,
+              })}
             </p>
             {fellBackToKeyword && (
               <p className="mb-4 text-xs text-text-muted">{t("meaningFallbackNotice")}</p>

@@ -18,8 +18,8 @@ interface SearchDialogProps {
   onClose: () => void;
 }
 
-// Seed-verse labels stay untranslated — they're proper-noun surah titles (the same
-// convention as reciter names), not interface copy.
+// Seed-verse labels stay untranslated — they're a fixed set of surah/verse names
+// (transliteration + English gloss), not interface copy that varies by locale.
 const SEED_VERSES: Array<{ ref: string; label: string }> = [
   { ref: "1:1", label: "Al-Fatiha — Opening" },
   { ref: "2:255", label: "Ayat al-Kursi" },
