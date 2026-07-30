@@ -157,7 +157,13 @@
     "findingVerses": "Claude ayetleri buluyor…",
     "noVersesFound": "Bu isim için ayet bulunamadı.",
     "connectionLabel": "Bağlantı: ",
-    "mapOnCanvas": "Tuvalde Haritala →"
+    "mapOnCanvas": "Tuvalde Haritala →",
+    "categoryDhatLabel": "Sıfat el-Zat",
+    "categoryDhatDescription": "Zâtî Sıfatlar — Allah'a mahsus, yaratılıştan bağımsız olarak zorunlu ve ezelî olarak doğru olan sıfatlar",
+    "categorySifatLabel": "Sıfat el-Meani",
+    "categorySifatDescription": "Meânî Sıfatları — yedi sübûtî sıfat (İlim, Kudret, İrade, Hayat, Sem', Basar, Kelam) ve tenzihi (aşkınlığı) ifade eden isimler",
+    "categoryAfalLabel": "Sıfat el-Ef'al",
+    "categoryAfalDescription": "Fiilî Sıfatlar — Allah'ın yaratma, rızıklandırma, hidayet etme, bağışlama gibi yaratılışla olan egemen ilişkisini ifade eden isimler"
   },
   "errors": {
     "routeFailedTitle": "Bu sayfa yüklenemedi",

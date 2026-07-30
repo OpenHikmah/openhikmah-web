@@ -5,7 +5,7 @@ import { getTranslations } from "next-intl/server";
 import {
   getNameBySlug,
   DIVINE_NAMES,
-  CATEGORY_LABELS,
+  CATEGORY_LABEL_KEYS,
   type NameCategory,
 } from "@/lib/names/divine-names";
 import { Wordmark } from "@/components/layout/Wordmark";
@@ -49,7 +49,7 @@ export default async function NameDetailPage({ params }: Props) {
 
   const t = await getTranslations("names");
   const styles = CATEGORY_STYLES[name.category];
-  const categoryLabel = CATEGORY_LABELS[name.category];
+  const categoryLabelKey = CATEGORY_LABEL_KEYS[name.category].label;
 
   const prevName = DIVINE_NAMES.find((n) => n.id === name.id - 1);
   const nextName = DIVINE_NAMES.find((n) => n.id === name.id + 1);
@@ -84,7 +84,7 @@ export default async function NameDetailPage({ params }: Props) {
 
         <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
           <span className={`rounded px-2.5 py-1 text-xs font-medium ${styles.badge}`}>
-            {categoryLabel.en}
+            {t(categoryLabelKey)}
           </span>
           <span className="rounded border border-border bg-surface-raised px-2.5 py-1 font-mono text-xs text-text-secondary">
             {t("root", { root: name.root })}

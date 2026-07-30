@@ -157,7 +157,13 @@
     "findingVerses": "Claude ayələri tapır…",
     "noVersesFound": "Bu ad üçün ayə tapılmadı.",
     "connectionLabel": "Əlaqə: ",
-    "mapOnCanvas": "Lövhədə Xəritələndir →"
+    "mapOnCanvas": "Lövhədə Xəritələndir →",
+    "categoryDhatLabel": "Sifat əl-Zat",
+    "categoryDhatDescription": "Zat Sifətləri — yaradılışdan asılı olmayaraq Allaha məxsus zəruri və əzəli həqiqətlər",
+    "categorySifatLabel": "Sifat əl-Məani",
+    "categorySifatDescription": "Məna Sifətləri — yeddi sübuti sifət (Elm, Qüdrət, İradə, Həyat, Səm', Bəsər, Kəlam) və tənzihi (aşkınlığı) ifadə edən adlar",
+    "categoryAfalLabel": "Sifat əl-Əf'al",
+    "categoryAfalDescription": "Fe'l Sifətləri — Allahın yaratma, ruzi vermə, hidayət etmə, bağışlama kimi yaradılışla olan hökmranlıq əlaqəsini ifadə edən adlar"
   },
   "errors": {
     "routeFailedTitle": "Bu səhifə yüklənmədi",

@@ -57,7 +57,10 @@ export default function BookmarksPage() {
           <Heart className="h-5 w-5 text-gold" />
           <h1 className="text-lg font-semibold text-text-primary">{t("title")}</h1>
           {bookmarks.length > 0 && (
-            <span className="rounded border border-border px-1.5 py-0.5 font-mono text-xs text-text-muted">
+            <span
+              aria-label={t("savedCount", { count: bookmarks.length })}
+              className="rounded border border-border px-1.5 py-0.5 font-mono text-xs text-text-muted"
+            >
               {bookmarks.length}
             </span>
           )}

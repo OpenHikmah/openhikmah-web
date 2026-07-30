@@ -157,7 +157,13 @@
     "findingVerses": "Claude is finding verses…",
     "noVersesFound": "No verses found for this name.",
     "connectionLabel": "Connection: ",
-    "mapOnCanvas": "Map on Canvas →"
+    "mapOnCanvas": "Map on Canvas →",
+    "categoryDhatLabel": "Sifat al-Dhat",
+    "categoryDhatDescription": "Attributes of the Divine Essence — necessarily and eternally true of Allah independent of creation",
+    "categorySifatLabel": "Sifat al-Ma'ani",
+    "categorySifatDescription": "Attributes of Meaning — the seven positive qualities (Knowledge, Power, Will, Life, Hearing, Sight, Speech) and names expressing tanzih (transcendence)",
+    "categoryAfalLabel": "Sifat al-Af'al",
+    "categoryAfalDescription": "Attributes of Act — names that express Allah's sovereign relation to creation: creating, providing, guiding, forgiving"
   },
   "errors": {
     "routeFailedTitle": "This page failed to load",
