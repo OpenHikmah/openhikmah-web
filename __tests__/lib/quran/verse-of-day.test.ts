@@ -13,7 +13,12 @@ vi.mock("@/lib/infra/db", () => ({
 }));
 
 import { resolveVerse } from "@/lib/quran/verse-resolver";
-import { verseOfDayRef, getVerseOfDay, getCuratedVerseOfDay } from "@/lib/quran/verse-of-day";
+import {
+  verseOfDayRef,
+  getVerseOfDay,
+  getCuratedVerseOfDay,
+  getVerseOfDayWithReflection,
+} from "@/lib/quran/verse-of-day";
 
 describe("verseOfDayRef", () => {
   it("returns a valid verse ref (surah:ayah)", () => {
@@ -58,7 +63,7 @@ describe("getVerseOfDay override seam", () => {
     const verse = { ref: "2:255" } as never;
     vi.mocked(resolveVerse).mockResolvedValue(verse);
     const result = await getCuratedVerseOfDay(new Date("2026-06-04T00:00:00Z"));
-    expect(vi.mocked(resolveVerse)).toHaveBeenCalledWith("2:255");
+    expect(vi.mocked(resolveVerse)).toHaveBeenCalledWith("2:255", undefined);
     expect(result).toBe(verse);
   });
 
@@ -67,7 +72,44 @@ describe("getVerseOfDay override seam", () => {
     vi.mocked(resolveVerse).mockResolvedValue(verse);
     const date = new Date("2026-06-04T00:00:00Z");
     const result = await getVerseOfDay(date);
-    expect(vi.mocked(resolveVerse)).toHaveBeenCalledWith(verseOfDayRef(date));
+    expect(vi.mocked(resolveVerse)).toHaveBeenCalledWith(verseOfDayRef(date), undefined);
     expect(result).toBe(verse);
+  });
+
+  it("passes the requested edition through to resolveVerse", async () => {
+    const verse = { ref: "2:255" } as never;
+    vi.mocked(resolveVerse).mockResolvedValue(verse);
+    const date = new Date("2026-06-04T00:00:00Z");
+    await getVerseOfDay(date, "tr.diyanet");
+    expect(vi.mocked(resolveVerse)).toHaveBeenCalledWith(verseOfDayRef(date), "tr.diyanet");
+  });
+});
+
+describe("getVerseOfDayWithReflection", () => {
+  beforeEach(() => {
+    vi.mocked(resolveVerse).mockReset();
+    limitMock.mockReset();
+    limitMock.mockResolvedValue([]); // default: no curated entry
+  });
+
+  it("falls back to the algorithmic pick (no reflection) and passes the edition through", async () => {
+    const verse = { ref: "2:255" } as never;
+    vi.mocked(resolveVerse).mockResolvedValue(verse);
+    const date = new Date("2026-06-04T00:00:00Z");
+    const result = await getVerseOfDayWithReflection(date, "ru.kuliev");
+    expect(vi.mocked(resolveVerse)).toHaveBeenCalledWith(verseOfDayRef(date), "ru.kuliev");
+    expect(result).toEqual({ verse, reflection: null });
+  });
+
+  it("returns the curated verse + reflection, passing the edition to the curated lookup", async () => {
+    limitMock.mockResolvedValue([{ verseRef: "2:255", reflection: "On reliance." }]);
+    const verse = { ref: "2:255" } as never;
+    vi.mocked(resolveVerse).mockResolvedValue(verse);
+    const result = await getVerseOfDayWithReflection(
+      new Date("2026-06-04T00:00:00Z"),
+      "az.mammadaliyev"
+    );
+    expect(vi.mocked(resolveVerse)).toHaveBeenCalledWith("2:255", "az.mammadaliyev");
+    expect(result).toEqual({ verse, reflection: "On reliance." });
   });
 });

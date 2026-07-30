@@ -53,10 +53,14 @@ export function MarketingHero({ verse }: { verse: Verse | null }) {
         </div>
       </div>
 
-      {verse && (
+      {verse ? (
         <div className="shrink-0 pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-6">
           <VerseOfDayStrip verse={verse} />
         </div>
+      ) : (
+        <p className="shrink-0 pb-[calc(72px+env(safe-area-inset-bottom))] text-center text-xs text-text-muted md:pb-6">
+          Couldn&apos;t load today&apos;s verse right now.
+        </p>
       )}
     </main>
   );

@@ -70,8 +70,14 @@ async function nearest(
     .limit(limit);
 }
 
-async function hydrate(rows: Array<{ ref: string; similarity: number }>): Promise<SemanticMatch[]> {
-  const verseMap = await getVerses(rows.map((r) => r.ref));
+async function hydrate(
+  rows: Array<{ ref: string; similarity: number }>,
+  edition?: string
+): Promise<SemanticMatch[]> {
+  const verseMap = await getVerses(
+    rows.map((r) => r.ref),
+    edition
+  );
   return rows
     .map((r) => {
       const verse = verseMap.get(r.ref);
@@ -80,12 +86,19 @@ async function hydrate(rows: Array<{ ref: string; similarity: number }>): Promis
     .filter((m): m is SemanticMatch => m !== null);
 }
 
-/** Find verses whose meaning is closest to a free-text query. */
-export async function searchByMeaning(query: string, limit = 10): Promise<SemanticMatch[]> {
+/** Find verses whose meaning is closest to a free-text query. Ranking is always
+ *  English-keyed (the embeddings are built from English text), but the returned
+ *  verse text honors `edition` — display language and search language differ by
+ *  design. */
+export async function searchByMeaning(
+  query: string,
+  limit = 10,
+  edition?: string
+): Promise<SemanticMatch[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
   const queryVec = await embedQueryCached(trimmed);
-  return hydrate(await nearest(queryVec, limit));
+  return hydrate(await nearest(queryVec, limit), edition);
 }
 
 /**

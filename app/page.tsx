@@ -5,6 +5,7 @@ import { MobileNavBar } from "@/components/layout/MobileNavBar";
 import { WaveBackground } from "@/components/home/WaveBackground";
 import { HomeView } from "@/components/home/HomeView";
 import { getVerseOfDay } from "@/lib/quran/verse-of-day";
+import { getQuranEdition } from "@/lib/i18n/request-prefs";
 
 export const metadata: Metadata = {
   title: "Open Hikmah — the Qur'an as a connected graph",
@@ -28,7 +29,11 @@ export default async function Home({
   const { share } = await searchParams;
   if (share) redirect(`/canvas?share=${encodeURIComponent(share)}`);
 
-  const verse = await getVerseOfDay().catch(() => null);
+  const edition = await getQuranEdition();
+  const verse = await getVerseOfDay(undefined, edition).catch((err) => {
+    console.error("Home: Verse of the Day load failed:", err);
+    return null;
+  });
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-bg">

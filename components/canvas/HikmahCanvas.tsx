@@ -19,6 +19,7 @@ import { HikmahEdge } from "./HikmahEdge";
 import { CanvasLegend } from "./CanvasLegend";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { useCanvasStore } from "@/store/canvas";
+import { usePreferencesStore } from "@/store/preferences";
 import { useActivityTracker } from "@/hooks/useActivityTracker";
 import { useCanvasPersistence } from "@/hooks/useCanvasPersistence";
 import {
@@ -104,6 +105,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
   const getNodeByRef = useCanvasStore((s) => s.getNodeByRef);
   const hasNode = useCanvasStore((s) => s.hasNode);
   const getExpansionRefs = useCanvasStore((s) => s.getExpansionRefs);
+  const showMinimap = usePreferencesStore((s) => s.canvasPrefs.showMinimap);
 
   const runExpansion = useCallback(
     async (
@@ -344,20 +346,22 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
             <Panel position="bottom-left">
               <CanvasLegend />
             </Panel>
-            <MiniMap
-              pannable
-              zoomable
-              ariaLabel="Canvas minimap"
-              nodeColor={(n: Node) =>
-                (n.data as { isRoot?: boolean })?.isRoot
-                  ? "var(--color-gold)"
-                  : "var(--color-text-secondary)"
-              }
-              nodeStrokeWidth={0}
-              maskColor="color-mix(in srgb, var(--color-bg) 72%, transparent)"
-              className="hidden rounded-md border border-border sm:block"
-              style={{ background: "var(--color-surface)" }}
-            />
+            {showMinimap && (
+              <MiniMap
+                pannable
+                zoomable
+                ariaLabel="Canvas minimap"
+                nodeColor={(n: Node) =>
+                  (n.data as { isRoot?: boolean })?.isRoot
+                    ? "var(--color-gold)"
+                    : "var(--color-text-secondary)"
+                }
+                nodeStrokeWidth={0}
+                maskColor="color-mix(in srgb, var(--color-bg) 72%, transparent)"
+                className="hidden rounded-md border border-border sm:block"
+                style={{ background: "var(--color-surface)" }}
+              />
+            )}
           </>
         )}
       </ReactFlow>

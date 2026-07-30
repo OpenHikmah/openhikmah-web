@@ -103,7 +103,13 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
       {/* Two columns at lg: the Verse of the Day leads, destinations sit alongside
           so the page fills the width instead of stranding a narrow centre column. */}
       <div className="mt-[clamp(1rem,3.5vh,2rem)] grid items-start gap-6 lg:grid-cols-[1.5fr_1fr]">
-        {verse && <VerseOfDayCard verse={verse} />}
+        {verse ? (
+          <VerseOfDayCard verse={verse} />
+        ) : (
+          <Card className="p-5 text-sm text-text-muted">
+            Couldn&apos;t load today&apos;s verse right now. Please try again later.
+          </Card>
+        )}
 
         <div className="grid gap-3">
           <QuickLink
