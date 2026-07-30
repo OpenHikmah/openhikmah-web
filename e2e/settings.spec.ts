@@ -33,6 +33,11 @@ test.describe("language switching", () => {
     await page.getByRole("button", { name: /change language/i }).click();
     await page.getByRole("button", { name: "Türkçe" }).click();
 
+    // Nav chrome (server-rendered from the cookie-resolved locale) shows the
+    // Turkish next-intl strings once router.refresh() re-renders the layout.
+    await expect(page.getByRole("link", { name: "Tuval" })).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "tr");
+
     // /settings reads the same preferences store — its Interface language
     // select reflects the switch made via the header popover.
     await page.goto("/settings");
@@ -44,6 +49,7 @@ test.describe("language switching", () => {
     await expect(page.getByRole("combobox", { name: /interface language/i })).toHaveText("Türkçe");
     const cookies = await page.context().cookies();
     expect(cookies.find((c) => c.name === "oh_locale")?.value).toBe("tr");
+    await expect(page.locator("html")).toHaveAttribute("lang", "tr");
   });
 });
 

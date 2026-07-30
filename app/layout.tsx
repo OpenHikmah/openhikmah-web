@@ -2,8 +2,10 @@ import "@/lib/env";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Amiri } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
+import { getMessages } from "next-intl/server";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { getUiLocale } from "@/lib/i18n/request-prefs";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -43,18 +45,22 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getUiLocale();
+  const messages = await getMessages();
   return (
     <html
-      lang="en"
+      lang={locale}
       className={`${geistSans.variable} ${geistMono.variable} ${amiri.variable} h-full`}
     >
       <body className="min-h-full flex flex-col antialiased">
-        <Providers>{children}</Providers>
+        <Providers locale={locale} messages={messages}>
+          {children}
+        </Providers>
       </body>
       <GoogleAnalytics gaId="G-7R460Z8BZX" />
     </html>

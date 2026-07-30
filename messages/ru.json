@@ -1,0 +1,40 @@
+{
+  "common": {
+    "signIn": "Войти",
+    "signingIn": "Выполняется вход…",
+    "signOut": "Выйти",
+    "settings": "Настройки",
+    "allSettings": "Все настройки →",
+    "changeLanguage": "Изменить язык"
+  },
+  "nav": {
+    "canvas": "Холст",
+    "search": "Поиск",
+    "stories": "Истории",
+    "names": "Асма уль-Хусна",
+    "bookmarks": "Закладки",
+    "savedCanvases": "Сохранённые холсты",
+    "friendsLeaderboard": "Друзья и рейтинг",
+    "mentions": "Упоминания",
+    "accountMenu": "Меню аккаунта",
+    "signedIn": "Вы вошли в систему",
+    "dayStreak": "Серия дней: {count}",
+    "dayStreakLabel": "Серия дней",
+    "longest": "Рекорд"
+  },
+  "settings": {
+    "title": "Настройки",
+    "language": "Язык",
+    "languageDescription": "Устанавливает язык интерфейса приложения.",
+    "interfaceLanguage": "Язык интерфейса",
+    "quranTranslation": "Перевод Корана",
+    "quranTranslationDescription": "Сейчас используется {attribution} ({edition}).",
+    "quranTranslationEdition": "Издание перевода Корана",
+    "recitation": "Чтение",
+    "recitationDescription": "Чтец, используемый для аудио аятов.",
+    "reciter": "Чтец",
+    "canvas": "Холст",
+    "showMinimap": "Показать миникарту",
+    "showCanvasMinimap": "Показать миникарту холста"
+  }
+}

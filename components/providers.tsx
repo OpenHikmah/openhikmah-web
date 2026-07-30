@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { NextIntlClientProvider, type AbstractIntlMessages } from "next-intl";
 import { MiniPlayer } from "@/components/audio/MiniPlayer";
 import { TooltipProvider } from "@/components/ui";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { mergeGuestWorkspace } from "@/hooks/useCanvasPersistence";
+import type { Locale } from "@/lib/i18n/config";
 
 function SessionRestorer() {
   const setTokens = useAuthStore((s) => s.setTokens);
@@ -106,12 +108,22 @@ function SessionRestorer() {
   return null;
 }
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+  children,
+  locale,
+  messages,
+}: {
+  children: React.ReactNode;
+  locale: Locale;
+  messages: AbstractIntlMessages;
+}) {
   return (
-    <TooltipProvider delayDuration={300}>
-      <SessionRestorer />
-      {children}
-      <MiniPlayer />
-    </TooltipProvider>
+    <NextIntlClientProvider locale={locale} messages={messages}>
+      <TooltipProvider delayDuration={300}>
+        <SessionRestorer />
+        {children}
+        <MiniPlayer />
+      </TooltipProvider>
+    </NextIntlClientProvider>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import {
   Flame,
   Award,
@@ -33,6 +34,8 @@ export function AccountMenu() {
   const [open, setOpen] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const t = useTranslations("common");
+  const tNav = useTranslations("nav");
 
   useEffect(() => {
     if (!open) return;
@@ -96,12 +99,16 @@ export function AccountMenu() {
             regardless of sign-in, so logged-out mobile users must not lose it. */}
         <Link
           href="/bookmarks"
-          aria-label="Bookmarks"
+          aria-label={tNav("bookmarks")}
           className={cn(linkRow, "h-9 px-2 md:hidden")}
         >
           <Bookmark />
         </Link>
-        <Link href="/settings" aria-label="Settings" className={cn(linkRow, "h-9 px-2 md:hidden")}>
+        <Link
+          href="/settings"
+          aria-label={t("settings")}
+          className={cn(linkRow, "h-9 px-2 md:hidden")}
+        >
           <Settings />
         </Link>
         <button
@@ -114,7 +121,7 @@ export function AccountMenu() {
           ) : (
             <LogIn className="size-3.5" />
           )}
-          {signingIn ? "Signing in…" : "Sign in"}
+          {signingIn ? t("signingIn") : t("signIn")}
         </button>
       </div>
     );
@@ -128,7 +135,7 @@ export function AccountMenu() {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Account menu"
+        aria-label={tNav("accountMenu")}
         className={cn(
           "flex items-center gap-2 rounded-full border bg-surface-raised py-[3px] pl-[3px] pr-2 transition-colors sm:pr-3",
           open ? "border-gold-muted" : "border-border hover:border-gold-muted/70"
@@ -173,10 +180,10 @@ export function AccountMenu() {
             </span>
             <div className="min-w-0">
               <p className="truncate text-[15px] font-semibold text-text-primary">
-                {username ?? "Signed in"}
+                {username ?? tNav("signedIn")}
               </p>
               <p className="text-xs text-text-secondary">
-                {streak > 0 ? `On a ${streak}-day streak` : "Signed in"}
+                {streak > 0 ? tNav("dayStreak", { count: streak }) : tNav("signedIn")}
               </p>
             </div>
           </div>
@@ -188,7 +195,7 @@ export function AccountMenu() {
                 <span className="text-[18px] font-bold leading-none text-gold">{streak}</span>
               </div>
               <p className="mt-1 text-[10.5px] uppercase tracking-[0.04em] text-text-muted">
-                Day streak
+                {tNav("dayStreakLabel")}
               </p>
             </div>
             <div className="flex-1 rounded-[10px] border border-border bg-surface px-2.5 py-2">
@@ -199,7 +206,7 @@ export function AccountMenu() {
                 </span>
               </div>
               <p className="mt-1 text-[10.5px] uppercase tracking-[0.04em] text-text-muted">
-                Longest
+                {tNav("longest")}
               </p>
             </div>
           </div>
@@ -208,10 +215,10 @@ export function AccountMenu() {
 
           <div className="p-1.5">
             <Link href="/workspaces" onClick={() => setOpen(false)} className={linkRow}>
-              <FolderOpen /> Saved canvases
+              <FolderOpen /> {tNav("savedCanvases")}
             </Link>
             <Link href="/social" onClick={() => setOpen(false)} className={linkRow}>
-              <Trophy /> Friends &amp; Leaderboard
+              <Trophy /> {tNav("friendsLeaderboard")}
               {pendingFriendCount > 0 && (
                 <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-gold px-1 text-[10px] font-bold text-bg">
                   {pendingFriendCount > 9 ? "9+" : pendingFriendCount}
@@ -219,7 +226,7 @@ export function AccountMenu() {
               )}
             </Link>
             <Link href="/mentions" onClick={() => setOpen(false)} className={linkRow}>
-              <AtSign /> Mentions
+              <AtSign /> {tNav("mentions")}
               {pendingMentionCount > 0 && (
                 <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-gold px-1 text-[10px] font-bold text-bg">
                   {pendingMentionCount > 9 ? "9+" : pendingMentionCount}
@@ -232,10 +239,10 @@ export function AccountMenu() {
               onClick={() => setOpen(false)}
               className={cn(linkRow, "md:hidden")}
             >
-              <Bookmark /> Bookmarks
+              <Bookmark /> {tNav("bookmarks")}
             </Link>
             <Link href="/settings" onClick={() => setOpen(false)} className={linkRow}>
-              <Settings /> Settings
+              <Settings /> {t("settings")}
             </Link>
           </div>
 
@@ -247,7 +254,7 @@ export function AccountMenu() {
               role="menuitem"
               className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-[13.5px] text-text-primary transition-colors hover:bg-error/10 hover:text-error [&_svg]:size-[17px] [&_svg]:text-text-secondary [&:hover_svg]:text-error"
             >
-              <LogOut /> Sign out
+              <LogOut /> {t("signOut")}
             </button>
           </div>
         </div>
