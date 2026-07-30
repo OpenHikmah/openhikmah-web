@@ -6,15 +6,17 @@ import { useRouter } from "next/navigation";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { Card, Select, Switch, type SelectOption } from "@/components/ui";
 import { RECITERS } from "@/lib/quran/audio";
-import { DEFAULT_EDITION_BY_LOCALE as EDITION_BY_LOCALE } from "@/lib/i18n/config";
+import {
+  DEFAULT_EDITION_BY_LOCALE as EDITION_BY_LOCALE,
+  LOCALES as LOCALE_CODES,
+  LOCALE_LABELS,
+} from "@/lib/i18n/config";
 import { usePreferencesStore, type UiLocale } from "@/store/preferences";
 
-const LOCALE_OPTIONS: SelectOption[] = [
-  { value: "en", label: "English" },
-  { value: "tr", label: "Türkçe" },
-  { value: "ru", label: "Русский" },
-  { value: "az", label: "Azərbaycan dili" },
-];
+const LOCALE_OPTIONS: SelectOption[] = LOCALE_CODES.map((value) => ({
+  value,
+  label: LOCALE_LABELS[value],
+}));
 
 // Translator attribution per locale, shown alongside the edition code from
 // lib/i18n/config's DEFAULT_EDITION_BY_LOCALE (the whitelisted source of
@@ -75,6 +77,7 @@ export default function SettingsPage() {
 
         <SettingsSection title={t("language")} description={t("languageDescription")}>
           <Select
+            id="interface-language"
             aria-label={t("interfaceLanguage")}
             value={uiLocale}
             onValueChange={(v) => {

@@ -1,13 +1,37 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { NextIntlClientProvider, type AbstractIntlMessages } from "next-intl";
 import { MiniPlayer } from "@/components/audio/MiniPlayer";
 import { TooltipProvider } from "@/components/ui";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
+import { usePreferencesStore } from "@/store/preferences";
 import { mergeGuestWorkspace } from "@/hooks/useCanvasPersistence";
 import type { Locale } from "@/lib/i18n/config";
+
+// The persisted-store rehydration path (store/preferences.ts's
+// onRehydrateStorage) re-syncs the oh_locale cookie from localStorage on
+// mount, but it runs outside React and has no router access — so if the
+// cookie was missing/stale when this server component tree rendered (e.g. a
+// privacy tool cleared cookies but not localStorage), the just-rehydrated
+// cookie fixes *future* requests but the already-rendered next-intl
+// `messages` for *this* page stay in the wrong locale. Catch that one-time
+// divergence here and refresh once to pick up the corrected cookie.
+export function LocaleRehydrationSync({ ssrLocale }: { ssrLocale: Locale }) {
+  const uiLocale = usePreferencesStore((s) => s.uiLocale);
+  const router = useRouter();
+  const refreshed = useRef(false);
+
+  useEffect(() => {
+    if (refreshed.current || uiLocale === ssrLocale) return;
+    refreshed.current = true;
+    router.refresh();
+  }, [uiLocale, ssrLocale, router]);
+
+  return null;
+}
 
 function SessionRestorer() {
   const setTokens = useAuthStore((s) => s.setTokens);
@@ -121,6 +145,7 @@ export function Providers({
     <NextIntlClientProvider locale={locale} messages={messages}>
       <TooltipProvider delayDuration={300}>
         <SessionRestorer />
+        <LocaleRehydrationSync ssrLocale={locale} />
         {children}
         <MiniPlayer />
       </TooltipProvider>

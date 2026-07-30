@@ -39,14 +39,17 @@ test.describe("language switching", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", "tr");
 
     // /settings reads the same preferences store — its Interface language
-    // select reflects the switch made via the header popover.
+    // select reflects the switch made via the header popover. Select by #id
+    // rather than accessible name — the aria-label is now translation-driven
+    // (settings.interfaceLanguage), so it no longer reads "Interface language"
+    // once the locale is tr.
     await page.goto("/settings");
-    await expect(page.getByRole("combobox", { name: /interface language/i })).toHaveText("Türkçe");
+    await expect(page.locator("#interface-language")).toHaveText("Türkçe");
 
     // The store persists to localStorage and re-syncs the oh_locale cookie on
     // rehydration, so the choice survives a full reload, not just client nav.
     await page.reload();
-    await expect(page.getByRole("combobox", { name: /interface language/i })).toHaveText("Türkçe");
+    await expect(page.locator("#interface-language")).toHaveText("Türkçe");
     const cookies = await page.context().cookies();
     expect(cookies.find((c) => c.name === "oh_locale")?.value).toBe("tr");
     await expect(page.locator("html")).toHaveAttribute("lang", "tr");

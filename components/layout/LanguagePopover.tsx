@@ -7,13 +7,12 @@ import { Globe } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore, type UiLocale } from "@/store/preferences";
+import { LOCALES as LOCALE_CODES, LOCALE_LABELS } from "@/lib/i18n/config";
 
-const LOCALES: Array<{ value: UiLocale; label: string }> = [
-  { value: "en", label: "English" },
-  { value: "tr", label: "Türkçe" },
-  { value: "ru", label: "Русский" },
-  { value: "az", label: "Azərbaycan dili" },
-];
+const LOCALES: Array<{ value: UiLocale; label: string }> = LOCALE_CODES.map((value) => ({
+  value,
+  label: LOCALE_LABELS[value],
+}));
 
 /** Globe-icon quick-switcher next to the account menu — zero-navigation
  *  language switching from any page, including mid-canvas. */
