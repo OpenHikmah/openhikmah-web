@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { getAudioUrl } from "@/lib/quran/audio";
+import { usePreferencesStore } from "@/store/preferences";
 
 export interface AudioVerse {
   ref: string;
@@ -47,7 +48,7 @@ let playGen = 0;
 function loadAndPlay(verse: AudioVerse, onEnded: () => void) {
   const a = getAudio();
   a.onended = onEnded;
-  a.src = getAudioUrl(verse.surah, verse.ayah);
+  a.src = getAudioUrl(verse.surah, verse.ayah, usePreferencesStore.getState().reciter);
   a.load();
   return a.play();
 }

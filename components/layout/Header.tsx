@@ -33,6 +33,7 @@ import {
 import { AccountMenu } from "./AccountMenu";
 import { Wordmark } from "./Wordmark";
 import { HeaderNavLinks } from "./HeaderNavLinks";
+import { LanguagePopover } from "./LanguagePopover";
 
 interface HeaderProps {
   onSearchOpen: () => void;
@@ -341,7 +342,10 @@ export function Header({ onSearchOpen }: HeaderProps) {
           <Wordmark />
           <HeaderNavLinks />
         </div>
-        <AccountMenu />
+        <div className="flex items-center gap-3">
+          <LanguagePopover />
+          <AccountMenu />
+        </div>
       </header>
 
       {/* Mobile: bottom action bar — primary canvas actions (<md, only with nodes) */}

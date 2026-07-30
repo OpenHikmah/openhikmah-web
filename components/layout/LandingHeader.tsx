@@ -3,6 +3,7 @@
 import { AccountMenu } from "./AccountMenu";
 import { Wordmark } from "./Wordmark";
 import { HeaderNavLinks } from "./HeaderNavLinks";
+import { LanguagePopover } from "./LanguagePopover";
 
 export function LandingHeader() {
   return (
@@ -11,7 +12,10 @@ export function LandingHeader() {
         <Wordmark />
         <HeaderNavLinks />
       </div>
-      <AccountMenu />
+      <div className="flex items-center gap-3">
+        <LanguagePopover />
+        <AccountMenu />
+      </div>
     </header>
   );
 }
