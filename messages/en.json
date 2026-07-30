@@ -1,0 +1,40 @@
+{
+  "common": {
+    "signIn": "Sign in",
+    "signingIn": "Signing in…",
+    "signOut": "Sign out",
+    "settings": "Settings",
+    "allSettings": "All settings →",
+    "changeLanguage": "Change language"
+  },
+  "nav": {
+    "canvas": "Canvas",
+    "search": "Search",
+    "stories": "Stories",
+    "names": "Asma'ul Husna",
+    "bookmarks": "Bookmarks",
+    "savedCanvases": "Saved canvases",
+    "friendsLeaderboard": "Friends & Leaderboard",
+    "mentions": "Mentions",
+    "accountMenu": "Account menu",
+    "signedIn": "Signed in",
+    "dayStreak": "On a {count}-day streak",
+    "dayStreakLabel": "Day streak",
+    "longest": "Longest"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "languageDescription": "Sets the app interface language.",
+    "interfaceLanguage": "Interface language",
+    "quranTranslation": "Quran translation",
+    "quranTranslationDescription": "Currently {attribution} ({edition}).",
+    "quranTranslationEdition": "Quran translation edition",
+    "recitation": "Recitation",
+    "recitationDescription": "Reciter used for verse audio playback.",
+    "reciter": "Reciter",
+    "canvas": "Canvas",
+    "showMinimap": "Show minimap",
+    "showCanvasMinimap": "Show canvas minimap"
+  }
+}

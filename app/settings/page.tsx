@@ -1,18 +1,22 @@
 "use client";
 
 import { Settings as SettingsIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { Card, Select, Switch, type SelectOption } from "@/components/ui";
 import { RECITERS } from "@/lib/quran/audio";
-import { DEFAULT_EDITION_BY_LOCALE as EDITION_BY_LOCALE } from "@/lib/i18n/config";
+import {
+  DEFAULT_EDITION_BY_LOCALE as EDITION_BY_LOCALE,
+  LOCALES as LOCALE_CODES,
+  LOCALE_LABELS,
+} from "@/lib/i18n/config";
 import { usePreferencesStore, type UiLocale } from "@/store/preferences";
 
-const LOCALE_OPTIONS: SelectOption[] = [
-  { value: "en", label: "English" },
-  { value: "tr", label: "Türkçe" },
-  { value: "ru", label: "Русский" },
-  { value: "az", label: "Azərbaycan dili" },
-];
+const LOCALE_OPTIONS: SelectOption[] = LOCALE_CODES.map((value) => ({
+  value,
+  label: LOCALE_LABELS[value],
+}));
 
 // Translator attribution per locale, shown alongside the edition code from
 // lib/i18n/config's DEFAULT_EDITION_BY_LOCALE (the whitelisted source of
@@ -47,6 +51,8 @@ function SettingsSection({
 }
 
 export default function SettingsPage() {
+  const t = useTranslations("settings");
+  const router = useRouter();
   const uiLocale = usePreferencesStore((s) => s.uiLocale);
   const setUiLocale = usePreferencesStore((s) => s.setUiLocale);
   const quranEditionByLocale = usePreferencesStore((s) => s.quranEditionByLocale);
@@ -66,47 +72,54 @@ export default function SettingsPage() {
       <div className="mx-auto w-full max-w-2xl flex-1 space-y-4">
         <div className="mb-4 flex items-center gap-3">
           <SettingsIcon className="h-5 w-5 text-gold" />
-          <h1 className="text-lg font-semibold text-text-primary">Settings</h1>
+          <h1 className="text-lg font-semibold text-text-primary">{t("title")}</h1>
         </div>
 
-        <SettingsSection title="Language" description="Sets the app interface language.">
+        <SettingsSection title={t("language")} description={t("languageDescription")}>
           <Select
-            aria-label="Interface language"
+            id="interface-language"
+            aria-label={t("interfaceLanguage")}
             value={uiLocale}
-            onValueChange={(v) => setUiLocale(v as UiLocale)}
+            onValueChange={(v) => {
+              setUiLocale(v as UiLocale);
+              router.refresh();
+            }}
             options={LOCALE_OPTIONS}
           />
         </SettingsSection>
 
         <SettingsSection
-          title="Quran translation"
-          description={`Currently ${activeAttribution} (${activeEdition}).`}
+          title={t("quranTranslation")}
+          description={t("quranTranslationDescription", {
+            attribution: activeAttribution,
+            edition: activeEdition,
+          })}
         >
           <Select
-            aria-label="Quran translation edition"
+            aria-label={t("quranTranslationEdition")}
             value={activeEdition}
             onValueChange={(v) => setQuranEdition(uiLocale, v)}
             options={[{ value: activeEditionDefault, label: activeAttribution }]}
           />
         </SettingsSection>
 
-        <SettingsSection title="Recitation" description="Reciter used for verse audio playback.">
+        <SettingsSection title={t("recitation")} description={t("recitationDescription")}>
           <Select
-            aria-label="Reciter"
+            aria-label={t("reciter")}
             value={reciter}
             onValueChange={setReciter}
             options={RECITER_OPTIONS}
           />
         </SettingsSection>
 
-        <SettingsSection title="Canvas">
+        <SettingsSection title={t("canvas")}>
           <div className="flex items-center justify-between">
             <label htmlFor="canvas-minimap" className="text-sm text-text-secondary">
-              Show minimap
+              {t("showMinimap")}
             </label>
             <Switch
               id="canvas-minimap"
-              aria-label="Show canvas minimap"
+              aria-label={t("showCanvasMinimap")}
               checked={canvasPrefs.showMinimap}
               onCheckedChange={(checked) => setCanvasPrefs({ showMinimap: checked })}
             />

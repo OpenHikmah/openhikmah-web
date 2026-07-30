@@ -1,0 +1,40 @@
+{
+  "common": {
+    "signIn": "Giriş yap",
+    "signingIn": "Giriş yapılıyor…",
+    "signOut": "Çıkış yap",
+    "settings": "Ayarlar",
+    "allSettings": "Tüm ayarlar →",
+    "changeLanguage": "Dili değiştir"
+  },
+  "nav": {
+    "canvas": "Tuval",
+    "search": "Ara",
+    "stories": "Hikayeler",
+    "names": "Esmaü'l Hüsna",
+    "bookmarks": "Yer imleri",
+    "savedCanvases": "Kayıtlı tuvaller",
+    "friendsLeaderboard": "Arkadaşlar ve Sıralama",
+    "mentions": "Bahsetmeler",
+    "accountMenu": "Hesap menüsü",
+    "signedIn": "Giriş yapıldı",
+    "dayStreak": "{count} günlük seri",
+    "dayStreakLabel": "Günlük seri",
+    "longest": "En uzun"
+  },
+  "settings": {
+    "title": "Ayarlar",
+    "language": "Dil",
+    "languageDescription": "Uygulama arayüz dilini ayarlar.",
+    "interfaceLanguage": "Arayüz dili",
+    "quranTranslation": "Kur'an meali",
+    "quranTranslationDescription": "Şu anda {attribution} ({edition}).",
+    "quranTranslationEdition": "Kur'an meal baskısı",
+    "recitation": "Kıraat",
+    "recitationDescription": "Ayet seslendirmesi için kullanılan kâri.",
+    "reciter": "Kâri",
+    "canvas": "Tuval",
+    "showMinimap": "Küçük haritayı göster",
+    "showCanvasMinimap": "Tuval küçük haritasını göster"
+  }
+}

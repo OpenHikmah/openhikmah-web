@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { useMobileNavVisible } from "@/hooks/useMobileNavVisible";
 import { NAV_ITEMS, isNavItemActive } from "./nav-items";
@@ -15,13 +16,14 @@ const MOBILE_ITEMS = NAV_ITEMS.filter((item) => item.mobile !== false);
 export function MobileNavBar() {
   const pathname = usePathname();
   const visible = useMobileNavVisible();
+  const t = useTranslations("nav");
 
   // See useMobileNavVisible for the hide condition (populated /canvas only).
   if (!visible) return null;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 flex md:hidden border-t border-border bg-surface/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
-      {MOBILE_ITEMS.map(({ href, label, icon: Icon }) => (
+      {MOBILE_ITEMS.map(({ href, labelKey, icon: Icon }) => (
         <Link
           key={href}
           href={href}
@@ -31,7 +33,7 @@ export function MobileNavBar() {
           )}
         >
           <Icon />
-          <span>{label}</span>
+          <span>{t(labelKey)}</span>
         </Link>
       ))}
     </nav>

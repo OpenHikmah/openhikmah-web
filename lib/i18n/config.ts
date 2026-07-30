@@ -7,6 +7,17 @@ export type Locale = (typeof LOCALES)[number];
 
 export const DEFAULT_LOCALE: Locale = "en";
 
+// Each locale's own name for itself (never translated — a language's own
+// name is shown the same way regardless of the active UI locale). Single
+// source for the LanguagePopover and /settings language pickers, which
+// previously each hand-maintained their own copy of this list.
+export const LOCALE_LABELS: Record<Locale, string> = {
+  en: "English",
+  tr: "Türkçe",
+  ru: "Русский",
+  az: "Azərbaycan dili",
+};
+
 export const DEFAULT_EDITION_BY_LOCALE: Record<Locale, string> = {
   en: "en.sahih",
   tr: "tr.diyanet",

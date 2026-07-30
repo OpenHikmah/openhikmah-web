@@ -9,7 +9,8 @@ import {
 
 export interface NavItem {
   href: string;
-  label: string;
+  /** Key into the "nav" messages namespace — resolve with useTranslations("nav"). */
+  labelKey: "canvas" | "search" | "stories" | "names" | "bookmarks";
   icon: LucideIcon;
   /** Shown in the mobile bottom tab bar. Defaults to true. */
   mobile?: boolean;
@@ -20,11 +21,11 @@ export interface NavItem {
 // mobile !== false). Bookmarks is desktop-only — on mobile it lives in the
 // account menu to keep the bottom bar to 4 tabs.
 export const NAV_ITEMS: readonly NavItem[] = [
-  { href: "/canvas", label: "Canvas", icon: LayoutTemplate },
-  { href: "/search", label: "Search", icon: Search },
-  { href: "/stories", label: "Stories", icon: ScrollText },
-  { href: "/names", label: "Asma'ul Husna", icon: Sparkles },
-  { href: "/bookmarks", label: "Bookmarks", icon: Bookmark, mobile: false },
+  { href: "/canvas", labelKey: "canvas", icon: LayoutTemplate },
+  { href: "/search", labelKey: "search", icon: Search },
+  { href: "/stories", labelKey: "stories", icon: ScrollText },
+  { href: "/names", labelKey: "names", icon: Sparkles },
+  { href: "/bookmarks", labelKey: "bookmarks", icon: Bookmark, mobile: false },
 ] as const;
 
 export function isNavItemActive(pathname: string, href: string): boolean {

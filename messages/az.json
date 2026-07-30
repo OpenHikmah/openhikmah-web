@@ -1,0 +1,40 @@
+{
+  "common": {
+    "signIn": "Daxil ol",
+    "signingIn": "Daxil olunur…",
+    "signOut": "Çıxış et",
+    "settings": "Tənzimləmələr",
+    "allSettings": "Bütün tənzimləmələr →",
+    "changeLanguage": "Dili dəyiş"
+  },
+  "nav": {
+    "canvas": "Lövhə",
+    "search": "Axtar",
+    "stories": "Hekayələr",
+    "names": "Əsmayi-Hüsna",
+    "bookmarks": "Əlfəcinlər",
+    "savedCanvases": "Yadda saxlanmış lövhələr",
+    "friendsLeaderboard": "Dostlar və Reytinq",
+    "mentions": "Qeyd edilmələr",
+    "accountMenu": "Hesab menyusu",
+    "signedIn": "Daxil olunub",
+    "dayStreak": "{count} günlük seriya",
+    "dayStreakLabel": "Günlük seriya",
+    "longest": "Ən uzun"
+  },
+  "settings": {
+    "title": "Tənzimləmələr",
+    "language": "Dil",
+    "languageDescription": "Tətbiqin interfeys dilini təyin edir.",
+    "interfaceLanguage": "İnterfeys dili",
+    "quranTranslation": "Quran tərcüməsi",
+    "quranTranslationDescription": "Hazırda {attribution} ({edition}).",
+    "quranTranslationEdition": "Quran tərcümə nəşri",
+    "recitation": "Qiraət",
+    "recitationDescription": "Ayə səsləndirməsi üçün istifadə olunan qari.",
+    "reciter": "Qari",
+    "canvas": "Lövhə",
+    "showMinimap": "Kiçik xəritəni göstər",
+    "showCanvasMinimap": "Lövhə kiçik xəritəsini göstər"
+  }
+}
