@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { DIVINE_NAMES, CATEGORY_LABELS, type NameCategory } from "@/lib/names/divine-names";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
@@ -29,7 +30,8 @@ const CATEGORY_COLORS: Record<NameCategory, { border: string; badge: string; dot
   },
 };
 
-export default function NamesPage() {
+export default async function NamesPage() {
+  const t = await getTranslations("names");
   const byCategory = CATEGORY_ORDER.map((cat) => ({
     cat,
     names: DIVINE_NAMES.filter((n) => n.category === cat),
@@ -45,16 +47,11 @@ export default function NamesPage() {
       {/* Hero */}
       <div className="px-6 pt-12 pb-10 text-center border-b border-border-subtle">
         <p className="text-xs uppercase tracking-[0.2em] font-mono mb-3 text-text-muted">
-          Asmaul Husna
+          {t("eyebrow")}
         </p>
         <h1 className="font-arabic text-5xl mb-2 text-gold">أَسْمَاءُ اللَّه الْحُسْنَى</h1>
-        <p className="text-2xl font-light mb-4 text-text-primary">
-          The 99 Beautiful Names of Allah
-        </p>
-        <p className="text-sm max-w-xl mx-auto text-text-secondary">
-          Organised by Maturidi/Hanafi taxonomy — Sifat al-Dhat, Sifat al-Ma&apos;ani, and Sifat
-          al-Af&apos;al. Click any name to explore its verses.
-        </p>
+        <p className="text-2xl font-light mb-4 text-text-primary">{t("heroTitle")}</p>
+        <p className="text-sm max-w-xl mx-auto text-text-secondary">{t("heroDescription")}</p>
 
         {/* Legend */}
         <div className="flex flex-wrap justify-center gap-4 mt-8">
@@ -121,7 +118,7 @@ export default function NamesPage() {
 
       {/* Footer */}
       <footer className="text-center py-6 text-xs border-t border-border-subtle text-text-muted">
-        Names grounded in Maturidi/Hanafi tradition · verses powered by Claude
+        {t("footer")}
       </footer>
     </div>
   );

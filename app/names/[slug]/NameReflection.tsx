@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 interface Props {
   slug: string;
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function NameReflection({ slug, accent }: Props) {
+  const t = useTranslations("names");
   const [reflection, setReflection] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
@@ -38,7 +40,7 @@ export function NameReflection({ slug, accent }: Props) {
     >
       <div className="flex items-center gap-2">
         <span className="text-xs font-mono uppercase tracking-widest" style={{ color: accent }}>
-          Believer&apos;s Reflection
+          {t("reflectionLabel")}
         </span>
         <span className="text-xs font-arabic" style={{ color: "var(--color-text-muted)" }}>
           التخلق

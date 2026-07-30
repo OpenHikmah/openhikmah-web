@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import type { VerseRef } from "@/types/quran";
 
 interface NameVerse {
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function NameVerses({ slug, accent }: Props) {
+  const t = useTranslations("names");
   const [verses, setVerses] = useState<NameVerse[] | null>(null);
   const [error, setError] = useState(false);
 
@@ -42,7 +44,7 @@ export function NameVerses({ slug, accent }: Props) {
   if (error) {
     return (
       <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-        Could not load verses at this time.
+        {t("couldNotLoadVerses")}
       </p>
     );
   }
@@ -65,7 +67,7 @@ export function NameVerses({ slug, accent }: Props) {
           className="text-xs text-center pt-2 font-mono"
           style={{ color: "var(--color-text-muted)" }}
         >
-          Claude is finding verses…
+          {t("findingVerses")}
         </p>
       </div>
     );
@@ -74,7 +76,7 @@ export function NameVerses({ slug, accent }: Props) {
   if (verses.length === 0) {
     return (
       <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-        No verses found for this name.
+        {t("noVersesFound")}
       </p>
     );
   }
@@ -140,7 +142,7 @@ export function NameVerses({ slug, accent }: Props) {
               color: "var(--color-text-muted)",
             }}
           >
-            <span style={{ color: accent }}>Connection: </span>
+            <span style={{ color: accent }}>{t("connectionLabel")}</span>
             {verse.reason}
           </div>
 
@@ -151,7 +153,7 @@ export function NameVerses({ slug, accent }: Props) {
               className="text-xs flex items-center gap-1 transition-opacity hover:opacity-80"
               style={{ color: accent }}
             >
-              Map on Canvas →
+              {t("mapOnCanvas")}
             </Link>
           </div>
         </article>

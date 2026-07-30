@@ -131,5 +131,43 @@
     "mapOnCanvas": "Map on Canvas",
     "searchVersesAria": "Search verses",
     "nonEnglishHint": "Searching English translations — results are shown in English regardless of interface language."
+  },
+  "bookmarks": {
+    "title": "Bookmarks",
+    "emptyTitle": "No bookmarks yet.",
+    "emptyHint": "Tap the heart icon on any verse in the canvas to save it.",
+    "openCanvas": "Open canvas",
+    "openInCanvas": "Open in canvas",
+    "couldNotLoadVerse": "Could not load verse text.",
+    "savedCount": "{count, plural, =0 {No bookmarks yet} one {# saved verse} other {# saved verses}}"
+  },
+  "names": {
+    "eyebrow": "Asmaul Husna",
+    "heroTitle": "The 99 Beautiful Names of Allah",
+    "heroDescription": "Organised by Maturidi/Hanafi taxonomy — Sifat al-Dhat, Sifat al-Ma'ani, and Sifat al-Af'al. Click any name to explore its verses.",
+    "footer": "Names grounded in Maturidi/Hanafi tradition · verses powered by Claude",
+    "allNames": "All Names",
+    "allNinetyNine": "All 99",
+    "ofNinetyNine": "#{id} of 99",
+    "root": "Root: {root}",
+    "versesHeading": "Verses of this Name",
+    "reflectionLabel": "Believer's Reflection",
+    "pairingsLabel": "Common Pairings",
+    "couldNotLoadVerses": "Could not load verses at this time.",
+    "findingVerses": "Claude is finding verses…",
+    "noVersesFound": "No verses found for this name.",
+    "connectionLabel": "Connection: ",
+    "mapOnCanvas": "Map on Canvas →"
+  },
+  "errors": {
+    "routeFailedTitle": "This page failed to load",
+    "routeFailedBody": "An unexpected error interrupted this section. You can try again, or go back.",
+    "refPrefix": "ref: {digest}",
+    "tryAgain": "Try again",
+    "home": "Home",
+    "loading": "Loading…",
+    "rootTitle": "Something went wrong",
+    "rootBody": "An unexpected error interrupted this page. You can try again, or head back home.",
+    "todayVerseUnavailable": "Couldn't load today's verse right now. Please try again later."
   }
 }
