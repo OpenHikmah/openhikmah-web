@@ -19,7 +19,10 @@ export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
   const edition = await getQuranEdition();
-  const today = await getVerseOfDayWithReflection(undefined, edition).catch(() => null);
+  const today = await getVerseOfDayWithReflection(undefined, edition).catch((err) => {
+    console.error("Today: Verse of the Day load failed:", err);
+    return null;
+  });
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg">

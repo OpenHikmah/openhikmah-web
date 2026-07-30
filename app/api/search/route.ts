@@ -158,7 +158,7 @@ export async function GET(req: NextRequest) {
     const allowed = await consume(`search:${clientKey(req)}`);
     if (allowed) {
       try {
-        const matches = await searchByMeaning(q, SEMANTIC_RESULT_CAP);
+        const matches = await searchByMeaning(q, SEMANTIC_RESULT_CAP, edition);
         if (matches.length > 0) {
           const total = Math.min(SEMANTIC_RESULT_CAP, matches.length);
           const start = (page - 1) * pageSize;

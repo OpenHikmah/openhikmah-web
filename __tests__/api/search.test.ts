@@ -309,6 +309,13 @@ describe("GET /api/search", () => {
     expect(mockLogSearchQuery).not.toHaveBeenCalled();
   });
 
+  it("passes the caller's cookie-selected edition through to semantic search", async () => {
+    mockGetQuranEdition.mockResolvedValue("ru.kuliev");
+    mockSearchByMeaning.mockResolvedValueOnce([semanticMatch("94:5", "...")]);
+    await GET(makeMeaningReq("mercy"));
+    expect(mockSearchByMeaning).toHaveBeenCalledWith("mercy", 100, "ru.kuliev");
+  });
+
   it("resolves ref-format queries against the caller's cookie-selected edition", async () => {
     mockGetQuranEdition.mockResolvedValue("ru.kuliev");
     mockGetVerse.mockResolvedValueOnce(verse("2:255", "Аллах - нет божества, кроме Него."));

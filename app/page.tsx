@@ -30,7 +30,10 @@ export default async function Home({
   if (share) redirect(`/canvas?share=${encodeURIComponent(share)}`);
 
   const edition = await getQuranEdition();
-  const verse = await getVerseOfDay(undefined, edition).catch(() => null);
+  const verse = await getVerseOfDay(undefined, edition).catch((err) => {
+    console.error("Home: Verse of the Day load failed:", err);
+    return null;
+  });
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-bg">
