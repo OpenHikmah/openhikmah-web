@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
 import { STORIES, getStoryBySlug } from "@/lib/stories";
-import { getVerses } from "@/lib/quran/quran-corpus";
+import { resolveVerse } from "@/lib/quran/verse-resolver";
 import { getQuranEdition } from "@/lib/i18n/request-prefs";
 import { StoryVerseCard } from "./StoryVerseCard";
 import { OpenOnCanvasButton } from "./OpenOnCanvasButton";
@@ -40,7 +40,13 @@ export default async function StoryDetailPage({ params }: Props) {
 
   const allRefs = story.chapters.flatMap((c) => c.verseRefs);
   const edition = await getQuranEdition();
-  const verseMap = await getVerses(allRefs, edition);
+  // Per-ref resolveVerse (corpus first, live alquran.cloud fallback) rather than
+  // the batch getVerses — the corpus is seeded asynchronously and stories must
+  // still render before it's fully populated.
+  const resolved = await Promise.all(allRefs.map((ref) => resolveVerse(ref, edition)));
+  const verseMap = new Map<string, Verse>(
+    resolved.filter((v): v is Verse => v !== null).map((v) => [v.ref, v])
+  );
 
   return (
     <div className="min-h-screen bg-bg text-text-primary">
