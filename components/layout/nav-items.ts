@@ -1,7 +1,7 @@
 import {
   LayoutTemplate,
   Search,
-  BookOpen,
+  ScrollText,
   Sparkles,
   Bookmark,
   type LucideIcon,
@@ -22,7 +22,7 @@ export interface NavItem {
 export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/canvas", label: "Canvas", icon: LayoutTemplate },
   { href: "/search", label: "Search", icon: Search },
-  { href: "/stories", label: "Stories", icon: BookOpen },
+  { href: "/stories", label: "Stories", icon: ScrollText },
   { href: "/names", label: "Asma'ul Husna", icon: Sparkles },
   { href: "/bookmarks", label: "Bookmarks", icon: Bookmark, mobile: false },
 ] as const;
