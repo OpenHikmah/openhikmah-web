@@ -55,7 +55,6 @@ Rules:
 - Verse references must be real and accurate (format: surah:ayah, e.g. 2:255).
 - Each reason must be one concise sentence explaining the {{kind}} connection in classical Islamic terms.
 - Maintain strict Tanzih (divine transcendence). Avoid Tashbih (anthropomorphism).
-{{language}}
 - Return ONLY a valid JSON array. No prose, no markdown, no explanation outside the JSON.
 
 Output format:
@@ -65,13 +64,15 @@ Output format:
   { "ref": "surah:ayah", "reason": "one-sentence theological justification" }
 ]`;
 
-// Empty for English (the templates' own instructions are already in English).
-// Renders as a standalone rule bullet for any other locale — kept as a rule
-// among rules, not appended after the JSON-only instruction, so the model
-// doesn't mistake it for output-format guidance.
+// Empty for English. Appended AFTER the resolved template (fallback OR an
+// admin's prompt_versions override) rather than filled into a `{{language}}`
+// placeholder — an override created before this locale support existed has
+// no such placeholder, and renderTemplate silently drops unfilled ones, which
+// would silently keep generating English regardless of the requester's
+// locale. Appending guarantees the directive always reaches the model.
 function languageDirective(locale: Locale): string {
   if (locale === "en") return "";
-  return `- Write each "reason" in ${LOCALE_LANGUAGE_NAME[locale]}. Keep "ref" in "surah:ayah" format, and keep the Tanzih/Tashbih constraint above unchanged.`;
+  return `\n\nWrite each "reason" in ${LOCALE_LANGUAGE_NAME[locale]}. Keep "ref" in "surah:ayah" format, and keep the Tanzih/Tashbih constraint above unchanged.`;
 }
 
 async function buildPrompt(
@@ -82,14 +83,14 @@ async function buildPrompt(
   locale: Locale
 ): Promise<{ text: string; promptVersion: number | null }> {
   const { template, version } = await getPrompt("connection.legacy", LEGACY_FALLBACK_TEMPLATE);
-  const text = renderTemplate(template, {
-    fromRef,
-    arabicText,
-    translation,
-    task: KIND_INSTRUCTIONS[kind],
-    kind,
-    language: languageDirective(locale),
-  });
+  const text =
+    renderTemplate(template, {
+      fromRef,
+      arabicText,
+      translation,
+      task: KIND_INSTRUCTIONS[kind],
+      kind,
+    }) + languageDirective(locale);
   return { text, promptVersion: version };
 }
 
@@ -182,7 +183,6 @@ Rules:
 - Return at most 3, fewer if fewer are genuinely appropriate.
 - Each reason must be one concise sentence explaining the {{kind}} connection in classical Islamic terms.
 - Maintain strict Tanzih (divine transcendence). Avoid Tashbih (anthropomorphism).
-{{language}}
 - Return ONLY a valid JSON array. No prose, no markdown, no explanation outside the JSON.
 
 Output format:
@@ -203,15 +203,15 @@ async function buildSelectionPrompt(
     "connection.selection",
     SELECTION_FALLBACK_TEMPLATE
   );
-  const text = renderTemplate(template, {
-    fromRef,
-    arabicText,
-    translation,
-    task: KIND_SELECTION[kind],
-    candidates: list,
-    kind,
-    language: languageDirective(locale),
-  });
+  const text =
+    renderTemplate(template, {
+      fromRef,
+      arabicText,
+      translation,
+      task: KIND_SELECTION[kind],
+      candidates: list,
+      kind,
+    }) + languageDirective(locale);
   return { text, promptVersion: version };
 }
 

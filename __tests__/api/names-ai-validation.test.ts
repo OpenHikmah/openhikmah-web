@@ -227,4 +227,18 @@ describe("names AI routes — model output validation", () => {
     expect(translatePrompt).toMatch(/translate the following sentence into azerbaijani/i);
     expect(translatePrompt).toMatch(/strict tanzih/i);
   });
+
+  it("verses: an empty/failed translation falls back to the canonical English reason instead of blanking it", async () => {
+    withLocale("az");
+    mockVerseFetch();
+    mockCallAI
+      .mockResolvedValueOnce(JSON.stringify([{ ref: "2:255", reason: "Ayat al-Kursi." }]))
+      .mockResolvedValueOnce(""); // translation call returns nothing
+
+    const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body[0].reason).toBe("Ayat al-Kursi."); // canonical reason preserved, not blanked
+  });
 });

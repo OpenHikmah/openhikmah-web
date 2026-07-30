@@ -7,9 +7,9 @@ import type { Locale } from "@/lib/i18n/config";
  * Durable, write-once/read-many cache for the AI-generated 99-Names content
  * (verses, reflection, pairings). Replaces Next's `unstable_cache`, which is
  * wiped on every redeploy and so re-runs Claude for each name after each deploy.
- * Persisting to Postgres means each (name, kind) is generated at most once per
- * prompt `version` and served from the DB forever — the same pattern the
- * connection graph uses (see lib/graph-service.ts).
+ * Persisting to Postgres means each (slug, kind, locale) is generated at most
+ * once per prompt `version` and served from the DB forever — the same pattern
+ * the connection graph uses (see lib/graph-service.ts).
  */
 
 export type { NameContentKind };

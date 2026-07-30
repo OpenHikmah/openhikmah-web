@@ -224,17 +224,42 @@ async function getVersesBySlug(
   // Localize only the per-verse reason text (a translation of the canonical
   // English reason, cached in name_verse_reasons) — the verse list itself
   // stays exactly as selected above, so it never differs by locale.
+  //
+  // The translation batch below shares ONE rate-limit charge, not one per
+  // verse — without this guard, Promise.all would call onBeforeGenerate once
+  // per uncached verse (up to 5), burning a non-English client's budget
+  // several times faster than an English client's for the same page load. A
+  // request can still consume up to 2 total (this shared charge plus the
+  // canonical-selection charge above), matching "one charge per distinct
+  // generation effort" — selecting verses and translating reasons are two
+  // separate AI-generation events, same as reflection/pairings each charging
+  // once for their one event.
+  let rateLimitChecked = false;
+  const onBeforeGenerateOnce = async () => {
+    if (rateLimitChecked) return;
+    rateLimitChecked = true;
+    await onBeforeGenerate();
+  };
+
   const language = LOCALE_LANGUAGE_NAME[locale];
   const localizedReasons = await Promise.all(
-    verses.map((v) =>
-      getOrGenerateVerseReason(
+    verses.map(async (v) => {
+      const translated = await getOrGenerateVerseReason(
         slug,
         v.ref,
         locale,
         () => translateReason(v.reason, language),
-        onBeforeGenerate
-      )
-    )
+        onBeforeGenerateOnce
+      );
+      // A blank/failed translation must never silently replace an
+      // already-generated, already-Tanzih-checked English reason — fall back
+      // to it and log, rather than serve empty text.
+      if (translated.trim() === "") {
+        console.error(`Name verses: empty translation for ${slug}/${v.ref}/${locale}`);
+        return v.reason;
+      }
+      return translated;
+    })
   );
   return verses.map((v, i) => ({ ...v, reason: localizedReasons[i] }));
 }
