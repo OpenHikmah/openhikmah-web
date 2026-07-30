@@ -38,7 +38,12 @@ function makeDbChain(resolveWith: unknown[] = []) {
 vi.mock("@/lib/infra/db", () => ({
   db: {
     select: () => makeDbChain([]), // cache miss
-    insert: () => ({ values: () => ({ onConflictDoUpdate: async () => undefined }) }),
+    insert: () => ({
+      values: () => ({
+        onConflictDoUpdate: async () => undefined,
+        onConflictDoNothing: () => ({ returning: async () => [{ reason: "unused" }] }),
+      }),
+    }),
   },
 }));
 

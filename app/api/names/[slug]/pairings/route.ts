@@ -26,14 +26,14 @@ function buildPrompt(
   const languageLine =
     locale === "en"
       ? ""
-      : `\nWrite each "explanation" in ${LOCALE_LANGUAGE_NAME[locale]}. Keep "transliteration" and "arabic" as-is (do not translate names). Preserve the Tanzih framing implicit in classical Islamic terms.`;
+      : `\nWrite each "explanation" in ${LOCALE_LANGUAGE_NAME[locale]}. Keep "transliteration" and "arabic" as-is (do not translate names). Keep the Tanzih constraint above unchanged.`;
   return `You are a classical Islamic scholar (Maturidi/Hanafi tradition).
 
 The divine name ${transliteration} (${arabic}) means "${meaning}".
 
 Task: Identify 2–3 other divine names from the 99 Names that most frequently appear paired with ${transliteration} in the Quran. For each, explain in ONE sentence why this pairing provides perfect theological balance in the specific contexts where they appear together.
 
-Only include pairings where both names actually co-appear in the same verse or in closely related verses as documented in classical tafsir.${languageLine}
+Only include pairings where both names actually co-appear in the same verse or in closely related verses as documented in classical tafsir. Maintain strict Tanzih: never describe or imply physical form, spatial location, or resemblance to created things.${languageLine}
 
 Return ONLY a JSON array:
 [

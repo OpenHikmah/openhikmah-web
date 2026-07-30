@@ -25,7 +25,12 @@ function makeSelectChain(resolveWith: unknown[]) {
 const { mockSelect, mockInsert, mockValues, mockOnConflict, mockOnConflictDoNothing } = vi.hoisted(
   () => {
     const mockOnConflict = vi.fn().mockResolvedValue(undefined);
-    const mockOnConflictDoNothing = vi.fn().mockResolvedValue(undefined);
+    // Default: the insert "wins" (no conflict) — `.returning()` yields a
+    // non-empty array. Tests that simulate a losing conflict override this
+    // to resolve `.returning()` to `[]`.
+    const mockOnConflictDoNothing = vi.fn(() => ({
+      returning: vi.fn().mockResolvedValue([{ reason: "unused" }]),
+    }));
     const mockValues = vi.fn((..._args: unknown[]) => ({
       onConflictDoUpdate: mockOnConflict,
       onConflictDoNothing: mockOnConflictDoNothing,
@@ -315,6 +320,20 @@ describe("getOrGenerateVerseReason", () => {
 
     expect(out).toBe("");
     expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("when another process wins the insert race, returns the persisted (stored) translation, not the local one", async () => {
+    // First select (cache check): miss. Second select (post-conflict re-read,
+    // triggered by an empty .returning()): the other writer's stored value.
+    mockSelect
+      .mockReturnValueOnce(makeSelectChain([]))
+      .mockReturnValueOnce(makeSelectChain([{ reason: "diğer işlemin çevirisi" }]));
+    mockOnConflictDoNothing.mockReturnValueOnce({ returning: vi.fn().mockResolvedValue([]) });
+    const generate = vi.fn().mockResolvedValue("bu işlemin çevirisi");
+
+    const out = await getOrGenerateVerseReason("ar-rahman", "2:255", "tr", generate);
+
+    expect(out).toBe("diğer işlemin çevirisi");
   });
 
   it("calls onBeforeGenerate on a miss, before generate", async () => {

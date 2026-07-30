@@ -157,16 +157,36 @@ export async function getOrGenerateVerseReason(
 
   const work = (async () => {
     const reason = await generate();
-    if (reason.trim() !== "") {
-      const model = process.env.ANTHROPIC_MODEL ?? null;
-      try {
-        await db
-          .insert(nameVerseReasons)
-          .values({ slug, ref, locale, reason, model })
-          .onConflictDoNothing();
-      } catch (err) {
-        console.error("Failed to persist name_verse_reasons:", err);
+    if (reason.trim() === "") return reason;
+
+    const model = process.env.ANTHROPIC_MODEL ?? null;
+    try {
+      // `reasonInFlight` only coalesces callers within this process — a
+      // concurrent request on another instance can win the same (slug, ref,
+      // locale) row first. RETURNING is empty exactly when DO NOTHING
+      // discarded our insert; re-read in that case so this call returns the
+      // translation that's actually persisted, not the one that lost.
+      const inserted = await db
+        .insert(nameVerseReasons)
+        .values({ slug, ref, locale, reason, model })
+        .onConflictDoNothing()
+        .returning({ reason: nameVerseReasons.reason });
+      if (inserted.length === 0) {
+        const [existing] = await db
+          .select({ reason: nameVerseReasons.reason })
+          .from(nameVerseReasons)
+          .where(
+            and(
+              eq(nameVerseReasons.slug, slug),
+              eq(nameVerseReasons.ref, ref),
+              eq(nameVerseReasons.locale, locale)
+            )
+          )
+          .limit(1);
+        if (existing) return existing.reason;
       }
+    } catch (err) {
+      console.error("Failed to persist name_verse_reasons:", err);
     }
     return reason;
   })();

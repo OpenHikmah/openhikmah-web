@@ -41,7 +41,7 @@ vi.mock("@/lib/infra/db", () => ({
     insert: () => ({
       values: () => ({
         onConflictDoUpdate: async () => undefined,
-        onConflictDoNothing: async () => undefined,
+        onConflictDoNothing: () => ({ returning: async () => [{ reason: "unused" }] }),
       }),
     }),
   },

@@ -39,7 +39,12 @@ vi.mock("next/headers", () => ({ cookies: mockCookies }));
 vi.mock("@/lib/infra/db", () => ({
   db: {
     select: () => makeSelectChain([]), // durable cache always misses
-    insert: () => ({ values: () => ({ onConflictDoUpdate: async () => undefined }) }),
+    insert: () => ({
+      values: () => ({
+        onConflictDoUpdate: async () => undefined,
+        onConflictDoNothing: () => ({ returning: async () => [{ reason: "unused" }] }),
+      }),
+    }),
   },
 }));
 
