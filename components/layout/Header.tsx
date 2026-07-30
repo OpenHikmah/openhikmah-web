@@ -14,6 +14,7 @@ import {
   Check,
   AlertCircle,
 } from "lucide-react";
+import { useTranslations, useFormatter } from "next-intl";
 import { useCanvasStore, serializeCanvas } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
@@ -34,6 +35,7 @@ import { AccountMenu } from "./AccountMenu";
 import { Wordmark } from "./Wordmark";
 import { HeaderNavLinks } from "./HeaderNavLinks";
 import { LanguagePopover } from "./LanguagePopover";
+import { CANVAS_LEGEND_ITEMS } from "@/components/canvas/CanvasLegend";
 
 interface HeaderProps {
   onSearchOpen: () => void;
@@ -69,12 +71,6 @@ const BarButton = forwardRef<
   );
 });
 
-const LEGEND_ITEMS: Array<{ label: string; className: string }> = [
-  { label: "Theme", className: "bg-theme-edge" },
-  { label: "Root", className: "bg-root-edge" },
-  { label: "Contrast", className: "bg-contrast-edge" },
-];
-
 /** The mobile bar's overflow — export, save (signed-in only), and the edge-color
  * legend, none of which fit as a first-class bottom-bar button on a phone screen. */
 function MoreSheet({
@@ -101,6 +97,7 @@ function MoreSheet({
    *  mousedown-driven close runs before the button's own click-toggle handler). */
   triggerRef: React.RefObject<HTMLElement | null>;
 }) {
+  const t = useTranslations("canvas");
   const sheetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -140,12 +137,12 @@ function MoreSheet({
           )}
           <span className={cn("text-sm font-medium text-text-primary", saveError && "text-error")}>
             {saving
-              ? "Saving…"
+              ? t("saving")
               : saved
-                ? "Saved"
+                ? t("saved")
                 : saveError
-                  ? "Save failed — try again"
-                  : "Save workspace"}
+                  ? t("saveFailedRetry")
+                  : t("saveWorkspace")}
           </span>
         </button>
       )}
@@ -155,7 +152,7 @@ function MoreSheet({
         className="flex w-full items-center gap-2.5 px-4 py-3 text-left disabled:opacity-40"
       >
         <ImageIcon className="h-4 w-4 shrink-0 text-text-muted" />
-        <span className="text-sm font-medium text-text-primary">Export as PNG</span>
+        <span className="text-sm font-medium text-text-primary">{t("exportAsPng")}</span>
       </button>
       <button
         onClick={() => onExport("pdf")}
@@ -163,13 +160,13 @@ function MoreSheet({
         className="flex w-full items-center gap-2.5 px-4 py-3 text-left disabled:opacity-40"
       >
         <FileText className="h-4 w-4 shrink-0 text-text-muted" />
-        <span className="text-sm font-medium text-text-primary">Export as PDF</span>
+        <span className="text-sm font-medium text-text-primary">{t("exportAsPdf")}</span>
       </button>
       <div className="flex items-center gap-3 border-t border-border-subtle px-4 py-3">
-        {LEGEND_ITEMS.map((item) => (
-          <div key={item.label} className="flex items-center gap-1.5">
+        {CANVAS_LEGEND_ITEMS.map((item) => (
+          <div key={item.key} className="flex items-center gap-1.5">
             <span className={`h-0.5 w-3.5 rounded-full ${item.className}`} />
-            <span className="text-[11px] text-text-secondary">{item.label}</span>
+            <span className="text-[11px] text-text-secondary">{t(item.key)}</span>
           </div>
         ))}
       </div>
@@ -178,6 +175,8 @@ function MoreSheet({
 }
 
 export function Header({ onSearchOpen }: HeaderProps) {
+  const t = useTranslations("canvas");
+  const format = useFormatter();
   const { copied, copy } = useCopyFeedback();
   const [sharing, setSharing] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -310,8 +309,8 @@ export function Header({ onSearchOpen }: HeaderProps) {
     setSaving(true);
     try {
       const count = nodes.length;
-      const date = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      const name = `${count} verse${count === 1 ? "" : "s"} — ${date}`;
+      const date = format.dateTime(new Date(), { month: "short", day: "numeric" });
+      const name = t("workspaceName", { count, date });
       const res = await fetch("/api/workspace", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
@@ -365,17 +364,17 @@ export function Header({ onSearchOpen }: HeaderProps) {
             />
           )}
           <div className="fixed inset-x-0 bottom-0 z-40 flex md:hidden bg-surface/95 backdrop-blur border-t border-border pb-[env(safe-area-inset-bottom)]">
-            <BarButton icon={<Search />} label="Search" onClick={onSearchOpen} />
-            <BarButton icon={<Maximize2 />} label="Fit" onClick={requestFit} />
+            <BarButton icon={<Search />} label={t("toolbarSearch")} onClick={onSearchOpen} />
+            <BarButton icon={<Maximize2 />} label={t("fit")} onClick={requestFit} />
             <BarButton
               icon={<ListMusic />}
-              label={audioCurrentRef ? "Stop" : "Play all"}
+              label={audioCurrentRef ? t("stop") : t("playAll")}
               onClick={handlePlayGraph}
               active={!!audioCurrentRef}
             />
             <BarButton
               icon={<Share2 />}
-              label={sharing ? "…" : copied ? "Copied" : "Share"}
+              label={sharing ? t("sharing") : copied ? t("copied") : t("share")}
               onClick={handleShare}
               disabled={sharing}
               active={copied}
@@ -383,11 +382,11 @@ export function Header({ onSearchOpen }: HeaderProps) {
             <BarButton
               ref={moreButtonRef}
               icon={exportError ? <RotateCcw /> : <MoreHorizontal />}
-              label={exportError ? "Failed" : "More"}
+              label={exportError ? t("shareFailed") : t("more")}
               onClick={() => setMoreOpen((v) => !v)}
               active={moreOpen}
             />
-            <BarButton icon={<RotateCcw />} label="Clear" onClick={reset} danger />
+            <BarButton icon={<RotateCcw />} label={t("clear")} onClick={reset} danger />
           </div>
         </>
       )}

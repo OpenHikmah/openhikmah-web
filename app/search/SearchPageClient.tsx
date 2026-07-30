@@ -4,11 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Search, Network, Heart, BookOpen } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
 import { SearchModeToggle, type SearchMode } from "@/components/search/SearchModeToggle";
 import { Card, Input, IconButton, Tooltip, Pagination, buttonVariants } from "@/components/ui";
 import { useAuthStore } from "@/store/auth";
+import { usePreferencesStore } from "@/store/preferences";
 import { cn } from "@/lib/utils";
 import type { SearchResponse, SearchResult } from "@/types/quran";
 
@@ -16,6 +18,7 @@ const PAGE_SIZE = 20;
 
 // Curated starting points for the empty state — natural-language topics search
 // best in "meaning" mode, so chips navigate there rather than defaulting to Keyword.
+// Kept untranslated, same convention as SearchDialog's SEED_VERSES.
 const EXAMPLE_SEARCHES = [
   "2:255 — Ayat al-Kursi",
   "Patience",
@@ -31,6 +34,8 @@ function buildHref(q: string, mode: SearchMode, page: number) {
 }
 
 export function SearchPageClient() {
+  const t = useTranslations("search");
+  const uiLocale = usePreferencesStore((s) => s.uiLocale);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -140,12 +145,8 @@ export function SearchPageClient() {
           <Input
             value={inputValue}
             onChange={(e) => onInputChange(e.target.value)}
-            aria-label="Search verses"
-            placeholder={
-              mode === "meaning"
-                ? "Describe a meaning, e.g. trusting God in hardship…"
-                : "Search topics, or enter a ref like 2:255…"
-            }
+            aria-label={t("searchVersesAria")}
+            placeholder={mode === "meaning" ? t("placeholderMeaning") : t("placeholderKeyword")}
             className="flex-1"
           />
         </div>
@@ -154,7 +155,7 @@ export function SearchPageClient() {
         {!q.trim() ? (
           <div className="py-16 text-center">
             <Search className="mx-auto mb-4 h-8 w-8 text-text-muted/40" />
-            <p className="mb-6 text-sm text-text-muted">Enter a search term to get started.</p>
+            <p className="mb-6 text-sm text-text-muted">{t("enterSearchTerm")}</p>
             <div className="mx-auto flex max-w-md flex-wrap justify-center gap-2">
               {EXAMPLE_SEARCHES.map((example) => {
                 // Ref-shaped examples (e.g. "2:255 — Ayat al-Kursi") search fine in either
@@ -189,17 +190,17 @@ export function SearchPageClient() {
           </div>
         ) : error ? (
           <div className="py-20 text-center">
-            <p className="text-sm text-text-muted">Something went wrong. Try again.</p>
+            <p className="text-sm text-text-muted">{t("somethingWentWrong")}</p>
           </div>
         ) : !data || data.results.length === 0 ? (
           <div className="py-20 text-center">
             <BookOpen className="mx-auto mb-4 h-8 w-8 text-text-muted/40" />
             <p className="text-sm text-text-muted">
               {keywordUnavailable
-                ? "Search is temporarily unavailable."
+                ? t("searchUnavailable")
                 : mode === "meaning"
-                  ? "No verses matched that meaning."
-                  : "No exact matches."}
+                  ? t("noMeaningMatches")
+                  : t("noExactMatches")}
             </p>
             {keywordUnavailable ? (
               <button
@@ -207,7 +208,7 @@ export function SearchPageClient() {
                 onClick={() => setRetryCount((c) => c + 1)}
                 className="mt-3 text-sm text-teal-bright hover:underline"
               >
-                Try again →
+                {t("tryAgain")}
               </button>
             ) : (
               mode === "keyword" && (
@@ -216,7 +217,7 @@ export function SearchPageClient() {
                   onClick={() => navigate(q, "meaning", 1)}
                   className="mt-3 text-sm text-teal-bright hover:underline"
                 >
-                  Try &ldquo;By meaning&rdquo; search instead →
+                  {t("tryByMeaning")}
                 </button>
               )
             )}
@@ -224,14 +225,13 @@ export function SearchPageClient() {
         ) : (
           <>
             <p className="mb-4 text-sm text-text-muted">
-              Showing <span className="font-medium text-text-primary">{data.total}</span> result
-              {data.total === 1 ? "" : "s"} for &ldquo;{q}&rdquo;
+              {t("showingResults", { count: data.total, query: q })}
             </p>
             {fellBackToKeyword && (
-              <p className="mb-4 text-xs text-text-muted">
-                Meaning-based results aren&rsquo;t ready for this query yet — showing keyword
-                matches instead.
-              </p>
+              <p className="mb-4 text-xs text-text-muted">{t("meaningFallbackNotice")}</p>
+            )}
+            {uiLocale !== "en" && (
+              <p className="mb-4 text-xs text-text-muted">{t("nonEnglishHint")}</p>
             )}
             <div className="space-y-3">
               {data.results.map((result) => (
@@ -252,6 +252,8 @@ export function SearchPageClient() {
 }
 
 function ResultCard({ result }: { result: SearchResult }) {
+  const t = useTranslations("common");
+  const tSearch = useTranslations("search");
   const accessToken = useAuthStore((s) => s.accessToken);
   const isBookmarked = useAuthStore((s) => s.isBookmarked(result.ref));
   const toggleBookmark = useAuthStore((s) => s.toggleBookmark);
@@ -267,12 +269,12 @@ function ResultCard({ result }: { result: SearchResult }) {
         </div>
         <div className="flex items-center gap-2">
           {accessToken && (
-            <Tooltip label={isBookmarked ? "Remove bookmark" : "Bookmark verse"}>
+            <Tooltip label={isBookmarked ? t("removeBookmark") : t("bookmarkVerse")}>
               <IconButton
                 tone="gold"
                 size="xs"
                 onClick={() => toggleBookmark(result.ref)}
-                aria-label={isBookmarked ? "Remove bookmark" : "Bookmark verse"}
+                aria-label={isBookmarked ? t("removeBookmark") : t("bookmarkVerse")}
                 className={cn(isBookmarked && "border-gold-muted text-gold")}
               >
                 <Heart fill={isBookmarked ? "currentColor" : "none"} />
@@ -284,7 +286,7 @@ function ResultCard({ result }: { result: SearchResult }) {
             className={buttonVariants({ variant: "primary", size: "sm" })}
           >
             <Network className="w-3.5 h-3.5" />
-            Map on Canvas
+            {tSearch("mapOnCanvas")}
           </Link>
         </div>
       </div>

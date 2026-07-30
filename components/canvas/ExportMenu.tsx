@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState } from "react";
 import { FocusScope } from "@radix-ui/react-focus-scope";
 import { Image as ImageIcon, FileText } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface ExportMenuProps {
   onSelect: (format: "png" | "pdf") => void;
@@ -11,15 +12,16 @@ interface ExportMenuProps {
 
 const OPTIONS: Array<{
   format: "png" | "pdf";
-  label: string;
-  description: string;
+  labelKey: "exportPng" | "exportPdf";
+  descriptionKey: "exportPngDescription" | "exportPdfDescription";
   icon: typeof ImageIcon;
 }> = [
-  { format: "png", label: "PNG", description: "Image, current theme background", icon: ImageIcon },
-  { format: "pdf", label: "PDF", description: "Single-page document", icon: FileText },
+  { format: "png", labelKey: "exportPng", descriptionKey: "exportPngDescription", icon: ImageIcon },
+  { format: "pdf", labelKey: "exportPdf", descriptionKey: "exportPdfDescription", icon: FileText },
 ];
 
 export function ExportMenu({ onSelect, onClose }: ExportMenuProps) {
+  const t = useTranslations("canvas");
   const menuRef = useRef<HTMLDivElement>(null);
   const [openUp, setOpenUp] = useState(false);
 
@@ -62,8 +64,8 @@ export function ExportMenu({ onSelect, onClose }: ExportMenuProps) {
             >
               <opt.icon className="h-4 w-4 shrink-0 text-text-muted" />
               <div className="min-w-0">
-                <p className="text-xs font-medium text-text-primary">{opt.label}</p>
-                <p className="text-xs text-text-muted">{opt.description}</p>
+                <p className="text-xs font-medium text-text-primary">{t(opt.labelKey)}</p>
+                <p className="text-xs text-text-muted">{t(opt.descriptionKey)}</p>
               </div>
             </button>
           ))}

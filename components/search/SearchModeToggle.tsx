@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 // Keyword → Quran.com text search. Meaning → semantic (embedding) search over the
@@ -14,6 +15,8 @@ interface SearchModeToggleProps {
 }
 
 export function SearchModeToggle({ mode, onChange, className }: SearchModeToggleProps) {
+  const t = useTranslations("search");
+
   return (
     <div className={cn("flex items-center gap-1.5", className)}>
       {(["keyword", "meaning"] as SearchMode[]).map((m) => (
@@ -27,11 +30,11 @@ export function SearchModeToggle({ mode, onChange, className }: SearchModeToggle
             mode === m ? "bg-teal/15 text-teal-bright" : "text-text-muted hover:text-text-secondary"
           )}
         >
-          {m === "keyword" ? "Keyword" : "By meaning"}
+          {m === "keyword" ? t("keyword") : t("byMeaning")}
         </button>
       ))}
       {mode === "meaning" && (
-        <span className="ml-auto text-[10px] text-text-muted">semantic · finds related ideas</span>
+        <span className="ml-auto text-[10px] text-text-muted">{t("semanticHint")}</span>
       )}
     </div>
   );

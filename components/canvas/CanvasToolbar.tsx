@@ -15,6 +15,7 @@ import {
   Download,
 } from "lucide-react";
 import { Panel, useReactFlow } from "@xyflow/react";
+import { useTranslations, useFormatter } from "next-intl";
 import { cn } from "@/lib/utils";
 import { useCanvasStore, serializeCanvas } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
@@ -67,6 +68,8 @@ function ToolbarBtn({
 const divider = <span className="mx-0.5 h-4 w-px shrink-0 bg-border" />;
 
 export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
+  const t = useTranslations("canvas");
+  const format = useFormatter();
   const reactFlow = useReactFlow();
   const { copied, copy } = useCopyFeedback();
 
@@ -125,8 +128,8 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
     setSaving(true);
     try {
       const count = nodes.length;
-      const date = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      const name = `${count} verse${count === 1 ? "" : "s"} — ${date}`;
+      const date = format.dateTime(new Date(), { month: "short", day: "numeric" });
+      const name = t("workspaceName", { count, date });
       const res = await fetch("/api/workspace", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
@@ -206,7 +209,7 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
             is populated (the global header search was removed). See issue #75. */}
         <ToolbarBtn onClick={onSearchOpen} className="text-gold hover:bg-gold/10 hover:text-gold">
           <Search className="h-3.5 w-3.5" />
-          Search
+          {t("toolbarSearch")}
           <kbd className="ml-0.5 rounded bg-gold/10 px-1 font-mono text-[10px] text-text-muted">
             ⌘K
           </kbd>
@@ -229,7 +232,7 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
           ) : (
             <Share2 className="h-3.5 w-3.5" />
           )}
-          {copied ? "Copied" : shareError ? "Failed" : "Share"}
+          {copied ? t("copied") : shareError ? t("shareFailed") : t("share")}
         </ToolbarBtn>
 
         {accessToken ? (
@@ -246,7 +249,7 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
             ) : (
               <Save className="h-3.5 w-3.5" />
             )}
-            {saving ? "Saving…" : saved ? "Saved" : saveError ? "Failed" : "Save"}
+            {saving ? t("saving") : saved ? t("saved") : saveError ? t("saveFailed") : t("save")}
           </ToolbarBtn>
         ) : (
           // Don't silently hide Save when signed out — offer the way to enable it.
@@ -256,7 +259,7 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
             ) : (
               <LogIn className="h-3.5 w-3.5" />
             )}
-            Sign in to save
+            {t("signInToSave")}
           </ToolbarBtn>
         )}
 
@@ -274,7 +277,7 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
             ) : (
               <Download className="h-3.5 w-3.5" />
             )}
-            {exporting ? "Exporting…" : exportError ? "Failed" : "Export"}
+            {exporting ? t("exporting") : exportError ? t("exportFailed") : t("export")}
           </ToolbarBtn>
           {exportMenuOpen && (
             <ExportMenu onSelect={handleExport} onClose={() => setExportMenuOpen(false)} />
@@ -283,19 +286,19 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
 
         <ToolbarBtn onClick={() => reactFlow.fitView({ padding: 0.35, maxZoom: 1, duration: 400 })}>
           <Maximize2 className="h-3.5 w-3.5" />
-          Fit
+          {t("fit")}
         </ToolbarBtn>
 
         <ToolbarBtn onClick={handlePlay} active={!!currentRef}>
           <ListMusic className="h-3.5 w-3.5" />
-          {currentRef ? "Stop" : "Play"}
+          {currentRef ? t("stop") : t("play")}
         </ToolbarBtn>
 
         {divider}
 
         <ToolbarBtn onClick={reset} danger>
           <RotateCcw className="h-3.5 w-3.5" />
-          Clear
+          {t("clear")}
         </ToolbarBtn>
       </div>
     </Panel>
