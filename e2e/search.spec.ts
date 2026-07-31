@@ -15,7 +15,9 @@ test.describe("search page", () => {
     await page.goto("/search");
 
     await page.getByPlaceholder(/search topics/i).fill("mercy");
-    await expect(page.getByText(/showing \d+ results? for/i)).toBeVisible({ timeout: 15000 });
+    // The result count is locale-formatted (thousands separators), so match
+    // digits/separators loosely rather than assuming a bare number.
+    await expect(page.getByText(/showing [\d,.]+ results? for/i)).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole("link", { name: /map on canvas/i }).first()).toBeVisible();
   });
 

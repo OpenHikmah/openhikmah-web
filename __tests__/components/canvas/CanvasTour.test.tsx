@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { screen, fireEvent, act } from "@testing-library/react";
+import { renderWithIntl } from "../../test-utils/render-with-intl";
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { CanvasTour } from "@/components/canvas/CanvasTour";
 
@@ -8,14 +9,14 @@ beforeEach(() => {
 
 describe("CanvasTour", () => {
   it("focuses the primary action (not the dismiss button) when it appears", async () => {
-    render(<CanvasTour />);
+    renderWithIntl(<CanvasTour />);
     await vi.waitFor(() => {
       expect(screen.getByRole("button", { name: "Next" })).toBe(document.activeElement);
     });
   });
 
   it("traps Tab within the card, wrapping from the last control back to the first", async () => {
-    render(<CanvasTour />);
+    renderWithIntl(<CanvasTour />);
     const primary = await screen.findByRole("button", { name: "Next" });
     const dismiss = screen.getByRole("button", { name: "Dismiss tour" });
 
@@ -37,7 +38,7 @@ describe("CanvasTour", () => {
       outside.focus();
     });
 
-    render(<CanvasTour />);
+    renderWithIntl(<CanvasTour />);
     await screen.findByRole("button", { name: "Next" });
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss tour" }));

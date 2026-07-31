@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callAI } from "@/lib/ai/ai";
 import { getNameBySlug } from "@/lib/names/divine-names";
-import { getSurahName } from "@/lib/quran/surah-names";
 import { isValidRef } from "@/lib/quran/quran-corpus";
-import { getOrGenerateNameContent } from "@/lib/names/name-content";
+import { resolveVerse } from "@/lib/quran/verse-resolver";
+import { getOrGenerateNameContent, getOrGenerateVerseReason } from "@/lib/names/name-content";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import { incr } from "@/lib/infra/metrics";
+import { getUiLocale } from "@/lib/i18n/request-prefs";
+import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
 import sanitizeHtml from "sanitize-html";
 import type { VerseRef } from "@/types/quran";
 
@@ -26,37 +28,15 @@ interface NameVerse {
 
 async function fetchVerseData(ref: string): Promise<Omit<NameVerse, "reason"> | null> {
   if (!isValidRef(ref)) return null;
-  const [surahStr, ayahStr] = ref.split(":");
-  const surahNum = parseInt(surahStr, 10);
-  const ayahNum = parseInt(ayahStr, 10);
-
-  try {
-    const [arabicRes, translationRes] = await Promise.all([
-      fetch(`https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/ar.alafasy`),
-      fetch(`https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/en.sahih`),
-    ]);
-    if (!arabicRes.ok || !translationRes.ok) return null;
-    const [arabicData, translationData] = await Promise.all([
-      arabicRes.json(),
-      translationRes.json(),
-    ]);
-    const [surahName, surahNameArabic] = getSurahName(surahNum);
-    return {
-      ref: ref as VerseRef,
-      surah: surahNum,
-      ayah: ayahNum,
-      arabicText: arabicData.data.text,
-      translation: translationData.data.text,
-      surahName,
-      surahNameArabic,
-    };
-  } catch (err) {
-    // An upstream outage must not look identical to "no verse data" —
-    // log and count it so it's visible on /api/metrics, not silent.
-    console.error(`Name verses: alquran.cloud fetch failed for ${ref}:`, err);
+  const verse = await resolveVerse(ref);
+  if (!verse) {
+    // resolveVerse already logs the underlying corpus/live-fetch failure —
+    // this just keeps the metric so an upstream outage stays visible on
+    // /api/metrics, not silent.
     incr("quran_api_fetch_error");
     return null;
   }
+  return verse;
 }
 
 // Search quran.com for verses containing this name's Arabic text
@@ -162,16 +142,31 @@ function stripHtml(text: string): string {
   return sanitizeHtml(text, { allowedTags: [], allowedAttributes: {} });
 }
 
+// Translates (not re-derives) a verse's canonical English `reason` into the
+// target language, so the underlying theological justification stays exactly
+// what was already generated and validated in English.
+async function translateReason(reason: string, language: string): Promise<string> {
+  const prompt = `Translate the following sentence into ${language}. Preserve its meaning exactly — do not add, remove, or alter any theological claim, and maintain strict Tanzih (divine transcendence). Return ONLY the translated sentence, with no quotation marks, labels, or explanation.
+
+Sentence: "${reason}"`;
+  const translated = await callAI(prompt);
+  return translated.trim();
+}
+
 async function getVersesBySlug(
   slug: string,
+  locale: Locale,
   onBeforeGenerate: () => Promise<void>
 ): Promise<NameVerse[]> {
   const name = getNameBySlug(slug);
   if (!name) return [];
 
-  return getOrGenerateNameContent(
+  const verses = await getOrGenerateNameContent(
     slug,
     "verses",
+    // Verse selection is always cached/generated as "en" regardless of the
+    // requester's locale — see name_verse_reasons below for why.
+    "en",
     VERSES_VERSION,
     async (): Promise<NameVerse[]> => {
       // Try actual quran.com search first
@@ -223,6 +218,50 @@ async function getVersesBySlug(
     (v) => v.length === 0,
     onBeforeGenerate
   );
+
+  if (locale === "en" || verses.length === 0) return verses;
+
+  // Localize only the per-verse reason text (a translation of the canonical
+  // English reason, cached in name_verse_reasons) — the verse list itself
+  // stays exactly as selected above, so it never differs by locale.
+  //
+  // The translation batch below shares ONE rate-limit charge, not one per
+  // verse — without this guard, Promise.all would call onBeforeGenerate once
+  // per uncached verse (up to 5), burning a non-English client's budget
+  // several times faster than an English client's for the same page load. A
+  // request can still consume up to 2 total (this shared charge plus the
+  // canonical-selection charge above), matching "one charge per distinct
+  // generation effort" — selecting verses and translating reasons are two
+  // separate AI-generation events, same as reflection/pairings each charging
+  // once for their one event.
+  let rateLimitChecked = false;
+  const onBeforeGenerateOnce = async () => {
+    if (rateLimitChecked) return;
+    rateLimitChecked = true;
+    await onBeforeGenerate();
+  };
+
+  const language = LOCALE_LANGUAGE_NAME[locale];
+  const localizedReasons = await Promise.all(
+    verses.map(async (v) => {
+      const translated = await getOrGenerateVerseReason(
+        slug,
+        v.ref,
+        locale,
+        () => translateReason(v.reason, language),
+        onBeforeGenerateOnce
+      );
+      // A blank/failed translation must never silently replace an
+      // already-generated, already-Tanzih-checked English reason — fall back
+      // to it and log, rather than serve empty text.
+      if (translated.trim() === "") {
+        console.error(`Name verses: empty translation for ${slug}/${v.ref}/${locale}`);
+        return v.reason;
+      }
+      return translated;
+    })
+  );
+  return verses.map((v, i) => ({ ...v, reason: localizedReasons[i] }));
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
@@ -233,7 +272,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   }
 
   try {
-    const verses = await getVersesBySlug(slug, async () => {
+    const locale = await getUiLocale();
+    const verses = await getVersesBySlug(slug, locale, async () => {
       if (!(await consume(`names-gen:${clientKey(req)}`))) throw new RateLimitError();
     });
     return NextResponse.json(verses);

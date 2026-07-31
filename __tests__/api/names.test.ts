@@ -6,6 +6,12 @@ vi.mock("next/cache", () => ({
   unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
+// The routes now call getUiLocale() (lib/i18n/request-prefs.ts), which reads
+// next/headers' cookies() — unavailable outside a real Next request scope.
+// No cookie set here means it resolves to the "en" default, matching this
+// suite's pre-existing English-only fixtures/assertions.
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
+
 // The name routes now read/write a durable `name_content` cache via lib/infra/db
 // (see lib/names/name-content.ts). Mock the DB so the cache check is always a miss and
 // the persist is a no-op — the routes then exercise their real generation path.
@@ -32,7 +38,12 @@ function makeDbChain(resolveWith: unknown[] = []) {
 vi.mock("@/lib/infra/db", () => ({
   db: {
     select: () => makeDbChain([]), // cache miss
-    insert: () => ({ values: () => ({ onConflictDoUpdate: async () => undefined }) }),
+    insert: () => ({
+      values: () => ({
+        onConflictDoUpdate: async () => undefined,
+        onConflictDoNothing: () => ({ returning: async () => [{ reason: "unused" }] }),
+      }),
+    }),
   },
 }));
 

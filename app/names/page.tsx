@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { DIVINE_NAMES, CATEGORY_LABELS, type NameCategory } from "@/lib/names/divine-names";
+import { getTranslations } from "next-intl/server";
+import {
+  DIVINE_NAMES,
+  CATEGORY_LABELS,
+  CATEGORY_LABEL_KEYS,
+  type NameCategory,
+} from "@/lib/names/divine-names";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
 
@@ -29,7 +35,8 @@ const CATEGORY_COLORS: Record<NameCategory, { border: string; badge: string; dot
   },
 };
 
-export default function NamesPage() {
+export default async function NamesPage() {
+  const t = await getTranslations("names");
   const byCategory = CATEGORY_ORDER.map((cat) => ({
     cat,
     names: DIVINE_NAMES.filter((n) => n.category === cat),
@@ -45,26 +52,22 @@ export default function NamesPage() {
       {/* Hero */}
       <div className="px-6 pt-12 pb-10 text-center border-b border-border-subtle">
         <p className="text-xs uppercase tracking-[0.2em] font-mono mb-3 text-text-muted">
-          Asmaul Husna
+          {t("eyebrow")}
         </p>
         <h1 className="font-arabic text-5xl mb-2 text-gold">أَسْمَاءُ اللَّه الْحُسْنَى</h1>
-        <p className="text-2xl font-light mb-4 text-text-primary">
-          The 99 Beautiful Names of Allah
-        </p>
-        <p className="text-sm max-w-xl mx-auto text-text-secondary">
-          Organised by Maturidi/Hanafi taxonomy — Sifat al-Dhat, Sifat al-Ma&apos;ani, and Sifat
-          al-Af&apos;al. Click any name to explore its verses.
-        </p>
+        <p className="text-2xl font-light mb-4 text-text-primary">{t("heroTitle")}</p>
+        <p className="text-sm max-w-xl mx-auto text-text-secondary">{t("heroDescription")}</p>
 
         {/* Legend */}
         <div className="flex flex-wrap justify-center gap-4 mt-8">
           {CATEGORY_ORDER.map((cat) => {
             const label = CATEGORY_LABELS[cat];
+            const labelKeys = CATEGORY_LABEL_KEYS[cat];
             const colors = CATEGORY_COLORS[cat];
             return (
               <div key={cat} className="flex items-center gap-2 text-xs">
                 <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
-                <span className="text-text-secondary">{label.en}</span>
+                <span className="text-text-secondary">{t(labelKeys.label)}</span>
                 <span className="font-arabic text-sm text-text-muted">{label.ar}</span>
               </div>
             );
@@ -76,6 +79,7 @@ export default function NamesPage() {
       <div className="max-w-6xl mx-auto px-6 py-12 space-y-16">
         {byCategory.map(({ cat, names }) => {
           const label = CATEGORY_LABELS[cat];
+          const labelKeys = CATEGORY_LABEL_KEYS[cat];
           const colors = CATEGORY_COLORS[cat];
           return (
             <section key={cat}>
@@ -83,10 +87,10 @@ export default function NamesPage() {
               <div className="mb-6">
                 <div className="flex items-center gap-3 mb-2">
                   <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${colors.dot}`} />
-                  <h2 className="text-lg font-medium text-text-primary">{label.en}</h2>
+                  <h2 className="text-lg font-medium text-text-primary">{t(labelKeys.label)}</h2>
                   <span className="font-arabic text-xl text-text-secondary">{label.ar}</span>
                 </div>
-                <p className="text-xs pl-5 text-text-muted">{label.description}</p>
+                <p className="text-xs pl-5 text-text-muted">{t(labelKeys.description)}</p>
               </div>
 
               {/* Grid */}
@@ -121,7 +125,7 @@ export default function NamesPage() {
 
       {/* Footer */}
       <footer className="text-center py-6 text-xs border-t border-border-subtle text-text-muted">
-        Names grounded in Maturidi/Hanafi tradition · verses powered by Claude
+        {t("footer")}
       </footer>
     </div>
   );

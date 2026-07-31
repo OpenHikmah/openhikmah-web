@@ -129,7 +129,7 @@ describe("getConnections", () => {
     const out = await getConnections("1:1", "thematic", source);
 
     expect(mockGenerate).toHaveBeenCalledTimes(1);
-    expect(mockGenerate).toHaveBeenCalledWith("1:1", "ar", "tr", "thematic");
+    expect(mockGenerate).toHaveBeenCalledWith("1:1", "ar", "tr", "thematic", "en");
     expect(mockInsert).toHaveBeenCalledTimes(1);
     expect(mockValues).toHaveBeenCalledTimes(1);
     const persisted = mockValues.mock.calls[0][0] as Array<Record<string, unknown>>;
@@ -201,10 +201,14 @@ describe("getConnections", () => {
 
     expect(mockDiscover).toHaveBeenCalledWith("1:1", "thematic", undefined, []);
     expect(mockGenerateGrounded).toHaveBeenCalledTimes(1);
-    expect(mockGenerateGrounded).toHaveBeenCalledWith("1:1", "ar", "tr", "thematic", [
-      "2:255",
-      "3:18",
-    ]);
+    expect(mockGenerateGrounded).toHaveBeenCalledWith(
+      "1:1",
+      "ar",
+      "tr",
+      "thematic",
+      ["2:255", "3:18"],
+      "en"
+    );
     expect(mockGenerate).not.toHaveBeenCalled(); // legacy path skipped
     expect(out).toHaveLength(1);
     expect(mockInsert).toHaveBeenCalledTimes(1);
@@ -218,7 +222,7 @@ describe("getConnections", () => {
     const out = await getConnections("1:1", "root", source);
 
     expect(mockGenerateGrounded).not.toHaveBeenCalled();
-    expect(mockGenerate).toHaveBeenCalledWith("1:1", "ar", "tr", "root");
+    expect(mockGenerate).toHaveBeenCalledWith("1:1", "ar", "tr", "root", "en");
     expect(out).toHaveLength(1);
   });
 

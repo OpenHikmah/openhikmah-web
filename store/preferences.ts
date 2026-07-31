@@ -3,15 +3,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEFAULT_RECITER } from "@/lib/quran/audio";
+import { LOCALE_COOKIE, EDITION_COOKIE, type Locale } from "@/lib/i18n/config";
 
-// Locale/edition cookie names are duplicated (not imported) from
-// lib/i18n/config.ts intentionally — that module lands with the
-// multi-language epic and will re-export these same names; this store must
-// stand alone until then.
-export const LOCALE_COOKIE = "oh_locale";
-export const EDITION_COOKIE = "oh_edition";
-
-export type UiLocale = "en" | "tr" | "ru" | "az";
+export { LOCALE_COOKIE, EDITION_COOKIE };
+export type UiLocale = Locale;
 
 export interface CanvasPrefs {
   /** Whether the minimap panel renders on the canvas once nodes exist. */

@@ -6,6 +6,7 @@ import { discoverCandidates } from "@/lib/ai/connection-discovery";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { incr } from "@/lib/infra/metrics";
+import type { Locale } from "@/lib/i18n/config";
 import type { ConnectionResult, EdgeKind } from "@/types/quran";
 
 /**
@@ -37,6 +38,12 @@ interface GetConnectionsOptions {
    *  both the cache read and any fresh generation, so a repeat "get more"
    *  request surfaces genuinely new connections instead of the same set. */
   excludeRefs?: string[];
+  /** Language the reason text should be generated in on a cache MISS only.
+   *  The `connections` table has no locale column — a stored reason is served
+   *  to every later reader regardless of their locale (an accepted v1
+   *  limitation: whichever locale first triggers generation for a given
+   *  fromRef+kind "wins" the cached reason's language). Defaults to "en". */
+  locale?: Locale;
 }
 
 /** Hydrate stored edges (which carry only refs + reason) into full results. */
@@ -117,7 +124,7 @@ export async function getConnections(
   }
 
   incr("gen_started");
-  const work = generateAndPersist(fromRef, kind, source, excludeRefs);
+  const work = generateAndPersist(fromRef, kind, source, excludeRefs, options.locale ?? "en");
   inFlight.set(key, work);
   try {
     return await work;
@@ -137,7 +144,8 @@ async function generateAndPersist(
   fromRef: string,
   kind: EdgeKind,
   source: SourceVerse,
-  excludeRefs: string[] = []
+  excludeRefs: string[] = [],
+  locale: Locale = "en"
 ): Promise<ConnectionResult[]> {
   const candidates = await discoverCandidates(fromRef, kind, undefined, excludeRefs);
   // The legacy ungrounded path has no notion of excludeRefs — it would just
@@ -152,11 +160,12 @@ async function generateAndPersist(
           source.arabicText,
           source.translation,
           kind,
-          candidates
+          candidates,
+          locale
         )
       : excludeRefs.length > 0
         ? []
-        : await generateConnections(fromRef, source.arabicText, source.translation, kind);
+        : await generateConnections(fromRef, source.arabicText, source.translation, kind, locale);
 
   if (generated.length > 0) {
     const model = process.env.ANTHROPIC_MODEL ?? null;

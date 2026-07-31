@@ -1,6 +1,6 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
-import { verses, type VerseRow } from "@/lib/infra/db/schema";
+import { verses, verseTranslations, type VerseRow } from "@/lib/infra/db/schema";
 import { getSurahName } from "@/lib/quran/surah-names";
 import { SURAH_LENGTHS } from "@/lib/quran/audio";
 import type { Verse, VerseRef } from "@/types/quran";
@@ -9,16 +9,20 @@ import type { Verse, VerseRef } from "@/types/quran";
  * Local Quran corpus — reads verse data from the `verses` table instead of
  * fetching alquran.cloud / quran.com on every request. Seeded once by
  * `scripts/seed-quran.mjs`. Pure DB access: callers decide on any fallback.
+ *
+ * `edition` selects a row from `verse_translations`; `verses.translation`
+ * (the en.sahih column, present on every row) is the fallback whenever the
+ * requested edition has no row for that verse.
  */
 
-function rowToVerse(row: VerseRow): Verse {
+function rowToVerse(row: VerseRow, translationOverride?: string): Verse {
   const [surahName, surahNameArabic] = getSurahName(row.surah);
   return {
     surah: row.surah,
     ayah: row.ayah,
     ref: row.ref as VerseRef,
     arabicText: row.arabicText,
-    translation: row.translation,
+    translation: translationOverride ?? row.translation,
     surahName,
     surahNameArabic,
   };
@@ -37,17 +41,46 @@ export function isValidRef(ref: string): boolean {
   return surah >= 1 && surah <= 114 && ayah >= 1 && ayah <= SURAH_LENGTHS[surah - 1];
 }
 
-/** Returns the verse for a `"surah:ayah"` ref, or null if not in the corpus. */
-export async function getVerse(ref: string): Promise<Verse | null> {
-  const rows = await db.select().from(verses).where(eq(verses.ref, ref)).limit(1);
-  return rows[0] ? rowToVerse(rows[0]) : null;
+/**
+ * Returns the verse for a `"surah:ayah"` ref, or null if not in the corpus.
+ * `edition` (e.g. "tr.diyanet") selects a translation; omit for en.sahih.
+ */
+export async function getVerse(ref: string, edition?: string): Promise<Verse | null> {
+  if (!edition) {
+    const rows = await db.select().from(verses).where(eq(verses.ref, ref)).limit(1);
+    return rows[0] ? rowToVerse(rows[0]) : null;
+  }
+  const rows = await db
+    .select({ verse: verses, translationText: verseTranslations.text })
+    .from(verses)
+    .leftJoin(
+      verseTranslations,
+      and(eq(verseTranslations.ref, verses.ref), eq(verseTranslations.edition, edition))
+    )
+    .where(eq(verses.ref, ref))
+    .limit(1);
+  const row = rows[0];
+  return row ? rowToVerse(row.verse, row.translationText ?? undefined) : null;
 }
 
 /** Batch lookup. Returns a map keyed by ref; missing refs are simply absent. */
-export async function getVerses(refs: string[]): Promise<Map<string, Verse>> {
+export async function getVerses(refs: string[], edition?: string): Promise<Map<string, Verse>> {
   if (refs.length === 0) return new Map();
-  const rows = await db.select().from(verses).where(inArray(verses.ref, refs));
-  return new Map(rows.map((r) => [r.ref, rowToVerse(r)]));
+  if (!edition) {
+    const rows = await db.select().from(verses).where(inArray(verses.ref, refs));
+    return new Map(rows.map((r) => [r.ref, rowToVerse(r)]));
+  }
+  const rows = await db
+    .select({ verse: verses, translationText: verseTranslations.text })
+    .from(verses)
+    .leftJoin(
+      verseTranslations,
+      and(eq(verseTranslations.ref, verses.ref), eq(verseTranslations.edition, edition))
+    )
+    .where(inArray(verses.ref, refs));
+  return new Map(
+    rows.map((r) => [r.verse.ref, rowToVerse(r.verse, r.translationText ?? undefined)])
+  );
 }
 
 /** Subset of `refs` that exist in the corpus — used to reject hallucinated refs. */

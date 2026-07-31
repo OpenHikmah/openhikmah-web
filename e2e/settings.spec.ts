@@ -26,6 +26,36 @@ test.describe("settings page", () => {
   });
 });
 
+test.describe("language switching", () => {
+  test("switching language via the header popover persists across reload", async ({ page }) => {
+    await page.goto("/search");
+
+    await page.getByRole("button", { name: /change language/i }).click();
+    await page.getByRole("button", { name: "Türkçe" }).click();
+
+    // Nav chrome (server-rendered from the cookie-resolved locale) shows the
+    // Turkish next-intl strings once router.refresh() re-renders the layout.
+    await expect(page.getByRole("link", { name: "Tuval" })).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "tr");
+
+    // /settings reads the same preferences store — its Interface language
+    // select reflects the switch made via the header popover. Select by #id
+    // rather than accessible name — the aria-label is now translation-driven
+    // (settings.interfaceLanguage), so it no longer reads "Interface language"
+    // once the locale is tr.
+    await page.goto("/settings");
+    await expect(page.locator("#interface-language")).toHaveText("Türkçe");
+
+    // The store persists to localStorage and re-syncs the oh_locale cookie on
+    // rehydration, so the choice survives a full reload, not just client nav.
+    await page.reload();
+    await expect(page.locator("#interface-language")).toHaveText("Türkçe");
+    const cookies = await page.context().cookies();
+    expect(cookies.find((c) => c.name === "oh_locale")?.value).toBe("tr");
+    await expect(page.locator("html")).toHaveAttribute("lang", "tr");
+  });
+});
+
 test.describe("mobile bottom nav", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 

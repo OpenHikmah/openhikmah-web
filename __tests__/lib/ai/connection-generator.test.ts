@@ -117,6 +117,22 @@ describe("generateConnections", () => {
     const out = await generateConnections("1:1", "ar", "tr", "thematic");
     expect(out).toHaveLength(3);
   });
+
+  it("omits any language directive and keeps the Tanzih rule for the default (English) locale", async () => {
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
+    await generateConnections("1:1", "ar", "tr", "thematic");
+    const prompt = mockCallAI.mock.calls[0][0] as string;
+    expect(prompt).not.toMatch(/write each "reason" in/i);
+    expect(prompt).toMatch(/strict tanzih/i);
+  });
+
+  it("appends a language directive for a non-English locale without dropping the Tanzih rule", async () => {
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
+    await generateConnections("1:1", "ar", "tr", "thematic", "tr");
+    const prompt = mockCallAI.mock.calls[0][0] as string;
+    expect(prompt).toMatch(/write each "reason" in turkish/i);
+    expect(prompt).toMatch(/strict tanzih/i);
+  });
 });
 
 describe("generateGroundedConnections", () => {
@@ -179,5 +195,21 @@ describe("generateGroundedConnections", () => {
     mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
     await generateGroundedConnections("1:1", "ar", "tr", "root", ["2:255"]);
     expect(mockInsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits any language directive and keeps the Tanzih rule for the default (English) locale", async () => {
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
+    await generateGroundedConnections("1:1", "ar", "tr", "thematic", ["2:255"]);
+    const prompt = mockCallAI.mock.calls[0][0] as string;
+    expect(prompt).not.toMatch(/write each "reason" in/i);
+    expect(prompt).toMatch(/strict tanzih/i);
+  });
+
+  it("appends a language directive for a non-English locale without dropping the Tanzih rule", async () => {
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
+    await generateGroundedConnections("1:1", "ar", "tr", "thematic", ["2:255"], "ru");
+    const prompt = mockCallAI.mock.calls[0][0] as string;
+    expect(prompt).toMatch(/write each "reason" in russian/i);
+    expect(prompt).toMatch(/strict tanzih/i);
   });
 });

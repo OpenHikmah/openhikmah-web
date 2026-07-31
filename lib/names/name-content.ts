@@ -1,14 +1,15 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
-import { nameContent, type NameContentKind } from "@/lib/infra/db/schema";
+import { nameContent, nameVerseReasons, type NameContentKind } from "@/lib/infra/db/schema";
+import type { Locale } from "@/lib/i18n/config";
 
 /**
  * Durable, write-once/read-many cache for the AI-generated 99-Names content
  * (verses, reflection, pairings). Replaces Next's `unstable_cache`, which is
  * wiped on every redeploy and so re-runs Claude for each name after each deploy.
- * Persisting to Postgres means each (name, kind) is generated at most once per
- * prompt `version` and served from the DB forever — the same pattern the
- * connection graph uses (see lib/graph-service.ts).
+ * Persisting to Postgres means each (slug, kind, locale) is generated at most
+ * once per prompt `version` and served from the DB forever — the same pattern
+ * the connection graph uses (see lib/graph-service.ts).
  */
 
 export type { NameContentKind };
@@ -21,9 +22,9 @@ export type { NameContentKind };
 const inFlight = new Map<string, Promise<unknown>>();
 
 /**
- * Returns the cached content for `(slug, kind)` when present at the current
- * `version`; otherwise runs `generate()`, persists the result (unless empty),
- * and returns it.
+ * Returns the cached content for `(slug, kind, locale)` when present at the
+ * current `version`; otherwise runs `generate()`, persists the result (unless
+ * empty), and returns it.
  *
  * `isEmpty` decides whether a result is worth caching — an empty array or blank
  * string usually means a transient search/AI failure, so we return it but do NOT
@@ -40,6 +41,7 @@ const inFlight = new Map<string, Promise<unknown>>();
 export async function getOrGenerateNameContent<T>(
   slug: string,
   kind: NameContentKind,
+  locale: Locale,
   version: number,
   generate: () => Promise<T>,
   isEmpty: (value: T) => boolean,
@@ -49,7 +51,9 @@ export async function getOrGenerateNameContent<T>(
   const [row] = await db
     .select({ data: nameContent.data, version: nameContent.version })
     .from(nameContent)
-    .where(and(eq(nameContent.slug, slug), eq(nameContent.kind, kind)))
+    .where(
+      and(eq(nameContent.slug, slug), eq(nameContent.kind, kind), eq(nameContent.locale, locale))
+    )
     .limit(1);
 
   if (row && row.version === version) {
@@ -59,7 +63,7 @@ export async function getOrGenerateNameContent<T>(
       // Corrupt cache row — log (it's a genuine anomaly that would otherwise
       // silently re-trigger AI generation every request) then regenerate, which
       // overwrites it via the upsert below.
-      console.error(`Corrupt name_content row for ${slug}/${kind}, regenerating:`, err);
+      console.error(`Corrupt name_content row for ${slug}/${kind}/${locale}, regenerating:`, err);
     }
   }
 
@@ -69,11 +73,11 @@ export async function getOrGenerateNameContent<T>(
   // can't both become the leader. `version` is part of the key so a follower can
   // never join a generation running under a different version (defensive — the
   // version is a per-route constant, so this only differs across a deploy).
-  const key = `${slug}:${kind}:${version}`;
+  const key = `${slug}:${kind}:${locale}:${version}`;
   const pending = inFlight.get(key);
   if (pending) return pending as Promise<T>;
 
-  const work = generateAndPersist(slug, kind, version, generate, isEmpty);
+  const work = generateAndPersist(slug, kind, locale, version, generate, isEmpty);
   inFlight.set(key, work);
   try {
     return await work;
@@ -85,6 +89,7 @@ export async function getOrGenerateNameContent<T>(
 async function generateAndPersist<T>(
   slug: string,
   kind: NameContentKind,
+  locale: Locale,
   version: number,
   generate: () => Promise<T>,
   isEmpty: (value: T) => boolean
@@ -97,9 +102,9 @@ async function generateAndPersist<T>(
     try {
       await db
         .insert(nameContent)
-        .values({ slug, kind, data, model, version })
+        .values({ slug, kind, locale, data, model, version })
         .onConflictDoUpdate({
-          target: [nameContent.slug, nameContent.kind],
+          target: [nameContent.slug, nameContent.kind, nameContent.locale],
           set: { data, model, version, updatedAt: new Date() },
         });
     } catch (err) {
@@ -109,4 +114,86 @@ async function generateAndPersist<T>(
   }
 
   return result;
+}
+
+// Per-process single-flight for verse-reason translations, mirroring `inFlight`
+// above but keyed into name_verse_reasons instead of name_content.
+const reasonInFlight = new Map<string, Promise<string>>();
+
+/**
+ * Returns a locale-specific translation of a "verses" entry's per-verse
+ * `reason`, generating and persisting it on first request for that
+ * `(slug, ref, locale)`. Verse *selection* is never re-run here — callers
+ * pass the already-resolved canonical reason into `generate` to translate,
+ * not to re-derive from scratch (see lib/infra/db/schema.ts's comment on
+ * name_verse_reasons for why).
+ */
+export async function getOrGenerateVerseReason(
+  slug: string,
+  ref: string,
+  locale: Locale,
+  generate: () => Promise<string>,
+  onBeforeGenerate?: () => Promise<void>
+): Promise<string> {
+  const [row] = await db
+    .select({ reason: nameVerseReasons.reason })
+    .from(nameVerseReasons)
+    .where(
+      and(
+        eq(nameVerseReasons.slug, slug),
+        eq(nameVerseReasons.ref, ref),
+        eq(nameVerseReasons.locale, locale)
+      )
+    )
+    .limit(1);
+
+  if (row) return row.reason;
+
+  if (onBeforeGenerate) await onBeforeGenerate();
+
+  const key = `${slug}:${ref}:${locale}`;
+  const pending = reasonInFlight.get(key);
+  if (pending) return pending;
+
+  const work = (async () => {
+    const reason = await generate();
+    if (reason.trim() === "") return reason;
+
+    const model = process.env.ANTHROPIC_MODEL ?? null;
+    try {
+      // `reasonInFlight` only coalesces callers within this process — a
+      // concurrent request on another instance can win the same (slug, ref,
+      // locale) row first. RETURNING is empty exactly when DO NOTHING
+      // discarded our insert; re-read in that case so this call returns the
+      // translation that's actually persisted, not the one that lost.
+      const inserted = await db
+        .insert(nameVerseReasons)
+        .values({ slug, ref, locale, reason, model })
+        .onConflictDoNothing()
+        .returning({ reason: nameVerseReasons.reason });
+      if (inserted.length === 0) {
+        const [existing] = await db
+          .select({ reason: nameVerseReasons.reason })
+          .from(nameVerseReasons)
+          .where(
+            and(
+              eq(nameVerseReasons.slug, slug),
+              eq(nameVerseReasons.ref, ref),
+              eq(nameVerseReasons.locale, locale)
+            )
+          )
+          .limit(1);
+        if (existing) return existing.reason;
+      }
+    } catch (err) {
+      console.error("Failed to persist name_verse_reasons:", err);
+    }
+    return reason;
+  })();
+  reasonInFlight.set(key, work);
+  try {
+    return await work;
+  } finally {
+    reasonInFlight.delete(key);
+  }
 }

@@ -3,6 +3,7 @@ import { getPrompt, renderTemplate } from "@/lib/ai/prompt-registry";
 import { db } from "@/lib/infra/db";
 import { aiGenerations } from "@/lib/infra/db/schema";
 import { isValidRef, getVerses } from "@/lib/quran/quran-corpus";
+import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
 import type { ConnectionResult, EdgeKind, Verse } from "@/types/quran";
 
 /**
@@ -63,20 +64,33 @@ Output format:
   { "ref": "surah:ayah", "reason": "one-sentence theological justification" }
 ]`;
 
+// Empty for English. Appended AFTER the resolved template (fallback OR an
+// admin's prompt_versions override) rather than filled into a `{{language}}`
+// placeholder — an override created before this locale support existed has
+// no such placeholder, and renderTemplate silently drops unfilled ones, which
+// would silently keep generating English regardless of the requester's
+// locale. Appending guarantees the directive always reaches the model.
+function languageDirective(locale: Locale): string {
+  if (locale === "en") return "";
+  return `\n\nWrite each "reason" in ${LOCALE_LANGUAGE_NAME[locale]}. Keep "ref" in "surah:ayah" format, and keep the Tanzih/Tashbih constraint above unchanged.`;
+}
+
 async function buildPrompt(
   fromRef: string,
   arabicText: string,
   translation: string,
-  kind: EdgeKind
+  kind: EdgeKind,
+  locale: Locale
 ): Promise<{ text: string; promptVersion: number | null }> {
   const { template, version } = await getPrompt("connection.legacy", LEGACY_FALLBACK_TEMPLATE);
-  const text = renderTemplate(template, {
-    fromRef,
-    arabicText,
-    translation,
-    task: KIND_INSTRUCTIONS[kind],
-    kind,
-  });
+  const text =
+    renderTemplate(template, {
+      fromRef,
+      arabicText,
+      translation,
+      task: KIND_INSTRUCTIONS[kind],
+      kind,
+    }) + languageDirective(locale);
   return { text, promptVersion: version };
 }
 
@@ -103,10 +117,17 @@ export async function generateConnections(
   fromRef: string,
   arabicText: string,
   translation: string,
-  kind: EdgeKind
+  kind: EdgeKind,
+  locale: Locale = "en"
 ): Promise<ConnectionResult[]> {
   const model = process.env.ANTHROPIC_MODEL ?? null;
-  const { text: prompt, promptVersion } = await buildPrompt(fromRef, arabicText, translation, kind);
+  const { text: prompt, promptVersion } = await buildPrompt(
+    fromRef,
+    arabicText,
+    translation,
+    kind,
+    locale
+  );
   const text = await callAI(prompt);
 
   // Best-effort audit log — never fail generation because logging failed.
@@ -174,21 +195,23 @@ async function buildSelectionPrompt(
   arabicText: string,
   translation: string,
   kind: EdgeKind,
-  candidates: Verse[]
+  candidates: Verse[],
+  locale: Locale
 ): Promise<{ text: string; promptVersion: number | null }> {
   const list = candidates.map((v) => `- ${v.ref} — ${v.translation}`).join("\n");
   const { template, version } = await getPrompt(
     "connection.selection",
     SELECTION_FALLBACK_TEMPLATE
   );
-  const text = renderTemplate(template, {
-    fromRef,
-    arabicText,
-    translation,
-    task: KIND_SELECTION[kind],
-    candidates: list,
-    kind,
-  });
+  const text =
+    renderTemplate(template, {
+      fromRef,
+      arabicText,
+      translation,
+      task: KIND_SELECTION[kind],
+      candidates: list,
+      kind,
+    }) + languageDirective(locale);
   return { text, promptVersion: version };
 }
 
@@ -217,7 +240,8 @@ export async function generateGroundedConnections(
   arabicText: string,
   translation: string,
   kind: EdgeKind,
-  candidateRefs: string[]
+  candidateRefs: string[],
+  locale: Locale = "en"
 ): Promise<ConnectionResult[]> {
   const verseMap = await getVerses(candidateRefs);
   const candidates = candidateRefs
@@ -231,7 +255,8 @@ export async function generateGroundedConnections(
     arabicText,
     translation,
     kind,
-    candidates
+    candidates,
+    locale
   );
   const text = await callAI(prompt);
 

@@ -5,7 +5,8 @@ import { jobRuns, verses, verseEmbeddings } from "@/lib/infra/db/schema";
 
 /**
  * Triggers and tracks the project's one-time/resumable backfill scripts
- * (scripts/seed-quran.mjs, scripts/seed-morphology.mjs, scripts/embed-corpus.mjs)
+ * (scripts/seed-quran.mjs, scripts/seed-morphology.mjs, scripts/embed-corpus.mjs,
+ * scripts/seed-translations.mjs)
  * from the admin panel instead of a container shell. Deliberately simple for a
  * single-box deployment: one job runs at a time, tracked by an in-memory child
  * process reference in this module (the source of truth for "is a job running
@@ -14,7 +15,7 @@ import { jobRuns, verses, verseEmbeddings } from "@/lib/infra/db/schema";
  */
 
 export interface JobDefinition {
-  id: "seed-quran" | "seed-morphology" | "embed-corpus";
+  id: "seed-quran" | "seed-morphology" | "embed-corpus" | "seed-translations";
   label: string;
   script: string;
   requiresEnv?: string[];
@@ -32,6 +33,11 @@ export const JOBS: readonly JobDefinition[] = [
     label: "Generate verse embeddings",
     script: "scripts/embed-corpus.mjs",
     requiresEnv: ["GEMINI_API_KEY"],
+  },
+  {
+    id: "seed-translations",
+    label: "Seed verse translations (TR/RU/AZ)",
+    script: "scripts/seed-translations.mjs",
   },
 ] as const;
 

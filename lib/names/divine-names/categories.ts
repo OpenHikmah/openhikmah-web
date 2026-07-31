@@ -1,5 +1,16 @@
 import type { NameCategory } from "./types";
 
+/**
+ * Maps each category to the `names` namespace translation keys carrying its
+ * localized label/description, so callers don't fall back to CATEGORY_LABELS'
+ * English-only `.en`/`.description` fields outside the `en` locale.
+ */
+export const CATEGORY_LABEL_KEYS: Record<NameCategory, { label: string; description: string }> = {
+  dhat: { label: "categoryDhatLabel", description: "categoryDhatDescription" },
+  sifat: { label: "categorySifatLabel", description: "categorySifatDescription" },
+  "af'al": { label: "categoryAfalLabel", description: "categoryAfalDescription" },
+};
+
 export const CATEGORY_LABELS: Record<
   NameCategory,
   { en: string; ar: string; description: string }

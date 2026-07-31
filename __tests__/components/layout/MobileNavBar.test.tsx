@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
+import { renderWithIntl } from "../../test-utils/render-with-intl";
 
 const { mockUsePathname } = vi.hoisted(() => ({ mockUsePathname: vi.fn() }));
 vi.mock("next/navigation", () => ({ usePathname: mockUsePathname }));
@@ -14,14 +15,14 @@ describe("MobileNavBar", () => {
   it("renders the tab bar when the shared hook reports visible", () => {
     mockUsePathname.mockReturnValue("/search");
     mockMobileNavVisible.mockReturnValue(true);
-    render(<MobileNavBar />);
+    renderWithIntl(<MobileNavBar />);
     expect(screen.getByRole("link", { name: /Search/i })).toBeInTheDocument();
   });
 
   it("renders exactly 4 tabs and omits Bookmarks", () => {
     mockUsePathname.mockReturnValue("/search");
     mockMobileNavVisible.mockReturnValue(true);
-    render(<MobileNavBar />);
+    renderWithIntl(<MobileNavBar />);
     expect(screen.getAllByRole("link")).toHaveLength(4);
     expect(screen.queryByRole("link", { name: /Bookmarks/i })).not.toBeInTheDocument();
   });
@@ -29,7 +30,7 @@ describe("MobileNavBar", () => {
   it("renders nothing when the shared hook reports hidden", () => {
     mockUsePathname.mockReturnValue("/canvas");
     mockMobileNavVisible.mockReturnValue(false);
-    const { container } = render(<MobileNavBar />);
+    const { container } = renderWithIntl(<MobileNavBar />);
     expect(container).toBeEmptyDOMElement();
   });
 });

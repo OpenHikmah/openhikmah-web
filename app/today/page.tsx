@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
 import { VerseOfDayCard } from "@/components/today/VerseOfDayCard";
 import { getVerseOfDayWithReflection } from "@/lib/quran/verse-of-day";
+import { getQuranEdition } from "@/lib/i18n/request-prefs";
 
 export const metadata: Metadata = {
   title: "Verse of the Day — Open Hikmah",
@@ -17,7 +19,12 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
-  const today = await getVerseOfDayWithReflection().catch(() => null);
+  const t = await getTranslations("errors");
+  const edition = await getQuranEdition();
+  const today = await getVerseOfDayWithReflection(undefined, edition).catch((err) => {
+    console.error("Today: Verse of the Day load failed:", err);
+    return null;
+  });
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
@@ -28,9 +35,7 @@ export default async function TodayPage() {
         {today ? (
           <VerseOfDayCard verse={today.verse} reflection={today.reflection ?? undefined} />
         ) : (
-          <p className="text-sm text-text-muted">
-            Couldn&apos;t load today&apos;s verse right now. Please try again later.
-          </p>
+          <p className="text-sm text-text-muted">{t("todayVerseUnavailable")}</p>
         )}
       </main>
     </div>

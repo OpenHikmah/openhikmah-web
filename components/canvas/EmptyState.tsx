@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Search } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { JOURNEYS } from "@/lib/social/journeys";
 
 interface EmptyStateProps {
@@ -9,26 +10,26 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ onSearchOpen }: EmptyStateProps) {
+  const t = useTranslations("canvas");
+
   return (
     <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
       <div className="pointer-events-auto max-w-sm text-center">
-        <p className="mb-6 text-sm leading-relaxed text-text-muted">
-          Search a verse or theme — AI maps semantic connections across the Qur&apos;an.
-        </p>
+        <p className="mb-6 text-sm leading-relaxed text-text-muted">{t("emptyStateDescription")}</p>
 
         <button
           onClick={onSearchOpen}
           className="inline-flex cursor-pointer items-center gap-2 rounded border border-gold/25 bg-gold/[0.08] px-4 py-2 text-xs font-medium text-gold transition-colors hover:bg-gold/[0.12]"
         >
           <Search className="h-3.5 w-3.5" />
-          Search verses
+          {t("searchVerses")}
           <kbd className="rounded bg-gold/10 px-1 font-mono text-[10px] text-text-muted">⌘K</kbd>
         </button>
 
         {/* One-tap journeys — start a beautiful canvas with zero typing. */}
         <div className="mt-6">
           <p className="mb-2.5 text-[11px] uppercase tracking-[0.16em] text-text-muted">
-            Or begin with
+            {t("orBeginWith")}
           </p>
           <div className="flex flex-wrap justify-center gap-2">
             {JOURNEYS.map((j) => (

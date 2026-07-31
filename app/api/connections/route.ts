@@ -3,6 +3,7 @@ import { getConnections } from "@/lib/ai/graph-service";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
+import { getUiLocale } from "@/lib/i18n/request-prefs";
 import type { EdgeKind } from "@/types/quran";
 
 const MAX_EXCLUDE_REFS = 100;
@@ -57,11 +58,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const locale = await getUiLocale();
     const results = await getConnections(
       fromRef,
       kind as EdgeKind,
       { arabicText, translation },
-      { clientKey: clientKey(req), excludeRefs }
+      { clientKey: clientKey(req), excludeRefs, locale }
     );
 
     // A "get more" request (excludeRefs non-empty) legitimately can run out of

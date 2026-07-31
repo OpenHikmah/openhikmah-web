@@ -17,6 +17,8 @@ export interface SelectProps {
   className?: string;
   disabled?: boolean;
   "aria-label"?: string;
+  /** Locale-invariant hook for e2e selectors — aria-label text may be translated. */
+  id?: string;
 }
 
 export function Select({
@@ -27,10 +29,12 @@ export function Select({
   className,
   disabled,
   "aria-label": ariaLabel,
+  id,
 }: SelectProps) {
   return (
     <RadixSelect.Root value={value} onValueChange={onValueChange} disabled={disabled}>
       <RadixSelect.Trigger
+        id={id}
         aria-label={ariaLabel}
         className={cn(
           "flex h-10 w-full items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 text-sm text-text-primary transition-[border-color] duration-[120ms] hover:border-border-subtle focus:border-gold-muted disabled:cursor-not-allowed disabled:opacity-50",

@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const { mockGetVerse } = vi.hoisted(() => ({ mockGetVerse: vi.fn() }));
+const { mockGetVerse, mockGetQuranEdition } = vi.hoisted(() => ({
+  mockGetVerse: vi.fn(),
+  mockGetQuranEdition: vi.fn(),
+}));
 vi.mock("@/lib/quran/quran-corpus", () => ({ getVerse: mockGetVerse }));
+vi.mock("@/lib/i18n/request-prefs", () => ({ getQuranEdition: mockGetQuranEdition }));
 
 import { GET } from "@/app/api/verse/[surah]/[ayah]/route";
 
@@ -27,6 +31,8 @@ describe("GET /api/verse/[surah]/[ayah]", () => {
     // Default: corpus miss → exercises the live-fetch fallback path.
     mockGetVerse.mockReset();
     mockGetVerse.mockResolvedValue(null);
+    mockGetQuranEdition.mockReset();
+    mockGetQuranEdition.mockResolvedValue("en.sahih");
   });
 
   it("serves from the local corpus without fetching when present", async () => {
@@ -116,5 +122,22 @@ describe("GET /api/verse/[surah]/[ayah]", () => {
     const req = new NextRequest("http://localhost/api/verse/1/1");
     const res = await GET(req, params("1", "1"));
     expect(res.status).toBe(404);
+  });
+
+  it("resolves the verse against the caller's cookie-selected edition", async () => {
+    mockGetQuranEdition.mockResolvedValue("tr.diyanet");
+    mockGetVerse.mockResolvedValue({
+      surah: 2,
+      ayah: 255,
+      ref: "2:255",
+      arabicText: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ",
+      translation: "Allah'tan başka ilah yoktur.",
+      surahName: "Al-Baqarah",
+      surahNameArabic: "البقرة",
+    });
+
+    const req = new NextRequest("http://localhost/api/verse/2/255");
+    await GET(req, params("2", "255"));
+    expect(mockGetVerse).toHaveBeenCalledWith("2:255", "tr.diyanet");
   });
 });

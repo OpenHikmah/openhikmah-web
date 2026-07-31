@@ -30,6 +30,10 @@ const { mockSelect, mockInsert, mockConsume } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect, insert: mockInsert } }));
+// The route now calls getUiLocale() (lib/i18n/request-prefs.ts), which reads
+// next/headers' cookies() — unavailable outside a real Next request scope.
+// No cookie set here means it resolves to the "en" default.
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
 // The legacy generate path hydrates from the local corpus via getVerses; return a
 // verse for every requested ref so the cache-miss path yields connections.
 vi.mock("@/lib/quran/quran-corpus", async (importOriginal) => {

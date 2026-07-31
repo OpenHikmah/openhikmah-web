@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS, isNavItemActive } from "./nav-items";
 
 export function HeaderNavLinks() {
   const pathname = usePathname();
+  const t = useTranslations("nav");
 
   return (
     <nav className="hidden md:flex h-full items-center gap-0.5">
-      {NAV_ITEMS.map(({ href, label }) => (
+      {NAV_ITEMS.map(({ href, labelKey }) => (
         <Link
           key={href}
           href={href}
@@ -21,7 +23,7 @@ export function HeaderNavLinks() {
               : "text-text-muted hover:text-text-secondary hover:bg-white/5"
           )}
         >
-          {label}
+          {t(labelKey)}
         </Link>
       ))}
     </nav>

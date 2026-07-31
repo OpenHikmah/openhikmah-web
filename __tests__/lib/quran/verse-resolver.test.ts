@@ -96,4 +96,48 @@ describe("resolveVerse", () => {
     const result = await resolveVerse("2:255");
     expect(result).toBeNull();
   });
+
+  it("passes an unrecognized edition through as undefined (falls back to en.sahih)", async () => {
+    const v = verse("1:1");
+    mockGetVerse.mockResolvedValue(v);
+    await resolveVerse("1:1", "not-a-real-edition");
+    expect(mockGetVerse).toHaveBeenCalledWith("1:1", undefined);
+  });
+
+  it("passes a whitelisted non-default edition through to getVerse", async () => {
+    const v = verse("1:1");
+    mockGetVerse.mockResolvedValue(v);
+    await resolveVerse("1:1", "tr.diyanet");
+    expect(mockGetVerse).toHaveBeenCalledWith("1:1", "tr.diyanet");
+  });
+
+  it("live fallback fetches the requested edition's endpoint", async () => {
+    mockGetVerse.mockResolvedValue(null);
+    vi.mocked(fetch).mockImplementation(async (url: string | URL | Request) => {
+      const isArabic = String(url).includes("ar.alafasy");
+      return {
+        ok: true,
+        json: async () => ({ data: { text: isArabic ? "نص عربي" : "Türkçe metin" } }),
+      } as Response;
+    });
+    const result = await resolveVerse("2:255", "tr.diyanet");
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/tr.diyanet"), expect.anything());
+    expect(result?.translation).toBe("Türkçe metin");
+  });
+
+  it("live fallback falls back to en.sahih when the requested edition 404s upstream", async () => {
+    mockGetVerse.mockResolvedValue(null);
+    vi.mocked(fetch).mockImplementation(async (url: string | URL | Request) => {
+      const u = String(url);
+      if (u.includes("ar.alafasy")) {
+        return { ok: true, json: async () => ({ data: { text: "نص عربي" } }) } as Response;
+      }
+      if (u.includes("tr.diyanet")) {
+        return { ok: false } as Response;
+      }
+      return { ok: true, json: async () => ({ data: { text: "English fallback" } }) } as Response;
+    });
+    const result = await resolveVerse("2:255", "tr.diyanet");
+    expect(result?.translation).toBe("English fallback");
+  });
 });
