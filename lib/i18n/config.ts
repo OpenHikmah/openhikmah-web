@@ -18,6 +18,16 @@ export const LOCALE_LABELS: Record<Locale, string> = {
   az: "Azərbaycan dili",
 };
 
+// English names for each locale, used only when instructing an AI model which
+// language to write in (the model follows "Turkish" more reliably than a
+// native self-name). Distinct from LOCALE_LABELS, which is for UI display.
+export const LOCALE_LANGUAGE_NAME: Record<Locale, string> = {
+  en: "English",
+  tr: "Turkish",
+  ru: "Russian",
+  az: "Azerbaijani",
+};
+
 export const DEFAULT_EDITION_BY_LOCALE: Record<Locale, string> = {
   en: "en.sahih",
   tr: "tr.diyanet",

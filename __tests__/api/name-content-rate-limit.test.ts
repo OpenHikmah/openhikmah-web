@@ -23,18 +23,30 @@ function makeSelectChain(resolveWith: unknown[]) {
   return chain;
 }
 
-const { mockSelect, mockConsume, mockCallAI } = vi.hoisted(() => ({
+const { mockSelect, mockConsume, mockCallAI, mockCookies } = vi.hoisted(() => ({
   mockSelect: vi.fn(),
   mockConsume: vi.fn(),
   mockCallAI: vi.fn(),
+  // The routes now call getUiLocale() (lib/i18n/request-prefs.ts), which reads
+  // next/headers' cookies() — unavailable outside a real Next request scope.
+  // Defaults to no cookie set (→ "en"); individual tests can override.
+  mockCookies: vi.fn(async () => ({
+    get: (_name: string) => undefined as { value: string } | undefined,
+  })),
 }));
 
 vi.mock("@/lib/infra/db", () => ({
   db: {
     select: mockSelect,
-    insert: () => ({ values: () => ({ onConflictDoUpdate: async () => undefined }) }),
+    insert: () => ({
+      values: () => ({
+        onConflictDoUpdate: async () => undefined,
+        onConflictDoNothing: () => ({ returning: async () => [{ reason: "unused" }] }),
+      }),
+    }),
   },
 }));
+vi.mock("next/headers", () => ({ cookies: mockCookies }));
 
 vi.mock("@/lib/infra/rate-limit", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/infra/rate-limit")>();
@@ -75,6 +87,7 @@ describe("names AI routes — per-client rate limiting", () => {
     mockCallAI.mockReset();
     mockFetch.mockReset();
     mockFetch.mockResolvedValue({ ok: false });
+    mockCookies.mockReset().mockResolvedValue({ get: () => undefined }); // "en" default
   });
 
   for (const { label, call } of ROUTES) {
@@ -160,5 +173,45 @@ describe("names AI routes — per-client rate limiting", () => {
     expect(body).toHaveLength(1);
     expect(mockConsume).toHaveBeenCalledTimes(1);
     expect(mockCallAI).toHaveBeenCalled();
+  });
+
+  it("verses: a non-English locale with multiple uncached verse translations still consumes the rate limit exactly once", async () => {
+    mockCookies.mockResolvedValue({
+      get: (name: string) => (name === "oh_locale" ? { value: "tr" } : undefined),
+    });
+    mockSelect.mockReturnValue(makeSelectChain([])); // every select is a miss (verses + all translations)
+    mockConsume.mockResolvedValue(true);
+    // The two translation calls run concurrently (Promise.all), so they can
+    // reach mockCallAI in either order — resolve based on prompt content
+    // (each translateReason call embeds its own verse's source text) rather
+    // than call order, which a sequential mockResolvedValueOnce chain can't
+    // guarantee under concurrency.
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.includes("Ayat al-Kursi.")) return "Ayet el-Kürsi (tr).";
+      if (prompt.includes("Pure tawhid.")) return "Saf tevhid (tr).";
+      return JSON.stringify([
+        { ref: "2:255", reason: "Ayat al-Kursi." },
+        { ref: "112:1", reason: "Pure tawhid." },
+      ]);
+    });
+    mockFetch.mockImplementation(async (url: unknown) => {
+      if (typeof url !== "string") return { ok: false };
+      if (url.includes("api.alquran.cloud"))
+        return { ok: true, json: async () => ({ data: { text: "نص" } }) };
+      return { ok: false };
+    });
+
+    const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveLength(2);
+    expect(body.map((v: { reason: string }) => v.reason)).toEqual([
+      "Ayet el-Kürsi (tr).",
+      "Saf tevhid (tr).",
+    ]);
+    // At most 2 charges total (one for the canonical verse-selection miss,
+    // one shared across the whole translation batch) — never one per verse.
+    expect(mockConsume).toHaveBeenCalledTimes(2);
   });
 });

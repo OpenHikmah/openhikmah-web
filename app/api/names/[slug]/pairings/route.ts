@@ -4,6 +4,8 @@ import { getNameBySlug, DIVINE_NAMES } from "@/lib/names/divine-names";
 import { getOrGenerateNameContent } from "@/lib/names/name-content";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
+import { getUiLocale } from "@/lib/i18n/request-prefs";
+import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
 
 // Bump to force regeneration after a prompt change.
 const PAIRINGS_VERSION = 1;
@@ -15,14 +17,23 @@ interface Pairing {
   explanation: string;
 }
 
-function buildPrompt(transliteration: string, arabic: string, meaning: string): string {
+function buildPrompt(
+  transliteration: string,
+  arabic: string,
+  meaning: string,
+  locale: Locale
+): string {
+  const languageLine =
+    locale === "en"
+      ? ""
+      : `\nWrite each "explanation" in ${LOCALE_LANGUAGE_NAME[locale]}. Keep "transliteration" and "arabic" as-is (do not translate names). Keep the Tanzih constraint above unchanged.`;
   return `You are a classical Islamic scholar (Maturidi/Hanafi tradition).
 
 The divine name ${transliteration} (${arabic}) means "${meaning}".
 
 Task: Identify 2–3 other divine names from the 99 Names that most frequently appear paired with ${transliteration} in the Quran. For each, explain in ONE sentence why this pairing provides perfect theological balance in the specific contexts where they appear together.
 
-Only include pairings where both names actually co-appear in the same verse or in closely related verses as documented in classical tafsir.
+Only include pairings where both names actually co-appear in the same verse or in closely related verses as documented in classical tafsir. Maintain strict Tanzih: never describe or imply physical form, spatial location, or resemblance to created things.${languageLine}
 
 Return ONLY a JSON array:
 [
@@ -36,6 +47,7 @@ Return ONLY a JSON array:
 
 async function getPairings(
   slug: string,
+  locale: Locale,
   onBeforeGenerate: () => Promise<void>
 ): Promise<Pairing[]> {
   const name = getNameBySlug(slug);
@@ -44,9 +56,12 @@ async function getPairings(
   return getOrGenerateNameContent(
     slug,
     "pairings",
+    locale,
     PAIRINGS_VERSION,
     async () => {
-      const text = await callAI(buildPrompt(name.transliteration, name.arabic, name.meaning));
+      const text = await callAI(
+        buildPrompt(name.transliteration, name.arabic, name.meaning, locale)
+      );
 
       let raw: unknown;
       try {
@@ -106,7 +121,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   }
 
   try {
-    const pairings = await getPairings(slug, async () => {
+    const locale = await getUiLocale();
+    const pairings = await getPairings(slug, locale, async () => {
       if (!(await consume(`names-gen:${clientKey(req)}`))) throw new RateLimitError();
     });
     return NextResponse.json(pairings);
