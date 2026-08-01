@@ -21,6 +21,7 @@ import { useCopyFeedback } from "@/hooks/useCopyFeedback";
  */
 export function VerseOfDayCard({ verse, reflection }: { verse: Verse; reflection?: string }) {
   const tCommon = useTranslations("common");
+  const t = useTranslations("today");
   const playVerse = useAudioStore((s) => s.playVerse);
   const pauseAudio = useAudioStore((s) => s.pause);
   const resumeAudio = useAudioStore((s) => s.resume);
@@ -67,7 +68,7 @@ export function VerseOfDayCard({ verse, reflection }: { verse: Verse; reflection
       <div className="space-y-[clamp(0.85rem,2.5vh,1.25rem)] p-[clamp(1.15rem,3.5vh,2rem)]">
         <div className="flex items-center justify-between gap-3">
           <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-text-muted">
-            Verse of the day
+            {t("verseOfTheDay")}
           </span>
           <span className="shrink-0 rounded border border-gold bg-gold/10 px-1.5 py-0.5 font-mono text-xs text-gold">
             {verse.ref}
@@ -98,14 +99,14 @@ export function VerseOfDayCard({ verse, reflection }: { verse: Verse; reflection
             className={cn(buttonVariants({ variant: "primary", size: "md" }), "gap-2")}
           >
             <Network className="h-4 w-4" />
-            Open on canvas
+            {t("openOnCanvas")}
           </Link>
 
-          <Tooltip label={isThisPlaying ? "Pause recitation" : "Listen"}>
+          <Tooltip label={isThisPlaying ? t("pauseRecitation") : t("listen")}>
             <IconButton
               tone="teal"
               onClick={handleListen}
-              aria-label={isThisPlaying ? "Pause recitation" : "Listen to recitation"}
+              aria-label={isThisPlaying ? t("pauseRecitation") : t("listenToRecitation")}
               className={cn(isThisCurrent && "border-teal text-teal")}
             >
               {isThisPlaying ? <Pause /> : <Volume2 />}
@@ -123,10 +124,10 @@ export function VerseOfDayCard({ verse, reflection }: { verse: Verse; reflection
             </IconButton>
           </Tooltip>
 
-          <Tooltip label={copied ? "Copied!" : "Share"}>
+          <Tooltip label={copied ? t("copied") : t("share")}>
             <IconButton
               onClick={handleShare}
-              aria-label="Copy link to today's verse"
+              aria-label={t("copyLink")}
               className={cn(copied && "border-teal text-teal")}
             >
               {copied ? <Check /> : <Share2 />}

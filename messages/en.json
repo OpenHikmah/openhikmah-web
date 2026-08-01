@@ -141,6 +141,28 @@
     "couldNotLoadVerse": "Could not load verse text.",
     "savedCount": "{count, plural, =0 {No bookmarks yet} one {# saved verse} other {# saved verses}}"
   },
+  "today": {
+    "verseOfTheDay": "Verse of the day",
+    "openOnCanvas": "Open on canvas",
+    "pauseRecitation": "Pause recitation",
+    "listen": "Listen",
+    "listenToRecitation": "Listen to recitation",
+    "copied": "Copied!",
+    "share": "Share",
+    "copyLink": "Copy link to today's verse"
+  },
+  "home": {
+    "greeting": "Assalamu alaykum",
+    "welcomeBack": "Welcome back",
+    "welcomeBackNamed": "Welcome back, <gold>{name}</gold>",
+    "continueCanvas": "Continue your canvas",
+    "openCanvas": "Open the canvas",
+    "versesInProgress": "{count, plural, one {# verse in progress} other {# verses in progress}}",
+    "searchAVerse": "Search a verse and map its connections",
+    "savedCanvasCount": "{count, plural, one {# saved canvas} other {# saved canvases}}",
+    "savedCanvasesLoadError": "Couldn't load your saved canvases",
+    "savedGraphs": "Your saved graphs"
+  },
   "names": {
     "eyebrow": "Asmaul Husna",
     "heroTitle": "The 99 Beautiful Names of Allah",

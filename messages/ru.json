@@ -141,6 +141,28 @@
     "couldNotLoadVerse": "Не удалось загрузить текст аята.",
     "savedCount": "{count, plural, =0 {Пока нет закладок} one {# сохранённый аят} few {# сохранённых аята} many {# сохранённых аятов} other {# сохранённого аята}}"
   },
+  "today": {
+    "verseOfTheDay": "Аят дня",
+    "openOnCanvas": "Открыть на холсте",
+    "pauseRecitation": "Приостановить чтение",
+    "listen": "Слушать",
+    "listenToRecitation": "Слушать чтение",
+    "copied": "Скопировано!",
+    "share": "Поделиться",
+    "copyLink": "Скопировать ссылку на аят дня"
+  },
+  "home": {
+    "greeting": "Ассаляму алейкум",
+    "welcomeBack": "С возвращением",
+    "welcomeBackNamed": "С возвращением, <gold>{name}</gold>",
+    "continueCanvas": "Продолжить холст",
+    "openCanvas": "Открыть холст",
+    "versesInProgress": "{count, plural, one {# аят в процессе} few {# аята в процессе} many {# аятов в процессе} other {# аята в процессе}}",
+    "searchAVerse": "Найдите аят и отобразите его связи",
+    "savedCanvasCount": "{count, plural, one {# сохранённый холст} few {# сохранённых холста} many {# сохранённых холстов} other {# сохранённых холста}}",
+    "savedCanvasesLoadError": "Не удалось загрузить сохранённые холсты",
+    "savedGraphs": "Ваши сохранённые холсты"
+  },
   "names": {
     "eyebrow": "Асма уль-Хусна",
     "heroTitle": "99 Прекрасных Имён Аллаха",
