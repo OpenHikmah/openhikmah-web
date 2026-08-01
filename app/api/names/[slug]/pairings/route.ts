@@ -6,6 +6,7 @@ import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
 import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
+import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
 
 // Bump to force regeneration after a prompt change.
 const PAIRINGS_VERSION = 1;
@@ -33,7 +34,7 @@ The divine name ${transliteration} (${arabic}) means "${meaning}".
 
 Task: Identify 2–3 other divine names from the 99 Names that most frequently appear paired with ${transliteration} in the Quran. For each, explain in ONE sentence why this pairing provides perfect theological balance in the specific contexts where they appear together.
 
-Only include pairings where both names actually co-appear in the same verse or in closely related verses as documented in classical tafsir. Maintain strict Tanzih: never describe or imply physical form, spatial location, or resemblance to created things.${languageLine}
+Only include pairings where both names actually co-appear in the same verse or in closely related verses as documented in classical tafsir. Maintain ${TANZIH_CONSTRAINT}.${languageLine}
 
 Return ONLY a JSON array:
 [

@@ -1,5 +1,6 @@
 import { callAI } from "@/lib/ai/ai";
 import { getPrompt, renderTemplate } from "@/lib/ai/prompt-registry";
+import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
 import { db } from "@/lib/infra/db";
 import { aiGenerations } from "@/lib/infra/db/schema";
 import { isValidRef, getVerses } from "@/lib/quran/quran-corpus";
@@ -54,7 +55,7 @@ Rules:
 - Return EXACTLY 3 different verses (not the source verse).
 - Verse references must be real and accurate (format: surah:ayah, e.g. 2:255).
 - Each reason must be one concise sentence explaining the {{kind}} connection in classical Islamic terms.
-- Maintain strict Tanzih (divine transcendence). Avoid Tashbih (anthropomorphism).
+- Maintain ${TANZIH_CONSTRAINT}.
 - Return ONLY a valid JSON array. No prose, no markdown, no explanation outside the JSON.
 
 Output format:
@@ -182,7 +183,7 @@ Rules:
 - Choose ONLY from the candidate references listed above. Do NOT introduce any verse that is not in the list.
 - Return at most 3, fewer if fewer are genuinely appropriate.
 - Each reason must be one concise sentence explaining the {{kind}} connection in classical Islamic terms.
-- Maintain strict Tanzih (divine transcendence). Avoid Tashbih (anthropomorphism).
+- Maintain ${TANZIH_CONSTRAINT}.
 - Return ONLY a valid JSON array. No prose, no markdown, no explanation outside the JSON.
 
 Output format:

@@ -6,6 +6,7 @@ import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
 import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
+import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
 
 // Bump to force regeneration after a prompt change.
 const REFLECTION_VERSION = 1;
@@ -30,7 +31,7 @@ Task: Write a "Believer's Reflection" — a single paragraph (3–5 sentences) d
 
 Critical rules:
 1. NEVER equate the divine attribute directly to a human action or quality.
-2. ALWAYS maintain strict Tanzih — the attribute belongs exclusively and infinitely to Allah.
+2. ALWAYS maintain ${TANZIH_CONSTRAINT}. The attribute belongs exclusively and infinitely to Allah.
 3. Frame the reflection as the believer's RESPONSE to the name, not a possession of it.
 4. Use the language of trust (tawakkul), striving (sa'y), and certainty (yaqin) as appropriate.
 5. Keep the tone reverent, orthodox, and practically grounded.
