@@ -178,6 +178,8 @@
     "reflectionLabel": "Believer's Reflection",
     "pairingsLabel": "Common Pairings",
     "couldNotLoadVerses": "Could not load verses at this time.",
+    "couldNotLoadReflection": "Could not load the reflection at this time.",
+    "couldNotLoadPairings": "Could not load pairings at this time.",
     "findingVerses": "Claude is finding verses…",
     "noVersesFound": "No verses found for this name.",
     "connectionLabel": "Connection: ",

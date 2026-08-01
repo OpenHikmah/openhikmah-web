@@ -178,6 +178,8 @@
     "reflectionLabel": "Размышление верующего",
     "pairingsLabel": "Частые сочетания",
     "couldNotLoadVerses": "Не удалось загрузить аяты в данный момент.",
+    "couldNotLoadReflection": "Не удалось загрузить размышление в данный момент.",
+    "couldNotLoadPairings": "Не удалось загрузить сочетания в данный момент.",
     "findingVerses": "Claude ищет аяты…",
     "noVersesFound": "Для этого имени аяты не найдены.",
     "connectionLabel": "Связь: ",

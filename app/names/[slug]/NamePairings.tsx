@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 
-interface Pairing {
+export interface Pairing {
   name: string;
   transliteration: string;
   arabic: string;
@@ -14,14 +14,18 @@ interface Pairing {
 interface Props {
   slug: string;
   accent: string;
+  /** Server-prefetched pairings, or `null` on a cache miss (the component
+   *  then falls back to its own fetch, unchanged). */
+  initialPairings?: Pairing[] | null;
 }
 
-export function NamePairings({ slug, accent }: Props) {
+export function NamePairings({ slug, accent, initialPairings }: Props) {
   const t = useTranslations("names");
-  const [pairings, setPairings] = useState<Pairing[] | null>(null);
+  const [pairings, setPairings] = useState<Pairing[] | null>(initialPairings ?? null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    if (initialPairings != null) return; // already have it from the server
     let cancelled = false;
     fetch(`/api/names/${slug}/pairings`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
@@ -34,9 +38,19 @@ export function NamePairings({ slug, accent }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, initialPairings]);
 
-  if (error || (pairings !== null && pairings.length === 0)) return null;
+  if (error) {
+    return (
+      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+        {t("couldNotLoadPairings")}
+      </p>
+    );
+  }
+
+  // A successfully-loaded empty result is a legitimate "no pairings" case,
+  // not an error — hide the section rather than showing an empty card.
+  if (pairings !== null && pairings.length === 0) return null;
 
   return (
     <div

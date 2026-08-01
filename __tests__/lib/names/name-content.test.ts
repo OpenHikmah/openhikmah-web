@@ -47,7 +47,11 @@ const { mockSelect, mockInsert, mockValues, mockOnConflict, mockOnConflictDoNoth
 
 vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect, insert: mockInsert } }));
 
-import { getOrGenerateNameContent, getOrGenerateVerseReason } from "@/lib/names/name-content";
+import {
+  getOrGenerateNameContent,
+  getOrGenerateVerseReason,
+  getCachedNameContent,
+} from "@/lib/names/name-content";
 
 const isEmptyArr = (v: unknown[]) => v.length === 0;
 
@@ -270,6 +274,60 @@ describe("getOrGenerateNameContent", () => {
     const out = await getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr);
     expect(out).toEqual(["ok"]);
     expect(generate).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("getCachedNameContent", () => {
+  beforeEach(() => {
+    mockSelect.mockReset();
+    mockInsert.mockClear();
+  });
+
+  it("returns the cached value on a hit at the current version", async () => {
+    mockSelect.mockReturnValue(
+      makeSelectChain([{ data: JSON.stringify("a reflection"), version: 1 }])
+    );
+
+    const out = await getCachedNameContent<string>("ar-rahman", "reflection", "en", 1);
+
+    expect(out).toBe("a reflection");
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("returns null on a miss (no row)", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+
+    const out = await getCachedNameContent<string>("ar-rahman", "reflection", "en", 1);
+
+    expect(out).toBeNull();
+  });
+
+  it("returns null when the stored version is older than the requested version", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([{ data: JSON.stringify("stale"), version: 1 }]));
+
+    const out = await getCachedNameContent<string>("ar-rahman", "reflection", "en", 2);
+
+    expect(out).toBeNull();
+  });
+
+  it("returns null and logs on corrupt cached JSON, without persisting anything", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockSelect.mockReturnValue(makeSelectChain([{ data: "{not json", version: 1 }]));
+
+    const out = await getCachedNameContent<string>("ar-rahman", "reflection", "en", 1);
+
+    expect(out).toBeNull();
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("never calls generate — it is read-only", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([{ data: JSON.stringify(["a", "b"]), version: 1 }]));
+
+    const out = await getCachedNameContent<string[]>("al-malik", "pairings", "en", 1);
+
+    expect(out).toEqual(["a", "b"]);
   });
 });
 

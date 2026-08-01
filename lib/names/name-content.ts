@@ -86,6 +86,35 @@ export async function getOrGenerateNameContent<T>(
   }
 }
 
+/**
+ * Read-only cache lookup for `(slug, kind, locale)` at the current `version` —
+ * never generates, never consumes rate limit. Used for server-side prefetch
+ * (e.g. SSR) where a cache miss should fall through to the existing
+ * client-fetch-and-generate path rather than block the page render on an AI call.
+ */
+export async function getCachedNameContent<T>(
+  slug: string,
+  kind: NameContentKind,
+  locale: Locale,
+  version: number
+): Promise<T | null> {
+  const [row] = await db
+    .select({ data: nameContent.data, version: nameContent.version })
+    .from(nameContent)
+    .where(
+      and(eq(nameContent.slug, slug), eq(nameContent.kind, kind), eq(nameContent.locale, locale))
+    )
+    .limit(1);
+
+  if (!row || row.version !== version) return null;
+  try {
+    return JSON.parse(row.data) as T;
+  } catch (err) {
+    console.error(`Corrupt name_content row for ${slug}/${kind}/${locale}:`, err);
+    return null;
+  }
+}
+
 async function generateAndPersist<T>(
   slug: string,
   kind: NameContentKind,
