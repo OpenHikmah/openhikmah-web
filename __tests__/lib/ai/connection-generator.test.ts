@@ -105,6 +105,37 @@ describe("generateConnections", () => {
     expect(out).toEqual([]);
   });
 
+  it("logs when the AI response contains no JSON array", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      mockCallAI.mockResolvedValue("Sorry, I cannot help with that.");
+      const out = await generateConnections("1:1", "ar", "tr", "thematic");
+      expect(out).toEqual([]);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("no JSON array"),
+        expect.stringContaining("Sorry, I cannot help")
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it("logs when the AI response's JSON array is malformed", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      mockCallAI.mockResolvedValue("[{ not: valid json }]");
+      const out = await generateConnections("1:1", "ar", "tr", "thematic");
+      expect(out).toEqual([]);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("failed to parse"),
+        expect.stringContaining("not: valid json"),
+        expect.any(Error)
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
   it("caps at 3 connections even if the model returns more", async () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([

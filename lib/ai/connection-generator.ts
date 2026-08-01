@@ -95,16 +95,23 @@ async function buildPrompt(
 }
 
 function parseRawConnections(text: string): Array<{ ref: string; reason: string }> {
+  const jsonMatch = text.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) {
+    console.error("Connections: no JSON array found in AI response:", text.slice(0, 500));
+    return [];
+  }
   try {
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return [];
     const parsed = JSON.parse(jsonMatch[0]);
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) {
+      console.error("Connections: AI response JSON was not an array:", jsonMatch[0].slice(0, 500));
+      return [];
+    }
     return parsed.filter(
       (c): c is { ref: string; reason: string } =>
         c && typeof c.ref === "string" && typeof c.reason === "string"
     );
-  } catch {
+  } catch (err) {
+    console.error("Connections: failed to parse AI response:", text.slice(0, 500), err);
     return [];
   }
 }
