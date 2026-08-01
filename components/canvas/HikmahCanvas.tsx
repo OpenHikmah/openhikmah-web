@@ -65,6 +65,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
   const reactFlow = useReactFlow();
   const expandingRef = useRef(false);
   const mountedRef = useRef(true);
+  const noticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [expansionNotice, setExpansionNotice] = useState<{
     messageKey: "noMoreConnections" | "connectionsFailed" | "expansionInProgress";
     kind: "error" | "info";
@@ -84,6 +85,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current);
     };
   }, []);
 
@@ -146,7 +148,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
         }
 
         for (let i = 0; i < connections.length; i++) {
-          await new Promise<void>((resolve) => setTimeout(resolve, 350 * i));
+          await new Promise<void>((resolve) => setTimeout(resolve, 350));
           if (!mountedRef.current) break;
 
           const conn = connections[i];
@@ -203,7 +205,10 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
             messageKey: exhausted ? "noMoreConnections" : "connectionsFailed",
             kind: exhausted ? "info" : "error",
           });
-          setTimeout(() => setExpansionNotice(null), 6000);
+          if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current);
+          noticeTimeoutRef.current = setTimeout(() => {
+            if (mountedRef.current) setExpansionNotice(null);
+          }, 6000);
         }
       } finally {
         if (mountedRef.current) setExpandingNode(null);
