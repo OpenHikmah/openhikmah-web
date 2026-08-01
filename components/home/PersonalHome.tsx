@@ -44,6 +44,7 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
   const tNav = useTranslations("nav");
   const tBookmarks = useTranslations("bookmarks");
   const tErrors = useTranslations("errors");
+  const t = useTranslations("home");
   const bookmarks = useAuthStore((s) => s.bookmarks);
   const accessToken = useAuthStore((s) => s.accessToken);
   const username = useSocialStore((s) => s.username);
@@ -84,22 +85,21 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-text-muted">
-            Assalamu alaykum
+            {t("greeting")}
           </p>
           <h1 className="mt-1.5 text-[clamp(1.5rem,3.5vw,2.1rem)] font-semibold tracking-[-0.02em] text-text-primary">
-            {username ? (
-              <>
-                Welcome back, <span className="text-gold">{username}</span>
-              </>
-            ) : (
-              "Welcome back"
-            )}
+            {username
+              ? t.rich("welcomeBackNamed", {
+                  name: username,
+                  gold: (chunks) => <span className="text-gold">{chunks}</span>,
+                })
+              : t("welcomeBack")}
           </h1>
         </div>
         {streak > 0 && (
           <div className="flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/[0.08] px-3 py-1.5 text-gold">
             <Flame className="h-3.5 w-3.5" fill="currentColor" />
-            <span className="text-sm font-semibold">{streak}-day streak</span>
+            <span className="text-sm font-semibold">{tNav("dayStreak", { count: streak })}</span>
           </div>
         )}
       </div>
@@ -117,24 +117,22 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
           <QuickLink
             href="/canvas"
             icon={LayoutTemplate}
-            title={hasContinue ? "Continue your canvas" : "Open the canvas"}
+            title={hasContinue ? t("continueCanvas") : t("openCanvas")}
             subtitle={
-              hasContinue
-                ? `${continueCount} verse${continueCount === 1 ? "" : "s"} in progress`
-                : "Search a verse and map its connections"
+              hasContinue ? t("versesInProgress", { count: continueCount }) : t("searchAVerse")
             }
           />
           {accessToken && (
             <QuickLink
               href="/workspaces"
               icon={FolderOpen}
-              title="Saved canvases"
+              title={tNav("savedCanvases")}
               subtitle={
                 savedCount !== null
-                  ? `${savedCount} saved canvas${savedCount === 1 ? "" : "es"}`
+                  ? t("savedCanvasCount", { count: savedCount })
                   : savedCountError
-                    ? "Couldn't load your saved canvases"
-                    : "Your saved graphs"
+                    ? t("savedCanvasesLoadError")
+                    : t("savedGraphs")
               }
             />
           )}

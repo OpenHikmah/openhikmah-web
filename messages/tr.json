@@ -141,6 +141,28 @@
     "couldNotLoadVerse": "Ayet metni yüklenemedi.",
     "savedCount": "{count, plural, =0 {Henüz yer imi yok} one {# kayıtlı ayet} other {# kayıtlı ayet}}"
   },
+  "today": {
+    "verseOfTheDay": "Günün ayeti",
+    "openOnCanvas": "Tuvalde aç",
+    "pauseRecitation": "Kıraati duraklat",
+    "listen": "Dinle",
+    "listenToRecitation": "Kıraati dinle",
+    "copied": "Kopyalandı!",
+    "share": "Paylaş",
+    "copyLink": "Günün ayetinin bağlantısını kopyala"
+  },
+  "home": {
+    "greeting": "Selamün aleyküm",
+    "welcomeBack": "Tekrar hoş geldin",
+    "welcomeBackNamed": "Tekrar hoş geldin, <gold>{name}</gold>",
+    "continueCanvas": "Tuvaline devam et",
+    "openCanvas": "Tuvali aç",
+    "versesInProgress": "{count, plural, one {# ayet devam ediyor} other {# ayet devam ediyor}}",
+    "searchAVerse": "Bir ayet arayın ve bağlantılarını haritalayın",
+    "savedCanvasCount": "{count, plural, one {# kayıtlı tuval} other {# kayıtlı tuval}}",
+    "savedCanvasesLoadError": "Kayıtlı tuvalleriniz yüklenemedi",
+    "savedGraphs": "Kayıtlı tuvalleriniz"
+  },
   "names": {
     "eyebrow": "Esmaü'l Hüsna",
     "heroTitle": "Allah'ın 99 Güzel İsmi",

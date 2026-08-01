@@ -141,6 +141,28 @@
     "couldNotLoadVerse": "Ayə mətni yüklənə bilmədi.",
     "savedCount": "{count, plural, =0 {Hələ əlfəcin yoxdur} one {# yadda saxlanmış ayə} other {# yadda saxlanmış ayə}}"
   },
+  "today": {
+    "verseOfTheDay": "Günün ayəsi",
+    "openOnCanvas": "Lövhədə aç",
+    "pauseRecitation": "Qiraəti dayandır",
+    "listen": "Dinlə",
+    "listenToRecitation": "Qiraəti dinlə",
+    "copied": "Kopyalandı!",
+    "share": "Paylaş",
+    "copyLink": "Günün ayəsinin bağlantısını kopyala"
+  },
+  "home": {
+    "greeting": "Əssəlamu aleykum",
+    "welcomeBack": "Yenidən xoş gəldin",
+    "welcomeBackNamed": "Yenidən xoş gəldin, <gold>{name}</gold>",
+    "continueCanvas": "Lövhənə davam et",
+    "openCanvas": "Lövhəni aç",
+    "versesInProgress": "{count, plural, one {# ayə davam edir} other {# ayə davam edir}}",
+    "searchAVerse": "Bir ayə axtarın və əlaqələrini xəritələndirin",
+    "savedCanvasCount": "{count, plural, one {# yadda saxlanmış lövhə} other {# yadda saxlanmış lövhə}}",
+    "savedCanvasesLoadError": "Yadda saxlanmış lövhələriniz yüklənə bilmədi",
+    "savedGraphs": "Yadda saxlanmış lövhələriniz"
+  },
   "names": {
     "eyebrow": "Əsmayi-Hüsna",
     "heroTitle": "Allahın 99 Gözəl Adı",
