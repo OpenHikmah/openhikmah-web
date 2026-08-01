@@ -263,7 +263,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   getNodeById: (id) => get().nodes.find((n) => n.id === id),
 
-  getDuplicateNodeIds: (ref) => get().duplicateNodeIdsByRef[ref] ?? [],
+  // Shallow copies — callers must not be able to mutate the cached maps directly.
+  getDuplicateNodeIds: (ref) => [...(get().duplicateNodeIdsByRef[ref] ?? [])],
 
   // Expansion edges are always directed source(nodeId) -> target(newNode), so a
   // simple source+kind filter is sufficient — no need to check the reverse edge.
@@ -275,7 +276,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       .filter((ref) => !!ref) as string[];
   },
 
-  getExpansionCounts: (nodeId) => get().expansionCountsByNode[nodeId] ?? {},
+  getExpansionCounts: (nodeId) => ({ ...(get().expansionCountsByNode[nodeId] ?? {}) }),
 
   reset: () =>
     set({

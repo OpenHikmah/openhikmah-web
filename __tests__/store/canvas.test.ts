@@ -277,6 +277,27 @@ describe("canvas store", () => {
     expect(useCanvasStore.getState().getDuplicateNodeIds("9:9")).toEqual([]);
   });
 
+  it("getDuplicateNodeIds and getExpansionCounts return copies, not the cached map's live values", () => {
+    const id1 = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+    const id2 = useCanvasStore.getState().addVerseNode(baseVerse, { x: 300, y: 0 });
+
+    const dupes = useCanvasStore.getState().getDuplicateNodeIds("2:255");
+    dupes.push("mutated-in-caller");
+    expect(useCanvasStore.getState().getDuplicateNodeIds("2:255")).toEqual([id1, id2]);
+
+    const edge: CanvasEdge = {
+      id: "edge-1",
+      source: id1,
+      target: id2,
+      type: "hikmah",
+      data: { kind: "thematic", label: "theme" },
+    };
+    useCanvasStore.getState().addConnectionEdge(edge);
+    const counts = useCanvasStore.getState().getExpansionCounts(id1);
+    counts.thematic = 999;
+    expect(useCanvasStore.getState().getExpansionCounts(id1)).toEqual({ thematic: 1 });
+  });
+
   it("duplicate and expansion-count lookups stay correct after the newly-added pulse clears, proving they don't rely on newlyAddedNodeId as a freshness signal", () => {
     const id1 = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
     const id2 = useCanvasStore.getState().addVerseNode(baseVerse, { x: 300, y: 0 });
