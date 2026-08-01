@@ -94,6 +94,7 @@
     "workspaceName": "{count, plural, one {# ayet} other {# ayet}} — {date}",
     "noMoreConnections": "Bu türde başka bağlantı yok.",
     "connectionsFailed": "Bağlantı bulunamadı. Farklı bir tür deneyin.",
+    "expansionInProgress": "Bir genişletme zaten çalışıyor — biraz sonra tekrar deneyin.",
     "dismiss": "Kapat",
     "minimapAria": "Tuval küçük haritası",
     "saveFailedRetry": "Kaydetme başarısız — tekrar deneyin",

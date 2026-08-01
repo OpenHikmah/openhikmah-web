@@ -94,6 +94,7 @@
     "workspaceName": "{count, plural, one {# verse} other {# verses}} — {date}",
     "noMoreConnections": "No more connections of this type.",
     "connectionsFailed": "Could not find connections. Try a different type.",
+    "expansionInProgress": "An expansion is already running — try again in a moment.",
     "dismiss": "Dismiss",
     "minimapAria": "Canvas minimap",
     "saveFailedRetry": "Save failed — try again",

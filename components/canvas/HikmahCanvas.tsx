@@ -66,7 +66,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
   const expandingRef = useRef(false);
   const mountedRef = useRef(true);
   const [expansionNotice, setExpansionNotice] = useState<{
-    messageKey: "noMoreConnections" | "connectionsFailed";
+    messageKey: "noMoreConnections" | "connectionsFailed" | "expansionInProgress";
     kind: "error" | "info";
   } | null>(null);
 
@@ -118,7 +118,12 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
       translation: string,
       sourcePos: { x: number; y: number }
     ) => {
-      if (expandingRef.current) return;
+      if (expandingRef.current) {
+        if (mountedRef.current) {
+          setExpansionNotice({ messageKey: "expansionInProgress", kind: "info" });
+        }
+        return;
+      }
       expandingRef.current = true;
       setExpandingNode(nodeId);
 

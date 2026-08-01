@@ -94,6 +94,7 @@
     "workspaceName": "{count, plural, one {# аят} few {# аята} many {# аятов} other {# аята}} — {date}",
     "noMoreConnections": "Больше нет связей этого типа.",
     "connectionsFailed": "Не удалось найти связи. Попробуйте другой тип.",
+    "expansionInProgress": "Расширение уже выполняется — попробуйте снова через мгновение.",
     "dismiss": "Закрыть",
     "minimapAria": "Миникарта холста",
     "saveFailedRetry": "Ошибка сохранения — попробуйте снова",
