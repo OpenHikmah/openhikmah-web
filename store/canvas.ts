@@ -88,6 +88,13 @@ interface CanvasStore {
   viewport: CanvasViewport;
   sidebarWidth: number;
   fitRequestToken: number;
+  /** Node ids sharing the same verse ref, keyed by ref. Recomputed by every
+   *  action that touches `nodes`, so `getDuplicateNodeIds` is a plain lookup
+   *  instead of an O(N) scan on every VerseNode render. */
+  duplicateNodeIdsByRef: Record<string, string[]>;
+  /** Per-source-node outgoing expansion-edge counts by kind. Recomputed by
+   *  every action that touches `edges`, mirroring `duplicateNodeIdsByRef`. */
+  expansionCountsByNode: Record<string, Partial<Record<EdgeKind, number>>>;
 
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
@@ -124,6 +131,29 @@ interface CanvasStore {
 let nodeIdCounter = 0;
 const nextId = () => `node-${++nodeIdCounter}`;
 
+function computeDuplicateMap(nodes: Node[]): Record<string, string[]> {
+  const map: Record<string, string[]> = {};
+  for (const n of nodes) {
+    const ref = (n.data as unknown as Verse)?.ref;
+    if (!ref) continue;
+    (map[ref] ??= []).push(n.id);
+  }
+  return map;
+}
+
+function computeExpansionCountsMap(
+  edges: Edge[]
+): Record<string, Partial<Record<EdgeKind, number>>> {
+  const map: Record<string, Partial<Record<EdgeKind, number>>> = {};
+  for (const e of edges) {
+    const kind = (e.data as { kind?: EdgeKind })?.kind;
+    if (!kind) continue;
+    const counts = (map[e.source] ??= {});
+    counts[kind] = (counts[kind] ?? 0) + 1;
+  }
+  return map;
+}
+
 export const DEFAULT_SIDEBAR_WIDTH = 288;
 
 // Pulse duration must exceed the CSS `.node-pulse` animation length (1.5s) so the
@@ -145,13 +175,23 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   viewport: { x: 0, y: 0, zoom: 1 },
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
   fitRequestToken: 0,
+  duplicateNodeIdsByRef: {},
+  expansionCountsByNode: {},
 
-  setNodes: (nodes) => set({ nodes }),
-  setEdges: (edges) => set({ edges }),
+  setNodes: (nodes) => set({ nodes, duplicateNodeIdsByRef: computeDuplicateMap(nodes) }),
+  setEdges: (edges) => set({ edges, expansionCountsByNode: computeExpansionCountsMap(edges) }),
 
-  onNodesChange: (changes) => set((s) => ({ nodes: applyNodeChanges(changes, s.nodes) })),
+  onNodesChange: (changes) =>
+    set((s) => {
+      const nodes = applyNodeChanges(changes, s.nodes);
+      return { nodes, duplicateNodeIdsByRef: computeDuplicateMap(nodes) };
+    }),
 
-  onEdgesChange: (changes) => set((s) => ({ edges: applyEdgeChanges(changes, s.edges) })),
+  onEdgesChange: (changes) =>
+    set((s) => {
+      const edges = applyEdgeChanges(changes, s.edges);
+      return { edges, expansionCountsByNode: computeExpansionCountsMap(edges) };
+    }),
 
   setViewport: (viewport) => set({ viewport }),
 
@@ -166,9 +206,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         get().nodes.map((n) => n.position),
         { x: 0, y: 0 }
       );
-    set((s) => ({
-      nodes: [...s.nodes, { id, type: "verse", position: pos, data: { ...verse } } as Node],
-    }));
+    set((s) => {
+      const nodes = [...s.nodes, { id, type: "verse", position: pos, data: { ...verse } } as Node];
+      return { nodes, duplicateNodeIdsByRef: computeDuplicateMap(nodes) };
+    });
     get().setNewlyAddedNode(id);
     return id;
   },
@@ -181,19 +222,18 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
           (e.source === edge.target && e.target === edge.source)
       );
       if (exists) return s;
-      return {
-        edges: [
-          ...s.edges,
-          {
-            id: edge.id,
-            source: edge.source,
-            target: edge.target,
-            type: "hikmah",
-            data: edge.data,
-            animated: true,
-          } as Edge,
-        ],
-      };
+      const edges = [
+        ...s.edges,
+        {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          type: "hikmah",
+          data: edge.data,
+          animated: true,
+        } as Edge,
+      ];
+      return { edges, expansionCountsByNode: computeExpansionCountsMap(edges) };
     });
   },
 
@@ -223,10 +263,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   getNodeById: (id) => get().nodes.find((n) => n.id === id),
 
-  getDuplicateNodeIds: (ref) =>
-    get()
-      .nodes.filter((n) => (n.data as unknown as Verse)?.ref === ref)
-      .map((n) => n.id),
+  // Shallow copies — callers must not be able to mutate the cached maps directly.
+  getDuplicateNodeIds: (ref) => [...(get().duplicateNodeIdsByRef[ref] ?? [])],
 
   // Expansion edges are always directed source(nodeId) -> target(newNode), so a
   // simple source+kind filter is sufficient — no need to check the reverse edge.
@@ -238,16 +276,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       .filter((ref) => !!ref) as string[];
   },
 
-  getExpansionCounts: (nodeId) => {
-    const counts: Partial<Record<EdgeKind, number>> = {};
-    for (const e of get().edges) {
-      if (e.source !== nodeId) continue;
-      const kind = (e.data as { kind?: EdgeKind })?.kind;
-      if (!kind) continue;
-      counts[kind] = (counts[kind] ?? 0) + 1;
-    }
-    return counts;
-  },
+  getExpansionCounts: (nodeId) => ({ ...(get().expansionCountsByNode[nodeId] ?? {}) }),
 
   reset: () =>
     set({
@@ -261,6 +290,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       pendingAutoExpand: null,
       pendingPanToNodeId: null,
       newlyAddedNodeId: null,
+      duplicateNodeIdsByRef: {},
+      expansionCountsByNode: {},
     }),
 
   restoreCanvas: (saved: SavedCanvas) => {
@@ -281,6 +312,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       pendingAutoExpand: null,
       pendingPanToNodeId: null,
       newlyAddedNodeId: null,
+      duplicateNodeIdsByRef: computeDuplicateMap(nodes),
+      expansionCountsByNode: computeExpansionCountsMap(edges),
     });
   },
 
@@ -324,9 +357,15 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
           )
       );
 
-    set((s) => ({
-      nodes: [...s.nodes, ...placed],
-      edges: [...s.edges, ...finalEdges],
-    }));
+    set((s) => {
+      const nodes = [...s.nodes, ...placed];
+      const edges = [...s.edges, ...finalEdges];
+      return {
+        nodes,
+        edges,
+        duplicateNodeIdsByRef: computeDuplicateMap(nodes),
+        expansionCountsByNode: computeExpansionCountsMap(edges),
+      };
+    });
   },
 }));
