@@ -1,10 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, waitFor, cleanup } from "@testing-library/react";
 import { usePreferencesStore } from "@/store/preferences";
-import { LocaleRehydrationSync } from "@/components/providers";
+import { useAuthStore } from "@/store/auth";
+import { LocaleRehydrationSync, SessionRestorer } from "@/components/providers";
 
 const { mockRefresh } = vi.hoisted(() => ({ mockRefresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mockRefresh }) }));
+vi.mock("@/hooks/useCanvasPersistence", () => ({
+  mergeGuestWorkspace: vi.fn().mockResolvedValue(undefined),
+}));
 
 describe("LocaleRehydrationSync", () => {
   beforeEach(() => {
@@ -28,5 +32,54 @@ describe("LocaleRehydrationSync", () => {
     // A later, unrelated re-render with the same mismatch must not refresh again.
     usePreferencesStore.setState({ uiLocale: "tr" });
     await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("SessionRestorer", () => {
+  const mockFetch = vi.fn();
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    vi.stubGlobal("fetch", mockFetch);
+    useAuthStore.setState({ accessToken: null, isSessionLoading: true });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("logs a distinguishing message and still resolves session loading when refresh throws", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockFetch.mockRejectedValueOnce(new Error("network down"));
+
+    render(<SessionRestorer />);
+
+    await waitFor(() => expect(useAuthStore.getState().isSessionLoading).toBe(false));
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("session restore failed"),
+      expect.any(Error)
+    );
+    errorSpy.mockRestore();
+  });
+
+  it("does not log an error for the expected no-session case (non-OK refresh response)", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockFetch.mockResolvedValueOnce({ ok: false });
+
+    render(<SessionRestorer />);
+
+    await waitFor(() => expect(useAuthStore.getState().isSessionLoading).toBe(false));
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("skips the refresh call entirely when a token is already in memory", async () => {
+    useAuthStore.setState({ accessToken: "already-signed-in", isSessionLoading: true });
+
+    render(<SessionRestorer />);
+
+    await waitFor(() => expect(useAuthStore.getState().isSessionLoading).toBe(false));
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
