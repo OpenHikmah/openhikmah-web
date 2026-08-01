@@ -176,6 +176,8 @@
     "reflectionLabel": "Möminin Təfəkkürü",
     "pairingsLabel": "Ümumi Uyğunluqlar",
     "couldNotLoadVerses": "Ayələr hazırda yüklənə bilmədi.",
+    "couldNotLoadReflection": "Təfəkkür hazırda yüklənə bilmədi.",
+    "couldNotLoadPairings": "Uyğunluqlar hazırda yüklənə bilmədi.",
     "findingVerses": "Claude ayələri tapır…",
     "noVersesFound": "Bu ad üçün ayə tapılmadı.",
     "connectionLabel": "Əlaqə: ",

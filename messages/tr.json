@@ -176,6 +176,8 @@
     "reflectionLabel": "Müminin Tefekkürü",
     "pairingsLabel": "Yaygın Eşleşmeler",
     "couldNotLoadVerses": "Ayetler şu anda yüklenemedi.",
+    "couldNotLoadReflection": "Tefekkür şu anda yüklenemedi.",
+    "couldNotLoadPairings": "Eşleşmeler şu anda yüklenemedi.",
     "findingVerses": "Claude ayetleri buluyor…",
     "noVersesFound": "Bu isim için ayet bulunamadı.",
     "connectionLabel": "Bağlantı: ",

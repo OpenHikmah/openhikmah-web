@@ -11,7 +11,11 @@ import {
 import { Wordmark } from "@/components/layout/Wordmark";
 import { NameVerses } from "./NameVerses";
 import { NameReflection } from "./NameReflection";
-import { NamePairings } from "./NamePairings";
+import { NamePairings, type Pairing } from "./NamePairings";
+import { getCachedNameContent } from "@/lib/names/name-content";
+import { getUiLocale } from "@/lib/i18n/request-prefs";
+import { REFLECTION_VERSION } from "@/app/api/names/[slug]/reflection/route";
+import { PAIRINGS_VERSION } from "@/app/api/names/[slug]/pairings/route";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -50,6 +54,16 @@ export default async function NameDetailPage({ params }: Props) {
   const t = await getTranslations("names");
   const styles = CATEGORY_STYLES[name.category];
   const categoryLabelKey = CATEGORY_LABEL_KEYS[name.category].label;
+
+  // Read-only cache prefetch — a hit lets these sections render server-side
+  // (crawlers/view-source see the text immediately, no client round trip); a
+  // miss leaves the value undefined and the client components fall back to
+  // their existing fetch-and-generate behavior unchanged.
+  const locale = await getUiLocale();
+  const [initialReflection, initialPairings] = await Promise.all([
+    getCachedNameContent<string>(slug, "reflection", locale, REFLECTION_VERSION),
+    getCachedNameContent<Pairing[]>(slug, "pairings", locale, PAIRINGS_VERSION),
+  ]);
 
   const prevName = DIVINE_NAMES.find((n) => n.id === name.id - 1);
   const nextName = DIVINE_NAMES.find((n) => n.id === name.id + 1);
@@ -99,10 +113,10 @@ export default async function NameDetailPage({ params }: Props) {
       {/* Reflection + Pairings + Verses */}
       <div className="max-w-3xl mx-auto px-6 py-10 space-y-10">
         {/* Believer's Reflection */}
-        <NameReflection slug={slug} accent={styles.accent} />
+        <NameReflection slug={slug} accent={styles.accent} initialReflection={initialReflection} />
 
         {/* Structural Pairings */}
-        <NamePairings slug={slug} accent={styles.accent} />
+        <NamePairings slug={slug} accent={styles.accent} initialPairings={initialPairings} />
 
         {/* Verse Feed */}
         <div>

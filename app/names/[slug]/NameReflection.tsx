@@ -6,14 +6,18 @@ import { useTranslations } from "next-intl";
 interface Props {
   slug: string;
   accent: string;
+  /** Server-prefetched reflection text, or `null` on a cache miss (the
+   *  component then falls back to its own fetch, unchanged). */
+  initialReflection?: string | null;
 }
 
-export function NameReflection({ slug, accent }: Props) {
+export function NameReflection({ slug, accent, initialReflection }: Props) {
   const t = useTranslations("names");
-  const [reflection, setReflection] = useState<string | null>(null);
+  const [reflection, setReflection] = useState<string | null>(initialReflection ?? null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    if (initialReflection != null) return; // already have it from the server
     let cancelled = false;
     fetch(`/api/names/${slug}/reflection`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
@@ -26,9 +30,15 @@ export function NameReflection({ slug, accent }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, initialReflection]);
 
-  if (error) return null;
+  if (error) {
+    return (
+      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+        {t("couldNotLoadReflection")}
+      </p>
+    );
+  }
 
   return (
     <div

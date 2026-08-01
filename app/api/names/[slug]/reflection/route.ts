@@ -8,8 +8,9 @@ import { getUiLocale } from "@/lib/i18n/request-prefs";
 import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
 import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
 
-// Bump to force regeneration after a prompt change.
-const REFLECTION_VERSION = 1;
+// Bump to force regeneration after a prompt change. Exported so page.tsx can
+// use the same version when checking the cache for a server-side prefetch.
+export const REFLECTION_VERSION = 1;
 
 function buildPrompt(
   arabic: string,
