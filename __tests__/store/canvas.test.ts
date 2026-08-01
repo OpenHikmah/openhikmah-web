@@ -241,8 +241,65 @@ describe("canvas store", () => {
     expect(useCanvasStore.getState().getExpansionCounts(id)).toEqual({});
   });
 
-  it("reset clears all state", () => {
-    useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+  it("getExpansionCounts updates immediately after addConnectionEdge, without a re-scan call", () => {
+    const sourceId = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+    const targetId = useCanvasStore
+      .getState()
+      .addVerseNode({ ...baseVerse, ref: "1:1" as const, surah: 1, ayah: 1 }, { x: 300, y: 0 });
+
+    expect(useCanvasStore.getState().getExpansionCounts(sourceId)).toEqual({});
+
+    useCanvasStore.getState().addConnectionEdge({
+      id: "e1",
+      source: sourceId,
+      target: targetId,
+      type: "hikmah",
+      data: { kind: "root", label: "t" },
+    });
+
+    expect(useCanvasStore.getState().getExpansionCounts(sourceId)).toEqual({ root: 1 });
+  });
+
+  it("getDuplicateNodeIds returns every node id sharing a ref", () => {
+    const id1 = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+    const id2 = useCanvasStore.getState().addVerseNode(baseVerse, { x: 300, y: 0 });
+    const other = useCanvasStore
+      .getState()
+      .addVerseNode({ ...baseVerse, ref: "1:1" as const, surah: 1, ayah: 1 }, { x: 600, y: 0 });
+
+    expect(useCanvasStore.getState().getDuplicateNodeIds("2:255").sort()).toEqual(
+      [id1, id2].sort()
+    );
+    expect(useCanvasStore.getState().getDuplicateNodeIds("1:1")).toEqual([other]);
+  });
+
+  it("getDuplicateNodeIds returns an empty array for a ref not on the canvas", () => {
+    expect(useCanvasStore.getState().getDuplicateNodeIds("9:9")).toEqual([]);
+  });
+
+  it("duplicate and expansion-count lookups stay correct after the newly-added pulse clears, proving they don't rely on newlyAddedNodeId as a freshness signal", () => {
+    const id1 = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+    const id2 = useCanvasStore.getState().addVerseNode(baseVerse, { x: 300, y: 0 });
+    useCanvasStore.getState().addConnectionEdge({
+      id: "e1",
+      source: id1,
+      target: id2,
+      type: "hikmah",
+      data: { kind: "contrast", label: "t" },
+    });
+
+    // Simulate the pulse-highlight timeout having already fired and cleared
+    // newlyAddedNodeId — the derived lookups must still reflect current state.
+    useCanvasStore.setState({ newlyAddedNodeId: null });
+
+    expect(useCanvasStore.getState().getDuplicateNodeIds("2:255").sort()).toEqual(
+      [id1, id2].sort()
+    );
+    expect(useCanvasStore.getState().getExpansionCounts(id1)).toEqual({ contrast: 1 });
+  });
+
+  it("reset clears all state, including the derived duplicate/expansion-count maps", () => {
+    const id = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
     useCanvasStore.getState().setSelectedNode("x");
     useCanvasStore.getState().reset();
     const s = useCanvasStore.getState();
@@ -252,6 +309,10 @@ describe("canvas store", () => {
     expect(s.sidebarContent).toBeNull();
     expect(s.pendingExpand).toBeNull();
     expect(s.pendingAutoExpand).toBeNull();
+    expect(s.duplicateNodeIdsByRef).toEqual({});
+    expect(s.expansionCountsByNode).toEqual({});
+    expect(s.getDuplicateNodeIds("2:255")).toEqual([]);
+    expect(s.getExpansionCounts(id)).toEqual({});
   });
 });
 
@@ -403,6 +464,24 @@ describe("restoreCanvas", () => {
     expect(s.selectedNodeId).toBeNull();
     expect(s.sidebarContent).toBeNull();
     expect(s.pendingExpand).toBeNull();
+  });
+
+  it("populates the derived duplicate/expansion-count maps from restored data", () => {
+    const store = useCanvasStore.getState();
+    store.restoreCanvas({
+      v: 1,
+      nodes: [
+        { id: "node-1", x: 0, y: 0, verse: baseVerse },
+        { id: "node-2", x: 300, y: 0, verse: baseVerse },
+      ],
+      edges: [
+        { id: "e1", source: "node-1", target: "node-2", kind: "thematic", label: "", reason: "" },
+      ],
+    });
+
+    const s = useCanvasStore.getState();
+    expect(s.getDuplicateNodeIds("2:255").sort()).toEqual(["node-1", "node-2"]);
+    expect(s.getExpansionCounts("node-1")).toEqual({ thematic: 1 });
   });
 
   it("restores node id counter so new nodes don't collide", () => {

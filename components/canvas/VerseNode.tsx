@@ -20,9 +20,13 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
   const t = useTranslations("canvas");
   const tCommon = useTranslations("common");
 
-  const expandingNodeId = useCanvasStore((s) => s.expandingNodeId);
-  const openExpandNodeId = useCanvasStore((s) => s.openExpandNodeId);
-  const newlyAddedNodeId = useCanvasStore((s) => s.newlyAddedNodeId);
+  // Narrowed to booleans (not the raw shared id) so a change to any of these
+  // fields only re-renders the node it actually affects, not every node on
+  // the canvas — Zustand's default Object.is equality compares the boolean
+  // result itself, not the underlying shared field.
+  const isExpanding = useCanvasStore((s) => s.expandingNodeId === id);
+  const expandMenuOpen = useCanvasStore((s) => s.openExpandNodeId === id);
+  const isPulsing = useCanvasStore((s) => s.newlyAddedNodeId === id);
   const setSelectedNode = useCanvasStore((s) => s.setSelectedNode);
   const setOpenExpandNodeId = useCanvasStore((s) => s.setOpenExpandNodeId);
   const setSidebarContent = useCanvasStore((s) => s.setSidebarContent);
@@ -43,9 +47,6 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
   const resumeAudio = useAudioStore((s) => s.resume);
   const isThisPlaying = currentRef === verse.ref && isPlaying;
 
-  const isExpanding = expandingNodeId === id;
-  const expandMenuOpen = openExpandNodeId === id;
-  const isPulsing = newlyAddedNodeId === id;
   const otherDuplicateIds = getDuplicateNodeIds(verse.ref).filter((did) => did !== id);
   const hasDuplicate = otherDuplicateIds.length > 0;
   const expansionCounts = getExpansionCounts(id);
