@@ -522,3 +522,53 @@ describe("restoreCanvas", () => {
     expect(num).toBeGreaterThan(10);
   });
 });
+
+describe("appendWorkspace", () => {
+  beforeEach(() => {
+    useCanvasStore.getState().reset();
+  });
+
+  it("merges a duplicate verse and a remapped expansion edge, updating both derived-index maps", () => {
+    const store = useCanvasStore.getState();
+    const existingId = store.addVerseNode(baseVerse, { x: 0, y: 0 });
+
+    store.appendWorkspace({
+      v: 1,
+      nodes: [
+        // Same id as the already-on-canvas node -> forces a remap; same ref -> duplicate.
+        { id: existingId, x: 300, y: 0, verse: baseVerse },
+        {
+          id: "incoming-2",
+          x: 600,
+          y: 0,
+          verse: { ...baseVerse, ref: "1:1" as const, surah: 1, ayah: 1 },
+        },
+      ],
+      edges: [
+        {
+          id: "e1",
+          source: existingId,
+          target: "incoming-2",
+          kind: "thematic",
+          label: "",
+          reason: "",
+        },
+      ],
+    });
+
+    const s = useCanvasStore.getState();
+    expect(s.nodes).toHaveLength(3);
+
+    const dupes = s.getDuplicateNodeIds(baseVerse.ref);
+    expect(dupes).toHaveLength(2);
+    expect(dupes).toContain(existingId);
+    const remappedId = dupes.find((did) => did !== existingId)!;
+    expect(remappedId).not.toBe(existingId);
+
+    // The edge's source pointed at the pre-remap id, so the count must land on the
+    // remapped node, not the original — proving expansionCountsByNode was rebuilt
+    // from the remapped edges, not the incoming ones.
+    expect(s.getExpansionCounts(remappedId)).toEqual({ thematic: 1 });
+    expect(s.getExpansionCounts(existingId)).toEqual({});
+  });
+});

@@ -3,6 +3,7 @@
 import { memo } from "react";
 import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
 import { useTranslations } from "next-intl";
+import { useShallow } from "zustand/shallow";
 import type { Verse, EdgeKind } from "@/types/quran";
 import { useCanvasStore } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
@@ -32,9 +33,17 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
   const setSidebarContent = useCanvasStore((s) => s.setSidebarContent);
   const setPendingExpand = useCanvasStore((s) => s.setPendingExpand);
   const setNewlyAddedNode = useCanvasStore((s) => s.setNewlyAddedNode);
-  const getDuplicateNodeIds = useCanvasStore((s) => s.getDuplicateNodeIds);
-  const getExpansionCounts = useCanvasStore((s) => s.getExpansionCounts);
   const getNodeById = useCanvasStore((s) => s.getNodeById);
+  // Subscribed directly to the derived maps (not through the getDuplicateNodeIds/
+  // getExpansionCounts getters, which are stable function references and so never
+  // change identity — a selector returning them would never re-render this node
+  // when the underlying map does). useShallow bails the re-render when the
+  // recomputed array/object has the same contents as before, even though
+  // recomputeDerived rebuilds a fresh object on every mutation.
+  const otherDuplicateIds = useCanvasStore(
+    useShallow((s) => (s.duplicateNodeIdsByRef[verse.ref] ?? []).filter((did) => did !== id))
+  );
+  const expansionCounts = useCanvasStore(useShallow((s) => s.expansionCountsByNode[id] ?? {}));
   const reactFlow = useReactFlow();
 
   const isBookmarked = useAuthStore((s) => s.isBookmarked(verse.ref));
@@ -47,9 +56,7 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
   const resumeAudio = useAudioStore((s) => s.resume);
   const isThisPlaying = currentRef === verse.ref && isPlaying;
 
-  const otherDuplicateIds = getDuplicateNodeIds(verse.ref).filter((did) => did !== id);
   const hasDuplicate = otherDuplicateIds.length > 0;
-  const expansionCounts = getExpansionCounts(id);
 
   const handleExpandSelect = (kind: EdgeKind) => {
     setPendingExpand({ nodeId: id, ref: verse.ref, kind });
