@@ -104,7 +104,8 @@ function parseRawConnections(text: string): Array<{ ref: string; reason: string 
       (c): c is { ref: string; reason: string } =>
         c && typeof c.ref === "string" && typeof c.reason === "string"
     );
-  } catch {
+  } catch (err) {
+    console.error("Connections: failed to parse AI response:", text.slice(0, 500), err);
     return [];
   }
 }

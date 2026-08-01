@@ -105,6 +105,14 @@ describe("generateConnections", () => {
     expect(out).toEqual([]);
   });
 
+  it("logs when the AI response fails to parse instead of failing silently", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockCallAI.mockResolvedValue("[{ not: valid json }]");
+    await generateConnections("1:1", "ar", "tr", "thematic");
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+
   it("caps at 3 connections even if the model returns more", async () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([
