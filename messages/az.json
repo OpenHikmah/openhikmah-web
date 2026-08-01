@@ -139,6 +139,7 @@
     "openCanvas": "Lövhəni aç",
     "openInCanvas": "Lövhədə aç",
     "couldNotLoadVerse": "Ayə mətni yüklənə bilmədi.",
+    "couldNotLoadBookmarks": "Əlfəcinləriniz yüklənə bilmədi — yerli olaraq saxlanılanlar göstərilir.",
     "savedCount": "{count, plural, =0 {Hələ əlfəcin yoxdur} one {# yadda saxlanmış ayə} other {# yadda saxlanmış ayə}}"
   },
   "today": {

@@ -33,7 +33,7 @@ export function LocaleRehydrationSync({ ssrLocale }: { ssrLocale: Locale }) {
   return null;
 }
 
-function SessionRestorer() {
+export function SessionRestorer() {
   const setTokens = useAuthStore((s) => s.setTokens);
   const setSessionLoaded = useAuthStore((s) => s.setSessionLoaded);
   const loadRemoteBookmarks = useAuthStore((s) => s.loadRemoteBookmarks);
@@ -124,7 +124,9 @@ function SessionRestorer() {
           }
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.error("SessionRestorer: session restore failed:", err);
+      })
       .finally(() => setSessionLoaded());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

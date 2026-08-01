@@ -139,6 +139,7 @@
     "openCanvas": "Tuvali aç",
     "openInCanvas": "Tuvalde aç",
     "couldNotLoadVerse": "Ayet metni yüklenemedi.",
+    "couldNotLoadBookmarks": "Yer imleriniz yüklenemedi — yerel olarak kaydedilenler gösteriliyor.",
     "savedCount": "{count, plural, =0 {Henüz yer imi yok} one {# kayıtlı ayet} other {# kayıtlı ayet}}"
   },
   "today": {

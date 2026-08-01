@@ -8,7 +8,7 @@ describe("auth store", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     localStorage.clear();
-    useAuthStore.setState({ accessToken: null, bookmarks: [] });
+    useAuthStore.setState({ accessToken: null, bookmarks: [], bookmarksLoadError: false });
   });
 
   it("initial state has null token and empty bookmarks", () => {
@@ -120,10 +120,69 @@ describe("auth store", () => {
     expect(useAuthStore.getState().bookmarks).toEqual(["2:255", "112:1"]);
   });
 
-  it("loadRemoteBookmarks does nothing on API failure", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false });
+  it("loadRemoteBookmarks keeps the existing list but sets bookmarksLoadError on a non-OK response", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
     useAuthStore.setState({ accessToken: "tok", bookmarks: ["3:1"] });
     await useAuthStore.getState().loadRemoteBookmarks();
     expect(useAuthStore.getState().bookmarks).toEqual(["3:1"]); // unchanged
+    expect(useAuthStore.getState().bookmarksLoadError).toBe(true);
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("loadRemoteBookmarks keeps the existing list and sets bookmarksLoadError when fetch throws", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockFetch.mockRejectedValueOnce(new Error("network down"));
+    useAuthStore.setState({ accessToken: "tok", bookmarks: ["3:1"] });
+    await useAuthStore.getState().loadRemoteBookmarks();
+    expect(useAuthStore.getState().bookmarks).toEqual(["3:1"]); // unchanged
+    expect(useAuthStore.getState().bookmarksLoadError).toBe(true);
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("loadRemoteBookmarks clears a previous bookmarksLoadError on a subsequent successful load", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ refs: ["2:255"] }),
+    });
+    useAuthStore.setState({ accessToken: "tok", bookmarksLoadError: true });
+    await useAuthStore.getState().loadRemoteBookmarks();
+    expect(useAuthStore.getState().bookmarksLoadError).toBe(false);
+  });
+
+  it("loadRemoteBookmarks syncs local-only bookmarks to the server in bounded-size batches", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ refs: ["2:255"] }),
+    });
+    // 5 local-only refs, plus the initial GET, plus 5 sync POSTs = 6 total calls.
+    for (let i = 0; i < 5; i++) mockFetch.mockResolvedValueOnce({ ok: true });
+    useAuthStore.setState({
+      accessToken: "tok",
+      bookmarks: ["2:255", "1:1", "112:1", "3:18", "5:1", "18:10"],
+    });
+
+    await useAuthStore.getState().loadRemoteBookmarks();
+
+    const syncCalls = mockFetch.mock.calls.filter(
+      ([, init]) => (init as RequestInit | undefined)?.method === "POST"
+    );
+    expect(syncCalls).toHaveLength(5);
+  });
+
+  it("loadRemoteBookmarks logs a count of failed syncs without throwing", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ refs: [] }) })
+      .mockResolvedValueOnce({ ok: false, status: 500 })
+      .mockResolvedValueOnce({ ok: true });
+    useAuthStore.setState({ accessToken: "tok", bookmarks: ["3:18", "5:1"] });
+
+    await expect(useAuthStore.getState().loadRemoteBookmarks()).resolves.toBeUndefined();
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("failed to sync 1/2"));
+    errorSpy.mockRestore();
   });
 });

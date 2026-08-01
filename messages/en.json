@@ -139,6 +139,7 @@
     "openCanvas": "Open canvas",
     "openInCanvas": "Open in canvas",
     "couldNotLoadVerse": "Could not load verse text.",
+    "couldNotLoadBookmarks": "Could not load your bookmarks — showing what's saved locally.",
     "savedCount": "{count, plural, =0 {No bookmarks yet} one {# saved verse} other {# saved verses}}"
   },
   "today": {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Heart, Trash2, Network } from "lucide-react";
+import { Heart, Trash2, Network, AlertCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/store/auth";
 import { LandingHeader } from "@/components/layout/LandingHeader";
@@ -15,6 +15,7 @@ export default function BookmarksPage() {
   const t = useTranslations("bookmarks");
   const tCommon = useTranslations("common");
   const bookmarks = useAuthStore((s) => s.bookmarks);
+  const bookmarksLoadError = useAuthStore((s) => s.bookmarksLoadError);
   const toggleBookmark = useAuthStore((s) => s.toggleBookmark);
   const [verses, setVerses] = useState<Map<string, Verse>>(new Map());
   const [loading, setLoading] = useState(bookmarks.length > 0);
@@ -65,6 +66,13 @@ export default function BookmarksPage() {
             </span>
           )}
         </div>
+
+        {bookmarksLoadError && (
+          <div className="mb-6 flex items-center gap-2 rounded-md border border-error/30 bg-error/[0.06] px-3 py-2 text-xs text-error">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            <span>{t("couldNotLoadBookmarks")}</span>
+          </div>
+        )}
 
         {bookmarks.length === 0 ? (
           <div className="py-20 text-center">
