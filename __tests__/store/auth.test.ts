@@ -152,6 +152,25 @@ describe("auth store", () => {
     expect(useAuthStore.getState().bookmarksLoadError).toBe(false);
   });
 
+  it("loadRemoteBookmarks resolves without waiting for the (fire-and-forget) sync to finish", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ refs: ["2:255"] }),
+    });
+    let releaseSync!: (v: { ok: boolean }) => void;
+    mockFetch.mockReturnValueOnce(
+      new Promise((res) => {
+        releaseSync = res;
+      })
+    );
+    useAuthStore.setState({ accessToken: "tok", bookmarks: ["2:255", "1:1"] });
+
+    await useAuthStore.getState().loadRemoteBookmarks();
+    expect(useAuthStore.getState().bookmarks).toEqual(["2:255", "1:1"]);
+
+    releaseSync({ ok: true }); // avoid an unresolved promise leaking into later tests
+  });
+
   it("loadRemoteBookmarks syncs local-only bookmarks to the server in bounded-size batches", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -166,10 +185,12 @@ describe("auth store", () => {
 
     await useAuthStore.getState().loadRemoteBookmarks();
 
-    const syncCalls = mockFetch.mock.calls.filter(
-      ([, init]) => (init as RequestInit | undefined)?.method === "POST"
-    );
-    expect(syncCalls).toHaveLength(5);
+    await vi.waitFor(() => {
+      const syncCalls = mockFetch.mock.calls.filter(
+        ([, init]) => (init as RequestInit | undefined)?.method === "POST"
+      );
+      expect(syncCalls).toHaveLength(5);
+    });
   });
 
   it("loadRemoteBookmarks logs a count of failed syncs without throwing", async () => {
@@ -182,7 +203,9 @@ describe("auth store", () => {
 
     await expect(useAuthStore.getState().loadRemoteBookmarks()).resolves.toBeUndefined();
 
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("failed to sync 1/2"));
+    await vi.waitFor(() => {
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("failed to sync 1/2"));
+    });
     errorSpy.mockRestore();
   });
 });

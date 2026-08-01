@@ -29,6 +29,36 @@ interface AuthStore {
 // can burst at the per-user rate limiter (lib/infra/rate-limit.ts).
 const BOOKMARK_SYNC_CONCURRENCY = 3;
 
+// Fire-and-forget from loadRemoteBookmarks (not awaited) so a large sync
+// doesn't hold up isSessionLoading/AuthShell's spinner — but bounded and with
+// failures logged instead of silently dropped, unlike the old unbounded fan-out.
+async function syncLocalOnlyBookmarks(refs: string[], accessToken: string): Promise<void> {
+  let failedCount = 0;
+  for (let i = 0; i < refs.length; i += BOOKMARK_SYNC_CONCURRENCY) {
+    const chunk = refs.slice(i, i + BOOKMARK_SYNC_CONCURRENCY);
+    const results = await Promise.allSettled(
+      chunk.map((ref) =>
+        fetch("/api/bookmarks", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ ref }),
+        }).then((r) => {
+          if (!r.ok) throw new Error(`sync POST returned ${r.status}`);
+        })
+      )
+    );
+    failedCount += results.filter((r) => r.status === "rejected").length;
+  }
+  if (failedCount > 0) {
+    console.error(
+      `loadRemoteBookmarks: failed to sync ${failedCount}/${refs.length} local-only bookmark(s) to the server`
+    );
+  }
+}
+
 export const useAuthStore = create<AuthStore>()(
   persist(
     (set, get) => ({
@@ -105,31 +135,7 @@ export const useAuthStore = create<AuthStore>()(
           const local = get().bookmarks;
           const localOnly = local.filter((r) => !refs.includes(r));
           set({ bookmarks: [...new Set([...refs, ...localOnly])], bookmarksLoadError: false });
-
-          let failedCount = 0;
-          for (let i = 0; i < localOnly.length; i += BOOKMARK_SYNC_CONCURRENCY) {
-            const chunk = localOnly.slice(i, i + BOOKMARK_SYNC_CONCURRENCY);
-            const results = await Promise.allSettled(
-              chunk.map((ref) =>
-                fetch("/api/bookmarks", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${accessToken}`,
-                  },
-                  body: JSON.stringify({ ref }),
-                }).then((r) => {
-                  if (!r.ok) throw new Error(`sync POST returned ${r.status}`);
-                })
-              )
-            );
-            failedCount += results.filter((r) => r.status === "rejected").length;
-          }
-          if (failedCount > 0) {
-            console.error(
-              `loadRemoteBookmarks: failed to sync ${failedCount}/${localOnly.length} local-only bookmark(s) to the server`
-            );
-          }
+          if (localOnly.length > 0) void syncLocalOnlyBookmarks(localOnly, accessToken);
         } catch (err) {
           console.error("loadRemoteBookmarks: failed to load bookmarks", err);
           set({ bookmarksLoadError: true });
