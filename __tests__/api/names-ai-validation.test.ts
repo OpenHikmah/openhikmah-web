@@ -161,6 +161,14 @@ describe("names AI routes — model output validation", () => {
     expect(body[0].translation).toBe(ENGLISH);
   });
 
+  it("verses: the AI-fallback prompt includes the Tanzih constraint", async () => {
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "Ayat al-Kursi." }]));
+    await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+    expect(mockCallAI).toHaveBeenCalled();
+    const prompt = mockCallAI.mock.calls[0][0] as string;
+    expect(prompt).toMatch(/strict tanzih/i);
+  });
+
   it("reflection: no language directive for the default (English) locale", async () => {
     mockCallAI.mockResolvedValue("A reflection paragraph.");
     await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));

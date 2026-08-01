@@ -9,6 +9,7 @@ import { clientKey } from "@/lib/infra/http";
 import { incr } from "@/lib/infra/metrics";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
 import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
+import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
 import sanitizeHtml from "sanitize-html";
 import type { VerseRef } from "@/types/quran";
 
@@ -75,7 +76,7 @@ async function buildReasons(
 Divine name: ${transliteration} — "${meaning}"
 
 For each verse reference below, write ONE concise sentence (max 20 words) explaining how this verse manifests or relates to this divine name.
-Maintain strict Tanzih. Return ONLY a JSON object mapping ref → reason.
+Maintain ${TANZIH_CONSTRAINT}. Return ONLY a JSON object mapping ref → reason.
 
 Refs: ${refs.join(", ")}
 
@@ -112,6 +113,7 @@ The divine name ${transliteration} (${arabic}) means "${meaning}".
 Context: ${description}
 
 Find exactly 5 Quran verse references where this name's Arabic root appears or the verse concludes with a form of this name.
+Maintain ${TANZIH_CONSTRAINT}.
 Return ONLY a JSON array:
 [{ "ref": "surah:ayah", "reason": "one sentence" }, ...]`;
 
