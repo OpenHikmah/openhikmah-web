@@ -55,7 +55,6 @@ Rules:
 - Return EXACTLY 3 different verses (not the source verse).
 - Verse references must be real and accurate (format: surah:ayah, e.g. 2:255).
 - Each reason must be one concise sentence explaining the {{kind}} connection in classical Islamic terms.
-- Maintain ${TANZIH_CONSTRAINT}.
 - Return ONLY a valid JSON array. No prose, no markdown, no explanation outside the JSON.
 
 Output format:
@@ -76,6 +75,14 @@ function languageDirective(locale: Locale): string {
   return `\n\nWrite each "reason" in ${LOCALE_LANGUAGE_NAME[locale]}. Keep "ref" in "surah:ayah" format, and keep the Tanzih/Tashbih constraint above unchanged.`;
 }
 
+// Deliberately NOT part of either overridable template (see prompt-registry.ts):
+// appended after the resolved template — fallback OR an admin's DB-stored
+// override — the same way languageDirective is, so an admin override can
+// change task wording but can never omit this constraint.
+function tanzihDirective(): string {
+  return `\n\n- Maintain ${TANZIH_CONSTRAINT}.`;
+}
+
 async function buildPrompt(
   fromRef: string,
   arabicText: string,
@@ -91,7 +98,9 @@ async function buildPrompt(
       translation,
       task: KIND_INSTRUCTIONS[kind],
       kind,
-    }) + languageDirective(locale);
+    }) +
+    tanzihDirective() +
+    languageDirective(locale);
   return { text, promptVersion: version };
 }
 
@@ -190,7 +199,6 @@ Rules:
 - Choose ONLY from the candidate references listed above. Do NOT introduce any verse that is not in the list.
 - Return at most 3, fewer if fewer are genuinely appropriate.
 - Each reason must be one concise sentence explaining the {{kind}} connection in classical Islamic terms.
-- Maintain ${TANZIH_CONSTRAINT}.
 - Return ONLY a valid JSON array. No prose, no markdown, no explanation outside the JSON.
 
 Output format:
@@ -219,7 +227,9 @@ async function buildSelectionPrompt(
       task: KIND_SELECTION[kind],
       candidates: list,
       kind,
-    }) + languageDirective(locale);
+    }) +
+    tanzihDirective() +
+    languageDirective(locale);
   return { text, promptVersion: version };
 }
 

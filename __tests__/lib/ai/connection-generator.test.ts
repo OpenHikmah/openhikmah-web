@@ -27,6 +27,7 @@ vi.mock("@/lib/ai/prompt-registry", async (importOriginal) => {
 });
 
 import { generateConnections, generateGroundedConnections } from "@/lib/ai/connection-generator";
+import { getPrompt } from "@/lib/ai/prompt-registry";
 
 function verse(ref: string): Verse {
   const [s, a] = ref.split(":");
@@ -162,6 +163,24 @@ describe("generateConnections", () => {
     await generateConnections("1:1", "ar", "tr", "thematic", "tr");
     const prompt = mockCallAI.mock.calls[0][0] as string;
     expect(prompt).toMatch(/write each "reason" in turkish/i);
+    expect(prompt).toMatch(/strict tanzih/i);
+  });
+
+  it("keeps the Tanzih constraint even when an admin's prompt override omits it entirely", async () => {
+    // Simulates a DB-stored prompt_versions override that dropped the Tanzih
+    // rule (with or without intent) — the constraint must still reach the
+    // model, since it's appended after the resolved template, not baked into it.
+    vi.mocked(getPrompt).mockResolvedValueOnce({
+      template: `You are a helpful assistant.
+Reference: {{fromRef}}
+Task: {{task}}
+Return ONLY a valid JSON array of { "ref": "surah:ayah", "reason": "..." }.`,
+      version: 7,
+    });
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
+    await generateConnections("1:1", "ar", "tr", "thematic");
+    const prompt = mockCallAI.mock.calls[0][0] as string;
+    expect(prompt).not.toMatch(/you are a classical islamic scholar/i);
     expect(prompt).toMatch(/strict tanzih/i);
   });
 });
