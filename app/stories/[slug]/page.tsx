@@ -3,9 +3,9 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
-import { STORIES, getStoryBySlug } from "@/lib/stories";
+import { STORIES, getStoryBySlug, resolveLocalized } from "@/lib/stories";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
-import { getQuranEdition } from "@/lib/i18n/request-prefs";
+import { getQuranEdition, getUiLocale } from "@/lib/i18n/request-prefs";
 import { StoryVerseCard } from "./StoryVerseCard";
 import { OpenOnCanvasButton } from "./OpenOnCanvasButton";
 import type { Verse } from "@/types/quran";
@@ -27,9 +27,10 @@ export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const story = getStoryBySlug(slug);
   if (!story) return {};
+  const locale = await getUiLocale();
   return {
-    title: `${story.name.en} — Open Hikmah`,
-    description: story.tagline.en,
+    title: `${resolveLocalized(story.name, locale)} — Open Hikmah`,
+    description: resolveLocalized(story.tagline, locale),
   };
 }
 
@@ -38,6 +39,7 @@ export default async function StoryDetailPage({ params }: Props) {
   const story = getStoryBySlug(slug);
   if (!story) notFound();
 
+  const locale = await getUiLocale();
   const allRefs = story.chapters.flatMap((c) => c.verseRefs);
   const edition = await getQuranEdition();
   // Per-ref resolveVerse (corpus first, live alquran.cloud fallback) rather than
@@ -64,10 +66,12 @@ export default async function StoryDetailPage({ params }: Props) {
         </Link>
 
         <h1 className="mb-3 font-arabic text-6xl text-gold">{story.arabicName}</h1>
-        <p className="mb-2 text-xl text-text-primary">{story.name.en}</p>
-        <p className="mb-6 text-sm text-text-secondary">{story.tagline.en}</p>
+        <p className="mb-2 text-xl text-text-primary">{resolveLocalized(story.name, locale)}</p>
+        <p className="mb-6 text-sm text-text-secondary">
+          {resolveLocalized(story.tagline, locale)}
+        </p>
         <p className="mx-auto max-w-xl text-sm leading-relaxed text-text-secondary">
-          {story.intro.en}
+          {resolveLocalized(story.intro, locale)}
         </p>
       </div>
 
@@ -81,9 +85,11 @@ export default async function StoryDetailPage({ params }: Props) {
 
           return (
             <section key={chapter.id}>
-              <h2 className="mb-3 text-lg font-medium text-text-primary">{chapter.title.en}</h2>
+              <h2 className="mb-3 text-lg font-medium text-text-primary">
+                {resolveLocalized(chapter.title, locale)}
+              </h2>
               <p className="mb-6 text-sm leading-relaxed text-text-secondary">
-                {chapter.narrative.en}
+                {resolveLocalized(chapter.narrative, locale)}
               </p>
 
               <div className="space-y-3">

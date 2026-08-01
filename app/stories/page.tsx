@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
-import { STORIES } from "@/lib/stories";
+import { STORIES, resolveLocalized } from "@/lib/stories";
+import { getUiLocale } from "@/lib/i18n/request-prefs";
 
 export const metadata = {
   title: "Prophetic Stories — Open Hikmah",
@@ -9,7 +10,8 @@ export const metadata = {
     "Curated stories of the Prophets mentioned in the Quran, with verified verse mappings and a direct path to the connection canvas.",
 };
 
-export default function StoriesPage() {
+export default async function StoriesPage() {
+  const locale = await getUiLocale();
   return (
     <div className="min-h-screen bg-bg pb-[calc(72px+env(safe-area-inset-bottom))] text-text-primary md:pb-0">
       <LandingHeader />
@@ -38,8 +40,12 @@ export default function StoriesPage() {
               className="group rounded-lg border border-border bg-surface p-5 transition-all duration-200 hover:scale-[1.01] hover:border-gold"
             >
               <div className="mb-2 font-arabic text-3xl text-gold">{story.arabicName}</div>
-              <h2 className="text-lg font-medium text-text-primary">{story.name.en}</h2>
-              <p className="mt-1.5 text-sm text-text-secondary">{story.tagline.en}</p>
+              <h2 className="text-lg font-medium text-text-primary">
+                {resolveLocalized(story.name, locale)}
+              </h2>
+              <p className="mt-1.5 text-sm text-text-secondary">
+                {resolveLocalized(story.tagline, locale)}
+              </p>
               <p className="mt-3 text-xs text-text-muted">
                 {story.chapters.length} chapter{story.chapters.length === 1 ? "" : "s"} ·{" "}
                 {verseCount} verse{verseCount === 1 ? "" : "s"}
