@@ -128,6 +128,22 @@ describe("quran-corpus", () => {
       const verse = await getVerse("2:255", "tr.diyanet");
       expect(verse?.translation).toBe("text"); // row()'s default translation
     });
+
+    it("applies the verified correction for 103:2/az.mammadaliyev", async () => {
+      mockSelect.mockReturnValue(
+        makeDbChain([
+          {
+            verse: row("103:2", 103, 2),
+            translationText:
+              "İnsan (ömrünü bihudə işlərə sərf etməklə, dünyanı axirətdən üstün tutmaqla) ziyan içindədir?",
+          },
+        ])
+      );
+      const verse = await getVerse("103:2", "az.mammadaliyev");
+      expect(verse?.translation).toBe(
+        "İnsan (ömrünü bihudə işlərə sərf etməklə, dünyanı axirətdən üstün tutmaqla) ziyan içindədir."
+      );
+    });
   });
 
   describe("getVerses with edition", () => {
