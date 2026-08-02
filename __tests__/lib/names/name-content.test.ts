@@ -329,6 +329,23 @@ describe("getCachedNameContent", () => {
 
     expect(out).toEqual(["a", "b"]);
   });
+
+  it("returns null and logs (instead of throwing) when the query itself rejects", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockSelect.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.reject(new Error("connection refused")),
+        }),
+      }),
+    });
+
+    const out = await getCachedNameContent<string>("ar-rahman", "reflection", "en", 1);
+
+    expect(out).toBeNull();
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
 });
 
 describe("getOrGenerateVerseReason", () => {
