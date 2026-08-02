@@ -98,13 +98,22 @@ export async function getCachedNameContent<T>(
   locale: Locale,
   version: number
 ): Promise<T | null> {
-  const [row] = await db
-    .select({ data: nameContent.data, version: nameContent.version })
-    .from(nameContent)
-    .where(
-      and(eq(nameContent.slug, slug), eq(nameContent.kind, kind), eq(nameContent.locale, locale))
-    )
-    .limit(1);
+  let row: { data: string; version: number } | undefined;
+  try {
+    [row] = await db
+      .select({ data: nameContent.data, version: nameContent.version })
+      .from(nameContent)
+      .where(
+        and(eq(nameContent.slug, slug), eq(nameContent.kind, kind), eq(nameContent.locale, locale))
+      )
+      .limit(1);
+  } catch (err) {
+    // This is a read-only SSR prefetch (see call site in page.tsx) — a DB
+    // hiccup here must fall through to the client-side fetch-and-generate
+    // path, not crash the whole page render.
+    console.error(`Failed to read name_content for ${slug}/${kind}/${locale}:`, err);
+    return null;
+  }
 
   if (!row || row.version !== version) return null;
   try {
