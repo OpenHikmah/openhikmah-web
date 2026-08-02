@@ -174,12 +174,12 @@ describe("resolveVerse", () => {
       }
       return {
         ok: true,
-        json: async () => ({ data: { text: "Indeed, mankind is in loss?" } }),
+        json: async () => ({ data: { text: "Indeed, mankind is in loss," } }),
       } as Response;
     });
     const result = await resolveVerse("103:2", "az.mammadaliyev");
     // The correction table only has an entry for (103:2, az.mammadaliyev) —
     // since the resolved edition is en.sahih here, it must not fire.
-    expect(result?.translation).toBe("Indeed, mankind is in loss?");
+    expect(result?.translation).toBe("Indeed, mankind is in loss,");
   });
 });
