@@ -78,7 +78,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "husky": "^9.1.7",
-    "jsdom": "^29.1.1",
+    "jsdom": "^30.0.1",
     "lint-staged": "^17.0.7",
     "prettier": "^3.9.4",
     "size-limit": "^12.1.0",
