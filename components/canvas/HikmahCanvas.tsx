@@ -67,9 +67,25 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
   const mountedRef = useRef(true);
   const noticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [expansionNotice, setExpansionNotice] = useState<{
-    messageKey: "noMoreConnections" | "connectionsFailed" | "expansionInProgress";
+    messageKey:
+      | "noMoreConnections"
+      | "connectionsFailed"
+      | "expansionInProgress"
+      | "connectionExistsDifferentKind";
     kind: "error" | "info";
   } | null>(null);
+
+  const showExpansionNotice = useCallback(
+    (messageKey: NonNullable<typeof expansionNotice>["messageKey"], kind: "error" | "info") => {
+      if (!mountedRef.current) return;
+      setExpansionNotice({ messageKey, kind });
+      if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current);
+      noticeTimeoutRef.current = setTimeout(() => {
+        if (mountedRef.current) setExpansionNotice(null);
+      }, 6000);
+    },
+    []
+  );
 
   // The mobile bottom bar (in Header, outside this ReactFlowProvider) can't call
   // useReactFlow() directly, so it asks for a fit via the store instead.
@@ -121,9 +137,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
       sourcePos: { x: number; y: number }
     ) => {
       if (expandingRef.current) {
-        if (mountedRef.current) {
-          setExpansionNotice({ messageKey: "expansionInProgress", kind: "info" });
-        }
+        showExpansionNotice("expansionInProgress", "info");
         return;
       }
       expandingRef.current = true;
@@ -156,10 +170,16 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
             // Verse is already on the canvas elsewhere — draw the edge the AI
             // identified instead of silently dropping the connection, but
             // don't add a duplicate node. addConnectionEdge itself dedupes
-            // repeat source/target pairs, so re-expanding is a safe no-op.
+            // repeat source/target pairs; if one already exists with a
+            // *different* kind, surface that rather than dropping it silently.
             const existing = getNodeByRef(conn.ref);
             const edge = existing && buildConnectionEdge(nodeId, existing.id, conn);
-            if (edge) addConnectionEdge(edge);
+            if (edge) {
+              const result = addConnectionEdge(edge);
+              if (result === "duplicate-different-kind") {
+                showExpansionNotice("connectionExistsDifferentKind", "info");
+              }
+            }
             continue;
           }
 
@@ -200,16 +220,10 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
       } catch (err) {
         const exhausted = err instanceof ExhaustedExpansionError;
         if (!exhausted) console.error("Expansion failed:", err);
-        if (mountedRef.current) {
-          setExpansionNotice({
-            messageKey: exhausted ? "noMoreConnections" : "connectionsFailed",
-            kind: exhausted ? "info" : "error",
-          });
-          if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current);
-          noticeTimeoutRef.current = setTimeout(() => {
-            if (mountedRef.current) setExpansionNotice(null);
-          }, 6000);
-        }
+        showExpansionNotice(
+          exhausted ? "noMoreConnections" : "connectionsFailed",
+          exhausted ? "info" : "error"
+        );
       } finally {
         if (mountedRef.current) setExpandingNode(null);
         expandingRef.current = false;
@@ -223,6 +237,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
       getNodeByRef,
       getExpansionRefs,
       reactFlow,
+      showExpansionNotice,
     ]
   );
 

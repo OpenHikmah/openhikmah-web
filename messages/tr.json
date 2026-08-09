@@ -95,6 +95,7 @@
     "noMoreConnections": "Bu türde başka bağlantı yok.",
     "connectionsFailed": "Bağlantı bulunamadı. Farklı bir tür deneyin.",
     "expansionInProgress": "Bir genişletme zaten çalışıyor — biraz sonra tekrar deneyin.",
+    "connectionExistsDifferentKind": "Bu ayetler zaten farklı bir şekilde bağlı.",
     "dismiss": "Kapat",
     "minimapAria": "Tuval küçük haritası",
     "saveFailedRetry": "Kaydetme başarısız — tekrar deneyin",
