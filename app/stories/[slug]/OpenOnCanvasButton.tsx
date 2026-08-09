@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Network } from "lucide-react";
 import { buttonVariants } from "@/components/ui";
@@ -18,15 +18,37 @@ import type { Verse } from "@/types/quran";
 export function OpenOnCanvasButton({ verses, label }: { verses: Verse[]; label?: string }) {
   const [pending, setPending] = useState(false);
   const router = useRouter();
+  const mountedRef = useRef(true);
+  const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (resetTimeoutRef.current) clearTimeout(resetTimeoutRef.current);
+    };
+  }, []);
 
   const handleClick = () => {
     setPending(true);
-    const { hasNode, addVerseNode } = useCanvasStore.getState();
-    for (const verse of verses) {
-      if (hasNode(verse.ref)) continue;
-      addVerseNode(verse);
+    try {
+      const { hasNode, addVerseNode } = useCanvasStore.getState();
+      for (const verse of verses) {
+        if (hasNode(verse.ref)) continue;
+        addVerseNode(verse);
+      }
+      router.push("/canvas");
+    } catch {
+      if (mountedRef.current) setPending(false);
+      return;
     }
-    router.push("/canvas");
+    // router.push normally unmounts this component before it matters. If
+    // navigation is interrupted (blocked, cancelled) the component survives
+    // with `pending` stuck true and no way to retry — unstick it after a
+    // grace period long enough that it never fires during a normal navigation.
+    resetTimeoutRef.current = setTimeout(() => {
+      if (mountedRef.current) setPending(false);
+    }, 4000);
   };
 
   return (
