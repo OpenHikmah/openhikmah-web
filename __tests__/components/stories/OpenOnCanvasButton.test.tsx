@@ -104,13 +104,15 @@ describe("OpenOnCanvasButton", () => {
     }
   });
 
-  it("re-enables the button immediately if adding a node throws", () => {
+  it("re-enables the button and logs if adding a node throws", () => {
     const verses = [verse("12:4")];
+    const failure = new Error("store write failed");
     const addVerseNodeSpy = vi
       .spyOn(useCanvasStore.getState(), "addVerseNode")
       .mockImplementation(() => {
-        throw new Error("store write failed");
+        throw failure;
       });
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     render(<OpenOnCanvasButton verses={verses} />);
 
     const button = screen.getByRole("button", { name: /open on canvas/i });
@@ -118,6 +120,34 @@ describe("OpenOnCanvasButton", () => {
 
     expect(button).not.toBeDisabled();
     expect(mockPush).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("OpenOnCanvasButton"),
+      failure
+    );
+
     addVerseNodeSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("re-enables the button and logs if router.push throws", () => {
+    const verses = [verse("12:4")];
+    const failure = new Error("navigation blocked");
+    mockPush.mockImplementation(() => {
+      throw failure;
+    });
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<OpenOnCanvasButton verses={verses} />);
+
+    const button = screen.getByRole("button", { name: /open on canvas/i });
+    fireEvent.click(button);
+
+    expect(button).not.toBeDisabled();
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("OpenOnCanvasButton"),
+      failure
+    );
+
+    consoleErrorSpy.mockRestore();
+    mockPush.mockReset();
   });
 });

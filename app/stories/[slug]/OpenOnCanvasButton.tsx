@@ -38,9 +38,13 @@ export function OpenOnCanvasButton({ verses, label }: { verses: Verse[]; label?:
         addVerseNode(verse);
       }
       router.push("/canvas");
-    } catch {
+    } catch (err) {
       if (mountedRef.current) setPending(false);
-      return;
+      // Logged, not rethrown: React error boundaries don't catch errors
+      // thrown from event handlers, so rethrowing here would just become an
+      // unhandled exception instead of a visible error UI — console.error is
+      // what actually makes this surface instead of vanishing silently.
+      console.error("OpenOnCanvasButton: failed to add verses to the canvas or navigate", err);
     }
     // router.push normally unmounts this component before it matters. If
     // navigation is interrupted (blocked, cancelled) the component survives
