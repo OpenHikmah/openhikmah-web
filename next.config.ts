@@ -6,6 +6,15 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 const nextConfig: NextConfig = {
   reactCompiler: true,
   output: "standalone",
+  // The self-hosted Coolify build container has less memory than CI's runner,
+  // and OOM-kills during `next build`'s own "Running TypeScript" pass (no
+  // output, non-zero exit) once the project grows past its ceiling. Type
+  // errors are already a hard gate in CI (`bun run typecheck`, required
+  // before merge to main), so re-running the same check here is redundant
+  // work that just risks crashing the production build.
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   // Pin the workspace root to this project. Without it, Turbopack finds a stray
   // lockfile higher up (e.g. C:\Users\User\package-lock.json) and warns that it
   // guessed the wrong root. The dev/build scripts always run from the project dir.
