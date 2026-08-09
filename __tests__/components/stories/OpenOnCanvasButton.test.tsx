@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Verse } from "@/types/quran";
 
@@ -83,5 +83,71 @@ describe("OpenOnCanvasButton", () => {
     fireEvent.click(button);
 
     expect(useCanvasStore.getState().nodes).toHaveLength(2);
+  });
+
+  it("re-enables the button after a grace period if navigation never unmounts it", () => {
+    vi.useFakeTimers();
+    try {
+      const verses = [verse("12:4")];
+      render(<OpenOnCanvasButton verses={verses} />);
+
+      const button = screen.getByRole("button", { name: /open on canvas/i });
+      fireEvent.click(button);
+      expect(button).toBeDisabled();
+
+      act(() => {
+        vi.advanceTimersByTime(4000);
+      });
+      expect(button).not.toBeDisabled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("re-enables the button and logs if adding a node throws", () => {
+    const verses = [verse("12:4")];
+    const failure = new Error("store write failed");
+    const addVerseNodeSpy = vi
+      .spyOn(useCanvasStore.getState(), "addVerseNode")
+      .mockImplementation(() => {
+        throw failure;
+      });
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<OpenOnCanvasButton verses={verses} />);
+
+    const button = screen.getByRole("button", { name: /open on canvas/i });
+    fireEvent.click(button);
+
+    expect(button).not.toBeDisabled();
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("OpenOnCanvasButton"),
+      failure
+    );
+
+    addVerseNodeSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("re-enables the button and logs if router.push throws", () => {
+    const verses = [verse("12:4")];
+    const failure = new Error("navigation blocked");
+    mockPush.mockImplementation(() => {
+      throw failure;
+    });
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<OpenOnCanvasButton verses={verses} />);
+
+    const button = screen.getByRole("button", { name: /open on canvas/i });
+    fireEvent.click(button);
+
+    expect(button).not.toBeDisabled();
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("OpenOnCanvasButton"),
+      failure
+    );
+
+    consoleErrorSpy.mockRestore();
+    mockPush.mockReset();
   });
 });
