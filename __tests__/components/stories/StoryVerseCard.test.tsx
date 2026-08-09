@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
-import { NextIntlClientProvider } from "next-intl";
+import type { ReactElement } from "react";
+import { screen } from "@testing-library/react";
 import { describe, it, expect, beforeEach } from "vitest";
-import tr from "@/messages/tr.json";
+import { renderWithIntl } from "../../test-utils/render-with-intl";
 import { useAudioStore } from "@/store/audio";
 import { StoryVerseCard } from "@/app/stories/[slug]/StoryVerseCard";
 import { TooltipProvider } from "@/components/ui";
@@ -11,18 +11,16 @@ const VERSE: Verse = {
   surah: 12,
   ayah: 4,
   ref: "12:4" as Verse["ref"],
-  arabicText: "نص",
-  translation: "text",
+  arabicText:
+    "إِذْ قَالَ يُوسُفُ لِأَبِيهِ يَا أَبَتِ إِنِّي رَأَيْتُ أَحَدَ عَشَرَ كَوْكَبًا وَالشَّمْسَ وَالْقَمَرَ رَأَيْتُهُمْ لِي سَاجِدِينَ",
+  translation:
+    '[Of these stories mention] when Joseph said to his father, "O my father, indeed I have seen [in a dream] eleven stars and the sun and the moon; I saw them prostrating to me."',
   surahName: "Yusuf",
   surahNameArabic: "يوسف",
 };
 
-function renderWithTr(ui: React.ReactElement) {
-  return render(
-    <NextIntlClientProvider locale="tr" messages={tr}>
-      <TooltipProvider>{ui}</TooltipProvider>
-    </NextIntlClientProvider>
-  );
+function renderWithTr(ui: ReactElement) {
+  return renderWithIntl(<TooltipProvider>{ui}</TooltipProvider>, "tr");
 }
 
 describe("StoryVerseCard localization", () => {
