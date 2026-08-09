@@ -46,6 +46,12 @@
     "emptyStateDescription": "Bir ayet veya tema arayın — yapay zeka Kur'an genelindeki anlamsal bağlantıları haritalar.",
     "searchVerses": "Ayet ara",
     "orBeginWith": "Veya şununla başlayın",
+    "journey": {
+      "patience": "Sabır",
+      "mercy": "Rahmet",
+      "light": "Nur",
+      "gratitude": "Şükür"
+    },
     "duplicateTooltip": "Tuvalde başka yerde de açık — atlamak için tıklayın",
     "jumpToDuplicate": "Yinelenen ayet kartına atla",
     "pauseRecitation": "Kıraati duraklat",

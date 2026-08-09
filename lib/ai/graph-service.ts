@@ -38,11 +38,9 @@ interface GetConnectionsOptions {
    *  both the cache read and any fresh generation, so a repeat "get more"
    *  request surfaces genuinely new connections instead of the same set. */
   excludeRefs?: string[];
-  /** Language the reason text should be generated in on a cache MISS only.
-   *  The `connections` table has no locale column — a stored reason is served
-   *  to every later reader regardless of their locale (an accepted v1
-   *  limitation: whichever locale first triggers generation for a given
-   *  fromRef+kind "wins" the cached reason's language). Defaults to "en". */
+  /** Language the reason text is generated and cached in. Reads and writes are
+   *  both keyed on this, so each locale gets its own cached reason instead of
+   *  sharing whichever locale first triggered generation. Defaults to "en". */
   locale?: Locale;
 }
 
@@ -81,6 +79,7 @@ export async function getConnections(
   options: GetConnectionsOptions = {}
 ): Promise<ConnectionResult[]> {
   const excludeRefs = options.excludeRefs ?? [];
+  const locale = options.locale ?? "en";
 
   const existing = await db
     .select()
@@ -90,6 +89,7 @@ export async function getConnections(
         eq(connections.fromRef, fromRef),
         eq(connections.kind, kind),
         eq(connections.status, "active"),
+        eq(connections.locale, locale),
         ...(excludeRefs.length > 0 ? [notInArray(connections.toRef, excludeRefs)] : [])
       )
     )
@@ -114,9 +114,9 @@ export async function getConnections(
   // Single-flight: if an identical generation is already running, join it rather
   // than starting a second AI call. The get→set below MUST stay synchronous (no
   // await between them) or two concurrent callers could both become the leader.
-  // The exclude set is folded into the key so a "get more" request never
-  // coalesces with a plain repeat request for the same verse+kind.
-  const key = `${fromRef}:${kind}:${[...excludeRefs].sort().join(",")}`;
+  // The exclude set and locale are folded into the key so a "get more" request
+  // or a different-locale request never coalesces with an unrelated one.
+  const key = `${fromRef}:${kind}:${locale}:${[...excludeRefs].sort().join(",")}`;
   const pending = inFlight.get(key);
   if (pending) {
     incr("gen_coalesced");
@@ -124,7 +124,7 @@ export async function getConnections(
   }
 
   incr("gen_started");
-  const work = generateAndPersist(fromRef, kind, source, excludeRefs, options.locale ?? "en");
+  const work = generateAndPersist(fromRef, kind, source, excludeRefs, locale);
   inFlight.set(key, work);
   try {
     return await work;
@@ -179,6 +179,7 @@ async function generateAndPersist(
             kind,
             reason: g.reason,
             model,
+            locale,
           }))
         )
         .onConflictDoNothing();

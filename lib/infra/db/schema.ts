@@ -286,6 +286,10 @@ export const connections = pgTable(
     // 'thematic' | 'root' | 'contrast'
     kind: text("kind").notNull(),
     reason: text("reason").notNull(),
+    // Language `reason` was generated in. Rows are keyed per-locale so a
+    // reader always gets a reason in their own language instead of whichever
+    // locale first triggered generation for this fromRef+toRef+kind.
+    locale: text("locale").notNull().default("en"),
     model: text("model"),
     confidence: integer("confidence"),
     // 'active' | 'flagged' | 'retired' — lets edges be soft-deactivated without schema change
@@ -298,7 +302,7 @@ export const connections = pgTable(
     reviewedBy: text("reviewed_by"),
   },
   (t) => [
-    uniqueIndex("connections_from_to_kind_idx").on(t.fromRef, t.toRef, t.kind),
+    uniqueIndex("connections_from_to_kind_locale_idx").on(t.fromRef, t.toRef, t.kind, t.locale),
     index("connections_from_kind_idx").on(t.fromRef, t.kind),
     index("connections_reviewed_at_idx").on(t.reviewedAt),
   ]

@@ -85,6 +85,28 @@ describe("connection graph (integration, real Postgres)", () => {
     expect(await db.select().from(connections)).toHaveLength(1);
   });
 
+  it("caches connections per locale: a hit in one locale still generates for another", async () => {
+    await seed("2:255");
+    mockCallAI
+      .mockResolvedValueOnce(JSON.stringify([{ ref: "2:255", reason: "throne verse" }]))
+      .mockResolvedValueOnce(JSON.stringify([{ ref: "2:255", reason: "ayet-el kursi" }]));
+
+    const en = await getConnections("1:1", "thematic", source, { locale: "en" });
+    expect(en[0]).toMatchObject({ reason: "throne verse" });
+    expect(mockCallAI).toHaveBeenCalledTimes(1);
+
+    // Different locale — must NOT hit the English row, generates its own.
+    const tr = await getConnections("1:1", "thematic", source, { locale: "tr" });
+    expect(tr[0]).toMatchObject({ reason: "ayet-el kursi" });
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
+    expect(await db.select().from(connections)).toHaveLength(2);
+
+    // Re-requesting English now serves from cache, not a third AI call.
+    const enAgain = await getConnections("1:1", "thematic", source, { locale: "en" });
+    expect(enAgain[0]).toMatchObject({ reason: "throne verse" });
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
+  });
+
   it("the unique index dedupes duplicate edges", async () => {
     await db
       .insert(connections)

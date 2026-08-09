@@ -46,6 +46,12 @@
     "emptyStateDescription": "Search a verse or theme — AI maps semantic connections across the Qur'an.",
     "searchVerses": "Search verses",
     "orBeginWith": "Or begin with",
+    "journey": {
+      "patience": "Patience",
+      "mercy": "Mercy",
+      "light": "Light",
+      "gratitude": "Gratitude"
+    },
     "duplicateTooltip": "Also open elsewhere on canvas — click to jump",
     "jumpToDuplicate": "Jump to duplicate verse card",
     "pauseRecitation": "Pause recitation",
