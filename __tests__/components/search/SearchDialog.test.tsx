@@ -124,3 +124,46 @@ describe("SearchDialog keyboard navigation", () => {
     expect(screen.getAllByRole("option")[1]).toHaveAttribute("aria-selected", "true");
   });
 });
+
+describe("SearchDialog view-all-results footer hint", () => {
+  const results = [makeResult("2:1", "Al-Baqarah"), makeResult("2:2", "Al-Baqarah")];
+
+  beforeEach(() => {
+    useCanvasStore.getState().reset();
+    mockPush.mockReset();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.startsWith("/api/search")) {
+          // total (5) exceeds results.length (2) so the "view all results" footer renders.
+          const body: SearchResponse = { results, total: 5, page: 1, pageSize: 10 };
+          return { ok: true, json: async () => body, headers: new Headers() } as Response;
+        }
+        if (url.startsWith("/api/verse/")) {
+          const ref = url.replace("/api/verse/", "").replace("/", ":");
+          return { ok: true, json: async () => makeVerse(ref) } as Response;
+        }
+        throw new Error(`unexpected fetch ${url}`);
+      })
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("hides the 'press Enter to view all' hint once a result is highlighted, since Enter now selects it instead", async () => {
+    render(<SearchDialog open onClose={vi.fn()} />);
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "guidance" } });
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2), { timeout: 2000 });
+
+    expect(screen.getByText("Enter")).toBeInTheDocument();
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(screen.queryByText("Enter")).not.toBeInTheDocument();
+
+    // The footer button itself (click-to-view-all) stays available regardless of highlight.
+    expect(screen.getByText(/results/i)).toBeInTheDocument();
+  });
+});

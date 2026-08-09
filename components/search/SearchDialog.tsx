@@ -394,12 +394,14 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                 <span className="text-xs font-medium text-teal">
                   {t("viewAllResults", { count: totalResults, query: query.trim() })}
                 </span>
-                <span className="flex items-center gap-1.5 text-[11px] text-text-muted">
-                  {t("press")}
-                  <kbd className="flex items-center gap-1 rounded border border-border bg-surface-overlay px-1.5 py-0.5 font-mono">
-                    <CornerDownLeft className="w-3 h-3" /> Enter
-                  </kbd>
-                </span>
+                {highlightedIndex === -1 && (
+                  <span className="flex items-center gap-1.5 text-[11px] text-text-muted">
+                    {t("press")}
+                    <kbd className="flex items-center gap-1 rounded border border-border bg-surface-overlay px-1.5 py-0.5 font-mono">
+                      <CornerDownLeft className="w-3 h-3" /> Enter
+                    </kbd>
+                  </span>
+                )}
               </button>
             )}
           </div>
