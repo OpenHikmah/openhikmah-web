@@ -2,19 +2,40 @@ import type { Story } from "../types";
 
 export const MUSA_STORY: Story = {
   slug: "musa",
-  name: { en: "Musa (Moses)" },
+  name: {
+    en: "Musa (Moses)",
+    tr: "Musa (Hz. Musa)",
+    az: "Musa (Həzrət Musa)",
+    ru: "Муса (Моисей)",
+  },
   arabicName: "مُوسَىٰ",
-  tagline: { en: "From a basket on the river to the mountain where God spoke to him" },
+  tagline: {
+    en: "From a basket on the river to the mountain where God spoke to him",
+    tr: "Nehirdeki bir sepetten, Allah'ın kendisiyle konuştuğu dağa",
+    az: "Çaydakı bir səbətdən Allahın onunla danışdığı dağa qədər",
+    ru: "От корзины на реке до горы, где с ним говорил Бог",
+  },
   intro: {
     en: "No prophet's story is told across more of the Quran than Musa's. Cast onto the river as an infant to escape Pharaoh's decree, raised in Pharaoh's own household, called to prophethood at a burning bush, and sent back to confront the very court that raised him — his life traces a single, sustained argument about power, oppression, and the God who answers the oppressed. His story is inseparable from his brother Harun's, and from the long, difficult education of the people he led out of Egypt.",
+    tr: "Kur'an'da hiçbir peygamberin kıssası Musa'nınki kadar geniş yer tutmaz. Firavun'un fermanından kurtulmak için henüz bir bebekken nehre bırakılmış, Firavun'un sarayında büyütülmüş, yanan bir çalılıkta peygamberliğe çağrılmış ve kendisini büyüten o sarayla yüzleşmek üzere geri gönderilmiştir. Onun hayatı, güç, zulüm ve mazlumların duasına icabet eden Allah hakkında tek ve kesintisiz bir anlatıyı izler. Onun kıssası, kardeşi Harun'unkinden ve Mısır'dan çıkardığı halkın uzun ve zorlu eğitiminden ayrı düşünülemez.",
+    az: "Qurani-Kərimdə heç bir peyğəmbərin qissəsi Musanınkı qədər geniş yer tutmur. Fironun fərmanından qurtulmaq üçün hələ körpə ikən çaya atılmış, Fironun öz sarayında böyümüş, yanan bir kolun yanında peyğəmbərliyə çağırılmış və özünü böyüdən həmin sarayla üz-üzə gəlmək üçün geri göndərilmişdir. Onun həyatı hakimiyyət, zülm və məzlumların fəryadına cavab verən Allah haqqında vahid, davamlı bir mövzunu izləyir. Onun qissəsi qardaşı Harunun qissəsindən və Misirdən çıxartdığı xalqın uzun, çətin tərbiyəsindən ayrılmazdır.",
+    ru: "Ни одному пророку не посвящено в Коране столько внимания, сколько Мусе. Брошенный младенцем в реку, чтобы избежать указа Фараона, воспитанный в доме самого Фараона, призванный к пророчеству у горящего куста и отправленный обратно, чтобы противостоять тому самому двору, что его вырастил, — его жизнь прослеживает единую, непрерывную тему о власти, угнетении и Боге, отвечающем угнетённым. Его история неотделима от истории его брата Харуна и от долгого, трудного воспитания народа, который он вывел из Египта.",
   },
   primarySurahs: [20, 26, 28, 7],
   chapters: [
     {
       id: "the-river",
-      title: { en: "Cast into the river" },
+      title: {
+        en: "Cast into the river",
+        tr: "Nehre bırakılış",
+        az: "Çaya atılma",
+        ru: "Брошенный в реку",
+      },
       narrative: {
         en: "God inspires Musa's mother to nurse him, and when she fears for his safety, to cast him into the river without fear or grief — with the promise that he will be returned to her and made a messenger. Pharaoh's household draws him from the water; Pharaoh's wife asks that he be spared, unaware he is the very child her husband's decree was meant to reach. Musa's mother, her heart nearly breaking with the secret, sends his sister to follow him from a distance. The sister then suggests a household that could nurse him — his own family, restoring him to his mother exactly as God had promised.",
+        tr: "Allah, Musa'nın annesine onu emzirmesini, canından endişe ettiğinde ise korkmadan ve üzülmeden onu nehre bırakmasını ilham eder — kendisine, çocuğunun geri döndürüleceği ve bir elçi yapılacağı vaadiyle. Firavun'un ailesi onu sudan çıkarır; Firavun'un eşi onun bağışlanmasını ister, kocasının fermanının tam da bu çocuğa ulaşmak için çıkarıldığından habersizdir. Musa'nın annesi, sırrı yüzünden kalbi neredeyse parçalanırken, kızını onu uzaktan takip etmesi için gönderir. Kız kardeş ardından onu emzirebilecek bir aile önerir — bu, Allah'ın vaat ettiği gibi onu tam da kendi annesine kavuşturan öz ailesidir.",
+        az: "Allah Musanın anasına onu əmizdirməyi, canından qorxduqda isə qorxmadan və kədərlənmədən onu çaya atmağı ilham edir — övladının ona qaytarılacağı və elçi ediləcəyi vədi ilə. Fironun ailəsi onu sudan çıxarır; Fironun zövcəsi onun bağışlanmasını istəyir, ərinin fərmanının məhz bu uşağa çatmaq üçün çıxarıldığından xəbərsiz olaraq. Musanın anası sirrindən ürəyi az qala parçalanaraq, bacısını onu uzaqdan izləməyə göndərir. Bacı sonra onu əmizdirə biləcək bir ailə təklif edir — bu, Allahın vəd etdiyi kimi onu məhz öz anasına qovuşduran öz ailəsidir.",
+        ru: "Бог внушает матери Мусы кормить его, а когда она начинает бояться за его безопасность — бросить его в реку без страха и печали, с обещанием, что он будет возвращён ей и станет посланником. Домочадцы Фараона вылавливают его из воды; жена Фараона просит пощадить его, не зная, что это и есть тот самый ребёнок, ради которого был издан указ её мужа. Мать Мусы, сердце которой едва не разрывается от тайны, посылает его сестру следовать за ним на расстоянии. Сестра затем предлагает семью, которая могла бы кормить его, — это его собственная семья, и так он возвращается к своей матери в точности так, как обещал Бог.",
       },
       verseRefs: [
         "28:7",
@@ -32,9 +53,17 @@ export const MUSA_STORY: Story = {
     },
     {
       id: "the-burning-bush",
-      title: { en: '"Indeed, I am your Lord"' },
+      title: {
+        en: '"Indeed, I am your Lord"',
+        tr: '"Şüphesiz ben senin Rabbinim"',
+        az: '"Şübhəsiz ki, Mən sənin Rəbbinəm"',
+        ru: "«Поистине, Я — твой Господь»",
+      },
       narrative: {
         en: "Years later, traveling with his family, Musa sees a fire and goes toward it seeking guidance or warmth. He is called by name and told to remove his sandals, for he stands in a sacred valley — and told plainly that there is no god but God, who must be worshiped. He is shown two signs: his staff becomes a moving serpent when he throws it down, and his hand turns white without disease when he draws it to his side. He is then commanded to go to Pharaoh, who has transgressed all bounds.",
+        tr: "Yıllar sonra, ailesiyle birlikte yolculuk ederken Musa bir ateş görür ve yol bulmak ya da ısınmak umuduyla ona doğru yönelir. İsmiyle çağrılır ve kutsal bir vadide durduğu için ayakkabılarını çıkarması söylenir — ve kendisine, kendisinden başka ilah olmayan ve ibadet edilmesi gereken Allah'tan başka ilah olmadığı açıkça bildirilir. Kendisine iki alâmet gösterilir: değneğini yere attığında hareket eden bir yılana dönüşür, elini koynuna soktuğunda ise herhangi bir hastalık olmaksızın bembeyaz olur. Ardından, tüm sınırları aşmış olan Firavun'a gitmesi emredilir.",
+        az: "İllər sonra ailəsi ilə səyahət edərkən Musa bir od görür və yol tapmaq və ya isinmək ümidi ilə ona tərəf yönəlir. Adı ilə çağırılır və müqəddəs bir vadidə dayandığı üçün ayaqqabılarını çıxarması buyurulur — və ona açıq şəkildə bildirilir ki, Ondan başqa ibadətə layiq ilah yoxdur. Ona iki əlamət göstərilir: əsasını yerə atdıqda o, hərəkət edən bir ilana çevrilir, əlini qoltuğuna saldıqda isə heç bir xəstəlik olmadan ağappaq olur. Ardından ona bütün həddləri aşmış Firona getmək əmr olunur.",
+        ru: "Спустя годы, путешествуя со своей семьёй, Муса видит огонь и направляется к нему в надежде найти дорогу или согреться. Его окликают по имени и велят снять сандалии, ибо он стоит в священной долине, — и прямо говорят ему, что нет божества, достойного поклонения, кроме Бога. Ему показывают два знамения: его посох превращается в движущуюся змею, когда он бросает его наземь, а его рука становится белой без всякой болезни, когда он подносит её к боку. Затем ему повелевается идти к Фараону, преступившему все границы.",
       },
       verseRefs: [
         "20:9",
@@ -55,9 +84,17 @@ export const MUSA_STORY: Story = {
     },
     {
       id: "before-pharaoh",
-      title: { en: '"We are the messengers of the Lord of the worlds"' },
+      title: {
+        en: '"We are the messengers of the Lord of the worlds"',
+        tr: '"Biz âlemlerin Rabbinin elçileriyiz"',
+        az: '"Biz aləmlərin Rəbbinin elçiləriyik"',
+        ru: "«Мы — посланники Господа миров»",
+      },
       narrative: {
         en: "Musa asks God to send his brother Harun with him, fearing his own tongue will fail him and that Pharaoh's court, which raised and then he fled, will hold his past against him. Before Pharaoh, he identifies himself as a messenger sent to free the Children of Israel from bondage. Pharaoh throws his own upbringing back at him; Musa answers that he acted in ignorance before God granted him wisdom and prophethood, and asks how enslaving an entire people can be called a favor. When challenged for a sign, Musa throws down his staff and it becomes a serpent before them; he draws out his hand, and it is radiant white.",
+        tr: "Musa, kendi dilinin kendisini yarı yolda bırakmasından ve kendisini büyütüp sonra kaçtığı Firavun'un sarayının geçmişini aleyhinde kullanmasından korkarak, Allah'tan kardeşi Harun'u kendisiyle birlikte göndermesini ister. Firavun'un huzurunda kendisini, İsrailoğulları'nı kölelikten kurtarmak üzere gönderilmiş bir elçi olarak tanıtır. Firavun onun kendi yetiştirilişini yüzüne vurur; Musa, Allah kendisine hikmet ve peygamberlik bahşetmeden önce bilgisizlik içinde davrandığını söyler ve koca bir halkı köleleştirmenin nasıl bir lütuf sayılabileceğini sorar. Bir alâmet istendiğinde Musa değneğini yere atar ve o, önlerinde bir yılana dönüşür; elini çıkarır ve o, parıl parıl beyazdır.",
+        az: "Musa öz dilinin ona xəyanət edəcəyindən və özünü böyüdüb sonra qaçdığı Firon sarayının keçmişini əleyhinə çevirəcəyindən qorxaraq, Allahdan qardaşı Harunu özü ilə göndərməsini istəyir. Fironun hüzurunda özünü İsrail övladlarını köləlikdən azad etmək üçün göndərilmiş bir elçi kimi təqdim edir. Firon onun tərbiyəsini üzünə vurur; Musa Allah ona hikmət və peyğəmbərlik bəxş etməzdən əvvəl cahillik içində davrandığını söyləyir və bütöv bir xalqı köləliyə salmağın necə bir lütf sayıla biləcəyini soruşur. Bir əlamət tələb edildikdə Musa əsasını yerə atır və o, qarşılarında bir ilana çevrilir; əlini çıxarır və o, parlaq ağdır.",
+        ru: "Муса просит Бога отправить с ним его брата Харуна, опасаясь, что собственный язык подведёт его и что двор Фараона, вырастивший его и от которого он затем бежал, поставит ему в вину его прошлое. Перед Фараоном он называет себя посланником, отправленным освободить сынов Исраила от рабства. Фараон припоминает ему его же воспитание; Муса отвечает, что действовал по неведению, прежде чем Бог даровал ему мудрость и пророчество, и спрашивает, как порабощение целого народа может считаться благодеянием. Когда от него требуют знамения, Муса бросает свой посох, и тот превращается перед ними в змею; он вынимает руку, и она становится ослепительно белой.",
       },
       verseRefs: [
         "26:10",
@@ -84,9 +121,17 @@ export const MUSA_STORY: Story = {
     },
     {
       id: "the-crossing",
-      title: { en: "The sea parts" },
+      title: {
+        en: "The sea parts",
+        tr: "Denizin yarılması",
+        az: "Dənizin yarılması",
+        ru: "Море расступается",
+      },
       narrative: {
         en: "After a succession of afflictions sent upon Pharaoh's people — flood, locusts, lice, frogs, and blood — each one promised and broken in turn, Musa is told to leave with his people by night, warned that they will be pursued. Pharaoh's army catches up with them at the shore, and Musa's companions cry out that they will be overtaken. Musa answers simply that his Lord is with him and will guide him. He strikes the sea with his staff, and it parts, each side standing like a great mountain, and the Children of Israel cross to safety while Pharaoh's people are drowned behind them — the very people they had oppressed inheriting the land.",
+        tr: "Firavun'un halkı üzerine art arda gönderilen belalardan — sel, çekirge, haşarat, kurbağa ve kan — her biri vaat edilip sonra bozulduktan sonra, Musa'ya halkıyla birlikte geceleyin yola çıkması söylenir ve takip edilecekleri konusunda uyarılır. Firavun'un ordusu onlara sahilde yetişir ve Musa'nın yol arkadaşları yakalanacaklarını haykırırlar. Musa ise sadece Rabbinin kendisiyle birlikte olduğunu ve kendisine yol göstereceğini söyler. Değneğiyle denize vurur ve deniz yarılır, her iki taraf da büyük bir dağ gibi durur; İsrailoğulları güvenle karşıya geçerken Firavun'un halkı arkalarında boğulur — zulmettikleri o halk, toprağa mirasçı olur.",
+        az: "Fironun xalqı üzərinə ardıcıl göndərilən bəlalardan — daşqın, çəyirtkə, həşərat, qurbağa və qan — hər biri vəd edilib sonra pozulduqdan sonra, Musaya xalqı ilə birlikdə gecə vaxtı yola çıxması söylənir və təqib ediləcəkləri barədə xəbərdarlıq edilir. Fironun ordusu onlara sahildə çatır və Musanın yoldaşları yaxalanacaqlarını fəryad edirlər. Musa isə sadəcə Rəbbinin özü ilə olduğunu və ona yol göstərəcəyini söyləyir. Əsası ilə dənizə vurur və dəniz yarılır, hər iki tərəf böyük bir dağ kimi dayanır; İsrail övladları salamat qarşıya keçərkən Fironun xalqı arxalarında suya qərq olur — zülm etdikləri həmin xalq torpağa varis olur.",
+        ru: "После череды бедствий, посланных на народ Фараона — потопа, саранчи, вшей, лягушек и крови, — каждое из которых обещало избавление и всякий раз нарушалось, Мусе велено выйти со своим народом ночью, с предупреждением, что их будут преследовать. Войско Фараона настигает их у берега, и спутники Мусы восклицают, что их вот-вот настигнут. Муса отвечает лишь, что его Господь с ним и поведёт его. Он ударяет по морю своим посохом, и оно расступается — каждая сторона стоит подобно великой горе, — и сыны Исраила переходят в безопасности, а народ Фараона тонет позади них: тот самый народ, который они угнетали, наследует землю.",
       },
       verseRefs: [
         "26:52",
@@ -104,9 +149,17 @@ export const MUSA_STORY: Story = {
     },
     {
       id: "the-mountain-and-the-calf",
-      title: { en: "The tablets, and a calf of gold" },
+      title: {
+        en: "The tablets, and a calf of gold",
+        tr: "Levhalar ve altından bir buzağı",
+        az: "Lövhələr və qızıldan bir buzov",
+        ru: "Скрижали и золотой телец",
+      },
       narrative: {
         en: "God appoints forty nights for Musa at the mountain, and Musa leaves Harun in charge of the people in his absence. There he asks to see God directly and is told he cannot bear it — but is shown a sign in the mountain itself, and is given tablets containing instruction and explanation. In his absence, though, the people are led astray into worshiping a calf fashioned from their own gold ornaments, one that could neither speak nor guide them. Harun had warned them against it, but they refused until Musa's return. Musa comes back angry and grieved, and both brothers turn to God together, asking forgiveness and mercy — which is given to those who repent.",
+        tr: "Allah, Musa için dağda kırk gece belirler ve Musa, yokluğunda halkın başına Harun'u bırakır. Orada Musa, Allah'ı doğrudan görmek ister ve buna dayanamayacağı söylenir — ama dağın kendisinde bir alâmet gösterilir ve kendisine öğüt ve açıklama içeren levhalar verilir. Ancak onun yokluğunda halk, kendi altın süs eşyalarından yapılmış, ne konuşabilen ne de yol gösterebilen bir buzağıya tapmaya sürüklenir. Harun onları bundan sakındırmıştı, ama onlar Musa dönene kadar bundan vazgeçmemişlerdi. Musa öfkeli ve üzgün bir şekilde geri döner ve iki kardeş birlikte Allah'a yönelerek af ve rahmet dilerler — bu da tevbe edenlere bahşedilir.",
+        az: "Allah Musa üçün dağda qırx gecə təyin edir və Musa yoxluğunda xalqın başına Harunu buraxır. Orada Musa Allahı birbaşa görmək istəyir və buna dözə bilməyəcəyi söylənir — lakin dağın özündə bir əlamət göstərilir və ona öyüd-nəsihət və izahat ehtiva edən lövhələr verilir. Amma onun yoxluğunda xalq öz qızıl bəzək əşyalarından düzəldilmiş, nə danışa, nə də yol göstərə bilən bir buzova sitayiş etməyə sürüklənir. Harun onları bundan çəkindirmişdi, lakin onlar Musa qayıdana qədər bundan əl çəkmədilər. Musa qəzəbli və kədərli halda geri qayıdır və hər iki qardaş birlikdə Allaha üz tutub bağışlanma və mərhəmət diləyirlər — bu da tövbə edənlərə bəxş edilir.",
+        ru: "Бог назначает Мусе сорок ночей на горе, и Муса оставляет Харуна за старшего над народом в своё отсутствие. Там он просит увидеть Бога напрямую, и ему говорят, что он этого не вынесет, — но ему показывают знамение в самой горе и дают скрижали, содержащие наставление и разъяснение. Однако в его отсутствие народ впадает в заблуждение, начиная поклоняться тельцу, изготовленному из их же золотых украшений, — тельцу, который не мог ни говорить, ни вести их. Харун предостерегал их от этого, но они отказывались слушать до самого возвращения Мусы. Муса возвращается разгневанным и опечаленным, и оба брата вместе обращаются к Богу, прося прощения и милости — которая даруется тем, кто раскаивается.",
       },
       verseRefs: [
         "7:142",

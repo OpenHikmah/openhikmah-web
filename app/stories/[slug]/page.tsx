@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
 import { STORIES, getStoryBySlug, resolveLocalized } from "@/lib/stories";
@@ -40,6 +41,7 @@ export default async function StoryDetailPage({ params }: Props) {
   if (!story) notFound();
 
   const locale = await getUiLocale();
+  const t = await getTranslations("stories");
   const allRefs = story.chapters.flatMap((c) => c.verseRefs);
   const edition = await getQuranEdition();
   // Per-ref resolveVerse (corpus first, live alquran.cloud fallback) rather than
@@ -62,7 +64,7 @@ export default async function StoryDetailPage({ params }: Props) {
           className="mb-6 inline-flex items-center gap-1.5 text-xs text-text-secondary transition-colors hover:text-text-primary"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          <span>All Stories</span>
+          <span>{t("allStories")}</span>
         </Link>
 
         <h1 className="mb-3 font-arabic text-6xl text-gold">{story.arabicName}</h1>
@@ -100,13 +102,12 @@ export default async function StoryDetailPage({ params }: Props) {
 
               {missingCount > 0 && (
                 <p className="mt-3 text-xs text-text-muted">
-                  {missingCount} verse{missingCount === 1 ? "" : "s"} in this chapter couldn&apos;t
-                  be loaded right now — please try again later.
+                  {t("missingVerses", { count: missingCount })}
                 </p>
               )}
 
               <div className="mt-5">
-                <OpenOnCanvasButton verses={verses} />
+                <OpenOnCanvasButton verses={verses} label={t("openOnCanvas")} />
               </div>
             </section>
           );
@@ -114,8 +115,7 @@ export default async function StoryDetailPage({ params }: Props) {
       </div>
 
       <footer className="border-t border-border-subtle py-6 text-center text-xs text-text-muted">
-        Curated per the Maturidi/Hanafi tradition · every verse reference verified against the Quran
-        corpus
+        {t("footer")}
       </footer>
     </div>
   );

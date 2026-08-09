@@ -154,6 +154,20 @@
     "share": "Paylaş",
     "copyLink": "Günün ayetinin bağlantısını kopyala"
   },
+  "stories": {
+    "eyebrow": "Peygamber Kıssaları",
+    "heading": "Peygamberlerin ayet ayet anlatılan kıssaları",
+    "description": "Doğrulanmış Kur'an referanslarına dayanan derlenmiş anlatılar — her ayet, seçtiğiniz mealde anlık olarak çözümlenir. Herhangi bir bölümü doğrudan bağlantı tuvaline açın.",
+    "chapterVerseCount": "{chapters, plural, other {# bölüm}} · {verses, plural, other {# ayet}}",
+    "footer": "Maturidi/Hanefi geleneğine göre derlenmiştir · her ayet referansı Kur'an külliyatına karşı doğrulanmıştır",
+    "allStories": "Tüm Kıssalar",
+    "allStoriesHome": "Tüm kıssalar",
+    "missingVerses": "{count, plural, other {# ayet}} bu bölümde şu anda yüklenemedi — lütfen daha sonra tekrar deneyin.",
+    "openOnCanvas": "Tuvalde aç",
+    "pauseRecitation": "Kıraati duraklat",
+    "listen": "Dinle",
+    "listenToRecitation": "Kıraati dinle"
+  },
   "home": {
     "greeting": "Selamün aleyküm",
     "welcomeBack": "Tekrar hoş geldin",
