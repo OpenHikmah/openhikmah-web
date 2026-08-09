@@ -88,7 +88,7 @@ describe("canvas store", () => {
     expect(node!.id).toBe(id);
   });
 
-  it("addConnectionEdge adds an edge", () => {
+  it('addConnectionEdge adds an edge and reports "added"', () => {
     const sourceId = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
     const targetVerse = { ...baseVerse, surah: 1, ayah: 1, ref: "1:1" as const };
     const targetId = useCanvasStore.getState().addVerseNode(targetVerse, { x: 300, y: 0 });
@@ -100,11 +100,12 @@ describe("canvas store", () => {
       type: "hikmah",
       data: { kind: "thematic", label: "theme", reason: "test" },
     };
-    useCanvasStore.getState().addConnectionEdge(edge);
+    const result = useCanvasStore.getState().addConnectionEdge(edge);
+    expect(result).toBe("added");
     expect(useCanvasStore.getState().edges).toHaveLength(1);
   });
 
-  it("addConnectionEdge does not add duplicate edges", () => {
+  it('addConnectionEdge does not add a duplicate of the same kind, and reports "duplicate-same-kind"', () => {
     const id1 = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
     const id2 = useCanvasStore
       .getState()
@@ -117,11 +118,12 @@ describe("canvas store", () => {
       data: { kind: "thematic", label: "theme" },
     };
     useCanvasStore.getState().addConnectionEdge(edge);
-    useCanvasStore.getState().addConnectionEdge(edge);
+    const result = useCanvasStore.getState().addConnectionEdge(edge);
+    expect(result).toBe("duplicate-same-kind");
     expect(useCanvasStore.getState().edges).toHaveLength(1);
   });
 
-  it("addConnectionEdge prevents reversed duplicate", () => {
+  it("addConnectionEdge prevents a reversed duplicate of the same kind", () => {
     const id1 = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
     const id2 = useCanvasStore
       .getState()
@@ -135,8 +137,35 @@ describe("canvas store", () => {
     };
     const reversed: CanvasEdge = { ...edge, id: "edge-2", source: id2, target: id1 };
     useCanvasStore.getState().addConnectionEdge(edge);
-    useCanvasStore.getState().addConnectionEdge(reversed);
+    const result = useCanvasStore.getState().addConnectionEdge(reversed);
+    expect(result).toBe("duplicate-same-kind");
     expect(useCanvasStore.getState().edges).toHaveLength(1);
+  });
+
+  it('addConnectionEdge does not add a second edge of a different kind between the same pair, and reports "duplicate-different-kind"', () => {
+    const id1 = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+    const id2 = useCanvasStore
+      .getState()
+      .addVerseNode({ ...baseVerse, ref: "1:1" as const, ayah: 1, surah: 1 }, { x: 300, y: 0 });
+    const thematicEdge: CanvasEdge = {
+      id: "edge-1",
+      source: id1,
+      target: id2,
+      type: "hikmah",
+      data: { kind: "thematic", label: "theme" },
+    };
+    const rootEdge: CanvasEdge = {
+      id: "edge-2",
+      source: id1,
+      target: id2,
+      type: "hikmah",
+      data: { kind: "root", label: "root" },
+    };
+    useCanvasStore.getState().addConnectionEdge(thematicEdge);
+    const result = useCanvasStore.getState().addConnectionEdge(rootEdge);
+    expect(result).toBe("duplicate-different-kind");
+    expect(useCanvasStore.getState().edges).toHaveLength(1);
+    expect((useCanvasStore.getState().edges[0].data as { kind?: string })?.kind).toBe("thematic");
   });
 
   it("setSelectedNode sets selectedNodeId", () => {

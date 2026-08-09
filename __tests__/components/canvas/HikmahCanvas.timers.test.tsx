@@ -142,4 +142,44 @@ describe("HikmahCanvas expansion-notice timeout", () => {
     // Unmounting must clear the scheduled dismiss rather than letting it fire later.
     expect(clearTimeoutSpy).toHaveBeenCalled();
   });
+
+  it("surfaces a notice instead of silently dropping a connection when a different-kind edge already links the pair", async () => {
+    useCanvasStore.setState({
+      nodes: [verseNode("n1", "1:1"), verseNode("n2", "2:255")] as never,
+      edges: [
+        {
+          id: "edge-existing",
+          source: "n1",
+          target: "n2",
+          type: "hikmah",
+          data: { kind: "thematic", label: "existing" },
+        },
+      ] as never,
+    });
+    // The AI identifies a "root" connection to a verse already on the canvas,
+    // already linked to the source by a "thematic" edge — a different kind.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve([{ ...connection("2:255"), kind: "root" }]),
+      })
+    );
+
+    render(<HikmahCanvas onSearchOpen={vi.fn()} />);
+
+    act(() => {
+      useCanvasStore.getState().setPendingExpand({ nodeId: "n1", ref: "1:1", kind: "root" });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "These verses are already connected a different way."
+    );
+    // The pre-existing thematic edge is untouched — no second edge was added.
+    expect(useCanvasStore.getState().edges).toHaveLength(1);
+    expect((useCanvasStore.getState().edges[0].data as { kind?: string })?.kind).toBe("thematic");
+  });
 });

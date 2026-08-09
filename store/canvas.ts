@@ -103,7 +103,7 @@ interface CanvasStore {
   setViewport: (viewport: CanvasViewport) => void;
 
   addVerseNode: (verse: Verse, position?: { x: number; y: number }) => string;
-  addConnectionEdge: (edge: CanvasEdge) => void;
+  addConnectionEdge: (edge: CanvasEdge) => AddConnectionEdgeResult;
   setSelectedNode: (id: string | null) => void;
   setExpandingNode: (id: string | null) => void;
   setOpenExpandNodeId: (id: string | null) => void;
@@ -153,6 +153,8 @@ function computeExpansionCountsMap(
   }
   return map;
 }
+
+export type AddConnectionEdgeResult = "added" | "duplicate-same-kind" | "duplicate-different-kind";
 
 export const DEFAULT_SIDEBAR_WIDTH = 288;
 
@@ -215,13 +217,19 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   },
 
   addConnectionEdge: (edge) => {
+    let result: AddConnectionEdgeResult = "added";
     set((s) => {
-      const exists = s.edges.some(
+      const existingEdge = s.edges.find(
         (e) =>
           (e.source === edge.source && e.target === edge.target) ||
           (e.source === edge.target && e.target === edge.source)
       );
-      if (exists) return s;
+      if (existingEdge) {
+        const existingKind = (existingEdge.data as { kind?: EdgeKind })?.kind;
+        result =
+          existingKind === edge.data.kind ? "duplicate-same-kind" : "duplicate-different-kind";
+        return s;
+      }
       const edges = [
         ...s.edges,
         {
@@ -235,6 +243,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       ];
       return { edges, expansionCountsByNode: computeExpansionCountsMap(edges) };
     });
+    return result;
   },
 
   setSelectedNode: (id) => set({ selectedNodeId: id }),

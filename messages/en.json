@@ -95,6 +95,7 @@
     "noMoreConnections": "No more connections of this type.",
     "connectionsFailed": "Could not find connections. Try a different type.",
     "expansionInProgress": "An expansion is already running — try again in a moment.",
+    "connectionExistsDifferentKind": "These verses are already connected a different way.",
     "dismiss": "Dismiss",
     "minimapAria": "Canvas minimap",
     "saveFailedRetry": "Save failed — try again",

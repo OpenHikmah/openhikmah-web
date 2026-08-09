@@ -95,6 +95,7 @@
     "noMoreConnections": "Bu növdə başqa əlaqə yoxdur.",
     "connectionsFailed": "Əlaqə tapılmadı. Fərqli növ sınayın.",
     "expansionInProgress": "Artıq bir genişləndirmə işləyir — bir az sonra yenidən cəhd edin.",
+    "connectionExistsDifferentKind": "Bu ayələr artıq başqa cür bağlıdır.",
     "dismiss": "Bağla",
     "minimapAria": "Lövhə kiçik xəritəsi",
     "saveFailedRetry": "Yadda saxlama uğursuz oldu — yenidən cəhd edin",
