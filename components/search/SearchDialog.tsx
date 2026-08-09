@@ -42,6 +42,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const [previewError, setPreviewError] = useState(false);
   const [mode, setMode] = useState<SearchMode>("keyword");
   const [fellBackToKeyword, setFellBackToKeyword] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -96,6 +97,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
         );
         setSearchResults(data.results);
         setTotalResults(data.total);
+        setHighlightedIndex(-1);
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
           setSearchResults([]);
@@ -181,6 +183,23 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     [mapConnections]
   );
 
+  const selectResult = useCallback(
+    async (result: SearchResult) => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/verse/${result.ref.replace(":", "/")}`);
+        if (!res.ok) throw new Error();
+        const verse: Verse = await res.json();
+        mapConnections(verse);
+      } catch {
+        // silent
+      } finally {
+        setLoading(false);
+      }
+    },
+    [mapConnections]
+  );
+
   const viewAllResults = useCallback(() => {
     const trimmed = query.trim();
     if (!trimmed || /^\d+:\d+$/.test(trimmed)) return;
@@ -210,6 +229,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
           setIsSearching(false);
           setFellBackToKeyword(false);
           setMode("keyword");
+          setHighlightedIndex(-1);
           onClose();
         }
       }}
@@ -245,10 +265,28 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                     setLoading(false);
                     setIsSearching(false);
                     setFellBackToKeyword(false);
+                    setHighlightedIndex(-1);
                   }
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && showResults) viewAllResults();
+                  if (showResults && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                    e.preventDefault();
+                    const delta = e.key === "ArrowDown" ? 1 : -1;
+                    setHighlightedIndex((prev) => {
+                      const next = prev + delta;
+                      if (next < 0) return searchResults.length - 1;
+                      if (next >= searchResults.length) return 0;
+                      return next;
+                    });
+                    return;
+                  }
+                  if (e.key === "Enter" && showResults) {
+                    if (highlightedIndex >= 0 && highlightedIndex < searchResults.length) {
+                      selectResult(searchResults[highlightedIndex]);
+                    } else {
+                      viewAllResults();
+                    }
+                  }
                 }}
                 placeholder={mode === "meaning" ? t("placeholderMeaning") : t("placeholderKeyword")}
                 className="flex-1 bg-transparent text-sm outline-none text-text-primary placeholder:text-text-muted"
@@ -289,7 +327,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
               )}
 
               {showResults && (
-                <div className="p-3 space-y-0.5">
+                <div className="p-3 space-y-0.5" role="listbox">
                   {fellBackToKeyword && (
                     <p className="px-2 pb-1.5 text-[10px] text-text-muted">
                       {t("fallbackKeyword")}
@@ -298,24 +336,14 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                   {uiLocale !== "en" && (
                     <p className="px-2 pb-1.5 text-[10px] text-text-muted">{t("nonEnglishHint")}</p>
                   )}
-                  {searchResults.map((result) => (
+                  {searchResults.map((result, index) => (
                     <SearchResultRow
                       key={result.ref}
                       result={result}
                       alreadyAdded={hasNode(result.ref)}
-                      onSelect={async () => {
-                        setLoading(true);
-                        try {
-                          const res = await fetch(`/api/verse/${result.ref.replace(":", "/")}`);
-                          if (!res.ok) throw new Error();
-                          const verse: Verse = await res.json();
-                          mapConnections(verse);
-                        } catch {
-                          // silent
-                        } finally {
-                          setLoading(false);
-                        }
-                      }}
+                      isHighlighted={index === highlightedIndex}
+                      onHover={() => setHighlightedIndex(index)}
+                      onSelect={() => selectResult(result)}
                     />
                   ))}
                 </div>
@@ -441,18 +469,25 @@ function VerseCard({
 function SearchResultRow({
   result,
   alreadyAdded,
+  isHighlighted,
+  onHover,
   onSelect,
 }: {
   result: SearchResult;
   alreadyAdded: boolean;
+  isHighlighted: boolean;
+  onHover: () => void;
   onSelect: () => void;
 }) {
   return (
     <button
+      role="option"
+      aria-selected={isHighlighted}
       onClick={onSelect}
+      onMouseEnter={onHover}
       className={cn(
         "w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left transition-colors",
-        "hover:bg-surface-raised"
+        isHighlighted ? "bg-surface-raised" : "hover:bg-surface-raised"
       )}
     >
       <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 mt-0.5 bg-surface-overlay">
