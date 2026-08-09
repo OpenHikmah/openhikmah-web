@@ -1,4 +1,4 @@
-import { and, eq, notInArray } from "drizzle-orm";
+import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { connections, type Connection } from "@/lib/infra/db/schema";
 import { generateConnections, generateGroundedConnections } from "@/lib/ai/connection-generator";
@@ -16,11 +16,12 @@ import type { ConnectionResult, EdgeKind } from "@/types/quran";
  */
 
 /**
- * Single-flight registry: concurrent cache misses for the SAME verse+kind share
- * one in-flight generation instead of each firing its own (expensive) AI call.
- * Per-process — full coverage on the single box; a multi-instance deployment
+ * Single-flight registry: concurrent cache misses for the SAME verse+kind+locale
+ * share one in-flight generation instead of each firing its own (expensive) AI
+ * call. Per-process — full coverage on the single box; a multi-instance deployment
  * would need a Redis lock to coalesce across processes (deferred). Keyed by
- * `${fromRef}:${kind}`; entries are removed as soon as the generation settles.
+ * `${fromRef}:${kind}:${locale}:${excludeRefs}`; entries are removed as soon as
+ * the generation settles.
  */
 const inFlight = new Map<string, Promise<ConnectionResult[]>>();
 
@@ -170,7 +171,7 @@ async function generateAndPersist(
   if (generated.length > 0) {
     const model = process.env.ANTHROPIC_MODEL ?? null;
     try {
-      await db
+      const inserted = await db
         .insert(connections)
         .values(
           generated.map((g) => ({
@@ -182,7 +183,37 @@ async function generateAndPersist(
             locale,
           }))
         )
-        .onConflictDoNothing();
+        .onConflictDoNothing()
+        .returning({ toRef: connections.toRef });
+
+      // A concurrent generation on another instance can win the same
+      // (fromRef, toRef, kind, locale) row first — RETURNING omits exactly the
+      // rows DO NOTHING discarded. Re-read those so this call returns what's
+      // actually persisted, not the text that lost the race (mirrors the same
+      // fix in lib/names/name-content.ts).
+      const insertedRefs = new Set(inserted.map((r) => r.toRef));
+      const conflicted = generated.filter((g) => !insertedRefs.has(g.ref));
+      if (conflicted.length > 0) {
+        const persisted = await db
+          .select({ toRef: connections.toRef, reason: connections.reason })
+          .from(connections)
+          .where(
+            and(
+              eq(connections.fromRef, fromRef),
+              eq(connections.kind, kind),
+              eq(connections.locale, locale),
+              inArray(
+                connections.toRef,
+                conflicted.map((g) => g.ref)
+              )
+            )
+          );
+        const reasonByRef = new Map(persisted.map((r) => [r.toRef, r.reason]));
+        return generated.map((g) => {
+          const persistedReason = reasonByRef.get(g.ref);
+          return persistedReason !== undefined ? { ...g, reason: persistedReason } : g;
+        });
+      }
     } catch (err) {
       console.error("Failed to persist connections:", err);
     }

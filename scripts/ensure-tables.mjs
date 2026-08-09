@@ -82,13 +82,22 @@ try {
       to_ref     text NOT NULL,
       kind       text NOT NULL,
       reason     text NOT NULL,
+      locale     text NOT NULL DEFAULT 'en',
       model      text,
       confidence integer,
       status     text NOT NULL DEFAULT 'active',
       created_at timestamptz NOT NULL DEFAULT now()
     )
   `;
-  await sql`CREATE UNIQUE INDEX IF NOT EXISTS connections_from_to_kind_idx ON connections (from_ref, to_ref, kind)`;
+  await sql`ALTER TABLE connections ADD COLUMN IF NOT EXISTS locale text NOT NULL DEFAULT 'en'`;
+  // Migration 0020 replaced this 3-column index with a 4-column one that includes
+  // locale — drop the stale name first so this idempotent bootstrap doesn't
+  // resurrect it (its name check alone wouldn't catch that the column set moved
+  // on, and a stray 3-column unique constraint here would make every insert of a
+  // second locale's row for the same fromRef+toRef+kind silently conflict and
+  // vanish under onConflictDoNothing()).
+  await sql`DROP INDEX IF EXISTS connections_from_to_kind_idx`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS connections_from_to_kind_locale_idx ON connections (from_ref, to_ref, kind, locale)`;
   await sql`CREATE INDEX IF NOT EXISTS connections_from_kind_idx ON connections (from_ref, kind)`;
 
   await sql`
