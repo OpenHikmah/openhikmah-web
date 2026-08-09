@@ -135,7 +135,7 @@
     "nonEnglishHint": "Searching English translations — results are shown in English regardless of interface language."
   },
   "bookmarks": {
-    "title": "Bookmarks",
+    "title": "Saved",
     "emptyTitle": "No bookmarks yet.",
     "emptyHint": "Tap the heart icon on any verse in the canvas to save it.",
     "openCanvas": "Open canvas",
