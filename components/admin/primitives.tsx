@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button, type ButtonProps } from "@/components/ui";
+import { useArmedConfirm } from "@/hooks/useArmedConfirm";
 import { InfoHint } from "./InfoHint";
 
 /** A compact dashboard stat: a label, a large gold value, and optional hint. An
@@ -117,33 +117,10 @@ export function ConfirmButton({
   children: React.ReactNode;
   confirmLabel?: string;
 } & Omit<ButtonProps, "onClick">) {
-  const [armed, setArmed] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Clear any pending disarm timer on unmount.
-  useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    },
-    []
-  );
+  const { armed, trigger } = useArmedConfirm(onConfirm);
 
   return (
-    <Button
-      variant={armed ? "danger" : variant}
-      size={size}
-      onClick={() => {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        if (armed) {
-          setArmed(false);
-          onConfirm();
-        } else {
-          setArmed(true);
-          timerRef.current = setTimeout(() => setArmed(false), 3000);
-        }
-      }}
-      {...props}
-    >
+    <Button variant={armed ? "danger" : variant} size={size} onClick={trigger} {...props}>
       {armed ? confirmLabel : children}
     </Button>
   );
