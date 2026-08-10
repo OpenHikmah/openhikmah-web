@@ -106,9 +106,11 @@ export default async function StoryDetailPage({ params }: Props) {
                 </p>
               )}
 
-              <div className="mt-5">
-                <OpenOnCanvasButton verses={verses} label={t("openOnCanvas")} />
-              </div>
+              {verses.length > 0 && (
+                <div className="mt-5">
+                  <OpenOnCanvasButton verses={verses} label={t("openOnCanvas")} />
+                </div>
+              )}
             </section>
           );
         })}

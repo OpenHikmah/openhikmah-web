@@ -170,6 +170,15 @@ describe("Stories pages — locale-aware rendering", () => {
 
   it("passes a translated label into the Open on canvas button", async () => {
     mockGetUiLocale.mockResolvedValue("tr");
+    mockResolveVerse.mockResolvedValue({
+      ref: "12:1",
+      surah: 12,
+      ayah: 1,
+      arabicText: "الر ۚ تِلْكَ آيَاتُ الْكِتَابِ الْمُبِينِ",
+      translation: "Alif, Lam, Ra. These are the verses of the clear Book.",
+      surahName: "Yusuf",
+      surahNameArabic: "يوسف",
+    });
     const { default: StoryDetailPage } = await import("@/app/stories/[slug]/page");
     const { OpenOnCanvasButton } = await import("@/app/stories/[slug]/OpenOnCanvasButton");
     const tree = await StoryDetailPage({ params: Promise.resolve({ slug: "test-story" }) });

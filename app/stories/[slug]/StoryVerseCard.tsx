@@ -7,7 +7,6 @@ import { useAudioStore } from "@/store/audio";
 import { cn } from "@/lib/utils";
 import type { Verse } from "@/types/quran";
 
-/** Arabic + translation + per-verse audio, for a chapter's verse feed. */
 export function StoryVerseCard({ verse }: { verse: Verse }) {
   const t = useTranslations("stories");
   const playVerse = useAudioStore((s) => s.playVerse);
