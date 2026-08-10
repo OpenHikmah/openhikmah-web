@@ -1,6 +1,6 @@
 {
   "common": {
-    "signIn": "Sign in",
+    "signIn": "Log in",
     "signingIn": "Signing in…",
     "signOut": "Sign out",
     "settings": "Settings",
@@ -12,9 +12,9 @@
   "nav": {
     "canvas": "Canvas",
     "search": "Search",
-    "stories": "Stories",
+    "stories": "Narratives",
     "names": "Asma'ul Husna",
-    "bookmarks": "Bookmarks",
+    "bookmarks": "Saved",
     "savedCanvases": "Saved canvases",
     "friendsLeaderboard": "Friends & Leaderboard",
     "mentions": "Mentions",
@@ -135,7 +135,7 @@
     "nonEnglishHint": "Searching English translations — results are shown in English regardless of interface language."
   },
   "bookmarks": {
-    "title": "Bookmarks",
+    "title": "Saved",
     "emptyTitle": "No bookmarks yet.",
     "emptyHint": "Tap the heart icon on any verse in the canvas to save it.",
     "openCanvas": "Open canvas",

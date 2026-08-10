@@ -12,9 +12,9 @@
   "nav": {
     "canvas": "Lövhə",
     "search": "Axtar",
-    "stories": "Hekayələr",
+    "stories": "Qissələr",
     "names": "Əsmayi-Hüsna",
-    "bookmarks": "Əlfəcinlər",
+    "bookmarks": "Yadda saxlanılanlar",
     "savedCanvases": "Yadda saxlanmış lövhələr",
     "friendsLeaderboard": "Dostlar və Reytinq",
     "mentions": "Qeyd edilmələr",
@@ -135,7 +135,7 @@
     "nonEnglishHint": "İngilis dilindəki tərcümələr axtarılır — nəticələr interfeys dilindən asılı olmayaraq ingilis dilində göstərilir."
   },
   "bookmarks": {
-    "title": "Əlfəcinlər",
+    "title": "Yadda saxlanılanlar",
     "emptyTitle": "Hələ əlfəcin yoxdur.",
     "emptyHint": "Yadda saxlamaq üçün lövhədəki istənilən ayənin ürək işarəsinə toxunun.",
     "openCanvas": "Lövhəni aç",
