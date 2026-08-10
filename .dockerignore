@@ -9,6 +9,7 @@ __tests__
 .agents
 scripts
 !scripts/migrate.mjs
+!scripts/migrate-concurrent-indexes.mjs
 !scripts/ensure-tables.mjs
 # One-time data backfills, shipped so they can be run from a container shell.
 !scripts/seed-quran.mjs

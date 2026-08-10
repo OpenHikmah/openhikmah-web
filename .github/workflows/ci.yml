@@ -207,6 +207,34 @@ jobs:
       - name: Check bundle size
         run: bun run size
 
+  docker-build:
+    name: Docker Build (production image)
+    runs-on: ubuntu-latest
+    # Builds the exact Dockerfile/.dockerignore combination the deploy server uses.
+    # Catches COPY sources missing from the build context (e.g. a file added to
+    # the Dockerfile but not allow-listed in .dockerignore) before it reaches
+    # production — bun run build alone doesn't exercise .dockerignore at all.
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build production image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: openhikmah-web:ci-check
+          build-args: |
+            NEXT_PUBLIC_APP_URL=https://placeholder.example.com
+            NEXT_PUBLIC_QF_CLIENT_ID=placeholder-client-id
+            NEXT_PUBLIC_QF_AUTH_BASE=https://placeholder.example.com
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
