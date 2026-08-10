@@ -22,8 +22,7 @@ function friend(overrides: Partial<Parameters<typeof FriendList>[0]["friends"][n
 describe("FriendList confirm-before-destroy", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    useAuthStore.setState({ accessToken: "test-token" as any });
+    useAuthStore.setState({ accessToken: "test-token" });
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) })
