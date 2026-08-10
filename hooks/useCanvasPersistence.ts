@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { Node, Edge } from "@xyflow/react";
 import { useCanvasStore, serializeCanvas, type SavedCanvas } from "@/store/canvas";
 
 /** localStorage key for the in-progress canvas. Exported so the home screen can
@@ -71,6 +72,10 @@ export function useCanvasPersistence() {
   const restoreCanvas = useCanvasStore((s) => s.restoreCanvas);
   const hydratedRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestRef = useRef({ nodes, edges });
+  useEffect(() => {
+    latestRef.current = { nodes, edges };
+  }, [nodes, edges]);
 
   function tryRestoreFromLocalStorage() {
     // Skip if the store was already populated (e.g. by a workspace load that
@@ -127,18 +132,41 @@ export function useCanvasPersistence() {
     if (!hydratedRef.current) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      try {
-        if (nodes.length === 0) {
-          localStorage.removeItem(LS_KEY);
-        } else {
-          localStorage.setItem(LS_KEY, JSON.stringify(serializeCanvas(nodes, edges)));
-        }
-      } catch {
-        // localStorage quota exceeded — ignore
-      }
+      saveTimerRef.current = null;
+      saveToLocalStorage(nodes, edges);
     }, 800);
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
   }, [nodes, edges]);
+
+  // Flush any pending debounced save synchronously before the page unloads,
+  // so an edit made just before navigating away (e.g. clicking "Sign in to
+  // save") isn't lost to the 800ms debounce window.
+  useEffect(() => {
+    const flush = () => {
+      if (!hydratedRef.current || !saveTimerRef.current) return;
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+      saveToLocalStorage(latestRef.current.nodes, latestRef.current.edges);
+    };
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("beforeunload", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("beforeunload", flush);
+    };
+  }, []);
+}
+
+function saveToLocalStorage(nodes: Node[], edges: Edge[]) {
+  try {
+    if (nodes.length === 0) {
+      localStorage.removeItem(LS_KEY);
+    } else {
+      localStorage.setItem(LS_KEY, JSON.stringify(serializeCanvas(nodes, edges)));
+    }
+  } catch {
+    // localStorage quota exceeded — ignore
+  }
 }
