@@ -123,7 +123,7 @@ export function SearchPageClient() {
       });
 
     return () => controller.abort();
-  }, [q, mode, page, retryCount]);
+  }, [q, mode, page, retryCount, uiLocale]);
 
   const navigate = useCallback(
     (nextQ: string, nextMode: SearchMode, nextPage: number) => {
