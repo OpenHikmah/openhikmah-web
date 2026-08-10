@@ -83,6 +83,23 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(false);
   const exportContainerRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
+  const shareTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exportTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // CanvasToolbar unmounts whenever nodes.length hits 0 (e.g. select-all +
+  // delete while a save/share/export request is still in flight) — clear any
+  // pending feedback-reset timeout and stop setting state after that point.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (shareTimeoutRef.current) clearTimeout(shareTimeoutRef.current);
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
+    };
+  }, []);
 
   // Close on any click outside the export button/menu — panning the canvas,
   // clicking a node, or clicking the minimap would otherwise leave it open
@@ -116,10 +133,13 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
       const url = await buildShareUrl(serializeCanvas(nodes, edges));
       await copy(url);
     } catch {
+      if (!mountedRef.current) return;
       setShareError(true);
-      setTimeout(() => setShareError(false), 2500);
+      shareTimeoutRef.current = setTimeout(() => {
+        if (mountedRef.current) setShareError(false);
+      }, 2500);
     } finally {
-      setSharing(false);
+      if (mountedRef.current) setSharing(false);
     }
   };
 
@@ -135,18 +155,26 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ name, data: serializeCanvas(nodes, edges), nodeCount: count }),
       });
+      if (!mountedRef.current) return;
       if (res.ok) {
         setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
+        saveTimeoutRef.current = setTimeout(() => {
+          if (mountedRef.current) setSaved(false);
+        }, 2000);
       } else {
         setSaveError(true);
-        setTimeout(() => setSaveError(false), 2000);
+        saveTimeoutRef.current = setTimeout(() => {
+          if (mountedRef.current) setSaveError(false);
+        }, 2000);
       }
     } catch {
+      if (!mountedRef.current) return;
       setSaveError(true);
-      setTimeout(() => setSaveError(false), 2000);
+      saveTimeoutRef.current = setTimeout(() => {
+        if (mountedRef.current) setSaveError(false);
+      }, 2000);
     } finally {
-      setSaving(false);
+      if (mountedRef.current) setSaving(false);
     }
   };
 
@@ -181,10 +209,13 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
         downloadBlob(blob, `hikmah-canvas-${stamp}.pdf`);
       }
     } catch {
+      if (!mountedRef.current) return;
       setExportError(true);
-      setTimeout(() => setExportError(false), 2500);
+      exportTimeoutRef.current = setTimeout(() => {
+        if (mountedRef.current) setExportError(false);
+      }, 2500);
     } finally {
-      setExporting(false);
+      if (mountedRef.current) setExporting(false);
     }
   };
 
