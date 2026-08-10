@@ -11,7 +11,7 @@ const {
   mockGetQuranEdition,
 } = vi.hoisted(() => ({
   mockSearchByMeaning: vi.fn(),
-  mockConsume: vi.fn(async () => true),
+  mockConsume: vi.fn(async (_key: string, _limit?: number, _windowSeconds?: number) => true),
   mockGetVerse: vi.fn(),
   mockGetVerses: vi.fn(async () => new Map()),
   mockLogSearchQuery: vi.fn(async () => undefined),
@@ -275,7 +275,9 @@ describe("GET /api/search", () => {
   });
 
   it("mode=meaning falls back to keyword (not 429) when rate-limited, without embedding", async () => {
-    mockConsume.mockResolvedValue(false);
+    // Deny only the AI-generation "search:" budget — the keyword fallback has
+    // its own separate "searchkw:" budget, which is still within limit here.
+    mockConsume.mockImplementation(async (key: string) => !key.startsWith("search:"));
     mockFetch.mockResolvedValueOnce(
       quranComResponse([{ verse_key: "2:1", translations: [{ text: "Alif Lam Mim" }] }])
     );
@@ -284,6 +286,15 @@ describe("GET /api/search", () => {
     expect(res.headers.get("x-search-fallback")).toBe("keyword");
     expect(mockSearchByMeaning).not.toHaveBeenCalled();
     expect((await res.json()).results[0].ref).toBe("2:1");
+  });
+
+  it("mode=meaning gates the keyword fallback under searchkw:, and 429s when that budget is exhausted", async () => {
+    mockSearchByMeaning.mockResolvedValueOnce([]);
+    mockConsume.mockImplementation(async (key: string) => !key.startsWith("searchkw:"));
+    const res = await GET(makeMeaningReq("mercy"));
+    expect(mockConsume).toHaveBeenCalledWith(expect.stringMatching(/^searchkw:/), 60, 60);
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toBe("Too many search requests");
   });
 
   it("rate-limits the keyword search response when the search budget is exhausted", async () => {

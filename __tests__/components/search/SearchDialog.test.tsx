@@ -55,6 +55,16 @@ describe("SearchDialog — rate-limit vs. genuine empty results", () => {
     expect(screen.queryByText(/no results found/i)).not.toBeInTheDocument();
   });
 
+  it("shows an 'unavailable' message when the search request itself rejects, not 'no results'", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("network down"));
+
+    renderWithIntl(<SearchDialog open={true} onClose={vi.fn()} />);
+    await typeQuery("mercy");
+
+    expect(screen.getByText(/temporarily unavailable/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no results found/i)).not.toBeInTheDocument();
+  });
+
   it("still shows the plain 'no results' copy for a genuine zero-match 200 response", async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ results: [], total: 0, page: 1, pageSize: 10 }), {

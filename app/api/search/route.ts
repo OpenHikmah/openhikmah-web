@@ -185,6 +185,18 @@ export async function GET(req: NextRequest) {
         console.error("Semantic search route error:", err);
       }
     }
+    // The keyword fallback below is the same proxy call plain keyword search
+    // makes — gate it under the same searchkw: budget, or a caller could use
+    // mode=meaning to bypass the keyword limit indefinitely (semantic misses
+    // fall through to keyword on every request).
+    const keywordAllowed = await consume(
+      `searchkw:${clientKey(req)}`,
+      KEYWORD_SEARCH_LIMIT,
+      KEYWORD_SEARCH_WINDOW_SECONDS
+    );
+    if (!keywordAllowed) {
+      return NextResponse.json({ error: "Too many search requests" }, { status: 429 });
+    }
     const { results, total, failed } = await keywordSearch(q, page, pageSize, edition);
     const response: SearchResponse = { results, total, page, pageSize };
     await maybeLogSearchQuery(req, q, "keyword", total);
