@@ -226,9 +226,11 @@ async function getVersesBySlug(
 
   // The cache above is keyed to "en" regardless of locale — verse *selection*
   // (and its arabicText/translation as generated) never varies by request, so
-  // it isn't re-fetched per locale. But the displayed text must still honor
-  // the requester's edition, so re-hydrate arabicText/translation here when
-  // it differs from the canonical en.sahih the cache was built with.
+  // it isn't re-fetched per locale. But the displayed translation must still
+  // honor the requester's edition, so re-hydrate it here when it differs from
+  // the canonical en.sahih the cache was built with. arabicText is left as-is
+  // — resolveVerse always sources it from ar.alafasy regardless of `edition`,
+  // so re-fetching it would be a same-value round trip.
   const hydratedVerses =
     edition === DEFAULT_EDITION_BY_LOCALE.en
       ? verses
@@ -238,7 +240,6 @@ async function getVersesBySlug(
             if (!localized) return v;
             return {
               ...v,
-              arabicText: localized.arabicText,
               translation: stripHtml(localized.translation),
             };
           })
