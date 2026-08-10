@@ -3,7 +3,13 @@ import type { SearchResponse, SearchResult, VerseRef } from "@/types/quran";
 import { getSurahName } from "@/lib/quran/surah-names";
 import { searchByMeaning } from "@/lib/quran/semantic-search";
 import { getVerse, getVerses } from "@/lib/quran/quran-corpus";
-import { consume, SEARCH_LOG_LIMIT, SEARCH_LOG_WINDOW_SECONDS } from "@/lib/infra/rate-limit";
+import {
+  consume,
+  SEARCH_LOG_LIMIT,
+  SEARCH_LOG_WINDOW_SECONDS,
+  KEYWORD_SEARCH_LIMIT,
+  KEYWORD_SEARCH_WINDOW_SECONDS,
+} from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import { logSearchQuery } from "@/lib/infra/search-log";
 import { getQuranEdition } from "@/lib/i18n/request-prefs";
@@ -190,7 +196,14 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const allowed = await consume(`search:${clientKey(req)}`);
+  // Plain keyword search is a cheap proxy call, not an AI generation — its own
+  // bucket so normal typing/paging never competes with the AI-generation
+  // budget (search: prefix, shared with the "by meaning" semantic attempt).
+  const allowed = await consume(
+    `searchkw:${clientKey(req)}`,
+    KEYWORD_SEARCH_LIMIT,
+    KEYWORD_SEARCH_WINDOW_SECONDS
+  );
   if (!allowed) {
     return NextResponse.json({ error: "Too many search requests" }, { status: 429 });
   }

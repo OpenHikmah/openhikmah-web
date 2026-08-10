@@ -22,6 +22,8 @@ vi.mock("@/lib/infra/rate-limit", () => ({
   consume: mockConsume,
   SEARCH_LOG_LIMIT: 30,
   SEARCH_LOG_WINDOW_SECONDS: 60,
+  KEYWORD_SEARCH_LIMIT: 60,
+  KEYWORD_SEARCH_WINDOW_SECONDS: 60,
 }));
 vi.mock("@/lib/quran/quran-corpus", () => ({
   getVerse: mockGetVerse,
@@ -293,6 +295,14 @@ describe("GET /api/search", () => {
     expect(res.status).toBe(429);
     const body = await res.json();
     expect(body.error).toBe("Too many search requests");
+  });
+
+  it("gates plain keyword search under its own bucket, separate from the AI-generation budget", async () => {
+    mockFetch.mockResolvedValueOnce(quranComResponse([]));
+    await GET(makeSearchReq("mercy"));
+    expect(mockConsume).toHaveBeenCalledWith(expect.stringMatching(/^searchkw:/), 60, 60);
+    // Never the shared AI-generation "search:" bucket keyword search used to share.
+    expect(mockConsume).not.toHaveBeenCalledWith(expect.stringMatching(/^search:/));
   });
 
   it("rate-limits the search-log write on the keyword path, within budget", async () => {

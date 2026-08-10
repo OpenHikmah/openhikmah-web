@@ -61,6 +61,15 @@ export const MUTATION_WINDOW_SECONDS = positiveIntEnv("MUTATION_RATE_WINDOW", 60
 export const SEARCH_LOG_LIMIT = positiveIntEnv("SEARCH_LOG_RATE_LIMIT", 30);
 export const SEARCH_LOG_WINDOW_SECONDS = positiveIntEnv("SEARCH_LOG_RATE_WINDOW", 60);
 
+/**
+ * Default budget for plain keyword search (a cheap proxy call to the
+ * quran.com full-text API, not an AI generation) — its own bucket, sized well
+ * above AI_GEN_LIMIT, so normal search usage never competes with the AI
+ * generation budget it used to share.
+ */
+export const KEYWORD_SEARCH_LIMIT = positiveIntEnv("KEYWORD_SEARCH_RATE_LIMIT", 60);
+export const KEYWORD_SEARCH_WINDOW_SECONDS = positiveIntEnv("KEYWORD_SEARCH_RATE_WINDOW", 60);
+
 /** Probability that a given `consume` call also prunes expired buckets. */
 const SWEEP_PROBABILITY = 0.01;
 /** Keep this many windows of history before a bucket is eligible for pruning. */
