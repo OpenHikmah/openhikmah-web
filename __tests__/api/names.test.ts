@@ -6,11 +6,19 @@ vi.mock("next/cache", () => ({
   unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
-// The routes now call getUiLocale() (lib/i18n/request-prefs.ts), which reads
-// next/headers' cookies() — unavailable outside a real Next request scope.
-// No cookie set here means it resolves to the "en" default, matching this
-// suite's pre-existing English-only fixtures/assertions.
-vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
+// The routes now call getUiLocale()/getQuranEdition() (lib/i18n/request-prefs.ts),
+// which read next/headers' cookies() — unavailable outside a real Next request
+// scope. Mock the module directly (same pattern as __tests__/api/search.test.ts)
+// so individual tests can override the locale/edition; the defaults below match
+// this suite's pre-existing English-only fixtures/assertions.
+const { mockGetUiLocale, mockGetQuranEdition } = vi.hoisted(() => ({
+  mockGetUiLocale: vi.fn(async () => "en" as const),
+  mockGetQuranEdition: vi.fn(async () => "en.sahih"),
+}));
+vi.mock("@/lib/i18n/request-prefs", () => ({
+  getUiLocale: mockGetUiLocale,
+  getQuranEdition: mockGetQuranEdition,
+}));
 
 // The name routes now read/write a durable `name_content` cache via lib/infra/db
 // (see lib/names/name-content.ts). Mock the DB so the cache check is always a miss and
@@ -106,7 +114,13 @@ describe("GET /api/names", () => {
 });
 
 describe("GET /api/names/[slug]/verses", () => {
-  beforeEach(() => mockFetch.mockReset());
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockGetUiLocale.mockReset();
+    mockGetUiLocale.mockResolvedValue("en");
+    mockGetQuranEdition.mockReset();
+    mockGetQuranEdition.mockResolvedValue("en.sahih");
+  });
 
   function params(slug: string) {
     return { params: Promise.resolve({ slug }) };
@@ -153,6 +167,26 @@ describe("GET /api/names/[slug]/verses", () => {
       expect(verse).toHaveProperty("translation");
       expect(verse).toHaveProperty("reason");
       expect(verse).toHaveProperty("surahName");
+    }
+  });
+
+  it("hydrates verse translation for the requester's edition, not the en.sahih the selection was cached with", async () => {
+    mockGetQuranEdition.mockResolvedValue("tr.diyanet");
+    mockFetch.mockImplementation(async (url: string) => {
+      if (typeof url !== "string") return { ok: false };
+      if (url.includes("ar.alafasy")) return arabicResp();
+      if (url.includes("tr.diyanet")) return transResp("Türkçe çeviri");
+      if (url.includes("en.sahih")) return transResp("English translation");
+      return { ok: false };
+    });
+
+    const req = new NextRequest("http://localhost/api/names/al-alim/verses");
+    const res = await getNameVerses(req, params("al-alim"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.length).toBeGreaterThan(0);
+    for (const verse of body) {
+      expect(verse.translation).toBe("Türkçe çeviri");
     }
   });
 });

@@ -7,8 +7,8 @@ import { getOrGenerateNameContent, getOrGenerateVerseReason } from "@/lib/names/
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import { incr } from "@/lib/infra/metrics";
-import { getUiLocale } from "@/lib/i18n/request-prefs";
-import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
+import { getUiLocale, getQuranEdition } from "@/lib/i18n/request-prefs";
+import { LOCALE_LANGUAGE_NAME, DEFAULT_EDITION_BY_LOCALE, type Locale } from "@/lib/i18n/config";
 import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
 import sanitizeHtml from "sanitize-html";
 import type { VerseRef } from "@/types/quran";
@@ -158,6 +158,7 @@ Sentence: "${reason}"`;
 async function getVersesBySlug(
   slug: string,
   locale: Locale,
+  edition: string,
   onBeforeGenerate: () => Promise<void>
 ): Promise<NameVerse[]> {
   const name = getNameBySlug(slug);
@@ -221,7 +222,29 @@ async function getVersesBySlug(
     onBeforeGenerate
   );
 
-  if (locale === "en" || verses.length === 0) return verses;
+  if (verses.length === 0) return verses;
+
+  // The cache above is keyed to "en" regardless of locale — verse *selection*
+  // (and its arabicText/translation as generated) never varies by request, so
+  // it isn't re-fetched per locale. But the displayed text must still honor
+  // the requester's edition, so re-hydrate arabicText/translation here when
+  // it differs from the canonical en.sahih the cache was built with.
+  const hydratedVerses =
+    edition === DEFAULT_EDITION_BY_LOCALE.en
+      ? verses
+      : await Promise.all(
+          verses.map(async (v) => {
+            const localized = await resolveVerse(v.ref, edition);
+            if (!localized) return v;
+            return {
+              ...v,
+              arabicText: localized.arabicText,
+              translation: stripHtml(localized.translation),
+            };
+          })
+        );
+
+  if (locale === "en") return hydratedVerses;
 
   // Localize only the per-verse reason text (a translation of the canonical
   // English reason, cached in name_verse_reasons) — the verse list itself
@@ -245,7 +268,7 @@ async function getVersesBySlug(
 
   const language = LOCALE_LANGUAGE_NAME[locale];
   const localizedReasons = await Promise.all(
-    verses.map(async (v) => {
+    hydratedVerses.map(async (v) => {
       const translated = await getOrGenerateVerseReason(
         slug,
         v.ref,
@@ -263,7 +286,7 @@ async function getVersesBySlug(
       return translated;
     })
   );
-  return verses.map((v, i) => ({ ...v, reason: localizedReasons[i] }));
+  return hydratedVerses.map((v, i) => ({ ...v, reason: localizedReasons[i] }));
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
@@ -275,7 +298,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 
   try {
     const locale = await getUiLocale();
-    const verses = await getVersesBySlug(slug, locale, async () => {
+    const edition = await getQuranEdition();
+    const verses = await getVersesBySlug(slug, locale, edition, async () => {
       if (!(await consume(`names-gen:${clientKey(req)}`))) throw new RateLimitError();
     });
     return NextResponse.json(verses);
