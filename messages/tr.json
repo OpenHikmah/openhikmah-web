@@ -10,11 +10,11 @@
     "bookmarkVerse": "Ayeti işaretle"
   },
   "nav": {
-    "canvas": "Tuval",
+    "canvas": "Kanvas",
     "search": "Ara",
-    "stories": "Hikayeler",
+    "stories": "Kıssalar",
     "names": "Esmaü'l Hüsna",
-    "bookmarks": "Yer imleri",
+    "bookmarks": "Kaydedilenler",
     "savedCanvases": "Kayıtlı tuvaller",
     "friendsLeaderboard": "Arkadaşlar ve Sıralama",
     "mentions": "Bahsetmeler",
@@ -35,7 +35,7 @@
     "recitation": "Kıraat",
     "recitationDescription": "Ayet seslendirmesi için kullanılan kâri.",
     "reciter": "Kâri",
-    "canvas": "Tuval",
+    "canvas": "Kanvas",
     "showMinimap": "Küçük haritayı göster",
     "showCanvasMinimap": "Tuval küçük haritasını göster"
   },
@@ -46,6 +46,12 @@
     "emptyStateDescription": "Bir ayet veya tema arayın — yapay zeka Kur'an genelindeki anlamsal bağlantıları haritalar.",
     "searchVerses": "Ayet ara",
     "orBeginWith": "Veya şununla başlayın",
+    "journey": {
+      "patience": "Sabır",
+      "mercy": "Rahmet",
+      "light": "Nur",
+      "gratitude": "Şükür"
+    },
     "duplicateTooltip": "Tuvalde başka yerde de açık — atlamak için tıklayın",
     "jumpToDuplicate": "Yinelenen ayet kartına atla",
     "pauseRecitation": "Kıraati duraklat",
@@ -126,6 +132,7 @@
     "enterSearchTerm": "Başlamak için bir arama terimi girin.",
     "somethingWentWrong": "Bir şeyler ters gitti. Tekrar deneyin.",
     "searchUnavailable": "Arama geçici olarak kullanılamıyor.",
+    "rateLimited": "Biraz hızlı arıyorsunuz — bir an bekleyip tekrar deneyin.",
     "tryAgain": "Tekrar dene →",
     "tryByMeaning": "Bunun yerine \"Anlama göre\" aramayı deneyin →",
     "showingResults": "\"{query}\" için <b>{count, plural, one {# sonuç} other {# sonuç}}</b> gösteriliyor",
@@ -135,7 +142,7 @@
     "nonEnglishHint": "İngilizce çeviriler aranıyor — sonuçlar arayüz dilinden bağımsız olarak İngilizce gösterilir."
   },
   "bookmarks": {
-    "title": "Yer imleri",
+    "title": "Kaydedilenler",
     "emptyTitle": "Henüz yer imi yok.",
     "emptyHint": "Kaydetmek için tuvaldeki herhangi bir ayetin kalp simgesine dokunun.",
     "openCanvas": "Tuvali aç",
@@ -153,6 +160,20 @@
     "copied": "Kopyalandı!",
     "share": "Paylaş",
     "copyLink": "Günün ayetinin bağlantısını kopyala"
+  },
+  "stories": {
+    "eyebrow": "Peygamber Kıssaları",
+    "heading": "Peygamberlerin ayet ayet anlatılan kıssaları",
+    "description": "Doğrulanmış Kur'an referanslarına dayanan derlenmiş anlatılar — her ayet, seçtiğiniz mealde anlık olarak çözümlenir. Herhangi bir bölümü doğrudan bağlantı tuvaline açın.",
+    "chapterVerseCount": "{chapters, plural, other {# bölüm}} · {verses, plural, other {# ayet}}",
+    "footer": "Maturidi/Hanefi geleneğine göre derlenmiştir · her ayet referansı Kur'an külliyatına karşı doğrulanmıştır",
+    "allStories": "Tüm Kıssalar",
+    "allStoriesHome": "Tüm kıssalar",
+    "missingVerses": "{count, plural, other {# ayet}} bu bölümde şu anda yüklenemedi — lütfen daha sonra tekrar deneyin.",
+    "openOnCanvas": "Tuvalde aç",
+    "pauseRecitation": "Kıraati duraklat",
+    "listen": "Dinle",
+    "listenToRecitation": "Kıraati dinle"
   },
   "home": {
     "greeting": "Selamün aleyküm",

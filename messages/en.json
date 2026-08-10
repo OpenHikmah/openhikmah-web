@@ -1,6 +1,6 @@
 {
   "common": {
-    "signIn": "Sign in",
+    "signIn": "Log in",
     "signingIn": "Signing in…",
     "signOut": "Sign out",
     "settings": "Settings",
@@ -12,9 +12,9 @@
   "nav": {
     "canvas": "Canvas",
     "search": "Search",
-    "stories": "Stories",
+    "stories": "Narratives",
     "names": "Asma'ul Husna",
-    "bookmarks": "Bookmarks",
+    "bookmarks": "Saved",
     "savedCanvases": "Saved canvases",
     "friendsLeaderboard": "Friends & Leaderboard",
     "mentions": "Mentions",
@@ -46,6 +46,12 @@
     "emptyStateDescription": "Search a verse or theme — AI maps semantic connections across the Qur'an.",
     "searchVerses": "Search verses",
     "orBeginWith": "Or begin with",
+    "journey": {
+      "patience": "Patience",
+      "mercy": "Mercy",
+      "light": "Light",
+      "gratitude": "Gratitude"
+    },
     "duplicateTooltip": "Also open elsewhere on canvas — click to jump",
     "jumpToDuplicate": "Jump to duplicate verse card",
     "pauseRecitation": "Pause recitation",
@@ -126,6 +132,7 @@
     "enterSearchTerm": "Enter a search term to get started.",
     "somethingWentWrong": "Something went wrong. Try again.",
     "searchUnavailable": "Search is temporarily unavailable.",
+    "rateLimited": "You're searching a bit fast — wait a moment and try again.",
     "tryAgain": "Try again →",
     "tryByMeaning": "Try \"By meaning\" search instead →",
     "showingResults": "Showing <b>{count, plural, one {# result} other {# results}}</b> for \"{query}\"",
@@ -135,7 +142,7 @@
     "nonEnglishHint": "Searching English translations — results are shown in English regardless of interface language."
   },
   "bookmarks": {
-    "title": "Bookmarks",
+    "title": "Saved",
     "emptyTitle": "No bookmarks yet.",
     "emptyHint": "Tap the heart icon on any verse in the canvas to save it.",
     "openCanvas": "Open canvas",
@@ -153,6 +160,20 @@
     "copied": "Copied!",
     "share": "Share",
     "copyLink": "Copy link to today's verse"
+  },
+  "stories": {
+    "eyebrow": "Prophetic Narratives",
+    "heading": "The stories of the Prophets, verse by verse",
+    "description": "Curated narratives grounded in verified Quran references — every verse resolved live, in your chosen translation. Open any chapter directly onto the connection canvas.",
+    "chapterVerseCount": "{chapters, plural, one {# chapter} other {# chapters}} · {verses, plural, one {# verse} other {# verses}}",
+    "footer": "Curated per the Maturidi/Hanafi tradition · every verse reference verified against the Quran corpus",
+    "allStories": "All Stories",
+    "allStoriesHome": "All stories",
+    "missingVerses": "{count, plural, one {# verse} other {# verses}} in this chapter couldn't be loaded right now — please try again later.",
+    "openOnCanvas": "Open on canvas",
+    "pauseRecitation": "Pause recitation",
+    "listen": "Listen",
+    "listenToRecitation": "Listen to recitation"
   },
   "home": {
     "greeting": "Assalamu alaykum",

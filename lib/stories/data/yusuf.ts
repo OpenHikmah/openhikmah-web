@@ -2,27 +2,51 @@ import type { Story } from "../types";
 
 export const YUSUF_STORY: Story = {
   slug: "yusuf",
-  name: { en: "Yusuf (Joseph)" },
+  name: { en: "Yusuf (Joseph)", tr: "Yusuf", az: "Yusuf", ru: "Юсуф" },
   arabicName: "يُوسُف",
-  tagline: { en: "The best of stories — betrayal, patience, and a reunion decades in the making" },
+  tagline: {
+    en: "The best of stories — betrayal, patience, and a reunion decades in the making",
+    tr: "Kıssaların en güzeli — ihanet, sabır ve on yıllar sonra gerçekleşen bir kavuşma",
+    az: "Qissələrin ən gözəli — xəyanət, səbir və onilliklər sonra baş tutan qovuşma",
+    ru: "Лучшее из повествований — предательство, терпение и воссоединение, наступившее спустя десятилетия",
+  },
   intro: {
     en: "Surah Yusuf is unique in the Quran: a single, continuous narrative told from a dream in childhood to a throne in Egypt decades later, introduced by God as \"the best of stories.\" Sold by his own brothers, falsely accused, imprisoned for years, and finally raised to a position where he could forgive the very people who tried to destroy him, Yusuf's story is one continuous demonstration of patience answered by God's plan unfolding exactly as promised.",
+    tr: "Yusuf Suresi, Kur'an içinde eşsiz bir yere sahiptir: çocukluktaki bir rüyadan, on yıllar sonra Mısır'daki bir tahta uzanan, Allah tarafından \"kıssaların en güzeli\" olarak takdim edilen tek ve kesintisiz bir anlatıdır. Öz kardeşleri tarafından satılan, haksız yere suçlanan, yıllarca hapiste tutulan ve nihayetinde kendisini yok etmeye çalışan kişileri bağışlayabileceği bir konuma yükseltilen Yusuf'un hikâyesi, sabrın Allah'ın vaat ettiği gibi tastamam gerçekleşen planıyla karşılık bulmasının kesintisiz bir örneğidir.",
+    az: 'Yusuf surəsi Qurani-Kərimdə özünəməxsus yer tutur: uşaqlıqda görülən bir yuxudan başlayıb onilliklər sonra Misirdə bir taxta qədər uzanan, Allah tərəfindən "qissələrin ən gözəli" adlandırılan vahid və kəsintisiz bir hekayədir. Öz qardaşları tərəfindən satılan, haqsız yerə ittiham olunan, illərlə həbsdə saxlanılan və nəhayət özünü məhv etməyə çalışanları bağışlaya biləcəyi bir mövqeyə yüksəldilən Yusufun hekayəsi, səbrin Allahın vəd etdiyi kimi tam yerinə yetən planla mükafatlandırılmasının davamlı bir nümunəsidir.',
+    ru: "Сура «Юсуф» уникальна в Коране: это единое, непрерывное повествование — от сна, увиденного в детстве, до трона в Египте десятилетия спустя, — представленное Аллахом как «лучшее из повествований». Проданный собственными братьями, ложно обвинённый, годами находившийся в заключении и в итоге вознесённый на положение, позволившее ему простить тех самых людей, что пытались его погубить, — история Юсуфа есть непрерывное свидетельство терпения, вознаграждённого исполнением замысла Аллаха в точности так, как было обещано.",
   },
   primarySurahs: [12],
   chapters: [
     {
       id: "the-dream",
-      title: { en: "Eleven stars, the sun, and the moon" },
+      title: {
+        en: "Eleven stars, the sun, and the moon",
+        tr: "On bir yıldız, güneş ve ay",
+        az: "On bir ulduz, günəş və ay",
+        ru: "Одиннадцать звёзд, солнце и луна",
+      },
       narrative: {
         en: "Yusuf tells his father Yaqub of a dream: eleven stars, the sun, and the moon, all prostrating before him. Yaqub immediately warns him not to tell his brothers, fearing they would plot against him out of envy — for Satan, he says, is an open enemy to man. He tells Yusuf that God will choose him and teach him the interpretation of events, completing His favor on him and on the family of Yaqub just as He completed it on Ibrahim and Ishaq before him.",
+        tr: "Yusuf, babası Yakub'a bir rüya anlatır: on bir yıldız, güneş ve ay, hepsi kendisine secde etmektedir. Yakub hemen onu bu rüyayı kardeşlerine anlatmaması konusunda uyarır; kıskançlıktan ona tuzak kurmalarından korkmaktadır — çünkü şeytan, der, insan için apaçık bir düşmandır. Yusuf'a, Allah'ın kendisini seçeceğini ve olayların yorumunu ona öğreteceğini, daha önce Ibrahim ve İshak üzerinde tamamladığı gibi nimetini hem onun hem de Yakub ailesinin üzerinde tamamlayacağını söyler.",
+        az: "Yusuf atası Yaquba bir yuxu danışır: on bir ulduz, günəş və ay — hamısı ona səcdə edir. Yaqub dərhal onu bu yuxunu qardaşlarına danışmaması barədə xəbərdar edir, çünki qısqanclıqdan ona qəsd hazırlayacaqlarından qorxur — zira, deyir, şeytan insan üçün açıq-aşkar düşməndir. Yusufa deyir ki, Allah onu seçəcək və hadisələrin yozumunu ona öyrədəcək, daha əvvəl İbrahim və İshaqın üzərində tamamladığı kimi, Öz nemətini həm onun, həm də Yaqub ailəsinin üzərində tamamlayacaqdır.",
+        ru: "Юсуф рассказывает своему отцу Йакубу сон: одиннадцать звёзд, солнце и луна склоняются перед ним ниц. Йакуб сразу предупреждает его не рассказывать об этом братьям, опасаясь, что из зависти они замыслят против него недоброе, — ведь, говорит он, шайтан для человека есть явный враг. Он говорит Юсуфу, что Аллах изберёт его и научит его толкованию событий, довершив Свою милость над ним и над родом Йакуба, как прежде довершил её над Ибрахимом и Исхаком.",
       },
       verseRefs: ["12:4", "12:5", "12:6"],
     },
     {
       id: "the-well",
-      title: { en: "Thrown into the bottom of a well" },
+      title: {
+        en: "Thrown into the bottom of a well",
+        tr: "Bir kuyunun dibine atılış",
+        az: "Quyunun dibinə atılma",
+        ru: "Брошен на дно колодца",
+      },
       narrative: {
         en: "Yusuf's brothers resent how much their father loves him and his younger brother, and plot to remove him — debating between killing him outright and casting him into a distant land, before one among them suggests throwing him into a well instead, where passing travelers might find him. They ask their father to let Yusuf go out with them, promising to watch over him; Yaqub agrees reluctantly, afraid a wolf might take him. That night they return weeping, claiming a wolf devoured him while they raced each other, and produce his shirt stained with false blood. Yaqub does not believe them, and says only that beautiful patience is what is called for. A caravan later draws Yusuf up from the well and sells him in Egypt for a small price.",
+        tr: "Yusuf'un kardeşleri, babalarının onu ve küçük kardeşini ne kadar çok sevdiğine içerlerler ve onu ortadan kaldırmayı planlarlar — onu doğrudan öldürmek ile uzak bir diyara götürüp bırakmak arasında tartışırlarken, içlerinden biri onun yerine bir kuyuya atılmasını, böylece oradan geçen yolcuların onu bulabileceğini önerir. Babalarından Yusuf'u kendileriyle birlikte dışarı çıkarmasına izin vermesini isterler ve ona göz kulak olacaklarına söz verirler; Yakub, bir kurdun onu kapabileceğinden korkarak isteksizce razı olur. O gece ağlayarak geri dönerler, yarışırken bir kurdun onu yediğini iddia ederler ve sahte kanla lekelenmiş gömleğini gösterirler. Yakub onlara inanmaz ve yalnızca gerekenin güzel bir sabır olduğunu söyler. Daha sonra bir kervan Yusuf'u kuyudan çıkarır ve onu Mısır'da ucuz bir fiyata satar.",
+        az: "Yusufun qardaşları atalarının onu və kiçik qardaşını nə qədər çox sevdiyinə həsəd aparır və onu aradan qaldırmağı planlaşdırırlar — onu birbaşa öldürmək ilə uzaq bir diyara aparıb tərk etmək arasında mübahisə edərkən, içlərindən biri onun əvəzinə bir quyuya atılmasını təklif edir ki, oradan keçən karvançılar onu tapa bilsinlər. Atalarından Yusufu özləri ilə bərabər çölə çıxarmasına icazə verməsini xahiş edir və ona nəzarət edəcəklərinə söz verirlər; Yaqub bir qurdun onu qapa biləcəyindən qorxaraq könülsüz razılıq verir. O gecə ağlayaraq geri qayıdır, yarışarkən bir qurdun onu yediyini iddia edir və saxta qanla ləkələnmiş köynəyini göstərirlər. Yaqub onlara inanmır və yalnız lazım olanın gözəl bir səbir olduğunu deyir. Daha sonra bir karvan Yusufu quyudan çıxarır və onu Misirdə ucuz qiymətə satır.",
+        ru: "Братья Юсуфа завидуют тому, как сильно отец любит его и его младшего брата, и замышляют избавиться от него — они спорят между тем, чтобы убить его прямо, или увезти его в дальнюю землю, пока один из них не предлагает вместо этого бросить его в колодец, где его могли бы найти проходящие путники. Они просят отца отпустить Юсуфа с ними, обещая присматривать за ним; Йакуб соглашается неохотно, опасаясь, что его может утащить волк. В ту ночь они возвращаются в слезах, утверждая, что волк съел его, пока они состязались друг с другом, и предъявляют его рубаху, испачканную ложной кровью. Йакуб им не верит и говорит лишь, что подобает прекрасное терпение. Позже караван вытягивает Юсуфа из колодца и продаёт его в Египте за небольшую цену.",
       },
       verseRefs: [
         "12:7",
@@ -43,9 +67,17 @@ export const YUSUF_STORY: Story = {
     },
     {
       id: "the-temptation",
-      title: { en: '"I seek refuge in God"' },
+      title: {
+        en: '"I seek refuge in God"',
+        tr: '"Allah\'a sığınırım"',
+        az: '"Allaha sığınıram"',
+        ru: "«Я прибегаю к защите Аллаха»",
+      },
       narrative: {
         en: "Raised in the household of an Egyptian official, Yusuf grows into maturity and is given judgment and knowledge. The wife of the household attempts to seduce him; he refuses, saying his master has treated him well and that wrongdoers do not succeed. As they both race for the door, she tears his shirt from behind, and they are discovered by her husband. A witness from her own family proposes a simple test — the direction of the tear on the shirt — which proves Yusuf innocent. Even so, and even though the women of the city later see him and are so struck by his appearance that they cut their own hands in astonishment, he is imprisoned rather than her.",
+        tr: "Bir Mısırlı yetkilinin evinde büyüyen Yusuf, olgunluğa erişir ve kendisine hüküm ile bilgi bahşedilir. Evin hanımı onu ayartmaya çalışır; Yusuf reddeder, efendisinin kendisine iyi davrandığını ve zalimlerin asla iflah olmayacağını söyler. İkisi de kapıya doğru koşarken kadın onun gömleğini arkadan yırtar ve kocası tarafından yakalanırlar. Kadının kendi ailesinden bir şahit basit bir sınama önerir — gömlekteki yırtığın yönü — ve bu, Yusuf'un masumiyetini kanıtlar. Buna rağmen, ve şehrin kadınları daha sonra onu gördüklerinde güzelliği karşısında öylesine şaşırıp ellerini kesmelerine rağmen, hapsedilen kadın değil, Yusuf olur.",
+        az: "Bir Misir vəzirinin evində böyüyən Yusuf yetkinliyə çatır və ona hökm ilə elm bəxş edilir. Evin xanımı onu yoldan çıxarmağa cəhd edir; Yusuf imtina edir, ağasının ona yaxşı davrandığını və zalimlərin nicat tapmayacağını deyir. Hər ikisi qapıya tərəf qaçarkən qadın onun köynəyini arxadan cırır və onlar qadının əri tərəfindən aşkar edilirlər. Qadının öz ailəsindən olan bir şahid sadə bir sınaq təklif edir — köynəkdəki cırığın istiqaməti — və bu, Yusufun günahsızlığını sübut edir. Buna baxmayaraq, və şəhərin qadınları sonradan onu görüb gözəlliyi qarşısında heyrətdən əllərini kəsmələrinə baxmayaraq, həbs olunan qadın deyil, Yusuf olur.",
+        ru: "Юсуф, выросший в доме египетского сановника, достигает зрелости, и ему дарованы мудрость суждения и знание. Жена хозяина дома пытается соблазнить его; он отказывается, говоря, что его господин обошёлся с ним хорошо и что творящие несправедливость не преуспеют. Когда оба бросаются к двери, она разрывает его рубаху сзади, и их застаёт её муж. Свидетель из её же семьи предлагает простую проверку — по направлению разрыва на рубахе, — которая доказывает невиновность Юсуфа. Тем не менее, и даже несмотря на то что женщины города позже видят его и настолько поражены его обликом, что в изумлении порезали себе руки, в темницу заключают не её, а его.",
       },
       verseRefs: [
         "12:22",
@@ -65,17 +97,33 @@ export const YUSUF_STORY: Story = {
     },
     {
       id: "the-prison",
-      title: { en: "Interpreting dreams in prison" },
+      title: {
+        en: "Interpreting dreams in prison",
+        tr: "Hapiste rüya yorumlamak",
+        az: "Zindanda yuxu yozmaq",
+        ru: "Толкование снов в темнице",
+      },
       narrative: {
         en: "Two fellow prisoners bring Yusuf their dreams to interpret. Before answering, he tells them of his own faith — that he has left the ways of those who do not believe in God and follows the religion of his fathers, Ibrahim, Ishaq, and Yaqub, associating nothing with Him. He interprets both dreams accurately, and asks the one he knows will be freed to mention him to his master. Satan makes the man forget, and Yusuf remains in prison for several more years.",
+        tr: "İki hapishane arkadaşı, yorumlaması için rüyalarını Yusuf'a getirir. Cevap vermeden önce, Yusuf onlara kendi inancından bahseder — Allah'a inanmayanların yolunu terk ettiğini ve atalarının, Ibrahim, İshak ve Yakub'un dinine tabi olduğunu, O'na hiçbir şeyi ortak koşmadığını söyler. Her iki rüyayı da doğru şekilde yorumlar ve serbest bırakılacağını bildiği kişiden efendisinin yanında kendisinden söz etmesini ister. Şeytan bu adama unutturur ve Yusuf hapiste birkaç yıl daha kalır.",
+        az: "İki zindan yoldaşı yozmaq üçün yuxularını Yusufa gətirir. Cavab verməzdən əvvəl, Yusuf onlara öz inancından danışır — Allaha inanmayanların yolunu tərk etdiyini və atalarının, İbrahim, İshaq və Yaqubun dininə tabe olduğunu, Ona heç bir şeyi şərik qoşmadığını söyləyir. Hər iki yuxunu da doğru yozur və azad olunacağını bildiyi adamdan ağasının yanında özündən bəhs etməsini xahiş edir. Şeytan bu adama unutdurur və Yusuf zindanda daha bir neçə il qalır.",
+        ru: "Двое товарищей по заключению приносят Юсуфу свои сны для толкования. Прежде чем ответить, он рассказывает им о своей вере — о том, что оставил путь тех, кто не верует в Аллаха, и следует религии своих отцов, Ибрахима, Исхака и Йакуба, не приобщая к Нему никого в сотоварищи. Он верно толкует оба сна и просит того, о ком знает, что будет освобождён, упомянуть о нём своему господину. Шайтан заставляет этого человека забыть, и Юсуф остаётся в темнице ещё на несколько лет.",
       },
       verseRefs: ["12:36", "12:37", "12:38", "12:39", "12:40", "12:41", "12:42"],
     },
     {
       id: "the-kings-dream",
-      title: { en: "Seven fat cows and seven lean" },
+      title: {
+        en: "Seven fat cows and seven lean",
+        tr: "Yedi semiz inek ve yedi zayıf",
+        az: "Yeddi kök inək və yeddi arıq",
+        ru: "Семь тучных коров и семь тощих",
+      },
       narrative: {
         en: "Years later, the king dreams of seven fat cows eaten by seven lean ones, and asks his court to interpret it; none can. The former prisoner finally remembers Yusuf and is sent to ask him. Yusuf interprets the dream as seven years of abundance followed by seven years of famine, and advises storing grain during the years of plenty. When the king wishes to bring him to court, Yusuf insists first that the matter of the women who cut their hands be examined — refusing to leave prison on the strength of a favor alone, only once his innocence is publicly acknowledged. The official's wife herself finally admits the truth: it was she who sought to seduce him. The king appoints Yusuf over the storehouses of the land.",
+        tr: "Yıllar sonra, kral yedi semiz ineğin yedi zayıf inek tarafından yenildiğini görür ve sarayındakilerden bunu yorumlamalarını ister; hiçbiri yorumlayamaz. Eski mahkûm nihayet Yusuf'u hatırlar ve ona sorulması için gönderilir. Yusuf rüyayı yedi yıllık bolluğu takip eden yedi yıllık kıtlık olarak yorumlar ve bolluk yıllarında tahıl depolanmasını tavsiye eder. Kral onu saraya getirtmek istediğinde, Yusuf önce ellerini kesen kadınların meselesinin incelenmesinde ısrar eder — sadece bir lütuf sayesinde hapisten çıkmayı reddeder, ancak masumiyeti herkesçe kabul edildiğinde çıkmayı kabul eder. Yetkilinin karısı nihayet gerçeği kendisi itiraf eder: onu ayartmaya çalışan kendisiydi. Kral, Yusuf'u ülkenin ambarlarının başına tayin eder.",
+        az: "İllər sonra padşah yeddi kök inəyin yeddi arıq inək tərəfindən yeyildiyini yuxuda görür və saray əhlindən bunu yozmalarını istəyir; heç biri bacarmır. Keçmiş məhbus nəhayət Yusufu xatırlayır və ondan soruşmaq üçün göndərilir. Yusuf yuxunu yeddi bolluq ilinin ardınca gələn yeddi qıtlıq ili kimi yozur və bolluq illərində taxıl saxlamağı məsləhət görür. Padşah onu saraya gətirtmək istədikdə, Yusuf əvvəlcə əllərini kəsən qadınların məsələsinin araşdırılmasında israr edir — sadəcə bir lütf sayəsində zindandan çıxmaqdan imtina edir, yalnız günahsızlığı hamı tərəfindən təsdiqləndikdən sonra razılaşır. Vəzirin arvadı nəhayət həqiqəti özü etiraf edir: onu yoldan çıxarmağa çalışan məhz özü olub. Padşah Yusufu ölkənin anbarlarının başına təyin edir.",
+        ru: "Годы спустя царю снится, что семь тучных коров съедены семью тощими, и он просит своих придворных истолковать этот сон; никто не может. Бывший узник наконец вспоминает о Юсуфе, и его посылают спросить у него. Юсуф толкует сон как семь лет изобилия, за которыми последуют семь лет голода, и советует запасать зерно в годы изобилия. Когда царь желает призвать его ко двору, Юсуф сначала настаивает на том, чтобы было рассмотрено дело женщин, порезавших себе руки, — отказываясь покинуть темницу лишь на основании милости, пока его невиновность не будет признана открыто. Жена сановника сама наконец признаёт истину: это она пыталась его соблазнить. Царь назначает Юсуфа хранителем житниц страны.",
       },
       verseRefs: [
         "12:43",
@@ -96,9 +144,17 @@ export const YUSUF_STORY: Story = {
     },
     {
       id: "the-brothers-return",
-      title: { en: "The cup in the brother's bag" },
+      title: {
+        en: "The cup in the brother's bag",
+        tr: "Kardeşin çuvalındaki kupa",
+        az: "Qardaşın çuvalındakı piyalə",
+        ru: "Чаша в мешке брата",
+      },
       narrative: {
         en: "Famine brings Yusuf's brothers to Egypt for grain, and he recognizes them though they do not recognize him. He asks them to bring their youngest brother next time, and secretly returns their goods with their supplies to draw them back. When they return with Benjamin, Yusuf reveals himself to him privately. He then has a cup placed in Benjamin's bag and has the caravan accused of theft. When the brothers are asked what the penalty should be if the accused is a liar, they answer with their own people's custom — that the one in whose bag it is found shall himself be the penalty — not knowing the cup will be found with Benjamin. The Quran notes this could not have happened under the king's own law except that God willed it. The brothers protest, and the eldest — bound by an earlier oath to their father — refuses to leave without him, and stays behind while the others return to Yaqub with the news.",
+        tr: "Kıtlık, Yusuf'un kardeşlerini tahıl almak için Mısır'a getirir; onlar kendisini tanımasalar da o, onları tanır. Onlardan bir sonraki sefer en küçük kardeşlerini de getirmelerini ister ve onları geri çekmek için mallarını erzaklarının içine gizlice geri koyar. Bünyamin ile döndüklerinde, Yusuf kendini ona özel olarak tanıtır. Ardından Bünyamin'in çuvalına bir kupa yerleştirtir ve kervanı hırsızlıkla suçlatır. Suçlu bir yalancı olursa cezasının ne olması gerektiği sorulduğunda, kardeşler kendi halklarının geleneğiyle cevap verirler — çuvalında bulunan kişinin bizzat cezanın kendisi olacağını söylerler — kupanın Bünyamin'de bulunacağını bilmeden. Kur'an, bunun kralın kendi yasasına göre gerçekleşemeyeceğini, ancak Allah'ın dilemesiyle olduğunu belirtir. Kardeşler itiraz eder ve en büyükleri — babalarına verdiği önceki bir yemine bağlı olarak — onsuz ayrılmayı reddeder ve geride kalırken diğerleri haberle Yakub'a döner.",
+        az: "Qıtlıq Yusufun qardaşlarını taxıl üçün Misirə gətirir; onlar onu tanımasalar da, o onları tanıyır. Onlardan növbəti dəfə ən kiçik qardaşlarını da gətirmələrini istəyir və onları geri qaytarmaq üçün mallarını ərzaqlarının içinə gizlicə qaytarır. Bünyaminlə qayıtdıqlarında, Yusuf özünü ona məxfi şəkildə tanıdır. Sonra Bünyaminin çuvalına bir piyalə qoydurur və karvanı oğurluqda ittiham etdirir. Təqsirkarın yalançı olduğu təqdirdə cəzasının nə olacağı soruşulduqda, qardaşlar öz xalqlarının adətinə uyğun cavab verirlər — çuvalında tapılan şəxsin özünün cəza olacağını deyirlər — piyalənin Bünyamində tapılacağını bilmədən. Quran qeyd edir ki, bu, padşahın öz qanununa görə baş verə bilməzdi, əgər Allah istəməsəydi. Qardaşlar etiraz edir və ən böyükləri — atalarına verdiyi əvvəlki anda bağlı qalaraq — onsuz getməkdən imtina edir və geridə qalır, digərləri isə xəbərlə Yaqubun yanına qayıdır.",
+        ru: "Голод приводит братьев Юсуфа в Египет за зерном, и он узнаёт их, хотя они не узнают его. Он просит их в следующий раз привезти их младшего брата и тайно возвращает им их товар вместе с припасами, чтобы побудить их вернуться. Когда они возвращаются с Беньямином, Юсуф открывается ему наедине. Затем он велит подложить чашу в мешок Беньямина и обвиняет караван в краже. Когда братьев спрашивают, каким должно быть наказание, если обвиняемый лжёт, они отвечают согласно обычаю своего народа — что тот, в чьём мешке она найдена, сам станет возмездием, — не зная, что чаша будет найдена у Беньямина. Коран отмечает, что по закону самого царя это не могло бы произойти, если бы того не пожелал Аллах. Братья возражают, и старший из них — связанный прежней клятвой, данной отцу, — отказывается уходить без него и остаётся, пока остальные возвращаются к Йакубу с этой вестью.",
       },
       verseRefs: [
         "12:58",
@@ -121,9 +177,17 @@ export const YUSUF_STORY: Story = {
     },
     {
       id: "the-reunion",
-      title: { en: '"I am Yusuf, and this is my brother"' },
+      title: {
+        en: '"I am Yusuf, and this is my brother"',
+        tr: '"Ben Yusuf\'um, bu da benim kardeşim"',
+        az: '"Mən Yusufam, bu da qardaşımdır"',
+        ru: "«Я — Юсуф, а это мой брат»",
+      },
       narrative: {
         en: "Yaqub's grief over Yusuf, never resolved after all these years, returns in full; his eyes turn white from constant weeping, though he tells his sons he complains only to God, of whom he knows what they do not. When the brothers return to Egypt a final time, pleading for charity, Yusuf finally asks if they remember what they did to him and his brother in their ignorance — and reveals who he is. They ask forgiveness; he tells them there is no blame upon them and that God will forgive them, and sends his shirt ahead for Yaqub, whose sight is restored the moment it reaches him. The family is reunited in Egypt, and Yusuf's parents and brothers bow before him — the dream from the story's opening chapter, fulfilled after decades, exactly as it was shown to him.",
+        tr: "Yakub'un Yusuf'a duyduğu ve bunca yıl sonra bile hiç dinmemiş olan kederi tekrar bütün şiddetiyle geri döner; gözleri sürekli ağlamaktan beyazlaşır, yine de oğullarına yalnızca Allah'a şikâyette bulunduğunu, O'nun kendisinin bilmediği şeyleri bildiğini söyler. Kardeşler son kez Mısır'a dönüp yardım dilendiklerinde, Yusuf sonunda onlara cahillikleri içinde kendisine ve kardeşine ne yaptıklarını hatırlayıp hatırlamadıklarını sorar — ve kim olduğunu açıklar. Kardeşler af dilerler; Yusuf onlara herhangi bir kınamanın söz konusu olmadığını ve Allah'ın onları bağışlayacağını söyler, ardından Yakub için gömleğini önden gönderir; gömlek kendisine ulaştığı an Yakub'un gözleri açılır. Aile Mısır'da yeniden bir araya gelir ve Yusuf'un ana babası ile kardeşleri önünde eğilirler — hikâyenin açılış bölümündeki rüya, on yıllar sonra, kendisine gösterildiği şekliyle tastamam gerçekleşmiş olur.",
+        az: "Yaqubun Yusufa görə çəkdiyi və bunca illər keçsə də heç dinməyən kədəri yenidən bütün şiddətilə geri qayıdır; gözləri daimi ağlamaqdan ağarır, yenə də oğullarına yalnız Allaha şikayət etdiyini, Onun özünün bilmədiyi şeyləri bildiyini söyləyir. Qardaşlar son dəfə Misirə qayıdıb yardım dilədikdə, Yusuf nəhayət onlardan nadanlıqları içində özünə və qardaşına nə etdiklərini xatırlayıb xatırlamadıqlarını soruşur — və kim olduğunu açıqlayır. Qardaşlar bağışlanma diləyir; Yusuf onlara heç bir qınaq olmadığını və Allahın onları bağışlayacağını söyləyir, sonra Yaqub üçün köynəyini qabaqcadan göndərir; köynək ona çatan an Yaqubun gözləri açılır. Ailə Misirdə yenidən bir araya gəlir və Yusufun ata-anası ilə qardaşları onun qarşısında əyilirlər — hekayənin açılış fəslindəki yuxu, onilliklər sonra, ona göstərildiyi kimi tam yerinə yetir.",
+        ru: "Скорбь Йакуба о Юсуфе, так и не утихшая за все эти годы, возвращается с новой силой; его глаза белеют от непрестанного плача, хотя он говорит своим сыновьям, что жалуется лишь Аллаху, Которому ведомо то, чего не знают они. Когда братья в последний раз возвращаются в Египет, прося о милости, Юсуф наконец спрашивает, помнят ли они, что сделали ему и его брату по своему неведению, — и открывает, кто он. Они просят прощения; он говорит им, что нет на них вины и что Аллах простит их, и отправляет свою рубаху вперёд для Йакуба, чьё зрение возвращается в тот миг, когда она до него доходит. Семья воссоединяется в Египте, и родители и братья Юсуфа склоняются перед ним — сон из первой главы этой истории исполняется спустя десятилетия в точности так, как был ему показан.",
       },
       verseRefs: [
         "12:84",

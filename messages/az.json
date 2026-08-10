@@ -12,9 +12,9 @@
   "nav": {
     "canvas": "Lövhə",
     "search": "Axtar",
-    "stories": "Hekayələr",
+    "stories": "Qissələr",
     "names": "Əsmayi-Hüsna",
-    "bookmarks": "Əlfəcinlər",
+    "bookmarks": "Yadda saxlanılanlar",
     "savedCanvases": "Yadda saxlanmış lövhələr",
     "friendsLeaderboard": "Dostlar və Reytinq",
     "mentions": "Qeyd edilmələr",
@@ -46,6 +46,12 @@
     "emptyStateDescription": "Bir ayə və ya mövzu axtarın — süni intellekt Quran boyunca semantik əlaqələri xəritələndirir.",
     "searchVerses": "Ayə axtar",
     "orBeginWith": "Və ya bununla başlayın",
+    "journey": {
+      "patience": "Səbir",
+      "mercy": "Mərhəmət",
+      "light": "Nur",
+      "gratitude": "Şükür"
+    },
     "duplicateTooltip": "Lövhədə başqa yerdə də açıqdır — keçmək üçün klikləyin",
     "jumpToDuplicate": "Təkrarlanan ayə kartına keç",
     "pauseRecitation": "Qiraəti dayandır",
@@ -126,6 +132,7 @@
     "enterSearchTerm": "Başlamaq üçün axtarış termini daxil edin.",
     "somethingWentWrong": "Nəsə səhv getdi. Yenidən cəhd edin.",
     "searchUnavailable": "Axtarış müvəqqəti əlçatan deyil.",
+    "rateLimited": "Bir az sürətli axtarırsınız — bir az gözləyib yenidən cəhd edin.",
     "tryAgain": "Yenidən cəhd et →",
     "tryByMeaning": "Bunun əvəzinə \"Mənaya görə\" axtarışı sınayın →",
     "showingResults": "\"{query}\" üçün <b>{count, plural, one {# nəticə} other {# nəticə}}</b> göstərilir",
@@ -135,7 +142,7 @@
     "nonEnglishHint": "İngilis dilindəki tərcümələr axtarılır — nəticələr interfeys dilindən asılı olmayaraq ingilis dilində göstərilir."
   },
   "bookmarks": {
-    "title": "Əlfəcinlər",
+    "title": "Yadda saxlanılanlar",
     "emptyTitle": "Hələ əlfəcin yoxdur.",
     "emptyHint": "Yadda saxlamaq üçün lövhədəki istənilən ayənin ürək işarəsinə toxunun.",
     "openCanvas": "Lövhəni aç",
@@ -153,6 +160,20 @@
     "copied": "Kopyalandı!",
     "share": "Paylaş",
     "copyLink": "Günün ayəsinin bağlantısını kopyala"
+  },
+  "stories": {
+    "eyebrow": "Peyğəmbər Qissələri",
+    "heading": "Peyğəmbərlərin ayə-ayə izah olunan qissələri",
+    "description": "Doğrulanmış Quran istinadlarına əsaslanan tərtib edilmiş rəvayətlər — hər ayə seçdiyiniz tərcümədə canlı şəkildə həll olunur. İstənilən fəsli birbaşa əlaqə lövhəsində açın.",
+    "chapterVerseCount": "{chapters, plural, other {# fəsil}} · {verses, plural, other {# ayə}}",
+    "footer": "Maturidi/Hənəfi ənənəsinə uyğun tərtib edilmişdir · hər ayə istinadı Quran korpusuna qarşı yoxlanılmışdır",
+    "allStories": "Bütün Qissələr",
+    "allStoriesHome": "Bütün qissələr",
+    "missingVerses": "{count, plural, other {# ayə}} bu fəsildə hazırda yüklənə bilmədi — zəhmət olmasa daha sonra yenidən cəhd edin.",
+    "openOnCanvas": "Lövhədə aç",
+    "pauseRecitation": "Qiraəti dayandır",
+    "listen": "Dinlə",
+    "listenToRecitation": "Qiraəti dinlə"
   },
   "home": {
     "greeting": "Əssəlamu aleykum",

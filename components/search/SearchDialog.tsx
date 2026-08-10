@@ -44,6 +44,10 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const [fellBackToKeyword, setFellBackToKeyword] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [selectError, setSelectError] = useState(false);
+  // Distinguishes "the search itself couldn't run" (rate limited, or the
+  // upstream keyword API failed) from a genuine zero-match search — those
+  // call for different copy instead of both silently reading as "no results".
+  const [searchError, setSearchError] = useState<"rateLimited" | "unavailable" | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -85,11 +89,16 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
       setTotalResults(0);
       setFellBackToKeyword(false);
       setSelectError(false);
+      setSearchError(null);
       try {
         const url = `/api/search?q=${encodeURIComponent(q)}${
           searchMode === "meaning" ? "&mode=meaning" : ""
         }`;
         const res = await fetch(url, { signal });
+        if (res.status === 429) {
+          setSearchError("rateLimited");
+          return;
+        }
         if (!res.ok) throw new Error();
         const data: SearchResponse = await res.json();
         // In "by meaning" mode the server falls back to keyword search when
@@ -97,6 +106,9 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
         setFellBackToKeyword(
           searchMode === "meaning" && res.headers.get("x-search-fallback") === "keyword"
         );
+        if (res.headers.get("x-search-error") === "keyword-unavailable") {
+          setSearchError("unavailable");
+        }
         setSearchResults(data.results);
         setTotalResults(data.total);
         setHighlightedIndex(-1);
@@ -104,6 +116,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
         if ((err as Error).name !== "AbortError") {
           setSearchResults([]);
           setTotalResults(0);
+          setSearchError("unavailable");
         }
       } finally {
         if (!signal.aborted) setIsSearching(false);
@@ -232,6 +245,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
           setLoading(false);
           setIsSearching(false);
           setFellBackToKeyword(false);
+          setSearchError(null);
           setMode("keyword");
           setHighlightedIndex(-1);
           setSelectError(false);
@@ -280,6 +294,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                     setFellBackToKeyword(false);
                     setHighlightedIndex(-1);
                     setSelectError(false);
+                    setSearchError(null);
                   }
                 }}
                 onKeyDown={(e) => {
@@ -373,7 +388,13 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
               {!showSeedVerses && !showPreview && !showResults && !busy && !previewError && (
                 <div className="px-4 py-8 text-center">
                   <p className="text-sm text-text-muted">
-                    {mode === "meaning" ? t("noMeaningMatches") : t("noResults")}
+                    {searchError === "rateLimited"
+                      ? t("rateLimited")
+                      : searchError === "unavailable"
+                        ? t("searchUnavailable")
+                        : mode === "meaning"
+                          ? t("noMeaningMatches")
+                          : t("noResults")}
                   </p>
                 </div>
               )}

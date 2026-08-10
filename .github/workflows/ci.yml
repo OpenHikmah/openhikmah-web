@@ -263,6 +263,9 @@ jobs:
       - name: Run migrations
         run: bun run db:migrate
 
+      - name: Run non-transactional index migrations
+        run: bun run db:migrate:concurrent-indexes
+
       - name: Get installed Playwright version
         id: playwright-version
         run: echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"

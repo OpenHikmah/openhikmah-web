@@ -1,6 +1,6 @@
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { renderWithIntl as render } from "../../test-utils/render-with-intl";
+import { renderWithIntl } from "../../test-utils/render-with-intl";
 import type { Verse, SearchResult, SearchResponse } from "@/types/quran";
 
 vi.mock("@xyflow/react", () => ({
@@ -78,7 +78,7 @@ describe("SearchDialog keyboard navigation", () => {
   });
 
   async function openDialogWithResults(onClose = vi.fn()) {
-    render(<SearchDialog open onClose={onClose} />);
+    renderWithIntl(<SearchDialog open onClose={onClose} />);
     const input = screen.getByRole("combobox");
     fireEvent.change(input, { target: { value: "guidance" } });
     await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2), { timeout: 2000 });
@@ -177,7 +177,7 @@ describe("SearchDialog selected-result fetch failure", () => {
   it("surfaces an error instead of silently doing nothing when the selected result fails to load", async () => {
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    render(<SearchDialog open onClose={vi.fn()} />);
+    renderWithIntl(<SearchDialog open onClose={vi.fn()} />);
     const input = screen.getByRole("combobox");
     fireEvent.change(input, { target: { value: "guidance" } });
     await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2), { timeout: 2000 });
@@ -223,7 +223,7 @@ describe("SearchDialog view-all-results footer hint", () => {
   });
 
   it("hides the 'press Enter to view all' hint once a result is highlighted, since Enter now selects it instead", async () => {
-    render(<SearchDialog open onClose={vi.fn()} />);
+    renderWithIntl(<SearchDialog open onClose={vi.fn()} />);
     const input = screen.getByRole("combobox");
     fireEvent.change(input, { target: { value: "guidance" } });
     await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2), { timeout: 2000 });
@@ -235,5 +235,77 @@ describe("SearchDialog view-all-results footer hint", () => {
 
     // The footer button itself (click-to-view-all) stays available regardless of highlight.
     expect(screen.getByRole("button", { name: /results/i })).toBeInTheDocument();
+  });
+});
+
+describe("SearchDialog — rate-limit vs. genuine empty results", () => {
+  const mockFetch = vi.fn();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", mockFetch);
+    mockFetch.mockReset();
+    useCanvasStore.setState({ nodes: [], viewport: { x: 0, y: 0, zoom: 1 } });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  async function typeQuery(text: string) {
+    const input = screen.getByPlaceholderText(/search topics/i);
+    fireEvent.change(input, { target: { value: text } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(420);
+    });
+  }
+
+  it("shows a distinct message for a 429 response, not the generic 'no results' copy", async () => {
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 429 }));
+
+    renderWithIntl(<SearchDialog open={true} onClose={vi.fn()} />);
+    await typeQuery("mercy");
+
+    expect(screen.getByText(/searching a bit fast/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no results found/i)).not.toBeInTheDocument();
+  });
+
+  it("shows an 'unavailable' message when the upstream keyword API failed, not 'no results'", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ results: [], total: 0, page: 1, pageSize: 10 }), {
+        status: 200,
+        headers: { "x-search-error": "keyword-unavailable" },
+      })
+    );
+
+    renderWithIntl(<SearchDialog open={true} onClose={vi.fn()} />);
+    await typeQuery("mercy");
+
+    expect(screen.getByText(/temporarily unavailable/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no results found/i)).not.toBeInTheDocument();
+  });
+
+  it("shows an 'unavailable' message when the search request itself rejects, not 'no results'", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("network down"));
+
+    renderWithIntl(<SearchDialog open={true} onClose={vi.fn()} />);
+    await typeQuery("mercy");
+
+    expect(screen.getByText(/temporarily unavailable/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no results found/i)).not.toBeInTheDocument();
+  });
+
+  it("still shows the plain 'no results' copy for a genuine zero-match 200 response", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ results: [], total: 0, page: 1, pageSize: 10 }), {
+        status: 200,
+      })
+    );
+
+    renderWithIntl(<SearchDialog open={true} onClose={vi.fn()} />);
+    await typeQuery("zzzzznotreal");
+
+    expect(screen.getByText(/no results found/i)).toBeInTheDocument();
   });
 });

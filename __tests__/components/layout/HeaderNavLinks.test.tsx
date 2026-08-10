@@ -7,11 +7,11 @@ const { mockUsePathname } = vi.hoisted(() => ({ mockUsePathname: vi.fn() }));
 vi.mock("next/navigation", () => ({ usePathname: mockUsePathname }));
 
 describe("HeaderNavLinks", () => {
-  it("renders all 5 desktop items including Bookmarks", () => {
+  it("renders all 5 desktop items including Saved", () => {
     mockUsePathname.mockReturnValue("/search");
     renderWithIntl(<HeaderNavLinks />);
     expect(screen.getAllByRole("link")).toHaveLength(5);
-    expect(screen.getByRole("link", { name: /Bookmarks/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Stories/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Saved/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Narratives/i })).toBeInTheDocument();
   });
 });

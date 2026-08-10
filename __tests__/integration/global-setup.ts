@@ -29,6 +29,16 @@ export async function setup({ provide }: SetupContext) {
     await migrate(drizzle(sql), {
       migrationsFolder: join(process.cwd(), "lib/infra/db/migrations"),
     });
+
+    // Migration 0020 only adds the "locale" column — its index transition is
+    // deliberately non-transactional (see scripts/migrate-concurrent-indexes.mjs)
+    // and so isn't applied by the transactional migrate() call above. Apply it
+    // here too so integration tests see the real, final schema.
+    await sql`
+      CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS connections_from_to_kind_locale_idx
+      ON connections (from_ref, to_ref, kind, locale)
+    `;
+    await sql`DROP INDEX CONCURRENTLY IF EXISTS connections_from_to_kind_idx`;
   } finally {
     await sql.end();
   }

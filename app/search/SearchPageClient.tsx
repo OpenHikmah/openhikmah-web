@@ -53,6 +53,9 @@ export function SearchPageClient() {
   // Keyword search calls an upstream API — this distinguishes "the search itself
   // failed" from a genuine zero-match result, which call for different copy.
   const [keywordUnavailable, setKeywordUnavailable] = useState(false);
+  // 429s are also not a genuine zero-match result — distinct copy from both
+  // "no results" and a generic upstream failure.
+  const [rateLimited, setRateLimited] = useState(false);
   // Bumped by the "Try again" button so the fetch effect re-runs even when
   // q/mode/page are unchanged (router.replace to the same URL is a no-op).
   const [retryCount, setRetryCount] = useState(0);
@@ -87,6 +90,7 @@ export function SearchPageClient() {
     setError(false);
     setFellBackToKeyword(false);
     setKeywordUnavailable(false);
+    setRateLimited(false);
 
     fetch(
       `/api/search?q=${encodeURIComponent(trimmed)}${
@@ -95,6 +99,11 @@ export function SearchPageClient() {
       { signal: controller.signal }
     )
       .then(async (res) => {
+        if (res.status === 429) {
+          setRateLimited(true);
+          setData({ results: [], total: 0, page, pageSize: PAGE_SIZE });
+          return;
+        }
         if (!res.ok) throw new Error();
         const json: SearchResponse = await res.json();
         setFellBackToKeyword(
@@ -198,13 +207,15 @@ export function SearchPageClient() {
           <div className="py-20 text-center">
             <BookOpen className="mx-auto mb-4 h-8 w-8 text-text-muted/40" />
             <p className="text-sm text-text-muted">
-              {keywordUnavailable
-                ? t("searchUnavailable")
-                : mode === "meaning"
-                  ? t("noMeaningMatches")
-                  : t("noExactMatches")}
+              {rateLimited
+                ? t("rateLimited")
+                : keywordUnavailable
+                  ? t("searchUnavailable")
+                  : mode === "meaning"
+                    ? t("noMeaningMatches")
+                    : t("noExactMatches")}
             </p>
-            {keywordUnavailable ? (
+            {rateLimited || keywordUnavailable ? (
               <button
                 type="button"
                 onClick={() => setRetryCount((c) => c + 1)}

@@ -41,7 +41,7 @@ test.describe("language switching", () => {
 
     // Nav chrome (server-rendered from the cookie-resolved locale) shows the
     // Turkish next-intl strings once router.refresh() re-renders the layout.
-    await expect(page.getByRole("link", { name: "Tuval" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Kanvas" })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", "tr");
 
     // /settings reads the same preferences store — its Interface language
@@ -65,35 +65,37 @@ test.describe("language switching", () => {
 test.describe("mobile bottom nav", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("shows 4 tabs and excludes Bookmarks from the tab bar", async ({ page }) => {
+  test("shows 4 tabs and excludes Saved from the tab bar", async ({ page }) => {
     await page.goto("/search");
 
     const tabBar = page.locator("nav").filter({ has: page.getByRole("link", { name: "Canvas" }) });
     await expect(tabBar.getByRole("link")).toHaveCount(4);
-    await expect(tabBar.getByRole("link", { name: /bookmarks/i })).toHaveCount(0);
+    await expect(tabBar.getByRole("link", { name: /saved/i })).toHaveCount(0);
   });
 
-  test("Bookmarks is reachable via the account menu when signed in", async ({
+  test("Saved is reachable via the account menu when signed in", async ({
     authenticatedPage: page,
   }) => {
     await page.goto("/search");
 
     await page.getByRole("button", { name: /account menu/i }).click();
-    const bookmarksLink = page.getByRole("menu").getByRole("link", { name: /bookmarks/i });
-    await expect(bookmarksLink).toBeVisible();
-    await bookmarksLink.click();
+    // Exact match: the loose /saved/i regex also matches the adjacent "Saved
+    // canvases" workspaces link in this same menu.
+    const savedLink = page.getByRole("menu").getByRole("link", { name: "Saved", exact: true });
+    await expect(savedLink).toBeVisible();
+    await savedLink.click();
     // 15s: Next dev serves routes with on-demand compilation, and this may be
     // the first hit on /bookmarks in a fresh dev server — well past the
     // default 5s assertion timeout on a cold compile.
     await expect(page).toHaveURL(/\/bookmarks/, { timeout: 15000 });
   });
 
-  test("Bookmarks is reachable next to Sign in when signed out", async ({ page }) => {
+  test("Saved is reachable next to Log in when signed out", async ({ page }) => {
     await page.goto("/search");
 
-    const bookmarksLink = page.getByRole("link", { name: "Bookmarks" });
-    await expect(bookmarksLink).toBeVisible();
-    await bookmarksLink.click();
+    const savedLink = page.getByRole("link", { name: "Saved" });
+    await expect(savedLink).toBeVisible();
+    await savedLink.click();
     await expect(page).toHaveURL(/\/bookmarks/, { timeout: 15000 });
   });
 });

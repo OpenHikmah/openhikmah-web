@@ -52,14 +52,26 @@ export const MUTATION_WINDOW_SECONDS = positiveIntEnv("MUTATION_RATE_WINDOW", 60
 
 /**
  * Default budget for search-log writes per client — the search endpoints
- * themselves are intentionally unauthenticated and unlimited (see
- * app/api/search/route.ts), but the DB write that records each query for
- * analytics must not grow unbounded under scripted/spam traffic. Gating only
- * the write (not the search response) means abusive traffic still gets
- * results, it just stops being logged past the budget.
+ * themselves are intentionally unauthenticated (see app/api/search/route.ts)
+ * but are rate-limited (KEYWORD_SEARCH_LIMIT below, and the AI-generation
+ * budget for "by meaning" search); this is a separate budget for the DB
+ * write that records each query for analytics, which must not grow
+ * unbounded under scripted/spam traffic even when the search itself is
+ * still within budget. Gating only the write (not the search response)
+ * means abusive traffic still gets results, it just stops being logged
+ * past the budget.
  */
 export const SEARCH_LOG_LIMIT = positiveIntEnv("SEARCH_LOG_RATE_LIMIT", 30);
 export const SEARCH_LOG_WINDOW_SECONDS = positiveIntEnv("SEARCH_LOG_RATE_WINDOW", 60);
+
+/**
+ * Default budget for plain keyword search (a cheap proxy call to the
+ * quran.com full-text API, not an AI generation) — its own bucket, sized well
+ * above AI_GEN_LIMIT, so normal search usage never competes with the AI
+ * generation budget it used to share.
+ */
+export const KEYWORD_SEARCH_LIMIT = positiveIntEnv("KEYWORD_SEARCH_RATE_LIMIT", 60);
+export const KEYWORD_SEARCH_WINDOW_SECONDS = positiveIntEnv("KEYWORD_SEARCH_RATE_WINDOW", 60);
 
 /** Probability that a given `consume` call also prunes expired buckets. */
 const SWEEP_PROBABILITY = 0.01;

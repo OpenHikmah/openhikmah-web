@@ -19,6 +19,7 @@
     "size": "size-limit",
     "embed": "bun scripts/embed-corpus.mjs",
     "db:migrate": "bun scripts/migrate.mjs",
+    "db:migrate:concurrent-indexes": "bun scripts/migrate-concurrent-indexes.mjs",
     "prepare": "husky"
   },
   "lint-staged": {

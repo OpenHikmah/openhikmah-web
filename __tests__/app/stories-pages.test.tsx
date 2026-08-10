@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ReactNode } from "react";
+import { createTranslator } from "use-intl/core";
 import type { Story } from "@/lib/stories";
+import en from "@/messages/en.json";
+import tr from "@/messages/tr.json";
+import az from "@/messages/az.json";
+import ru from "@/messages/ru.json";
+
+const MESSAGES = { en, tr, az, ru };
 
 // A synthetic story with a populated `tr` field (no real story data has one yet),
 // so these tests can exercise the actual locale-swap branch of resolveLocalized,
@@ -33,6 +40,17 @@ vi.mock("@/lib/i18n/request-prefs", () => ({
   getUiLocale: mockGetUiLocale,
   getQuranEdition: mockGetQuranEdition,
 }));
+// next-intl/server's getTranslations relies on the RSC build, which isn't
+// resolved under vitest's jsdom environment — build a real translator
+// (ICU formatting included) from the same locale the page itself resolves.
+vi.mock("next-intl/server", () => ({
+  getTranslations: async (namespace: string) => {
+    const locale = (await mockGetUiLocale()) as keyof typeof MESSAGES;
+    // `namespace` can't be narrowed to createTranslator's generic NamespaceKeys
+    // type from a plain runtime string; this mock only ever runs in tests.
+    return createTranslator({ locale, messages: MESSAGES[locale], namespace: namespace as never });
+  },
+}));
 vi.mock("@/lib/quran/verse-resolver", () => ({ resolveVerse: mockResolveVerse }));
 vi.mock("@/lib/stories", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/stories")>();
@@ -55,6 +73,24 @@ function extractText(node: unknown): string[] {
     return extractText((node as { props?: { children?: ReactNode } }).props?.children);
   }
   return [];
+}
+
+// extractText only walks `children` — this digs out an element by its
+// component type so tests can assert on non-children props like `label`.
+function findByType(node: unknown, type: unknown): { props: Record<string, unknown> } | undefined {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findByType(child, type);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  if (node && typeof node === "object" && "type" in node && "props" in node) {
+    const el = node as { type: unknown; props: Record<string, unknown> };
+    if (el.type === type) return el;
+    return findByType(el.props?.children, type);
+  }
+  return undefined;
 }
 
 describe("Stories pages — locale-aware rendering", () => {
@@ -100,5 +136,53 @@ describe("Stories pages — locale-aware rendering", () => {
     const metadata = await generateMetadata({ params: Promise.resolve({ slug: "test-story" }) });
     expect(metadata.title).toContain("Test Hikayesi");
     expect(metadata.description).toBe("Türkçe bir slogan");
+  });
+
+  it("index page chrome (eyebrow/heading/footer) renders in the active locale, not hardcoded English", async () => {
+    mockGetUiLocale.mockResolvedValue("tr");
+    const { default: StoriesPage } = await import("@/app/stories/page");
+    const text = extractText(await StoriesPage());
+    expect(text).toContain("Peygamber Kıssaları");
+    expect(text.join(" ")).toContain("Maturidi/Hanefi geleneğine göre");
+    expect(text).not.toContain("Prophetic Narratives");
+  });
+
+  it("detail page back link and footer render in the active locale", async () => {
+    mockGetUiLocale.mockResolvedValue("tr");
+    const { default: StoryDetailPage } = await import("@/app/stories/[slug]/page");
+    const text = extractText(
+      await StoryDetailPage({ params: Promise.resolve({ slug: "test-story" }) })
+    );
+    expect(text).toContain("Tüm Kıssalar");
+    expect(text.join(" ")).toContain("Maturidi/Hanefi geleneğine göre");
+    expect(text).not.toContain("All Stories");
+  });
+
+  it("shows a translated, correctly pluralized missing-verses notice when a verse can't be resolved", async () => {
+    mockGetUiLocale.mockResolvedValue("tr");
+    mockResolveVerse.mockResolvedValue(null);
+    const { default: StoryDetailPage } = await import("@/app/stories/[slug]/page");
+    const text = extractText(
+      await StoryDetailPage({ params: Promise.resolve({ slug: "test-story" }) })
+    );
+    expect(text.join(" ")).toContain("1 ayet bu bölümde şu anda yüklenemedi");
+  });
+
+  it("passes a translated label into the Open on canvas button", async () => {
+    mockGetUiLocale.mockResolvedValue("tr");
+    mockResolveVerse.mockResolvedValue({
+      ref: "12:1",
+      surah: 12,
+      ayah: 1,
+      arabicText: "الر ۚ تِلْكَ آيَاتُ الْكِتَابِ الْمُبِينِ",
+      translation: "Alif, Lam, Ra. These are the verses of the clear Book.",
+      surahName: "Yusuf",
+      surahNameArabic: "يوسف",
+    });
+    const { default: StoryDetailPage } = await import("@/app/stories/[slug]/page");
+    const { OpenOnCanvasButton } = await import("@/app/stories/[slug]/OpenOnCanvasButton");
+    const tree = await StoryDetailPage({ params: Promise.resolve({ slug: "test-story" }) });
+    const button = findByType(tree, OpenOnCanvasButton);
+    expect(button?.props.label).toBe("Tuvalde aç");
   });
 });
