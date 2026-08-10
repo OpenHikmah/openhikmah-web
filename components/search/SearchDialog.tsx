@@ -43,6 +43,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const [mode, setMode] = useState<SearchMode>("keyword");
   const [fellBackToKeyword, setFellBackToKeyword] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [selectError, setSelectError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -83,6 +84,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
       setSearchResults([]);
       setTotalResults(0);
       setFellBackToKeyword(false);
+      setSelectError(false);
       try {
         const url = `/api/search?q=${encodeURIComponent(q)}${
           searchMode === "meaning" ? "&mode=meaning" : ""
@@ -186,13 +188,15 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const selectResult = useCallback(
     async (result: SearchResult) => {
       setLoading(true);
+      setSelectError(false);
       try {
         const res = await fetch(`/api/verse/${result.ref.replace(":", "/")}`);
         if (!res.ok) throw new Error();
         const verse: Verse = await res.json();
         mapConnections(verse);
-      } catch {
-        // silent
+      } catch (err) {
+        console.error("Failed to fetch selected search result:", err);
+        setSelectError(true);
       } finally {
         setLoading(false);
       }
@@ -230,6 +234,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
           setFellBackToKeyword(false);
           setMode("keyword");
           setHighlightedIndex(-1);
+          setSelectError(false);
           onClose();
         }
       }}
@@ -251,6 +256,14 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
               )}
               <input
                 ref={inputRef}
+                role="combobox"
+                aria-expanded={showResults}
+                aria-controls="search-results-listbox"
+                aria-activedescendant={
+                  showResults && highlightedIndex >= 0
+                    ? `search-result-${highlightedIndex}`
+                    : undefined
+                }
                 value={query}
                 onChange={(e) => {
                   const v = e.target.value;
@@ -266,6 +279,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                     setIsSearching(false);
                     setFellBackToKeyword(false);
                     setHighlightedIndex(-1);
+                    setSelectError(false);
                   }
                 }}
                 onKeyDown={(e) => {
@@ -326,8 +340,14 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                 </div>
               )}
 
+              {selectError && (
+                <div className="px-4 py-3 text-center">
+                  <p className="text-xs text-red-400">{t("somethingWentWrong")}</p>
+                </div>
+              )}
+
               {showResults && (
-                <div className="p-3 space-y-0.5" role="listbox">
+                <div className="p-3 space-y-0.5" role="listbox" id="search-results-listbox">
                   {fellBackToKeyword && (
                     <p className="px-2 pb-1.5 text-[10px] text-text-muted">
                       {t("fallbackKeyword")}
@@ -339,6 +359,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                   {searchResults.map((result, index) => (
                     <SearchResultRow
                       key={result.ref}
+                      id={`search-result-${index}`}
                       result={result}
                       alreadyAdded={hasNode(result.ref)}
                       isHighlighted={index === highlightedIndex}
@@ -469,12 +490,14 @@ function VerseCard({
 }
 
 function SearchResultRow({
+  id,
   result,
   alreadyAdded,
   isHighlighted,
   onHover,
   onSelect,
 }: {
+  id: string;
   result: SearchResult;
   alreadyAdded: boolean;
   isHighlighted: boolean;
@@ -483,6 +506,7 @@ function SearchResultRow({
 }) {
   return (
     <button
+      id={id}
       role="option"
       aria-selected={isHighlighted}
       onClick={onSelect}

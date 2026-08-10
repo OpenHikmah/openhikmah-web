@@ -14,27 +14,40 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mockPush }) }));
 import { useCanvasStore } from "@/store/canvas";
 import { SearchDialog } from "@/components/search/SearchDialog";
 
+// Real, verified text (Sahih International / ar-simple-clean) for 2:1-2:2 —
+// test fixtures render Quranic text and must not use placeholder strings.
+const VERSE_TEXT: Record<string, { arabic: string; translation: string }> = {
+  "2:1": { arabic: "الم", translation: "Alif, Lam, Meem." },
+  "2:2": {
+    arabic: "ذَٰلِكَ الْكِتَابُ لَا رَيْبَ ۛ فِيهِ ۛ هُدًى لِّلْمُتَّقِينَ",
+    translation:
+      "This is the Book about which there is no doubt, a guidance for those conscious of Allah -",
+  },
+};
+
 function makeResult(ref: string, surahName: string): SearchResult {
+  const text = VERSE_TEXT[ref];
   return {
     ref: ref as SearchResult["ref"],
     surahName,
-    surahNameArabic: "سورة",
-    snippet: `snippet for ${ref}`,
-    arabicText: "نص",
-    translation: "text",
+    surahNameArabic: "سورة البقرة",
+    snippet: text.translation,
+    arabicText: text.arabic,
+    translation: text.translation,
   };
 }
 
 function makeVerse(ref: string): Verse {
   const [s, a] = ref.split(":");
+  const text = VERSE_TEXT[ref];
   return {
     surah: Number(s),
     ayah: Number(a),
     ref: ref as Verse["ref"],
-    arabicText: "نص",
-    translation: "text",
-    surahName: "Surah",
-    surahNameArabic: "سورة",
+    arabicText: text.arabic,
+    translation: text.translation,
+    surahName: "Al-Baqarah",
+    surahNameArabic: "سورة البقرة",
   };
 }
 
@@ -66,7 +79,7 @@ describe("SearchDialog keyboard navigation", () => {
 
   async function openDialogWithResults(onClose = vi.fn()) {
     render(<SearchDialog open onClose={onClose} />);
-    const input = screen.getByRole("textbox");
+    const input = screen.getByRole("combobox");
     fireEvent.change(input, { target: { value: "guidance" } });
     await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2), { timeout: 2000 });
     return { input, onClose };
@@ -123,6 +136,55 @@ describe("SearchDialog keyboard navigation", () => {
     fireEvent.mouseEnter(options[1]);
     expect(screen.getAllByRole("option")[1]).toHaveAttribute("aria-selected", "true");
   });
+
+  it("exposes the highlighted result to assistive tech via aria-activedescendant", async () => {
+    const { input } = await openDialogWithResults();
+    expect(input).not.toHaveAttribute("aria-activedescendant");
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    const options = screen.getAllByRole("option");
+    expect(input).toHaveAttribute("aria-activedescendant", options[0].id);
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(input).toHaveAttribute("aria-activedescendant", options[1].id);
+  });
+});
+
+describe("SearchDialog selected-result fetch failure", () => {
+  const results = [makeResult("2:1", "Al-Baqarah"), makeResult("2:2", "Al-Baqarah")];
+
+  beforeEach(() => {
+    useCanvasStore.getState().reset();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.startsWith("/api/search")) {
+          const body: SearchResponse = { results, total: results.length, page: 1, pageSize: 10 };
+          return { ok: true, json: async () => body, headers: new Headers() } as Response;
+        }
+        if (url.startsWith("/api/verse/")) {
+          return { ok: false, json: async () => ({}) } as Response;
+        }
+        throw new Error(`unexpected fetch ${url}`);
+      })
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("surfaces an error instead of silently doing nothing when the selected result fails to load", async () => {
+    render(<SearchDialog open onClose={vi.fn()} />);
+    const input = screen.getByRole("combobox");
+    fireEvent.change(input, { target: { value: "guidance" } });
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2), { timeout: 2000 });
+
+    fireEvent.click(screen.getAllByRole("option")[0]);
+
+    await waitFor(() => expect(screen.getByText(/something went wrong/i)).toBeInTheDocument());
+    expect(useCanvasStore.getState().nodes).toHaveLength(0);
+  });
 });
 
 describe("SearchDialog view-all-results footer hint", () => {
@@ -154,7 +216,7 @@ describe("SearchDialog view-all-results footer hint", () => {
 
   it("hides the 'press Enter to view all' hint once a result is highlighted, since Enter now selects it instead", async () => {
     render(<SearchDialog open onClose={vi.fn()} />);
-    const input = screen.getByRole("textbox");
+    const input = screen.getByRole("combobox");
     fireEvent.change(input, { target: { value: "guidance" } });
     await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2), { timeout: 2000 });
 
@@ -164,6 +226,6 @@ describe("SearchDialog view-all-results footer hint", () => {
     expect(screen.queryByText("Enter")).not.toBeInTheDocument();
 
     // The footer button itself (click-to-view-all) stays available regardless of highlight.
-    expect(screen.getByText(/results/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /results/i })).toBeInTheDocument();
   });
 });
