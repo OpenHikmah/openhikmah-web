@@ -105,6 +105,15 @@ describe("GET /api/search", () => {
     expect(mockFetch).not.toHaveBeenCalled(); // no external call for ref lookup
   });
 
+  it("does not crash when the local DB lookup throws for a ref-format query", async () => {
+    mockGetVerse.mockRejectedValueOnce(new Error("connection refused"));
+    const req = makeSearchReq("2:255");
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.results[0].ref).toBe("2:255");
+  });
+
   it("includes correct surahNameArabic for ref-format query", async () => {
     mockGetVerse.mockResolvedValueOnce(null);
     const req = makeSearchReq("1:1");
