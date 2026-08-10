@@ -184,9 +184,13 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
           }
 
           // Fan out radially, then nudge off any collision with the live graph
-          // (including siblings added moments ago in this same expansion).
-          const target = radialPos(sourcePos, i, connections.length);
+          // (including siblings added moments ago in this same expansion). Read
+          // the source node's position fresh each iteration — it may have been
+          // dragged mid-expansion, and staggered placements should follow it
+          // rather than fan out from a stale pre-drag snapshot.
           const state = useCanvasStore.getState();
+          const currentSourcePos = state.nodes.find((n) => n.id === nodeId)?.position ?? sourcePos;
+          const target = radialPos(currentSourcePos, i, connections.length);
           const existing = state.nodes.map((n) => n.position);
           // Edge labels (AI explanation pills, ~120×22px) render at edge midpoints.
           // Treat them as slim obstacles so new nodes avoid overlapping them without
