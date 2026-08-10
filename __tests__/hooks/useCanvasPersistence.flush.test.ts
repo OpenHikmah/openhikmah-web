@@ -57,21 +57,6 @@ describe("useCanvasPersistence flush-on-unload", () => {
     expect(saved.nodes).toHaveLength(1);
   });
 
-  it("flushes a pending edit to localStorage on beforeunload before the debounce fires", () => {
-    renderHook(() => useCanvasPersistence());
-
-    act(() => {
-      useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
-    });
-
-    act(() => {
-      window.dispatchEvent(new Event("beforeunload"));
-    });
-
-    const saved = JSON.parse(localStorage.getItem(CANVAS_STORAGE_KEY)!);
-    expect(saved.nodes).toHaveLength(1);
-  });
-
   it("does not double-write when the debounce timer fires after an unload flush already ran", () => {
     renderHook(() => useCanvasPersistence());
 
@@ -89,5 +74,35 @@ describe("useCanvasPersistence flush-on-unload", () => {
 
     expect(setItemSpy).not.toHaveBeenCalled();
     setItemSpy.mockRestore();
+  });
+
+  it("does not wipe a previously-saved canvas if unload happens while a ?share= restore is still in flight", async () => {
+    localStorage.setItem(
+      CANVAS_STORAGE_KEY,
+      JSON.stringify({ v: 1, nodes: [{ id: "existing" }], edges: [] })
+    );
+    window.history.pushState({}, "", "/canvas?share=12345678-1234-1234-1234-123456789abc");
+
+    let resolveFetch: (value: Response) => void;
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockReturnValue(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      })
+    );
+
+    renderHook(() => useCanvasPersistence());
+
+    // The share fetch hasn't resolved yet — nodes/edges are still the
+    // initial empty store state at this point.
+    act(() => {
+      window.dispatchEvent(new Event("pagehide"));
+    });
+
+    const saved = JSON.parse(localStorage.getItem(CANVAS_STORAGE_KEY)!);
+    expect(saved.nodes).toEqual([{ id: "existing" }]);
+
+    resolveFetch!({ ok: false } as Response);
+    fetchSpy.mockRestore();
+    window.history.pushState({}, "", "/canvas");
   });
 });
