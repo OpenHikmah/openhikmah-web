@@ -111,6 +111,7 @@ function ChallengeCard({
 }) {
   const accessToken = useAuthStore((s) => s.accessToken);
   const [acting, setActing] = useState<"accept" | "decline" | "cancel" | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const countdown = useCountdown(c.endsAt);
 
   const isChallenger = c.challengerId === myId;
@@ -132,13 +133,20 @@ function ChallengeCard({
   const handleAction = async (action: "accept" | "decline" | "cancel") => {
     if (!accessToken) return;
     setActing(action);
+    setError(null);
     try {
-      await fetch(`/api/social/challenges/${c.id}`, {
+      const res = await fetch(`/api/social/challenges/${c.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ action }),
       });
+      if (!res.ok) {
+        setError(`Couldn't ${action} — try again.`);
+        return;
+      }
       onUpdate();
+    } catch {
+      setError("Network error — try again.");
     } finally {
       setActing(null);
     }
@@ -202,6 +210,7 @@ function ChallengeCard({
         </p>
       )}
       {theyWon && <p className="text-center text-xs text-text-muted">@{opponentName} won</p>}
+      {error && <p className="text-center text-xs text-error">{error}</p>}
 
       {/* Actions */}
       {incoming && (
