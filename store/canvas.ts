@@ -88,6 +88,10 @@ interface CanvasStore {
   viewport: CanvasViewport;
   sidebarWidth: number;
   fitRequestToken: number;
+  /** Bumped by restoreCanvas so consumers (the activity tracker) can tell a
+   *  bulk restore apart from a genuine one-at-a-time user addition, without
+   *  relying on effect-ordering/timing to distinguish the two. */
+  restoreToken: number;
   /** Node ids sharing the same verse ref, keyed by ref. Recomputed by every
    *  action that touches `nodes`, so `getDuplicateNodeIds` is a plain lookup
    *  instead of an O(N) scan on every VerseNode render. */
@@ -177,6 +181,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   viewport: { x: 0, y: 0, zoom: 1 },
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
   fitRequestToken: 0,
+  restoreToken: 0,
   duplicateNodeIdsByRef: {},
   expansionCountsByNode: {},
 
@@ -310,7 +315,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       return m ? Math.max(max, parseInt(m[1], 10)) : max;
     }, 0);
     nodeIdCounter = maxNum;
-    set({
+    set((s) => ({
       nodes,
       edges,
       selectedNodeId: null,
@@ -323,7 +328,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       newlyAddedNodeId: null,
       duplicateNodeIdsByRef: computeDuplicateMap(nodes),
       expansionCountsByNode: computeExpansionCountsMap(edges),
-    });
+      restoreToken: s.restoreToken + 1,
+    }));
   },
 
   appendWorkspace: (saved: SavedCanvas) => {
