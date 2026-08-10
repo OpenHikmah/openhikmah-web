@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { Node, Edge } from "@xyflow/react";
 import { useCanvasStore, serializeCanvas, type SavedCanvas } from "@/store/canvas";
 
 /** localStorage key for the in-progress canvas. Exported so the home screen can
@@ -70,7 +71,12 @@ export function useCanvasPersistence() {
   const edges = useCanvasStore((s) => s.edges);
   const restoreCanvas = useCanvasStore((s) => s.restoreCanvas);
   const hydratedRef = useRef(false);
+  const restoringRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestRef = useRef({ nodes, edges });
+  useEffect(() => {
+    latestRef.current = { nodes, edges };
+  }, [nodes, edges]);
 
   function tryRestoreFromLocalStorage() {
     // Skip if the store was already populated (e.g. by a workspace load that
@@ -98,6 +104,11 @@ export function useCanvasPersistence() {
     const shareId = params.get("share");
 
     if (shareId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(shareId)) {
+      // While this fetch is in flight, nodes/edges are still their initial
+      // empty state — block the debounced save (and unload flush) from
+      // reading that state as "canvas cleared" and wiping out the real
+      // localStorage fallback this restore might fall back to.
+      restoringRef.current = true;
       fetch(`/api/share/${shareId}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((saved: SavedCanvas | null) => {
@@ -114,6 +125,9 @@ export function useCanvasPersistence() {
         })
         .catch(() => {
           tryRestoreFromLocalStorage();
+        })
+        .finally(() => {
+          restoringRef.current = false;
         });
       return;
     }
@@ -124,21 +138,43 @@ export function useCanvasPersistence() {
 
   // Auto-save to localStorage whenever nodes/edges change (debounced 800ms)
   useEffect(() => {
-    if (!hydratedRef.current) return;
+    if (!hydratedRef.current || restoringRef.current) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      try {
-        if (nodes.length === 0) {
-          localStorage.removeItem(LS_KEY);
-        } else {
-          localStorage.setItem(LS_KEY, JSON.stringify(serializeCanvas(nodes, edges)));
-        }
-      } catch {
-        // localStorage quota exceeded — ignore
-      }
+      saveTimerRef.current = null;
+      saveToLocalStorage(nodes, edges);
     }, 800);
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
   }, [nodes, edges]);
+
+  // Flush any pending debounced save synchronously before the page unloads,
+  // so an edit made just before navigating away (e.g. clicking "Sign in to
+  // save") isn't lost to the 800ms debounce window. pagehide (not
+  // beforeunload) so the page stays eligible for the back/forward cache.
+  useEffect(() => {
+    const flush = () => {
+      if (!hydratedRef.current || restoringRef.current || !saveTimerRef.current) return;
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+      saveToLocalStorage(latestRef.current.nodes, latestRef.current.edges);
+    };
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+    };
+  }, []);
+}
+
+function saveToLocalStorage(nodes: Node[], edges: Edge[]) {
+  try {
+    if (nodes.length === 0) {
+      localStorage.removeItem(LS_KEY);
+    } else {
+      localStorage.setItem(LS_KEY, JSON.stringify(serializeCanvas(nodes, edges)));
+    }
+  } catch {
+    // localStorage quota exceeded — ignore
+  }
 }
