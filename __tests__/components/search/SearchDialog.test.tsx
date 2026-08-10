@@ -175,6 +175,8 @@ describe("SearchDialog selected-result fetch failure", () => {
   });
 
   it("surfaces an error instead of silently doing nothing when the selected result fails to load", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
     render(<SearchDialog open onClose={vi.fn()} />);
     const input = screen.getByRole("combobox");
     fireEvent.change(input, { target: { value: "guidance" } });
@@ -184,6 +186,12 @@ describe("SearchDialog selected-result fetch failure", () => {
 
     await waitFor(() => expect(screen.getByText(/something went wrong/i)).toBeInTheDocument());
     expect(useCanvasStore.getState().nodes).toHaveLength(0);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "Failed to fetch selected search result:",
+      expect.any(Error)
+    );
+
+    consoleErrorSpy.mockRestore();
   });
 });
 
