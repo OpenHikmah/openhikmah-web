@@ -126,6 +126,7 @@
     "enterSearchTerm": "Başlamaq üçün axtarış termini daxil edin.",
     "somethingWentWrong": "Nəsə səhv getdi. Yenidən cəhd edin.",
     "searchUnavailable": "Axtarış müvəqqəti əlçatan deyil.",
+    "rateLimited": "Bir az sürətli axtarırsınız — bir az gözləyib yenidən cəhd edin.",
     "tryAgain": "Yenidən cəhd et →",
     "tryByMeaning": "Bunun əvəzinə \"Mənaya görə\" axtarışı sınayın →",
     "showingResults": "\"{query}\" üçün <b>{count, plural, one {# nəticə} other {# nəticə}}</b> göstərilir",

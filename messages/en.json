@@ -126,6 +126,7 @@
     "enterSearchTerm": "Enter a search term to get started.",
     "somethingWentWrong": "Something went wrong. Try again.",
     "searchUnavailable": "Search is temporarily unavailable.",
+    "rateLimited": "You're searching a bit fast — wait a moment and try again.",
     "tryAgain": "Try again →",
     "tryByMeaning": "Try \"By meaning\" search instead →",
     "showingResults": "Showing <b>{count, plural, one {# result} other {# results}}</b> for \"{query}\"",

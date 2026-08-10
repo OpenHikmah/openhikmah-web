@@ -126,6 +126,7 @@
     "enterSearchTerm": "Başlamak için bir arama terimi girin.",
     "somethingWentWrong": "Bir şeyler ters gitti. Tekrar deneyin.",
     "searchUnavailable": "Arama geçici olarak kullanılamıyor.",
+    "rateLimited": "Biraz hızlı arıyorsunuz — bir an bekleyip tekrar deneyin.",
     "tryAgain": "Tekrar dene →",
     "tryByMeaning": "Bunun yerine \"Anlama göre\" aramayı deneyin →",
     "showingResults": "\"{query}\" için <b>{count, plural, one {# sonuç} other {# sonuç}}</b> gösteriliyor",

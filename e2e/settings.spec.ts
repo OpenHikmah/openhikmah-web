@@ -29,6 +29,12 @@ test.describe("settings page", () => {
 test.describe("language switching", () => {
   test("switching language via the header popover persists across reload", async ({ page }) => {
     await page.goto("/search");
+    // First hit on /search in this file — next dev compiles it on demand, and
+    // under CI resource contention the page can paint before React finishes
+    // hydrating. A click that lands before hydration is a silent no-op (the
+    // popover trigger has no handler attached yet), so wait for the network
+    // to settle before treating the page as interactive.
+    await page.waitForLoadState("networkidle");
 
     await page.getByRole("button", { name: /change language/i }).click();
     await page.getByRole("button", { name: "Türkçe" }).click();
