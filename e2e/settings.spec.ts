@@ -73,7 +73,9 @@ test.describe("mobile bottom nav", () => {
     await page.goto("/search");
 
     await page.getByRole("button", { name: /account menu/i }).click();
-    const savedLink = page.getByRole("menu").getByRole("link", { name: /saved/i });
+    // Exact match: the loose /saved/i regex also matches the adjacent "Saved
+    // canvases" workspaces link in this same menu.
+    const savedLink = page.getByRole("menu").getByRole("link", { name: "Saved", exact: true });
     await expect(savedLink).toBeVisible();
     await savedLink.click();
     // 15s: Next dev serves routes with on-demand compilation, and this may be
