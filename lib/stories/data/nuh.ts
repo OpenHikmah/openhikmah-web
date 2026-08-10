@@ -2,19 +2,40 @@ import type { Story } from "../types";
 
 export const NUH_STORY: Story = {
   slug: "nuh",
-  name: { en: "Nuh (Noah)" },
+  name: {
+    en: "Nuh (Noah)",
+    tr: "Nuh",
+    az: "Nuh",
+    ru: "Нух (Ной)",
+  },
   arabicName: "نُوح",
-  tagline: { en: "Nine hundred and fifty years of calling a people to God" },
+  tagline: {
+    en: "Nine hundred and fifty years of calling a people to God",
+    tr: "Bir kavmi Allah'a çağırmakla geçen dokuz yüz elli yıl",
+    az: "Bir qövmü Allaha çağırmaqla keçən doqquz yüz əlli il",
+    ru: "Девятьсот пятьдесят лет призыва народа к Богу",
+  },
   intro: {
     en: "Nuh preached to his people for centuries, calling them away from idolatry with patience the Quran holds up as exemplary. Only a small number believed. When the warning was ignored to the end, he was commanded to build a ship, and the flood that followed became one of the Quran's clearest illustrations of a promise fulfilled — deliverance for those who believed, and destruction for a people who chose disbelief over centuries of warning.",
+    tr: "Nuh, yüzyıllar boyunca kavmine tebliğde bulundu; onları Kur'an'ın örnek gösterdiği bir sabırla putperestlikten uzaklaştırmaya çağırdı. Yalnızca az sayıda kişi iman etti. Uyarı sonuna kadar göz ardı edildiğinde, kendisine bir gemi inşa etmesi emredildi ve ardından gelen tufan, Kur'an'ın yerine getirilmiş bir vaadin en açık örneklerinden biri hâline geldi: iman edenler için kurtuluş, yüzyıllar süren uyarıya rağmen inkârı seçen bir kavim için ise helâk.",
+    az: "Nuh əsrlər boyu qövmünə təbliğ etdi; Quranın nümunə göstərdiyi səbrlə onları bütpərəstlikdən uzaqlaşdırmağa çağırdı. Yalnız az sayda insan iman gətirdi. Xəbərdarlıq sona qədər nəzərə alınmadıqda, ona bir gəmi tikmək əmr olundu və ardınca gələn tufan Quranın yerinə yetirilmiş bir vədin ən aydın nümunələrindən birinə çevrildi: iman gətirənlər üçün xilas, əsrlər boyu edilən xəbərdarlığa baxmayaraq küfrü seçən qövm üçün isə həlak.",
+    ru: "Нух проповедовал своему народу на протяжении веков, терпеливо призывая их отказаться от идолопоклонства — терпением, которое Коран приводит в пример. Уверовало лишь немногие. Когда предупреждение было проигнорировано до конца, ему было велено построить корабль, и последовавший за этим потоп стал одним из самых ясных примеров исполненного обещания в Коране: спасение для тех, кто уверовал, и гибель для народа, который на протяжении веков предупреждений предпочёл неверие.",
   },
   primarySurahs: [11, 71],
   chapters: [
     {
       id: "a-clear-warner",
-      title: { en: "A clear warner, night and day" },
+      title: {
+        en: "A clear warner, night and day",
+        tr: "Gece gündüz apaçık bir uyarıcı",
+        az: "Gecə-gündüz açıq-aydın bir xəbərdarçı",
+        ru: "Ясный увещеватель, день и ночь",
+      },
       narrative: {
         en: "Nuh is sent to his people with a single message: worship God alone. The leaders among them dismiss him as an ordinary man followed only by society's lowest, and accuse him of lying. He answers that he asks no payment for his message and will not drive away the believers who have gathered around him, however the elite regard them. Later he describes to God how he called his people night and day, publicly and privately, urging them to seek forgiveness — and that his invitation only increased their aversion. The Quran states that he remained among them a thousand years less fifty — nearly a millennium of warning before the flood came.",
+        tr: "Nuh, kavmine tek bir mesajla gönderilir: yalnızca Allah'a kulluk etmek. Kavminin ileri gelenleri onu, toplumun en aşağı kesiminden kişilerin izlediği sıradan bir adam olarak görüp reddeder ve onu yalancılıkla suçlarlar. Nuh, mesajı karşılığında hiçbir ücret istemediğini ve çevresinde toplanan müminleri, ileri gelenler onları nasıl görürse görsün, kovmayacağını söyler. Daha sonra Allah'a, kavmini gece gündüz, açıktan ve gizlice nasıl çağırdığını, onları bağışlanma dilemeye nasıl teşvik ettiğini anlatır — ve bu çağrının onların nefretini yalnızca artırdığını belirtir. Kur'an, onun elli yıl eksiğiyle bin yıl aralarında kaldığını bildirir; tufan gelmeden önce neredeyse bin yıllık bir uyarı süreci.",
+        az: "Nuh qövmünə tək bir mesajla göndərilir: yalnız Allaha ibadət etmək. Qövmünün irəli gələnləri onu cəmiyyətin ən aşağı təbəqəsinin izlədiyi adi bir insan sayaraq rədd edir və onu yalançılıqda ittiham edirlər. O isə cavab verir ki, mesajına görə heç bir əvəz istəmir və ətrafında toplaşan möminləri, irəli gələnlər onları necə görürsə görsün, qovmayacaq. Sonra Allaha qövmünü gecə-gündüz, açıq və gizli şəkildə necə çağırdığını, onları bağışlanma diləməyə necə həvəsləndirdiyini danışır — və bu dəvətin onların nifrətini ancaq artırdığını bildirir. Quran bildirir ki, o, əlli il əskiyi ilə min il qövmünün arasında qaldı — tufan gəlməzdən əvvəl demək olar ki, min illik bir xəbərdarlıq dövrü.",
+        ru: "Нух был послан к своему народу с единственным посланием: поклоняться только Богу. Знать среди них отвергла его как обычного человека, за которым следуют лишь низшие слои общества, и обвинила его во лжи. Он отвечает, что не просит платы за своё послание и не станет прогонять уверовавших, собравшихся вокруг него, как бы знать ни относилась к ним. Позже он рассказывает Богу, как призывал свой народ днём и ночью, открыто и тайно, побуждая их просить прощения — и что его призыв лишь усиливал их неприязнь. Коран говорит, что он оставался среди них тысячу лет без пятидесяти — почти тысячелетие предупреждений перед тем, как пришёл потоп.",
       },
       verseRefs: [
         "29:14",
@@ -35,9 +56,17 @@ export const NUH_STORY: Story = {
     },
     {
       id: "the-ship-and-the-flood",
-      title: { en: "The ship and the flood" },
+      title: {
+        en: "The ship and the flood",
+        tr: "Gemi ve tufan",
+        az: "Gəmi və tufan",
+        ru: "Корабль и потоп",
+      },
       narrative: {
         en: "God tells Nuh that no more of his people will believe, and instructs him to build a ship under His watch, without pleading further for those who have done wrong. Nuh builds it while the leaders of his people mock him as he works; he answers that they will see who is overtaken by disgrace. When the command comes, he is told to load a pair of every kind aboard along with his family and the believers — who are very few. The ship sails through waves like mountains, and Nuh calls out to his son, who has stayed apart, to come aboard; the son insists he will take refuge on a mountain instead, and is among those overtaken by the flood.",
+        tr: "Allah, Nuh'a kavminden artık kimsenin iman etmeyeceğini bildirir ve zulmedenler için artık yalvarmadan, kendi gözetimi altında bir gemi inşa etmesini emreder. Nuh gemiyi yaparken kavminin ileri gelenleri onunla alay eder; o da kimin rezilliğe uğrayacağını göreceklerini söyler. Emir geldiğinde, kendisine her türden bir çift ile ailesini ve pek az sayıdaki müminleri gemiye bindirmesi söylenir. Gemi dağlar gibi dalgalar arasında yol alır ve Nuh, kendilerinden ayrı duran oğluna gemiye binmesi için seslenir; oğlu ise bunun yerine bir dağa sığınacağında ısrar eder ve tufana kapılanlar arasında yer alır.",
+        az: "Allah Nuha qövmündən artıq heç kimin iman gətirməyəcəyini bildirir və zülm edənlər üçün daha yalvarmadan, Öz nəzarəti altında bir gəmi düzəltməsini əmr edir. Nuh gəmini düzəldərkən qövmünün irəli gələnləri onunla lağ edirlər; o isə cavab verir ki, kimin rüsvayçılığa düçar olacağını görəcəklər. Əmr gəldikdə, ona hər növdən bir cüt heyvanla birlikdə ailəsini və çox az sayda mömini gəmiyə mindirmək söylənilir. Gəmi dağlar kimi dalğalar arasında üzür və Nuh özündən ayrı qalan oğluna gəmiyə minməsi üçün səslənir; oğlu isə bunun əvəzinə bir dağa sığınacağında israr edir və tufana yaxalananlar arasında olur.",
+        ru: "Бог сообщает Нуху, что больше никто из его народа не уверует, и повелевает ему построить корабль под Его наблюдением, не заступаясь более за тех, кто творил несправедливость. Нух строит его, пока знать его народа насмехается над ним за работой; он отвечает, что они увидят, кого постигнет позор. Когда приходит повеление, ему велено погрузить на борт по паре от всякого вида, а также свою семью и уверовавших — которых очень мало. Корабль плывёт сквозь волны, подобные горам, и Нух взывает к своему сыну, который держался в стороне, чтобы тот взошёл на борт; сын настаивает, что вместо этого укроется на горе, и оказывается среди тех, кого настиг потоп.",
       },
       verseRefs: [
         "11:36",
@@ -56,9 +85,17 @@ export const NUH_STORY: Story = {
     },
     {
       id: "the-mountain-of-judiyy",
-      title: { en: '"Away with the wrongdoing people"' },
+      title: {
+        en: '"Away with the wrongdoing people"',
+        tr: '"Zalimler topluluğuna uzaklık olsun"',
+        az: '"Zalım tayfaya uzaqlıq olsun"',
+        ru: '"Да сгинет беззаконный народ"',
+      },
       narrative: {
         en: "The earth is commanded to swallow its water and the sky to withhold its rain; the ship comes to rest on Mount Judiyy, and it is declared that the wrongdoing people are gone. Grieving for his son, Nuh appeals to God, reminding Him that his son was of his family. He is told, gently but firmly, that his son's conduct placed him outside that promise, and Nuh asks forgiveness for having questioned a matter beyond his knowledge. God then tells him to disembark in security and blessing — not only for himself, but for the generations that would descend from those who were with him.",
+        tr: "Yeryüzüne suyunu yutması, gökyüzüne de yağmurunu tutması emredilir; gemi Cûdi Dağı'na oturur ve zalimler topluluğunun yok olduğu bildirilir. Oğlu için üzülen Nuh, Allah'a yakarır ve oğlunun kendi ailesinden olduğunu hatırlatır. Kendisine yumuşak fakat kesin bir şekilde, oğlunun davranışının onu bu vaadin dışında bıraktığı bildirilir ve Nuh, bilgisi ötesinde bir konuyu sorguladığı için bağışlanma diler. Ardından Allah, ona yalnızca kendisi için değil, kendisiyle birlikte olanlardan gelecek nesiller için de güven ve bereket içinde gemiden inmesini söyler.",
+        az: "Yerə suyunu udması, göyə isə yağışını saxlaması əmr olunur; gəmi Cudi dağında qərar tutur və zalım tayfanın məhv olduğu bəyan edilir. Oğlu üçün kədərlənən Nuh Allaha yalvarır və oğlunun öz ailəsindən olduğunu xatırladır. Ona yumşaq, lakin qəti şəkildə, oğlunun davranışının onu bu vədin xaricində qoyduğu bildirilir və Nuh bilgisindən kənar bir məsələni sorğuladığı üçün bağışlanma diləyir. Bundan sonra Allah ona təkcə özü üçün deyil, özü ilə birlikdə olanlardan gələcək nəsillər üçün də əmin-amanlıq və bərəkət içində gəmidən düşməsini bildirir.",
+        ru: "Земле велено поглотить свою воду, а небу — удержать свой дождь; корабль останавливается на горе Джуди, и объявляется, что беззаконный народ сгинул. Скорбя о сыне, Нух обращается к Богу, напоминая Ему, что его сын был из его семьи. Ему мягко, но твёрдо сообщают, что поведение его сына поставило его вне этого обещания, и Нух просит прощения за то, что усомнился в деле, недоступном его знанию. Затем Бог велит ему сойти на землю в безопасности и благословении — не только для себя, но и для поколений, которые произойдут от тех, кто был с ним.",
       },
       verseRefs: ["11:44", "11:45", "11:46", "11:47", "11:48"],
     },

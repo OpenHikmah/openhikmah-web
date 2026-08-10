@@ -4,6 +4,7 @@ import { useAuthStore } from "@/store/auth";
 import { Check, X, UserMinus, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Card, IconButton, Tooltip } from "@/components/ui";
+import { useArmedConfirm } from "@/hooks/useArmedConfirm";
 
 interface FriendEntry {
   id: number;
@@ -16,6 +17,41 @@ interface FriendEntry {
 interface Props {
   friends: FriendEntry[];
   onUpdate: () => void;
+}
+
+/** Icon button requiring a second click to confirm, for a destructive action
+ *  (removing a friend, cancelling a sent request) — consistent with the
+ *  confirm-before-destroy pattern used elsewhere in the app. */
+function DestructiveIconButton({
+  onConfirm,
+  disabled,
+  busy,
+  idleIcon,
+  label,
+  confirmLabel,
+}: {
+  onConfirm: () => void;
+  disabled: boolean;
+  busy: boolean;
+  idleIcon: React.ReactNode;
+  label: string;
+  confirmLabel: string;
+}) {
+  const { armed, trigger } = useArmedConfirm(onConfirm);
+  return (
+    <Tooltip label={armed ? confirmLabel : label}>
+      <IconButton
+        tone="danger"
+        size="xs"
+        onClick={trigger}
+        disabled={disabled}
+        aria-label={armed ? confirmLabel : label}
+        className={armed ? "border-error/40 bg-error/10 text-error" : undefined}
+      >
+        {busy ? <Loader2 className="animate-spin" /> : armed ? <Check /> : idleIcon}
+      </IconButton>
+    </Tooltip>
+  );
 }
 
 export function FriendList({ friends, onUpdate }: Props) {
@@ -124,17 +160,14 @@ export function FriendList({ friends, onUpdate }: Props) {
                   </Tooltip>
                 </div>
               ) : (
-                <Tooltip label="Cancel request">
-                  <IconButton
-                    tone="danger"
-                    size="xs"
-                    onClick={() => remove(f.id)}
-                    disabled={busy === f.id}
-                    aria-label="Cancel request"
-                  >
-                    {busy === f.id ? <Loader2 className="animate-spin" /> : <X />}
-                  </IconButton>
-                </Tooltip>
+                <DestructiveIconButton
+                  onConfirm={() => remove(f.id)}
+                  disabled={busy === f.id}
+                  busy={busy === f.id}
+                  idleIcon={<X />}
+                  label="Cancel request"
+                  confirmLabel="Click again to confirm"
+                />
               )}
             </Card>
           ))}
@@ -154,17 +187,14 @@ export function FriendList({ friends, onUpdate }: Props) {
                 <span className="text-sm text-text-primary">{f.friend?.username ?? "—"}</span>
                 <span className="font-mono text-xs text-gold">🔥 {f.friend?.streak ?? 0}</span>
               </div>
-              <Tooltip label="Remove friend">
-                <IconButton
-                  tone="danger"
-                  size="xs"
-                  onClick={() => remove(f.id)}
-                  disabled={busy === f.id}
-                  aria-label="Remove friend"
-                >
-                  {busy === f.id ? <Loader2 className="animate-spin" /> : <UserMinus />}
-                </IconButton>
-              </Tooltip>
+              <DestructiveIconButton
+                onConfirm={() => remove(f.id)}
+                disabled={busy === f.id}
+                busy={busy === f.id}
+                idleIcon={<UserMinus />}
+                label="Remove friend"
+                confirmLabel="Click again to confirm"
+              />
             </Card>
           ))}
         </div>
