@@ -38,7 +38,7 @@ export function EmptyState({ onSearchOpen }: EmptyStateProps) {
                 href={`/canvas?verse=${j.ref}`}
                 className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-text-secondary transition-[color,border-color] duration-[120ms] hover:border-gold-muted hover:text-gold"
               >
-                {j.label}
+                {t(`journey.${j.labelKey}`)}
               </Link>
             ))}
           </div>

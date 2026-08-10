@@ -6,13 +6,18 @@ import tr from "@/messages/tr.json";
 import ru from "@/messages/ru.json";
 import az from "@/messages/az.json";
 
-const MESSAGES: Record<string, Record<string, Record<string, string>>> = { en, tr, ru, az };
+type MessageTree = { [key: string]: string | MessageTree };
 
-function flatten(messages: Record<string, Record<string, string>>): Record<string, string> {
+const MESSAGES: Record<string, MessageTree> = { en, tr, ru, az };
+
+function flatten(messages: MessageTree, prefix = ""): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const [namespace, keys] of Object.entries(messages)) {
-    for (const [key, value] of Object.entries(keys)) {
-      out[`${namespace}.${key}`] = value;
+  for (const [key, value] of Object.entries(messages)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (typeof value === "string") {
+      out[path] = value;
+    } else {
+      Object.assign(out, flatten(value, path));
     }
   }
   return out;

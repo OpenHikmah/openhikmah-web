@@ -1,4 +1,4 @@
-import { and, eq, notInArray } from "drizzle-orm";
+import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { connections, type Connection } from "@/lib/infra/db/schema";
 import { generateConnections, generateGroundedConnections } from "@/lib/ai/connection-generator";
@@ -16,11 +16,12 @@ import type { ConnectionResult, EdgeKind } from "@/types/quran";
  */
 
 /**
- * Single-flight registry: concurrent cache misses for the SAME verse+kind share
- * one in-flight generation instead of each firing its own (expensive) AI call.
- * Per-process — full coverage on the single box; a multi-instance deployment
+ * Single-flight registry: concurrent cache misses for the SAME verse+kind+locale
+ * share one in-flight generation instead of each firing its own (expensive) AI
+ * call. Per-process — full coverage on the single box; a multi-instance deployment
  * would need a Redis lock to coalesce across processes (deferred). Keyed by
- * `${fromRef}:${kind}`; entries are removed as soon as the generation settles.
+ * `${fromRef}:${kind}:${locale}:${excludeRefs}`; entries are removed as soon as
+ * the generation settles.
  */
 const inFlight = new Map<string, Promise<ConnectionResult[]>>();
 
@@ -38,11 +39,9 @@ interface GetConnectionsOptions {
    *  both the cache read and any fresh generation, so a repeat "get more"
    *  request surfaces genuinely new connections instead of the same set. */
   excludeRefs?: string[];
-  /** Language the reason text should be generated in on a cache MISS only.
-   *  The `connections` table has no locale column — a stored reason is served
-   *  to every later reader regardless of their locale (an accepted v1
-   *  limitation: whichever locale first triggers generation for a given
-   *  fromRef+kind "wins" the cached reason's language). Defaults to "en". */
+  /** Language the reason text is generated and cached in. Reads and writes are
+   *  both keyed on this, so each locale gets its own cached reason instead of
+   *  sharing whichever locale first triggered generation. Defaults to "en". */
   locale?: Locale;
 }
 
@@ -81,6 +80,7 @@ export async function getConnections(
   options: GetConnectionsOptions = {}
 ): Promise<ConnectionResult[]> {
   const excludeRefs = options.excludeRefs ?? [];
+  const locale = options.locale ?? "en";
 
   const existing = await db
     .select()
@@ -90,6 +90,7 @@ export async function getConnections(
         eq(connections.fromRef, fromRef),
         eq(connections.kind, kind),
         eq(connections.status, "active"),
+        eq(connections.locale, locale),
         ...(excludeRefs.length > 0 ? [notInArray(connections.toRef, excludeRefs)] : [])
       )
     )
@@ -114,9 +115,9 @@ export async function getConnections(
   // Single-flight: if an identical generation is already running, join it rather
   // than starting a second AI call. The get→set below MUST stay synchronous (no
   // await between them) or two concurrent callers could both become the leader.
-  // The exclude set is folded into the key so a "get more" request never
-  // coalesces with a plain repeat request for the same verse+kind.
-  const key = `${fromRef}:${kind}:${[...excludeRefs].sort().join(",")}`;
+  // The exclude set and locale are folded into the key so a "get more" request
+  // or a different-locale request never coalesces with an unrelated one.
+  const key = `${fromRef}:${kind}:${locale}:${[...excludeRefs].sort().join(",")}`;
   const pending = inFlight.get(key);
   if (pending) {
     incr("gen_coalesced");
@@ -124,7 +125,7 @@ export async function getConnections(
   }
 
   incr("gen_started");
-  const work = generateAndPersist(fromRef, kind, source, excludeRefs, options.locale ?? "en");
+  const work = generateAndPersist(fromRef, kind, source, excludeRefs, locale);
   inFlight.set(key, work);
   try {
     return await work;
@@ -170,7 +171,7 @@ async function generateAndPersist(
   if (generated.length > 0) {
     const model = process.env.ANTHROPIC_MODEL ?? null;
     try {
-      await db
+      const inserted = await db
         .insert(connections)
         .values(
           generated.map((g) => ({
@@ -179,9 +180,40 @@ async function generateAndPersist(
             kind,
             reason: g.reason,
             model,
+            locale,
           }))
         )
-        .onConflictDoNothing();
+        .onConflictDoNothing()
+        .returning({ toRef: connections.toRef });
+
+      // A concurrent generation on another instance can win the same
+      // (fromRef, toRef, kind, locale) row first — RETURNING omits exactly the
+      // rows DO NOTHING discarded. Re-read those so this call returns what's
+      // actually persisted, not the text that lost the race (mirrors the same
+      // fix in lib/names/name-content.ts).
+      const insertedRefs = new Set(inserted.map((r) => r.toRef));
+      const conflicted = generated.filter((g) => !insertedRefs.has(g.ref));
+      if (conflicted.length > 0) {
+        const persisted = await db
+          .select({ toRef: connections.toRef, reason: connections.reason })
+          .from(connections)
+          .where(
+            and(
+              eq(connections.fromRef, fromRef),
+              eq(connections.kind, kind),
+              eq(connections.locale, locale),
+              inArray(
+                connections.toRef,
+                conflicted.map((g) => g.ref)
+              )
+            )
+          );
+        const reasonByRef = new Map(persisted.map((r) => [r.toRef, r.reason]));
+        return generated.map((g) => {
+          const persistedReason = reasonByRef.get(g.ref);
+          return persistedReason !== undefined ? { ...g, reason: persistedReason } : g;
+        });
+      }
     } catch (err) {
       console.error("Failed to persist connections:", err);
     }

@@ -46,6 +46,12 @@
     "emptyStateDescription": "Bir ayə və ya mövzu axtarın — süni intellekt Quran boyunca semantik əlaqələri xəritələndirir.",
     "searchVerses": "Ayə axtar",
     "orBeginWith": "Və ya bununla başlayın",
+    "journey": {
+      "patience": "Səbir",
+      "mercy": "Mərhəmət",
+      "light": "Nur",
+      "gratitude": "Şükür"
+    },
     "duplicateTooltip": "Lövhədə başqa yerdə də açıqdır — keçmək üçün klikləyin",
     "jumpToDuplicate": "Təkrarlanan ayə kartına keç",
     "pauseRecitation": "Qiraəti dayandır",

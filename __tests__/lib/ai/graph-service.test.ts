@@ -134,7 +134,12 @@ describe("getConnections", () => {
     expect(mockValues).toHaveBeenCalledTimes(1);
     const persisted = mockValues.mock.calls[0][0] as Array<Record<string, unknown>>;
     expect(persisted).toHaveLength(2);
-    expect(persisted[0]).toMatchObject({ fromRef: "1:1", toRef: "2:255", kind: "thematic" });
+    expect(persisted[0]).toMatchObject({
+      fromRef: "1:1",
+      toRef: "2:255",
+      kind: "thematic",
+      locale: "en",
+    });
     expect(out).toHaveLength(2);
   });
 
@@ -279,6 +284,48 @@ describe("getConnections", () => {
 
     const out = await getConnections("1:1", "thematic", source);
     expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+  });
+});
+
+describe("getConnections — per-locale caching", () => {
+  beforeEach(() => {
+    mockSelect.mockReset();
+    mockInsert.mockClear();
+    mockValues.mockClear();
+    mockOnConflict.mockClear();
+    mockGenerate.mockReset();
+    mockGenerateGrounded.mockReset();
+    mockDiscover.mockReset();
+    mockResolveVerse.mockReset();
+    mockConsume.mockReset();
+    mockConsume.mockResolvedValue(true);
+    mockDiscover.mockResolvedValue([]);
+    mockResolveVerse.mockImplementation(async (ref: string) => verse(ref));
+  });
+
+  it("persists the reason under the requested locale", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockGenerate.mockResolvedValue([result("2:255")]);
+
+    await getConnections("1:1", "thematic", source, { locale: "tr" });
+
+    expect(mockGenerate).toHaveBeenCalledWith("1:1", "ar", "tr", "thematic", "tr");
+    const persisted = mockValues.mock.calls[0][0] as Array<Record<string, unknown>>;
+    expect(persisted[0]).toMatchObject({ locale: "tr" });
+  });
+
+  it("does not coalesce concurrent misses for the same verse+kind but different locales", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockGenerate.mockImplementation(async () => [result("2:255")]);
+
+    await Promise.all([
+      getConnections("1:1", "thematic", source, { locale: "en" }),
+      getConnections("1:1", "thematic", source, { locale: "tr" }),
+    ]);
+
+    expect(mockGenerate).toHaveBeenCalledTimes(2);
+    expect(mockGenerate).toHaveBeenCalledWith("1:1", "ar", "tr", "thematic", "en");
+    expect(mockGenerate).toHaveBeenCalledWith("1:1", "ar", "tr", "thematic", "tr");
   });
 });
 
