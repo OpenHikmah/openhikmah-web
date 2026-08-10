@@ -42,6 +42,8 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const [previewError, setPreviewError] = useState(false);
   const [mode, setMode] = useState<SearchMode>("keyword");
   const [fellBackToKeyword, setFellBackToKeyword] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [selectError, setSelectError] = useState(false);
   // Distinguishes "the search itself couldn't run" (rate limited, or the
   // upstream keyword API failed) from a genuine zero-match search — those
   // call for different copy instead of both silently reading as "no results".
@@ -86,6 +88,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
       setSearchResults([]);
       setTotalResults(0);
       setFellBackToKeyword(false);
+      setSelectError(false);
       setSearchError(null);
       try {
         const url = `/api/search?q=${encodeURIComponent(q)}${
@@ -108,6 +111,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
         }
         setSearchResults(data.results);
         setTotalResults(data.total);
+        setHighlightedIndex(-1);
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
           setSearchResults([]);
@@ -194,6 +198,25 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     [mapConnections]
   );
 
+  const selectResult = useCallback(
+    async (result: SearchResult) => {
+      setLoading(true);
+      setSelectError(false);
+      try {
+        const res = await fetch(`/api/verse/${result.ref.replace(":", "/")}`);
+        if (!res.ok) throw new Error();
+        const verse: Verse = await res.json();
+        mapConnections(verse);
+      } catch (err) {
+        console.error("Failed to fetch selected search result:", err);
+        setSelectError(true);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [mapConnections]
+  );
+
   const viewAllResults = useCallback(() => {
     const trimmed = query.trim();
     if (!trimmed || /^\d+:\d+$/.test(trimmed)) return;
@@ -224,6 +247,8 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
           setFellBackToKeyword(false);
           setSearchError(null);
           setMode("keyword");
+          setHighlightedIndex(-1);
+          setSelectError(false);
           onClose();
         }
       }}
@@ -245,6 +270,14 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
               )}
               <input
                 ref={inputRef}
+                role="combobox"
+                aria-expanded={showResults}
+                aria-controls="search-results-listbox"
+                aria-activedescendant={
+                  showResults && highlightedIndex >= 0
+                    ? `search-result-${highlightedIndex}`
+                    : undefined
+                }
                 value={query}
                 onChange={(e) => {
                   const v = e.target.value;
@@ -259,11 +292,30 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                     setLoading(false);
                     setIsSearching(false);
                     setFellBackToKeyword(false);
+                    setHighlightedIndex(-1);
+                    setSelectError(false);
                     setSearchError(null);
                   }
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && showResults) viewAllResults();
+                  if (showResults && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                    e.preventDefault();
+                    const delta = e.key === "ArrowDown" ? 1 : -1;
+                    setHighlightedIndex((prev) => {
+                      const next = prev + delta;
+                      if (next < 0) return searchResults.length - 1;
+                      if (next >= searchResults.length) return 0;
+                      return next;
+                    });
+                    return;
+                  }
+                  if (e.key === "Enter" && showResults) {
+                    if (highlightedIndex >= 0 && highlightedIndex < searchResults.length) {
+                      selectResult(searchResults[highlightedIndex]);
+                    } else {
+                      viewAllResults();
+                    }
+                  }
                 }}
                 placeholder={mode === "meaning" ? t("placeholderMeaning") : t("placeholderKeyword")}
                 className="flex-1 bg-transparent text-sm outline-none text-text-primary placeholder:text-text-muted"
@@ -303,8 +355,14 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                 </div>
               )}
 
+              {selectError && (
+                <div className="px-4 py-3 text-center">
+                  <p className="text-xs text-red-400">{t("somethingWentWrong")}</p>
+                </div>
+              )}
+
               {showResults && (
-                <div className="p-3 space-y-0.5">
+                <div className="p-3 space-y-0.5" role="listbox" id="search-results-listbox">
                   {fellBackToKeyword && (
                     <p className="px-2 pb-1.5 text-[10px] text-text-muted">
                       {t("fallbackKeyword")}
@@ -313,24 +371,15 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                   {uiLocale !== "en" && (
                     <p className="px-2 pb-1.5 text-[10px] text-text-muted">{t("nonEnglishHint")}</p>
                   )}
-                  {searchResults.map((result) => (
+                  {searchResults.map((result, index) => (
                     <SearchResultRow
                       key={result.ref}
+                      id={`search-result-${index}`}
                       result={result}
                       alreadyAdded={hasNode(result.ref)}
-                      onSelect={async () => {
-                        setLoading(true);
-                        try {
-                          const res = await fetch(`/api/verse/${result.ref.replace(":", "/")}`);
-                          if (!res.ok) throw new Error();
-                          const verse: Verse = await res.json();
-                          mapConnections(verse);
-                        } catch {
-                          // silent
-                        } finally {
-                          setLoading(false);
-                        }
-                      }}
+                      isHighlighted={index === highlightedIndex}
+                      onHover={() => setHighlightedIndex(index)}
+                      onSelect={() => selectResult(result)}
                     />
                   ))}
                 </div>
@@ -387,12 +436,14 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                 <span className="text-xs font-medium text-teal">
                   {t("viewAllResults", { count: totalResults, query: query.trim() })}
                 </span>
-                <span className="flex items-center gap-1.5 text-[11px] text-text-muted">
-                  {t("press")}
-                  <kbd className="flex items-center gap-1 rounded border border-border bg-surface-overlay px-1.5 py-0.5 font-mono">
-                    <CornerDownLeft className="w-3 h-3" /> Enter
-                  </kbd>
-                </span>
+                {highlightedIndex === -1 && (
+                  <span className="flex items-center gap-1.5 text-[11px] text-text-muted">
+                    {t("press")}
+                    <kbd className="flex items-center gap-1 rounded border border-border bg-surface-overlay px-1.5 py-0.5 font-mono">
+                      <CornerDownLeft className="w-3 h-3" /> Enter
+                    </kbd>
+                  </span>
+                )}
               </button>
             )}
           </div>
@@ -460,20 +511,30 @@ function VerseCard({
 }
 
 function SearchResultRow({
+  id,
   result,
   alreadyAdded,
+  isHighlighted,
+  onHover,
   onSelect,
 }: {
+  id: string;
   result: SearchResult;
   alreadyAdded: boolean;
+  isHighlighted: boolean;
+  onHover: () => void;
   onSelect: () => void;
 }) {
   return (
     <button
+      id={id}
+      role="option"
+      aria-selected={isHighlighted}
       onClick={onSelect}
+      onMouseEnter={onHover}
       className={cn(
         "w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left transition-colors",
-        "hover:bg-surface-raised"
+        isHighlighted ? "bg-surface-raised" : "hover:bg-surface-raised"
       )}
     >
       <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 mt-0.5 bg-surface-overlay">
