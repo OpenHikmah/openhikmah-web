@@ -6,7 +6,11 @@ on:
   pull_request:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # Key on the commit SHA (not github.ref) so a `push` run and the matching
+  # `pull_request` run for the same commit share one group instead of racing
+  # each other on separate runners — that simultaneous contention is what was
+  # making the single-worker E2E suite flake (see e2e/settings.spec.ts).
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 # Least privilege by default. Jobs that need to report back to PRs override this explicitly.
