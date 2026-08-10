@@ -2,27 +2,56 @@ import type { Story } from "../types";
 
 export const IBRAHIM_STORY: Story = {
   slug: "ibrahim",
-  name: { en: "Ibrahim (Abraham)" },
+  name: {
+    en: "Ibrahim (Abraham)",
+    tr: "İbrahim",
+    az: "İbrahim",
+    ru: "Ибрахим (Авраам)",
+  },
   arabicName: "إِبْرَاهِيم",
-  tagline: { en: "The friend of God who questioned idols, survived fire, and raised the Kaaba" },
+  tagline: {
+    en: "The friend of God who questioned idols, survived fire, and raised the Kaaba",
+    tr: "Putları sorgulayan, ateşten kurtulan ve Kâbe'yi yükselten, Allah'ın dostu",
+    az: "Bütləri sorğulayan, oddan sağ çıxan və Kəbəni ucaldan, Allahın dostu",
+    ru: "Друг Аллаха, который бросил вызов идолам, уцелел в огне и воздвиг Каабу",
+  },
   intro: {
     en: "Ibrahim is described in the Quran as a nation unto himself — a model of devotion who confronted his own people's idolatry, was thrown into fire for it and emerged unharmed, and later, with his son Ismail, raised the foundations of the Kaaba. His story runs through the Quran as the root of the monotheistic line that continues through Ishaq, Yaqub, and eventually Muhammad ﷺ.",
+    tr: "Kur'an'da İbrahim, tek başına bir ümmet olarak tasvir edilir — kendi kavminin putperestliğine karşı çıkan, bu yüzden ateşe atılıp zarar görmeden çıkan ve daha sonra oğlu İsmail ile birlikte Kâbe'nin temellerini yükselten bir bağlılık örneği. Onun kıssası, Kur'an boyunca İshak, Yakub ve nihayetinde Muhammed'e (sallallahu aleyhi ve sellem) uzanan tevhid çizgisinin kökü olarak işlenir.",
+    az: "Quranda İbrahim təkbaşına bir ümmət kimi təsvir olunur — öz qövmünün bütpərəstliyinə qarşı çıxan, bunun üçün oda atılıb zərər görmədən çıxan və sonra oğlu İsmaillə birlikdə Kəbənin təməllərini ucaldan bir bağlılıq nümunəsi. Onun qissəsi Quran boyu İshaq, Yaqub və nəhayət Muhəmmədə (sallallahu aleyhi və səlləm) uzanan tövhid xəttinin kökü olaraq keçir.",
+    ru: "В Коране Ибрахим описан как целая община в одном лице — образец преданности, который выступил против идолопоклонства своего народа, за что был брошен в огонь и вышел невредимым, а позднее вместе со своим сыном Исмаилом воздвиг основания Каабы. Его история проходит через весь Коран как корень линии единобожия, продолженной через Исхака, Якуба и в итоге Мухаммада ﷺ.",
   },
   primarySurahs: [21, 37, 2],
   chapters: [
     {
       id: "questioning-the-idols",
-      title: { en: '"What are these statues?"' },
+      title: {
+        en: '"What are these statues?"',
+        tr: '"Bu heykeller de nedir?"',
+        az: '"Bu heykəllər nədir?"',
+        ru: "«Что это за изваяния?»",
+      },
       narrative: {
         en: "Ibrahim confronts his father and his people over the statues they worship, and they answer only that they found their fathers doing the same. He tells them plainly that they and their fathers have been in clear error, and declares that their Lord is the Lord of the heavens and the earth — the One who created them. He then breaks the idols into fragments, sparing only the largest, so that his people might question it themselves.",
+        tr: "İbrahim, babasını ve kavmini taptıkları heykeller konusunda hesaba çeker; onlar ise sadece atalarını da böyle yaparken bulduklarını söylerler. İbrahim onlara, kendilerinin ve atalarının apaçık bir sapkınlık içinde olduğunu açıkça söyler ve Rablerinin göklerin ve yerin Rabbi olduğunu, onları yaratanın O olduğunu ilan eder. Ardından putları parça parça kırar, yalnızca en büyüğünü bırakır ki kavmi onu kendisi sorgulasın.",
+        az: "İbrahim atasını və qövmünü ibadət etdikləri heykəllər üzündən hesaba çəkir; onlar isə yalnız atalarını da belə etdiklərini gördüklərini söyləyirlər. İbrahim onlara açıq şəkildə özlərinin və atalarının açıq-aşkar azğınlıqda olduğunu bildirir və Rəbbinin göylərin və yerin Rəbbi olduğunu, onları yaradanın da Məhz O olduğunu elan edir. Sonra bütləri parça-parça sındırır, yalnız ən böyüyünü saxlayır ki, qövmü onu özü sorğu-suala tutsun.",
+        ru: "Ибрахим обращается к своему отцу и своему народу по поводу статуй, которым они поклоняются, а те отвечают лишь, что застали своих отцов делающими то же самое. Он прямо говорит им, что и они, и их отцы пребывали в явном заблуждении, и объявляет, что их Господь — Господь небес и земли, Тот, Кто их сотворил. Затем он разбивает идолов на куски, оставив нетронутым лишь самого большого, чтобы его народ сам задал ему вопрос.",
       },
       verseRefs: ["21:51", "21:52", "21:53", "21:54", "21:55", "21:56", "21:57", "21:58"],
     },
     {
       id: "the-fire",
-      title: { en: '"O fire, be coolness and safety"' },
+      title: {
+        en: '"O fire, be coolness and safety"',
+        tr: '"Ey ateş, İbrahim\'e serinlik ve esenlik ol"',
+        az: '"Ey od, İbrahimə sərinlik və salamatlıq ol"',
+        ru: "«О огонь, стань прохладой и спасением»",
+      },
       narrative: {
         en: "When the people discover who broke their idols, they bring Ibrahim before them. He tells them to ask the largest idol itself, if it can speak — a challenge that leaves them silently returning to blame each other before reasserting their anger at him. They resolve to burn him for it. God's response is a single command to the fire itself: to become coolness and safety upon Ibrahim. The plan meant to destroy him instead makes his opponents the ones who lose.",
+        tr: "Kavim, putlarını kimin kırdığını öğrenince İbrahim'i huzurlarına getirirler. İbrahim onlara, konuşabiliyorsa en büyük puta sormalarını söyler; bu meydan okuma karşısında önce sessizce birbirlerini suçlamaya başlarlar, sonra yeniden ona öfkelenirler. Onu bu yüzden yakmaya karar verirler. Allah'ın cevabı, ateşin kendisine verilen tek bir emirdir: İbrahim üzerine serinlik ve esenlik olması. Onu yok etmek için kurulan tuzak, sonunda düşmanlarını kaybedenler hâline getirir.",
+        az: "Qövm bütlərini kimin sındırdığını öyrənəndə İbrahimi hüzurlarına gətirirlər. İbrahim onlara, əgər danışa bilirsə, ən böyük buttan soruşmalarını deyir; bu çağırış qarşısında onlar əvvəlcə sükutla bir-birlərini günahlandırır, sonra yenidən ona qarşı qəzəblərini büruzə verirlər. Onu bunun üçün yandırmağa qərar verirlər. Allahın cavabı isə odun özünə verilən tək bir əmrdir: İbrahimin üzərinə sərinlik və salamatlıq olsun. Onu məhv etmək üçün qurulan tələ, əksinə, onun düşmənlərini uduzanlar edir.",
+        ru: "Когда народ узнаёт, кто разбил их идолов, они приводят Ибрахима к себе. Он предлагает им спросить самого большого идола, если тот способен говорить, — этот вызов заставляет их сначала молча обвинять друг друга, а затем снова обратить гнев на него. Они решают сжечь его за это. Ответ Аллаха — единственное повеление самому огню: стать прохладой и спасением для Ибрахима. План, задуманный, чтобы уничтожить его, вместо этого делает проигравшими его противников.",
       },
       verseRefs: [
         "21:59",
@@ -41,17 +70,33 @@ export const IBRAHIM_STORY: Story = {
     },
     {
       id: "raising-the-house",
-      title: { en: "Raising the foundations of the House" },
+      title: {
+        en: "Raising the foundations of the House",
+        tr: "Beytullah'ın temellerinin yükseltilmesi",
+        az: "Beytullahın təməllərinin ucaldılması",
+        ru: "Возведение основания Дома",
+      },
       narrative: {
         en: "God tells Ibrahim He is making him a leader for the people; Ibrahim asks whether this covenant extends to his descendants, and is told it does not include the wrongdoers among them. He and his son Ismail raise the foundations of the Kaaba together, asking God to accept the work from them, to make them and their descendants people submitted to Him, to show them their rites of worship, and — in a supplication that reaches across the Quran to the coming of a final messenger — to send among their descendants a messenger who would recite God's verses and teach the Book and wisdom.",
+        tr: "Allah, İbrahim'e onu insanlara önder kılacağını bildirir; İbrahim bu ahdin soyundan gelenleri de kapsayıp kapsamadığını sorar ve kendisine bunun, aralarındaki zalimleri kapsamayacağı bildirilir. İbrahim, oğlu İsmail ile birlikte Kâbe'nin temellerini yükseltir; Allah'tan bu işi kendilerinden kabul etmesini, kendilerini ve soylarından gelenleri O'na teslim olmuş bir topluluk kılmasını, ibadet usullerini kendilerine göstermesini ve — Kur'an boyunca son bir elçinin gelişine uzanan bir duayla — soylarından, Allah'ın ayetlerini okuyacak, Kitab'ı ve hikmeti öğretecek bir elçi göndermesini niyaz ederler.",
+        az: "Allah İbrahimə onu insanlara rəhbər edəcəyini bildirir; İbrahim bu əhdin nəslindən gələnləri də əhatə edib-etmədiyini soruşur və ona bunun aralarındakı zalımları əhatə etməyəcəyi bildirilir. İbrahim oğlu İsmaillə birlikdə Kəbənin təməllərini ucaldır; Allahdan bu işi öz tərəflərindən qəbul etməsini, özlərini və nəsillərini Ona təslim olmuş bir camaat etməsini, ibadət qaydalarını özlərinə göstərməsini və — Quran boyunca son bir elçinin gəlişinə uzanan bir dua ilə — nəsillərindən Allahın ayələrini oxuyacaq, Kitabı və hikməti öyrədəcək bir elçi göndərməsini niyaz edirlər.",
+        ru: "Аллах говорит Ибрахиму, что сделает его вождём для людей; Ибрахим спрашивает, распространяется ли этот завет на его потомков, и получает ответ, что он не охватывает беззаконников среди них. Вместе со своим сыном Исмаилом он возводит основания Каабы, прося Аллаха принять этот труд от них, сделать их и их потомков покорными Ему, показать им обряды поклонения и — в мольбе, простирающейся через весь Коран к приходу последнего посланника — послать среди их потомков посланника, который будет читать им знамения Аллаха и обучать Писанию и мудрости.",
       },
       verseRefs: ["2:124", "2:125", "2:126", "2:127", "2:128", "2:129"],
     },
     {
       id: "the-sacrifice",
-      title: { en: "The vision and the great ransom" },
+      title: {
+        en: "The vision and the great ransom",
+        tr: "Rüya ve büyük fidye",
+        az: "Yuxu və böyük fidyə",
+        ru: "Видение и великий выкуп",
+      },
       narrative: {
         en: "Ibrahim prays for a righteous child and is given the good news of a forbearing son. When the boy is old enough to work alongside him, Ibrahim tells him of a vision in which he must sacrifice him, and asks what he thinks. The son answers that he will find him, God willing, among the steadfast. As both submit to what has been shown them and Ibrahim lays him down, God calls out that the vision has already been fulfilled — Ibrahim has passed the trial — and ransoms the boy with a great sacrifice instead. God leaves for Ibrahim a lasting mention among later generations: peace upon Ibrahim.",
+        tr: "İbrahim salih bir evlat için dua eder ve kendisine halim bir oğul müjdelenir. Çocuk onunla birlikte çalışacak yaşa gelince, İbrahim ona onu kurban etmesi gerektiğine dair gördüğü rüyayı anlatır ve ne düşündüğünü sorar. Oğlu, Allah dilerse kendisini sabredenlerden bulacağını söyler. İkisi de kendilerine gösterilene teslim olup İbrahim onu yere yatırınca, Allah rüyanın zaten gerçekleştiğini — İbrahim'in imtihanı geçtiğini — bildirir ve oğlunu büyük bir kurbanla fidye karşılığı kurtarır. Allah, İbrahim için sonraki nesiller arasında kalıcı bir anış bırakır: İbrahim'e selam olsun.",
+        az: "İbrahim saleh bir övlad üçün dua edir və ona həlim bir oğul müjdələnir. Uşaq onunla birlikdə çalışacaq yaşa gələndə, İbrahim ona onu qurban verməli olduğuna dair gördüyü yuxunu danışır və nə düşündüyünü soruşur. Oğlu, Allah istəsə, onu səbir edənlərdən tapacağını cavab verir. Hər ikisi özlərinə göstərilənə təslim olub İbrahim onu yerə uzadanda, Allah yuxunun artıq gerçəkləşdiyini — İbrahimin sınaqdan keçdiyini — bildirir və oğlunu böyük bir qurbanla fidyə verib xilas edir. Allah İbrahim üçün sonrakı nəsillər arasında əbədi bir zikr qoyur: İbrahimə salam olsun.",
+        ru: "Ибрахим молит о праведном ребёнке, и ему возвещается благая весть о кротком сыне. Когда мальчик достигает возраста, чтобы трудиться рядом с ним, Ибрахим рассказывает ему о видении, в котором должен принести его в жертву, и спрашивает его мнение. Сын отвечает, что, если будет угодно Аллаху, отец найдёт его среди стойких. Когда оба покоряются показанному им и Ибрахим укладывает его, Аллах возвещает, что видение уже исполнено — Ибрахим выдержал испытание, — и взамен выкупает мальчика великой жертвой. Аллах оставляет об Ибрахиме памятование среди последующих поколений: мир Ибрахиму.",
       },
       verseRefs: [
         "37:100",

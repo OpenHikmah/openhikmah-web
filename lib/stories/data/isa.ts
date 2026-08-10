@@ -2,19 +2,40 @@ import type { Story } from "../types";
 
 export const ISA_STORY: Story = {
   slug: "isa",
-  name: { en: "Isa (Jesus)" },
+  name: {
+    en: "Isa (Jesus)",
+    tr: "İsa (Hz. İsa)",
+    az: "İsa (Həzrət İsa)",
+    ru: "Иса (Иисус)",
+  },
   arabicName: "عِيسَىٰ",
-  tagline: { en: "Born of a word from God, sent as a messenger to the Children of Israel" },
+  tagline: {
+    en: "Born of a word from God, sent as a messenger to the Children of Israel",
+    tr: "Allah'tan bir söz ile doğdu, İsrailoğulları'na elçi olarak gönderildi",
+    az: "Allahın bir kəlməsi ilə doğuldu, İsrail övladlarına elçi olaraq göndərildi",
+    ru: "Рождённый словом от Бога, посланный посланником к сынам Исраиля",
+  },
   intro: {
     en: "Isa's story in the Quran begins before his birth, with the angels' announcement to Maryam, and continues through a birth that left her alone and afraid, a childhood marked by speaking in the cradle, and a prophetic mission of signs performed only by God's permission. The Quran is emphatic on one point above all: Isa was a messenger, not divine, and God raised him to Himself rather than allowing him to be killed.",
+    tr: "İsa'nın Kur'an'daki kıssası doğumundan önce, meleklerin Meryem'e müjdesiyle başlar; onu yalnız ve korku içinde bırakan bir doğumla, beşikte konuşmasıyla belirginleşen bir çocuklukla ve yalnızca Allah'ın izniyle gerçekleşen mucizelerden oluşan peygamberlik göreviyle devam eder. Kur'an her şeyden önce şu noktada kesin bir dille konuşur: İsa bir elçidir, ilah değildir; Allah onu öldürülmesine izin vermek yerine kendi katına yükseltmiştir.",
+    az: "İsanın Qurandakı qissəsi doğulmazdan əvvəl mələklərin Məryəmə verdiyi müjdə ilə başlayır; onu tək və qorxu içində qoyan bir doğumla, beşikdə danışması ilə seçilən uşaqlıqla və yalnız Allahın izni ilə göstərilən möcüzələrdən ibarət peyğəmbərlik vəzifəsi ilə davam edir. Quran hər şeydən əvvəl bir məsələdə qəti şəkildə danışır: İsa bir elçi idi, ilahi varlıq deyildi; Allah onu öldürülməsinə icazə vermək əvəzinə Öz dərgahına qaldırdı.",
+    ru: "История Исы в Коране начинается ещё до его рождения — с возвещения ангелов Марьям — и продолжается рождением, оставившим её одинокой и напуганной, детством, отмеченным речью в колыбели, и пророческой миссией знамений, совершавшихся исключительно с дозволения Бога. Коран особо подчёркивает одно: Иса был посланником, а не божеством, и Бог вознёс его к Себе, не позволив его убить.",
   },
   primarySurahs: [3, 19],
   chapters: [
     {
       id: "the-announcement",
-      title: { en: '"A word from Him"' },
+      title: {
+        en: '"A word from Him"',
+        tr: '"O\'ndan bir kelime"',
+        az: '"Onun tərəfindən bir kəlmə"',
+        ru: '"Слово от Него"',
+      },
       narrative: {
         en: 'The angels tell Maryam that God has chosen and purified her above the women of the worlds, and bring her news of a son whose name will be the Messiah, Isa son of Maryam, honored in this world and the next. She asks how she can have a child when no man has touched her; she is told that God creates what He wills, and when He decrees a matter He simply says to it, "Be," and it is. She is told he will speak to people in the cradle and in maturity, and will be taught the Scripture, wisdom, the Torah, and the Gospel.',
+        tr: "Melekler Meryem'e, Allah'ın onu seçip alemlerin kadınları arasından tertemiz kıldığını bildirir ve ona, adı Mesih, Meryem oğlu İsa olacak, dünyada ve ahirette şerefli bir oğul müjdesi verirler. Meryem, kendisine hiçbir erkek dokunmamışken nasıl bir çocuğu olabileceğini sorar; kendisine, Allah'ın dilediğini yarattığı ve bir işe hükmettiğinde ona sadece \"Ol!\" dediği, onun da hemen oluverdiği söylenir. Kendisine, oğlunun beşikte de yetişkinliğinde de insanlarla konuşacağı ve ona Kitab'ın, hikmetin, Tevrat'ın ve İncil'in öğretileceği bildirilir.",
+        az: 'Mələklər Məryəmə Allahın onu seçib aləmlərin qadınları arasından pak etdiyini bildirir və ona adı Məsih, Məryəm oğlu İsa olacaq, bu dünyada və axirətdə şərəfli bir oğul müjdəsi verirlər. Məryəm ona heç bir kişi toxunmadığı halda necə övladı ola biləcəyini soruşur; ona Allahın istədiyini yaratdığı və bir işə hökm verdikdə ona ancaq "Ol!" dediyi, onun da dərhal olduğu bildirilir. Ona, oğlunun həm beşikdə, həm də yetkin yaşında insanlarla danışacağı və ona Kitab, hikmət, Tövrat və İncil öyrədiləcəyi söylənir.',
+        ru: 'Ангелы говорят Марьям, что Бог избрал её и очистил превыше женщин миров, и сообщают ей весть о сыне, чьё имя будет Масих, Иса, сын Марьям, почитаемый в этом мире и в будущем. Она спрашивает, как у неё может быть ребёнок, если её не касался ни один мужчина; ей отвечают, что Бог творит то, что пожелает, и когда Он решает дело, то просто говорит ему: "Будь!" — и оно свершается. Ей сообщают, что он будет говорить с людьми в колыбели и в зрелом возрасте, и что его научат Писанию, мудрости, Торе и Инджилю.',
       },
       verseRefs: [
         "3:42",
@@ -34,9 +55,17 @@ export const ISA_STORY: Story = {
     },
     {
       id: "the-birth",
-      title: { en: "Beneath the palm tree" },
+      title: {
+        en: "Beneath the palm tree",
+        tr: "Hurma ağacının altında",
+        az: "Xurma ağacının altında",
+        ru: "Под пальмой",
+      },
       narrative: {
         en: "Maryam withdraws to a remote place, and the pains of childbirth bring her to the trunk of a palm tree, where she cries out that she wishes she had died before this rather than face what is coming. She is comforted — told not to grieve, that a stream has been provided beneath her and that shaking the palm trunk will drop fresh, ripe dates upon her. When she brings the child to her people, they accuse her, and she simply points to him. To their astonishment, the infant himself speaks, declaring that he is a servant of God, given the Scripture and made a prophet, made dutiful to his mother, and granted peace on the day of his birth, the day of his death, and the day he is raised alive.",
+        tr: "Meryem uzak bir yere çekilir ve doğum sancıları onu bir hurma ağacının gövdesine sürükler; orada, bunu yaşamaktansa daha önce ölmüş ve unutulup gitmiş olmayı dilediğini haykırır. Kendisine teselli verilir: üzülmemesi, altından bir su arkının akıtıldığı ve hurma dalını silkelediğinde üzerine taze, olgun hurmaların döküleceği söylenir. Çocuğu halkına getirdiğinde onu suçlarlar; o ise sadece çocuğu işaret eder. Onların hayretine karşılık, bebek bizzat konuşarak Allah'ın kulu olduğunu, kendisine Kitap verildiğini ve peygamber kılındığını, annesine karşı iyi davranmakla yükümlü kılındığını, doğduğu gün, öleceği gün ve diri olarak kaldırılacağı gün kendisine selamet bahşedildiğini bildirir.",
+        az: "Məryəm uzaq bir yerə çəkilir və doğum ağrıları onu bir xurma ağacının gövdəsinə gətirir; orada bunu yaşamaqdansa bundan əvvəl ölüb unudulmuş olmağı arzuladığını fəryad edir. Ona təsəlli verilir — kədərlənməməsi, altından bir arxın axıdıldığı və xurma gövdəsini silkələdikdə üzərinə təzə, yetişmiş xurmaların töküləcəyi bildirilir. Uşağı öz xalqına gətirdikdə onu ittiham edirlər, o isə sadəcə uşağı göstərir. Onların heyrətinə qarşı körpə özü danışaraq Allahın qulu olduğunu, ona Kitab verildiyini və peyğəmbər edildiyini, anasına qarşı vəzifəli qılındığını, doğulduğu gün, öləcəyi gün və diri olaraq qaldırılacağı gün ona salamatlıq bəxş edildiyini bəyan edir.",
+        ru: "Марьям удаляется в отдалённое место, и родовые схватки приводят её к стволу пальмы, где она восклицает, что желала бы умереть до этого и быть забытой, чем встретить то, что предстоит. Её утешают — говорят не печалиться, что под ней проведён ручей и что если потрясти ствол пальмы, на неё посыплются свежие спелые финики. Когда она приносит младенца к своему народу, её обвиняют, а она лишь указывает на него. К их изумлению, сам младенец заговаривает, объявляя, что он раб Божий, которому дано Писание и который сделан пророком, послушным своей матери, и которому дарован мир в день его рождения, в день его смерти и в день, когда он будет воскрешён живым.",
       },
       verseRefs: [
         "19:22",
@@ -55,17 +84,33 @@ export const ISA_STORY: Story = {
     },
     {
       id: "signs-and-message",
-      title: { en: "Signs by God's permission" },
+      title: {
+        en: "Signs by God's permission",
+        tr: "Allah'ın izniyle mucizeler",
+        az: "Allahın izni ilə möcüzələr",
+        ru: "Знамения с дозволения Бога",
+      },
       narrative: {
         en: "As a messenger to the Children of Israel, Isa performs signs he is careful to attribute entirely to God's permission, not his own power: shaping a bird from clay and breathing life into it, healing the blind and the leper, raising the dead. He confirms the Torah that came before him, and calls his people to fear God and obey him — declaring, in his own words, that God is his Lord and their Lord, and that this alone is the straight path.",
+        tr: "İsrailoğulları'na bir elçi olarak İsa, gerçekleştirdiği mucizeleri özenle kendi gücüne değil, tamamen Allah'ın iznine bağlar: çamurdan bir kuş şekli yapıp içine can üflemesi, körü ve alacalıyı iyileştirmesi, ölüleri diriltmesi. Kendisinden önce gelen Tevrat'ı doğrular ve halkını Allah'tan korkmaya ve kendisine itaat etmeye çağırır; kendi ağzından, Allah'ın hem kendisinin hem de onların Rabbi olduğunu ve tek doğru yolun bu olduğunu ilan eder.",
+        az: "İsrail övladlarına bir elçi olaraq İsa göstərdiyi möcüzələri diqqətlə öz gücünə deyil, tamamilə Allahın izninə aid edir: palçıqdan quş surəti düzəldib ona can üfürməsi, korları və cüzamlıları sağaltması, ölüləri diriltməsi. Özündən əvvəl gələn Tövratı təsdiq edir və xalqını Allahdan qorxmağa və özünə itaət etməyə çağırır; öz dilindən Allahın həm onun, həm də onların Rəbbi olduğunu və doğru yolun yalnız bu olduğunu bəyan edir.",
+        ru: "Как посланник к сынам Исраиля, Иса совершает знамения, которые он тщательно приписывает исключительно дозволению Бога, а не собственной силе: лепит из глины подобие птицы и вдыхает в неё жизнь, исцеляет слепого и прокажённого, воскрешает мёртвых. Он подтверждает истинность Торы, ниспосланной до него, и призывает свой народ бояться Бога и повиноваться ему, заявляя собственными словами, что Бог — его Господь и их Господь, и что только это есть прямой путь.",
       },
       verseRefs: ["3:49", "3:50", "3:51", "5:110"],
     },
     {
       id: "raised-to-god",
-      title: { en: '"They did not kill him, nor did they crucify him"' },
+      title: {
+        en: '"They did not kill him, nor did they crucify him"',
+        tr: '"Onu öldürmediler ve çarmıha germediler"',
+        az: '"Onu nə öldürdülər, nə də çarmıxa çəkdilər"',
+        ru: '"Они не убили его и не распяли"',
+      },
       narrative: {
         en: "Against the claim that Isa was killed, the Quran states directly that he was not killed and not crucified — that it was made to appear so to those who disputed over it, who have no real knowledge of the matter beyond assumption. God raised him to Himself instead. This is presented as a matter of certainty, closing a question the Quran treats as long settled by revelation rather than left open to debate.",
+        tr: "İsa'nın öldürüldüğü iddiasına karşı Kur'an, açıkça onun öldürülmediğini ve çarmıha gerilmediğini, bunun kendilerine sadece öyle gösterildiğini belirtir; bu konuda anlaşmazlığa düşenlerin, zandan öteye geçen gerçek bir bilgiye sahip olmadığı vurgulanır. Bunun yerine Allah onu kendi katına yükseltmiştir. Bu, kesinlik meselesi olarak sunulur; Kur'an'ın, tartışmaya açık bırakmak yerine vahiyle çoktan çözülmüş kabul ettiği bir soruyu kapatır.",
+        az: "İsanın öldürüldüyü iddiasına qarşı Quran açıq şəkildə onun öldürülmədiyini və çarmıxa çəkilmədiyini, bunun onlara yalnız belə göstərildiyini bildirir; bu barədə mübahisə edənlərin zənndən başqa həqiqi bir biliyə malik olmadığı vurğulanır. Bunun əvəzinə Allah onu Öz dərgahına qaldırmışdır. Bu, qəti bir məsələ kimi təqdim olunur; Quranın müzakirəyə açıq buraxmaq əvəzinə vəhy ilə çoxdan həll olunmuş hesab etdiyi bir sualı bağlayır.",
+        ru: "В ответ на утверждение, что Иса был убит, Коран прямо заявляет, что он не был убит и не был распят — что это лишь было представлено так тем, кто спорил об этом деле, не имея подлинного знания, кроме предположений. Вместо этого Бог вознёс его к Себе. Это преподносится как несомненный факт, закрывающий вопрос, который Коран считает давно решённым откровением, а не оставленным для дискуссии.",
       },
       verseRefs: ["4:157", "4:158"],
     },

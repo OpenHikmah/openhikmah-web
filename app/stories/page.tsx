@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
 import { STORIES, resolveLocalized } from "@/lib/stories";
@@ -12,6 +13,7 @@ export const metadata = {
 
 export default async function StoriesPage() {
   const locale = await getUiLocale();
+  const t = await getTranslations("stories");
   return (
     <div className="min-h-screen bg-bg pb-[calc(72px+env(safe-area-inset-bottom))] text-text-primary md:pb-0">
       <LandingHeader />
@@ -19,15 +21,10 @@ export default async function StoriesPage() {
 
       <div className="px-6 pb-10 pt-12 text-center border-b border-border-subtle">
         <p className="mb-3 font-mono text-xs uppercase tracking-[0.2em] text-text-muted">
-          Prophetic Stories
+          {t("eyebrow")}
         </p>
-        <h1 className="mb-4 text-2xl font-light text-text-primary">
-          The stories of the Prophets, verse by verse
-        </h1>
-        <p className="mx-auto max-w-xl text-sm text-text-secondary">
-          Curated narratives grounded in verified Quran references — every verse resolved live, in
-          your chosen translation. Open any chapter directly onto the connection canvas.
-        </p>
+        <h1 className="mb-4 text-2xl font-light text-text-primary">{t("heading")}</h1>
+        <p className="mx-auto max-w-xl text-sm text-text-secondary">{t("description")}</p>
       </div>
 
       <div className="mx-auto grid max-w-5xl gap-4 px-6 py-12 sm:grid-cols-2 lg:grid-cols-3">
@@ -47,8 +44,7 @@ export default async function StoriesPage() {
                 {resolveLocalized(story.tagline, locale)}
               </p>
               <p className="mt-3 text-xs text-text-muted">
-                {story.chapters.length} chapter{story.chapters.length === 1 ? "" : "s"} ·{" "}
-                {verseCount} verse{verseCount === 1 ? "" : "s"}
+                {t("chapterVerseCount", { chapters: story.chapters.length, verses: verseCount })}
               </p>
             </Link>
           );
@@ -56,8 +52,7 @@ export default async function StoriesPage() {
       </div>
 
       <footer className="border-t border-border-subtle py-6 text-center text-xs text-text-muted">
-        Curated per the Maturidi/Hanafi tradition · every verse reference verified against the Quran
-        corpus
+        {t("footer")}
       </footer>
     </div>
   );
