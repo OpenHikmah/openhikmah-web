@@ -237,7 +237,14 @@ async function getVersesBySlug(
       : await Promise.all(
           verses.map(async (v) => {
             const localized = await resolveVerse(v.ref, edition);
-            if (!localized) return v;
+            if (!localized) {
+              // Same reasoning as fetchVerseData: falling back to the cached
+              // en.sahih text (rather than failing the whole names/verses
+              // response over one edition) must still be visible, not silent.
+              console.error(`Name verses: edition hydration failed for ${v.ref}/${edition}`);
+              incr("quran_api_fetch_error");
+              return v;
+            }
             return {
               ...v,
               translation: stripHtml(localized.translation),

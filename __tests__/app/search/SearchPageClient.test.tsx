@@ -10,6 +10,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { SearchPageClient } from "@/app/search/SearchPageClient";
+import { usePreferencesStore } from "@/store/preferences";
 
 describe("SearchPageClient — rate-limit vs. genuine empty results", () => {
   const mockFetch = vi.fn();
@@ -57,5 +58,59 @@ describe("SearchPageClient — rate-limit vs. genuine empty results", () => {
     });
 
     expect(screen.getByText(/no exact matches/i)).toBeInTheDocument();
+  });
+});
+
+describe("SearchPageClient — re-fetches when the UI language changes", () => {
+  const mockFetch = vi.fn();
+  const previousUiLocale = usePreferencesStore.getState().uiLocale;
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", mockFetch);
+    mockFetch.mockReset();
+    usePreferencesStore.setState({ uiLocale: "en" });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    usePreferencesStore.setState({ uiLocale: previousUiLocale });
+  });
+
+  it("re-fetches results with the newly selected language once already on screen", async () => {
+    const englishResult = {
+      ref: "2:255",
+      surahName: "Al-Baqarah",
+      surahNameArabic: "البقرة",
+      snippet: "Allah - there is no deity except Him.",
+      arabicText: "الله لا إله إلا هو",
+      translation: "Allah - there is no deity except Him.",
+    };
+    const turkishResult = { ...englishResult, translation: "Allah, O'ndan başka ilah yoktur." };
+
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ results: [englishResult], total: 1, page: 1, pageSize: 20 }), {
+        status: 200,
+      })
+    );
+
+    await act(async () => {
+      renderWithIntl(<SearchPageClient />);
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(englishResult.translation)).toBeInTheDocument();
+
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ results: [turkishResult], total: 1, page: 1, pageSize: 20 }), {
+        status: 200,
+      })
+    );
+
+    await act(async () => {
+      usePreferencesStore.setState({ uiLocale: "tr" });
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(turkishResult.translation)).toBeInTheDocument();
   });
 });
