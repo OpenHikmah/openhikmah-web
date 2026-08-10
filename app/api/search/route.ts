@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import type { SearchResponse, SearchResult, VerseRef } from "@/types/quran";
 import { getSurahName } from "@/lib/quran/surah-names";
 import { searchByMeaning } from "@/lib/quran/semantic-search";
-import { getVerse, getVerses } from "@/lib/quran/quran-corpus";
+import { getVerses } from "@/lib/quran/quran-corpus";
+import { resolveVerse } from "@/lib/quran/verse-resolver";
 import {
   consume,
   SEARCH_LOG_LIMIT,
@@ -141,7 +142,9 @@ export async function GET(req: NextRequest) {
   const edition = await getQuranEdition();
 
   if (/^\d+:\d+$/.test(q)) {
-    const verse = await getVerse(q, edition);
+    // resolveVerse falls back to a live alquran.cloud fetch on a local DB
+    // failure — unlike a bare getVerse() call, this never crashes the route.
+    const verse = await resolveVerse(q, edition);
     const [surahName, surahNameArabic] = getSurahName(parseInt(q.split(":")[0], 10));
     const result: SearchResult = {
       ref: q as VerseRef,
