@@ -381,7 +381,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
             />
             <BarButton
               ref={moreButtonRef}
-              icon={exportError ? <RotateCcw /> : <MoreHorizontal />}
+              icon={exportError ? <AlertCircle /> : <MoreHorizontal />}
               label={exportError ? t("exportFailed") : t("more")}
               onClick={() => setMoreOpen((v) => !v)}
               active={moreOpen}
