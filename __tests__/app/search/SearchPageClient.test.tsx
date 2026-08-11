@@ -140,22 +140,16 @@ describe("SearchPageClient — direct navigation clears a pending debounced navi
   it("clicking an example chip before the debounce fires wins, not the stale typed query", async () => {
     renderWithIntl(<SearchPageClient />);
 
-    // Type a query — starts the 400ms debounce that would otherwise call
-    // navigate("Patience search term", ...) once it fires.
     fireEvent.change(screen.getByRole("textbox", { name: /search verses/i }), {
       target: { value: "some other query" },
     });
 
-    // Click an example chip before the debounce elapses.
     fireEvent.click(screen.getByRole("button", { name: "Mercy" }));
 
-    // Let the original 400ms debounce timer (if not cleared) fire.
     await act(async () => {
       vi.advanceTimersByTime(500);
     });
 
-    // Only the chip's direct navigate() call should have gone through — the
-    // stale debounced call for the typed query must not have fired at all.
     expect(mockReplace).toHaveBeenCalledTimes(1);
     expect(mockReplace).toHaveBeenCalledWith(
       expect.stringContaining(`q=${encodeURIComponent("Mercy")}`)
@@ -172,6 +166,7 @@ describe("SearchPageClient — direct navigation clears a pending debounced navi
         JSON.stringify({
           results: [
             {
+              // en.sahih (Saheeh International, alquran.cloud) — Al-Baqarah 2:255.
               ref: "2:255",
               surahName: "Al-Baqarah",
               surahNameArabic: "البقرة",
