@@ -24,6 +24,7 @@ export default function MentionsPage() {
   const [mentions, setMentions] = useState<Mention[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [markReadError, setMarkReadError] = useState(false);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -51,10 +52,19 @@ export default function MentionsPage() {
       method: "PATCH",
       headers: { Authorization: `Bearer ${accessToken}` },
     })
-      .then(() => {
-        if (!cancelled) setPendingMentionCount(0);
+      .then((r) => {
+        if (cancelled) return;
+        if (r.ok) {
+          setPendingMentionCount(0);
+          setMarkReadError(false);
+        } else {
+          setMarkReadError(true);
+        }
       })
-      .catch((e) => console.error("mentions page: mark-read failed", e));
+      .catch((e) => {
+        console.error("mentions page: mark-read failed", e);
+        if (!cancelled) setMarkReadError(true);
+      });
 
     return () => {
       cancelled = true;
@@ -74,6 +84,12 @@ export default function MentionsPage() {
             </span>
           )}
         </div>
+
+        {markReadError && (
+          <p className="mb-4 text-xs text-error">
+            Couldn&apos;t mark mentions as read. The unread count may be out of sync.
+          </p>
+        )}
 
         {error ? (
           <p className="py-10 text-center text-sm text-error">Couldn&apos;t load mentions.</p>
