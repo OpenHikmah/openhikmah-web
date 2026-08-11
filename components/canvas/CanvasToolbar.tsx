@@ -131,10 +131,12 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
     setSharing(true);
     try {
       const url = await buildShareUrl(serializeCanvas(nodes, edges));
+      if (!mountedRef.current) return;
       await copy(url);
     } catch {
       if (!mountedRef.current) return;
       setShareError(true);
+      if (shareTimeoutRef.current) clearTimeout(shareTimeoutRef.current);
       shareTimeoutRef.current = setTimeout(() => {
         if (mountedRef.current) setShareError(false);
       }, 2500);
@@ -156,6 +158,7 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
         body: JSON.stringify({ name, data: serializeCanvas(nodes, edges), nodeCount: count }),
       });
       if (!mountedRef.current) return;
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       if (res.ok) {
         setSaved(true);
         saveTimeoutRef.current = setTimeout(() => {
@@ -170,6 +173,7 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
     } catch {
       if (!mountedRef.current) return;
       setSaveError(true);
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
         if (mountedRef.current) setSaveError(false);
       }, 2000);
@@ -211,6 +215,7 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
     } catch {
       if (!mountedRef.current) return;
       setExportError(true);
+      if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
       exportTimeoutRef.current = setTimeout(() => {
         if (mountedRef.current) setExportError(false);
       }, 2500);

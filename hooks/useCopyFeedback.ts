@@ -11,14 +11,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export function useCopyFeedback(resetMs = 2000) {
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
 
   const copy = useCallback(
     async (text: string): Promise<boolean> => {
       try {
         await navigator.clipboard.writeText(text);
+        if (!mountedRef.current) return true;
         setCopied(true);
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        timeoutRef.current = setTimeout(() => setCopied(false), resetMs);
+        timeoutRef.current = setTimeout(() => {
+          if (mountedRef.current) setCopied(false);
+        }, resetMs);
         return true;
       } catch {
         return false;
@@ -28,12 +32,13 @@ export function useCopyFeedback(resetMs = 2000) {
   );
 
   // Clear a pending reset on unmount so it can't fire on a gone component.
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    },
-    []
-  );
+    };
+  }, []);
 
   return { copied, copy };
 }
