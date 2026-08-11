@@ -153,6 +153,7 @@ export function CreateChallengeForm({
           {prefillChip}
           <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2">
             <select
+              aria-label="Choose a friend"
               value={selectedFriend}
               onChange={(e) => {
                 setSelectedFriend(e.target.value);
@@ -218,6 +219,7 @@ export function CreateChallengeForm({
         {prefillChip}
 
         <select
+          aria-label="Choose a friend"
           value={selectedFriend}
           onChange={(e) => {
             setSelectedFriend(e.target.value);
