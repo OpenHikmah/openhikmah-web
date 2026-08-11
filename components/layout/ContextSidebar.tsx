@@ -163,6 +163,7 @@ function NotesSection({ verseRef }: { verseRef: string }) {
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder="Add a private note…"
+                aria-label="Add a private note"
                 rows={2}
                 className="w-full resize-none rounded border border-border bg-transparent px-2.5 py-2 text-xs text-text-primary transition-colors focus:border-gold-muted"
               />
