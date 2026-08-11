@@ -3,6 +3,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { FocusScope } from "@radix-ui/react-focus-scope";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -17,6 +19,8 @@ import {
   MessageSquareText,
   BarChart3,
   PlayCircle,
+  Menu,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -51,56 +55,170 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/** The module list + operator identity footer, shared by the persistent desktop
+ *  sidebar and the off-canvas mobile drawer. */
+function SidebarContent({
+  pathname,
+  username,
+  onNavigate,
+}: {
+  pathname: string;
+  username: string;
+  onNavigate?: () => void;
+}) {
+  return (
+    <>
+      <div className="flex items-baseline gap-2 px-5 py-5">
+        <span className="font-arabic text-lg text-gold">حكمة</span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-text-muted">
+          admin
+        </span>
+      </div>
+
+      <nav className="flex flex-1 flex-col gap-0.5 px-2.5">
+        {NAV.map(({ href, label, icon: Icon }) => {
+          const active = isActive(pathname, href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={onNavigate}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-[color,background-color] duration-[120ms]",
+                active
+                  ? "bg-gold/10 font-medium text-gold"
+                  : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
+              )}
+            >
+              <Icon className="h-4 w-4 shrink-0" strokeWidth={active ? 2.25 : 1.75} />
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="border-t border-border px-5 py-3.5">
+        <div className="flex items-center gap-2">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
+          <span className="truncate text-xs text-text-secondary">{username}</span>
+        </div>
+        <Link href="/" className="mt-1 block text-[11px] text-text-muted hover:text-gold">
+          ← Back to app
+        </Link>
+      </div>
+    </>
+  );
+}
+
+/** The off-canvas nav drawer shown below the `sm` breakpoint, opened from the
+ *  mobile top bar's hamburger button. Mirrors the MoreSheet/ExpandMenu focus-
+ *  trap pattern used elsewhere in the app. */
+function MobileSidebarDrawer({
+  pathname,
+  username,
+  onClose,
+  triggerRef,
+}: {
+  pathname: string;
+  username: string;
+  onClose: () => void;
+  triggerRef: React.RefObject<HTMLElement | null>;
+}) {
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        drawerRef.current &&
+        !drawerRef.current.contains(target) &&
+        !triggerRef.current?.contains(target)
+      ) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [onClose, triggerRef]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 sm:hidden">
+      <FocusScope asChild trapped loop>
+        <div
+          ref={drawerRef}
+          className="flex h-full w-64 max-w-[80vw] flex-col border-r border-border bg-surface"
+        >
+          <div className="flex items-center justify-end px-2.5 pt-2.5">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close menu"
+              className="rounded-md p-1.5 text-text-muted hover:bg-white/5 hover:text-text-primary"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <SidebarContent pathname={pathname} username={username} onNavigate={onClose} />
+        </div>
+      </FocusScope>
+    </div>
+  );
+}
+
 /**
  * The dense operator-console frame (design direction A): a persistent left
  * sidebar of modules + a top context bar, on the locked navy/gold/teal palette.
- * Gold marks the active module; the work area is filled per-page.
+ * Gold marks the active module; the work area is filled per-page. Below `sm`,
+ * the sidebar collapses behind a hamburger-triggered off-canvas drawer.
  */
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { username } = useAdmin();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <div className="flex min-h-dvh bg-bg text-text-primary">
-      <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-surface">
-        <div className="flex items-baseline gap-2 px-5 py-5">
-          <span className="font-arabic text-lg text-gold">حكمة</span>
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-text-muted">
-            admin
-          </span>
-        </div>
+    <div className="flex min-h-dvh flex-col bg-bg text-text-primary sm:flex-row">
+      <div className="flex items-center gap-2 border-b border-border bg-surface px-3 py-2.5 sm:hidden">
+        <button
+          ref={menuButtonRef}
+          type="button"
+          onClick={() => setMobileNavOpen((v) => !v)}
+          aria-label="Open menu"
+          aria-expanded={mobileNavOpen}
+          className="rounded-md p-1.5 text-text-secondary hover:bg-white/5 hover:text-text-primary"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <span className="font-arabic text-base text-gold">حكمة</span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-text-muted">
+          admin
+        </span>
+      </div>
 
-        <nav className="flex flex-1 flex-col gap-0.5 px-2.5">
-          {NAV.map(({ href, label, icon: Icon }) => {
-            const active = isActive(pathname, href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-[color,background-color] duration-[120ms]",
-                  active
-                    ? "bg-gold/10 font-medium text-gold"
-                    : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
-                )}
-              >
-                <Icon className="h-4 w-4 shrink-0" strokeWidth={active ? 2.25 : 1.75} />
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
+      {mobileNavOpen && (
+        <MobileSidebarDrawer
+          pathname={pathname}
+          username={username}
+          onClose={() => setMobileNavOpen(false)}
+          triggerRef={menuButtonRef}
+        />
+      )}
 
-        <div className="border-t border-border px-5 py-3.5">
-          <div className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
-            <span className="truncate text-xs text-text-secondary">{username}</span>
-          </div>
-          <Link href="/" className="mt-1 block text-[11px] text-text-muted hover:text-gold">
-            ← Back to app
-          </Link>
-        </div>
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-surface sm:flex">
+        <SidebarContent pathname={pathname} username={username} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
