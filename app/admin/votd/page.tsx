@@ -156,6 +156,7 @@ function DayEditor({
   const [reflection, setReflection] = useState(existing?.reflection ?? "");
   const [preview, setPreview] = useState<Verse | null>(null);
   const [busy, setBusy] = useState(false);
+  const [previewBusy, setPreviewBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   if (!date) {
@@ -167,6 +168,7 @@ function DayEditor({
   }
 
   const doPreview = async () => {
+    if (previewBusy) return;
     setMsg(null);
     setPreview(null);
     const match = /^(\d+):(\d+)$/.exec(verseRef.trim());
@@ -174,6 +176,7 @@ function DayEditor({
       setMsg("Enter a reference like 2:255.");
       return;
     }
+    setPreviewBusy(true);
     try {
       const v = await fetch(`/api/verse/${match[1]}/${match[2]}`);
       if (!v.ok) {
@@ -183,6 +186,8 @@ function DayEditor({
       setPreview((await v.json()) as Verse);
     } catch {
       setMsg("Preview failed.");
+    } finally {
+      setPreviewBusy(false);
     }
   };
 
@@ -231,8 +236,8 @@ function DayEditor({
             onChange={(e) => setVerseRef(e.target.value)}
             placeholder="e.g. 2:255"
           />
-          <Button size="md" variant="secondary" onClick={doPreview}>
-            Preview
+          <Button size="md" variant="secondary" onClick={doPreview} disabled={previewBusy}>
+            {previewBusy ? "Previewing…" : "Preview"}
           </Button>
         </div>
       </label>
