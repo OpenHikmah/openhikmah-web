@@ -8,7 +8,12 @@ describe("auth store", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     localStorage.clear();
-    useAuthStore.setState({ accessToken: null, bookmarks: [], bookmarksLoadError: false });
+    useAuthStore.setState({
+      accessToken: null,
+      bookmarks: [],
+      bookmarksLoadError: false,
+      bookmarkBusy: {},
+    });
   });
 
   it("initial state has null token and empty bookmarks", () => {
@@ -103,6 +108,56 @@ describe("auth store", () => {
     // Wait for the API call to resolve and rollback
     await new Promise((r) => setTimeout(r, 0));
     expect(useAuthStore.getState().bookmarks).toContain("5:1");
+  });
+
+  it("toggleBookmark ignores a rapid second click while a request for the same ref is in flight", async () => {
+    let resolveFetch!: (v: { ok: boolean }) => void;
+    mockFetch.mockReturnValueOnce(
+      new Promise((res) => {
+        resolveFetch = res;
+      })
+    );
+    useAuthStore.setState({ accessToken: "token-123", bookmarks: [] });
+
+    useAuthStore.getState().toggleBookmark("5:1");
+    expect(useAuthStore.getState().isBookmarkBusy("5:1")).toBe(true);
+    expect(useAuthStore.getState().bookmarks).toContain("5:1");
+
+    // Second click before the first request resolves must be a no-op — no
+    // second fetch, and the optimistic state must not flip back to removed.
+    useAuthStore.getState().toggleBookmark("5:1");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState().bookmarks).toContain("5:1");
+
+    resolveFetch({ ok: true });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useAuthStore.getState().isBookmarkBusy("5:1")).toBe(false);
+    expect(useAuthStore.getState().bookmarks).toContain("5:1");
+  });
+
+  it("toggleBookmark clears the busy flag after the request settles, allowing a later toggle", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true });
+    useAuthStore.setState({ accessToken: "token-123", bookmarks: [] });
+
+    useAuthStore.getState().toggleBookmark("5:1");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useAuthStore.getState().isBookmarkBusy("5:1")).toBe(false);
+
+    mockFetch.mockResolvedValueOnce({ ok: true });
+    useAuthStore.getState().toggleBookmark("5:1");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(useAuthStore.getState().bookmarks).not.toContain("5:1");
+  });
+
+  it("toggleBookmark busy-guard is per-ref, not global", () => {
+    mockFetch.mockReturnValue(new Promise(() => {})); // never resolves
+    useAuthStore.setState({ accessToken: "token-123", bookmarks: [] });
+
+    useAuthStore.getState().toggleBookmark("5:1");
+    useAuthStore.getState().toggleBookmark("2:255");
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(useAuthStore.getState().bookmarks).toEqual(expect.arrayContaining(["5:1", "2:255"]));
   });
 
   it("loadRemoteBookmarks does nothing when no token", async () => {
