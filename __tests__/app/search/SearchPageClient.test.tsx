@@ -11,6 +11,8 @@ vi.mock("next/navigation", () => ({
 
 import { SearchPageClient } from "@/app/search/SearchPageClient";
 import { usePreferencesStore } from "@/store/preferences";
+import { useAuthStore } from "@/store/auth";
+import { TooltipProvider } from "@/components/ui";
 
 describe("SearchPageClient — rate-limit vs. genuine empty results", () => {
   const mockFetch = vi.fn();
@@ -112,5 +114,53 @@ describe("SearchPageClient — re-fetches when the UI language changes", () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(screen.getByText(turkishResult.translation)).toBeInTheDocument();
+  });
+});
+
+describe("SearchPageClient — bookmark button busy state", () => {
+  const mockFetch = vi.fn();
+  const previousAuthState = useAuthStore.getState();
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", mockFetch);
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    useAuthStore.setState(previousAuthState);
+  });
+
+  it("disables a search result's bookmark button while that ref is busy", async () => {
+    const result = {
+      ref: "2:255",
+      surahName: "Al-Baqarah",
+      surahNameArabic: "البقرة",
+      snippet: "Allah - there is no deity except Him.",
+      arabicText: "الله لا إله إلا هو",
+      translation: "Allah - there is no deity except Him.",
+    };
+
+    useAuthStore.setState({
+      accessToken: "token-123",
+      bookmarks: [],
+      bookmarkBusy: { "2:255": true },
+    });
+
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ results: [result], total: 1, page: 1, pageSize: 20 }), {
+        status: 200,
+      })
+    );
+
+    await act(async () => {
+      renderWithIntl(
+        <TooltipProvider>
+          <SearchPageClient />
+        </TooltipProvider>
+      );
+    });
+
+    expect(screen.getByRole("button", { name: /bookmark verse/i })).toBeDisabled();
   });
 });

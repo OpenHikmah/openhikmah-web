@@ -18,6 +18,10 @@ interface AuthStore {
   // Refs with a POST/DELETE currently in flight — guards toggleBookmark
   // against a second click racing the first before it resolves.
   bookmarkBusy: Record<string, boolean>;
+  // Bumped by clearAuth — lets a toggleBookmark request started in a prior
+  // session detect that it's stale and skip its clearBusy/rollback, so it
+  // can't clobber busy/bookmark state that belongs to a later session.
+  bookmarkGeneration: number;
 
   setTokens: (accessToken: string) => void;
   setSessionLoaded: () => void;
@@ -71,12 +75,19 @@ export const useAuthStore = create<AuthStore>()(
       bookmarks: [],
       bookmarksLoadError: false,
       bookmarkBusy: {},
+      bookmarkGeneration: 0,
 
       setTokens: (accessToken) => set({ accessToken }),
       setSessionLoaded: () => set({ isSessionLoading: false }),
 
       clearAuth: () => {
-        set({ accessToken: null, bookmarks: [], bookmarksLoadError: false });
+        set((s) => ({
+          accessToken: null,
+          bookmarks: [],
+          bookmarksLoadError: false,
+          bookmarkBusy: {},
+          bookmarkGeneration: s.bookmarkGeneration + 1,
+        }));
         useSocialStore.getState().clearSocial();
       },
 
@@ -84,7 +95,7 @@ export const useAuthStore = create<AuthStore>()(
       isBookmarkBusy: (ref) => Boolean(get().bookmarkBusy[ref]),
 
       toggleBookmark: (ref) => {
-        const { bookmarks, accessToken, bookmarkBusy } = get();
+        const { bookmarks, accessToken, bookmarkBusy, bookmarkGeneration: generation } = get();
         if (bookmarkBusy[ref]) return;
 
         const wasBookmarked = bookmarks.includes(ref);
@@ -97,6 +108,7 @@ export const useAuthStore = create<AuthStore>()(
 
         if (!accessToken) {
           set((s) => {
+            if (s.bookmarkGeneration !== generation) return s;
             const nextBusy = { ...s.bookmarkBusy };
             delete nextBusy[ref];
             return { bookmarkBusy: nextBusy };
@@ -106,15 +118,21 @@ export const useAuthStore = create<AuthStore>()(
 
         const clearBusy = () =>
           set((s) => {
+            if (s.bookmarkGeneration !== generation) return s;
             const nextBusy = { ...s.bookmarkBusy };
             delete nextBusy[ref];
             return { bookmarkBusy: nextBusy };
           });
 
         const rollback = () =>
-          set((s) => ({
-            bookmarks: wasBookmarked ? [...s.bookmarks, ref] : s.bookmarks.filter((r) => r !== ref),
-          }));
+          set((s) => {
+            if (s.bookmarkGeneration !== generation) return s;
+            return {
+              bookmarks: wasBookmarked
+                ? [...s.bookmarks, ref]
+                : s.bookmarks.filter((r) => r !== ref),
+            };
+          });
 
         if (wasBookmarked) {
           fetch(`/api/bookmarks/${encodeURIComponent(ref)}`, {

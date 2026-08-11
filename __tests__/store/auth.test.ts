@@ -13,6 +13,7 @@ describe("auth store", () => {
       bookmarks: [],
       bookmarksLoadError: false,
       bookmarkBusy: {},
+      bookmarkGeneration: 0,
     });
   });
 
@@ -158,6 +159,54 @@ describe("auth store", () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(useAuthStore.getState().bookmarks).toEqual(expect.arrayContaining(["5:1", "2:255"]));
+  });
+
+  it("a sign-out during an in-flight toggle does not corrupt a later session's toggle of the same ref", async () => {
+    let resolveStaleFetch!: (v: { ok: boolean }) => void;
+    mockFetch.mockReturnValueOnce(
+      new Promise((res) => {
+        resolveStaleFetch = res;
+      })
+    );
+    useAuthStore.setState({ accessToken: "old-session-token", bookmarks: [] });
+
+    // Old session: start toggling "5:1" — request never settles yet.
+    useAuthStore.getState().toggleBookmark("5:1");
+    expect(useAuthStore.getState().isBookmarkBusy("5:1")).toBe(true);
+
+    // Sign out mid-request — busy state must clear immediately so the next
+    // session isn't blocked by a request that belongs to the old session.
+    useAuthStore.getState().clearAuth();
+    expect(useAuthStore.getState().isBookmarkBusy("5:1")).toBe(false);
+    expect(useAuthStore.getState().bookmarks).toEqual([]);
+
+    // New session: sign in and toggle the same ref — must not be blocked.
+    let resolveNewFetch!: (v: { ok: boolean }) => void;
+    mockFetch.mockReturnValueOnce(
+      new Promise((res) => {
+        resolveNewFetch = res;
+      })
+    );
+    useAuthStore.setState({ accessToken: "new-session-token" });
+    useAuthStore.getState().toggleBookmark("5:1");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(useAuthStore.getState().bookmarks).toContain("5:1");
+    expect(useAuthStore.getState().isBookmarkBusy("5:1")).toBe(true);
+
+    // The stale request from the old session finally settles (as a failure,
+    // which would normally roll back and clear busy) — its clearBusy/rollback
+    // must be a no-op against the new session's still-in-flight request.
+    resolveStaleFetch({ ok: false });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useAuthStore.getState().isBookmarkBusy("5:1")).toBe(true);
+    expect(useAuthStore.getState().bookmarks).toContain("5:1");
+
+    // Once the new session's own request settles, it clears its own busy
+    // state normally.
+    resolveNewFetch({ ok: true });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useAuthStore.getState().isBookmarkBusy("5:1")).toBe(false);
+    expect(useAuthStore.getState().bookmarks).toContain("5:1");
   });
 
   it("loadRemoteBookmarks does nothing when no token", async () => {
