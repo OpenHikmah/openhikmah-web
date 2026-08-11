@@ -14,6 +14,7 @@ import {
   Check,
   AlertCircle,
 } from "lucide-react";
+import { FocusScope } from "@radix-ui/react-focus-scope";
 import { useTranslations, useFormatter } from "next-intl";
 import { useCanvasStore, serializeCanvas } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
@@ -115,62 +116,77 @@ function MoreSheet({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [onClose, triggerRef]);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
-    <div
-      ref={sheetRef}
-      className="fixed inset-x-3 bottom-[calc(58px+env(safe-area-inset-bottom)+8px)] z-50 rounded-lg border border-border bg-surface-overlay shadow-floating md:hidden"
-    >
-      {onSave && (
+    <FocusScope asChild trapped loop>
+      <div
+        ref={sheetRef}
+        className="fixed inset-x-3 bottom-[calc(58px+env(safe-area-inset-bottom)+8px)] z-50 rounded-lg border border-border bg-surface-overlay shadow-floating md:hidden"
+      >
+        {onSave && (
+          <button
+            onClick={onSave}
+            disabled={saving || !canSave}
+            className="flex w-full items-center gap-2.5 px-4 py-3 text-left disabled:opacity-40"
+          >
+            {saving ? (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-text-muted" />
+            ) : saved ? (
+              <Check className="h-4 w-4 shrink-0 text-teal" />
+            ) : saveError ? (
+              <AlertCircle className="h-4 w-4 shrink-0 text-error" />
+            ) : (
+              <Save className="h-4 w-4 shrink-0 text-text-muted" />
+            )}
+            <span
+              className={cn("text-sm font-medium text-text-primary", saveError && "text-error")}
+            >
+              {saving
+                ? t("saving")
+                : saved
+                  ? t("saved")
+                  : saveError
+                    ? t("saveFailedRetry")
+                    : t("saveWorkspace")}
+            </span>
+          </button>
+        )}
         <button
-          onClick={onSave}
-          disabled={saving || !canSave}
+          onClick={() => onExport("png")}
+          disabled={exporting}
           className="flex w-full items-center gap-2.5 px-4 py-3 text-left disabled:opacity-40"
         >
-          {saving ? (
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-text-muted" />
-          ) : saved ? (
-            <Check className="h-4 w-4 shrink-0 text-teal" />
-          ) : saveError ? (
-            <AlertCircle className="h-4 w-4 shrink-0 text-error" />
-          ) : (
-            <Save className="h-4 w-4 shrink-0 text-text-muted" />
-          )}
-          <span className={cn("text-sm font-medium text-text-primary", saveError && "text-error")}>
-            {saving
-              ? t("saving")
-              : saved
-                ? t("saved")
-                : saveError
-                  ? t("saveFailedRetry")
-                  : t("saveWorkspace")}
-          </span>
+          <ImageIcon className="h-4 w-4 shrink-0 text-text-muted" />
+          <span className="text-sm font-medium text-text-primary">{t("exportAsPng")}</span>
         </button>
-      )}
-      <button
-        onClick={() => onExport("png")}
-        disabled={exporting}
-        className="flex w-full items-center gap-2.5 px-4 py-3 text-left disabled:opacity-40"
-      >
-        <ImageIcon className="h-4 w-4 shrink-0 text-text-muted" />
-        <span className="text-sm font-medium text-text-primary">{t("exportAsPng")}</span>
-      </button>
-      <button
-        onClick={() => onExport("pdf")}
-        disabled={exporting}
-        className="flex w-full items-center gap-2.5 px-4 py-3 text-left disabled:opacity-40"
-      >
-        <FileText className="h-4 w-4 shrink-0 text-text-muted" />
-        <span className="text-sm font-medium text-text-primary">{t("exportAsPdf")}</span>
-      </button>
-      <div className="flex items-center gap-3 border-t border-border-subtle px-4 py-3">
-        {CANVAS_LEGEND_ITEMS.map((item) => (
-          <div key={item.key} className="flex items-center gap-1.5">
-            <span className={`h-0.5 w-3.5 rounded-full ${item.className}`} />
-            <span className="text-[11px] text-text-secondary">{t(item.key)}</span>
-          </div>
-        ))}
+        <button
+          onClick={() => onExport("pdf")}
+          disabled={exporting}
+          className="flex w-full items-center gap-2.5 px-4 py-3 text-left disabled:opacity-40"
+        >
+          <FileText className="h-4 w-4 shrink-0 text-text-muted" />
+          <span className="text-sm font-medium text-text-primary">{t("exportAsPdf")}</span>
+        </button>
+        <div className="flex items-center gap-3 border-t border-border-subtle px-4 py-3">
+          {CANVAS_LEGEND_ITEMS.map((item) => (
+            <div key={item.key} className="flex items-center gap-1.5">
+              <span className={`h-0.5 w-3.5 rounded-full ${item.className}`} />
+              <span className="text-[11px] text-text-secondary">{t(item.key)}</span>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+    </FocusScope>
   );
 }
 
@@ -350,19 +366,6 @@ export function Header({ onSearchOpen }: HeaderProps) {
       {/* Mobile: bottom action bar — primary canvas actions (<md, only with nodes) */}
       {nodeCount > 0 && (
         <>
-          {moreOpen && (
-            <MoreSheet
-              onClose={() => setMoreOpen(false)}
-              onExport={handleExport}
-              exporting={exporting}
-              onSave={accessToken ? handleSave : null}
-              saving={saving}
-              saved={saved}
-              saveError={saveError}
-              canSave={nodes.length > 0}
-              triggerRef={moreButtonRef}
-            />
-          )}
           <div className="fixed inset-x-0 bottom-0 z-40 flex md:hidden bg-surface/95 backdrop-blur border-t border-border pb-[env(safe-area-inset-bottom)]">
             <BarButton icon={<Search />} label={t("toolbarSearch")} onClick={onSearchOpen} />
             <BarButton icon={<Maximize2 />} label={t("fit")} onClick={requestFit} />
@@ -381,13 +384,26 @@ export function Header({ onSearchOpen }: HeaderProps) {
             />
             <BarButton
               ref={moreButtonRef}
-              icon={exportError ? <RotateCcw /> : <MoreHorizontal />}
+              icon={exportError ? <AlertCircle /> : <MoreHorizontal />}
               label={exportError ? t("exportFailed") : t("more")}
               onClick={() => setMoreOpen((v) => !v)}
               active={moreOpen}
             />
             <BarButton icon={<RotateCcw />} label={t("clear")} onClick={reset} danger />
           </div>
+          {moreOpen && (
+            <MoreSheet
+              onClose={() => setMoreOpen(false)}
+              onExport={handleExport}
+              exporting={exporting}
+              onSave={accessToken ? handleSave : null}
+              saving={saving}
+              saved={saved}
+              saveError={saveError}
+              canSave={nodes.length > 0}
+              triggerRef={moreButtonRef}
+            />
+          )}
         </>
       )}
     </>
