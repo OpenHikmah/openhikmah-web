@@ -64,7 +64,7 @@ export function CanvasTour() {
   const isLast = step === STEPS.length - 1;
 
   return (
-    <div className="pointer-events-none absolute bottom-[calc(70px+env(safe-area-inset-bottom))] left-1/2 z-50 w-[min(360px,calc(100vw-2rem))] -translate-x-1/2 md:bottom-auto md:left-auto md:right-6 md:top-6 md:translate-x-0">
+    <div className="pointer-events-none absolute bottom-[calc(70px+env(safe-area-inset-bottom))] left-1/2 z-50 w-[min(360px,calc(100vw-2rem))] -translate-x-1/2 md:bottom-auto md:left-6 md:top-6 md:translate-x-0">
       <FocusScope
         asChild
         trapped
