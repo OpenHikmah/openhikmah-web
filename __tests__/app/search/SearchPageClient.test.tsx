@@ -139,6 +139,7 @@ describe("SearchPageClient — bookmark button busy state", () => {
       surahNameArabic: "البقرة",
       snippet: "Allah - there is no deity except Him.",
       arabicText: "الله لا إله إلا هو",
+      // en.sahih (Saheeh International, alquran.cloud) excerpt.
       translation: "Allah - there is no deity except Him.",
     };
 

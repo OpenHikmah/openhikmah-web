@@ -39,6 +39,7 @@ describe("BookmarksPage — bookmark button busy state", () => {
           ayah: 255,
           ref: "2:255",
           arabicText: "الله لا إله إلا هو الحي القيوم",
+          // en.sahih (Saheeh International, alquran.cloud) excerpt.
           translation: "Allah - there is no deity except Him, the Ever-Living, the Sustainer.",
           surahName: "Al-Baqarah",
           surahNameArabic: "البقرة",
