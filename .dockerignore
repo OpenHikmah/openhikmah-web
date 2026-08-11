@@ -15,5 +15,6 @@ scripts
 !scripts/seed-quran.mjs
 !scripts/embed-corpus.mjs
 !scripts/seed-morphology.mjs
+!scripts/seed-translations.mjs
 hosting.md
 plan.md
