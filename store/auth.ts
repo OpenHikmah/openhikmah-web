@@ -15,12 +15,20 @@ interface AuthStore {
   // or non-OK response) — lets the bookmarks page distinguish "really empty"
   // from "failed to load" instead of rendering both identically.
   bookmarksLoadError: boolean;
+  // Refs with a POST/DELETE currently in flight — guards toggleBookmark
+  // against a second click racing the first before it resolves.
+  bookmarkBusy: Record<string, boolean>;
+  // Bumped by clearAuth — lets a toggleBookmark request started in a prior
+  // session detect that it's stale and skip its clearBusy/rollback, so it
+  // can't clobber busy/bookmark state that belongs to a later session.
+  bookmarkGeneration: number;
 
   setTokens: (accessToken: string) => void;
   setSessionLoaded: () => void;
   clearAuth: () => void;
   toggleBookmark: (ref: string) => void;
   isBookmarked: (ref: string) => boolean;
+  isBookmarkBusy: (ref: string) => boolean;
   loadRemoteBookmarks: () => Promise<void>;
 }
 
@@ -66,32 +74,65 @@ export const useAuthStore = create<AuthStore>()(
       isSessionLoading: true,
       bookmarks: [],
       bookmarksLoadError: false,
+      bookmarkBusy: {},
+      bookmarkGeneration: 0,
 
       setTokens: (accessToken) => set({ accessToken }),
       setSessionLoaded: () => set({ isSessionLoading: false }),
 
       clearAuth: () => {
-        set({ accessToken: null, bookmarks: [], bookmarksLoadError: false });
+        set((s) => ({
+          accessToken: null,
+          bookmarks: [],
+          bookmarksLoadError: false,
+          bookmarkBusy: {},
+          bookmarkGeneration: s.bookmarkGeneration + 1,
+        }));
         useSocialStore.getState().clearSocial();
       },
 
       isBookmarked: (ref) => get().bookmarks.includes(ref),
+      isBookmarkBusy: (ref) => Boolean(get().bookmarkBusy[ref]),
 
       toggleBookmark: (ref) => {
-        const { bookmarks, accessToken } = get();
+        const { bookmarks, accessToken, bookmarkBusy, bookmarkGeneration: generation } = get();
+        if (bookmarkBusy[ref]) return;
+
         const wasBookmarked = bookmarks.includes(ref);
 
         // Optimistic update
-        set({
+        set((s) => ({
           bookmarks: wasBookmarked ? bookmarks.filter((r) => r !== ref) : [...bookmarks, ref],
-        });
+          bookmarkBusy: { ...s.bookmarkBusy, [ref]: true },
+        }));
 
-        if (!accessToken) return;
+        if (!accessToken) {
+          set((s) => {
+            if (s.bookmarkGeneration !== generation) return s;
+            const nextBusy = { ...s.bookmarkBusy };
+            delete nextBusy[ref];
+            return { bookmarkBusy: nextBusy };
+          });
+          return;
+        }
+
+        const clearBusy = () =>
+          set((s) => {
+            if (s.bookmarkGeneration !== generation) return s;
+            const nextBusy = { ...s.bookmarkBusy };
+            delete nextBusy[ref];
+            return { bookmarkBusy: nextBusy };
+          });
 
         const rollback = () =>
-          set((s) => ({
-            bookmarks: wasBookmarked ? [...s.bookmarks, ref] : s.bookmarks.filter((r) => r !== ref),
-          }));
+          set((s) => {
+            if (s.bookmarkGeneration !== generation) return s;
+            return {
+              bookmarks: wasBookmarked
+                ? [...s.bookmarks, ref]
+                : s.bookmarks.filter((r) => r !== ref),
+            };
+          });
 
         if (wasBookmarked) {
           fetch(`/api/bookmarks/${encodeURIComponent(ref)}`, {
@@ -101,7 +142,8 @@ export const useAuthStore = create<AuthStore>()(
             .then((r) => {
               if (!r.ok) rollback();
             })
-            .catch(rollback);
+            .catch(rollback)
+            .finally(clearBusy);
         } else {
           fetch("/api/bookmarks", {
             method: "POST",
@@ -114,7 +156,8 @@ export const useAuthStore = create<AuthStore>()(
             .then((r) => {
               if (!r.ok) rollback();
             })
-            .catch(rollback);
+            .catch(rollback)
+            .finally(clearBusy);
         }
       },
 

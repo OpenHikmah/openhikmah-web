@@ -288,6 +288,7 @@ function ResultCard({ result }: { result: SearchResult }) {
   const tSearch = useTranslations("search");
   const accessToken = useAuthStore((s) => s.accessToken);
   const isBookmarked = useAuthStore((s) => s.isBookmarked(result.ref));
+  const bookmarkBusy = useAuthStore((s) => s.isBookmarkBusy(result.ref));
   const toggleBookmark = useAuthStore((s) => s.toggleBookmark);
 
   return (
@@ -306,6 +307,7 @@ function ResultCard({ result }: { result: SearchResult }) {
                 tone="gold"
                 size="xs"
                 onClick={() => toggleBookmark(result.ref)}
+                disabled={bookmarkBusy}
                 aria-label={isBookmarked ? t("removeBookmark") : t("bookmarkVerse")}
                 className={cn(isBookmarked && "border-gold-muted text-gold")}
               >

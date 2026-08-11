@@ -16,6 +16,7 @@ export default function BookmarksPage() {
   const tCommon = useTranslations("common");
   const bookmarks = useAuthStore((s) => s.bookmarks);
   const bookmarksLoadError = useAuthStore((s) => s.bookmarksLoadError);
+  const bookmarkBusy = useAuthStore((s) => s.bookmarkBusy);
   const toggleBookmark = useAuthStore((s) => s.toggleBookmark);
   const [verses, setVerses] = useState<Map<string, Verse>>(new Map());
   const [loading, setLoading] = useState(bookmarks.length > 0);
@@ -131,6 +132,7 @@ export default function BookmarksPage() {
                           tone="danger"
                           size="xs"
                           onClick={() => toggleBookmark(ref)}
+                          disabled={Boolean(bookmarkBusy[ref])}
                           aria-label={tCommon("removeBookmark")}
                         >
                           <Trash2 />

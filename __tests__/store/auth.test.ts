@@ -8,7 +8,13 @@ describe("auth store", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     localStorage.clear();
-    useAuthStore.setState({ accessToken: null, bookmarks: [], bookmarksLoadError: false });
+    useAuthStore.setState({
+      accessToken: null,
+      bookmarks: [],
+      bookmarksLoadError: false,
+      bookmarkBusy: {},
+      bookmarkGeneration: 0,
+    });
   });
 
   it("initial state has null token and empty bookmarks", () => {
@@ -102,6 +108,104 @@ describe("auth store", () => {
 
     // Wait for the API call to resolve and rollback
     await new Promise((r) => setTimeout(r, 0));
+    expect(useAuthStore.getState().bookmarks).toContain("5:1");
+  });
+
+  it("toggleBookmark ignores a rapid second click while a request for the same ref is in flight", async () => {
+    let resolveFetch!: (v: { ok: boolean }) => void;
+    mockFetch.mockReturnValueOnce(
+      new Promise((res) => {
+        resolveFetch = res;
+      })
+    );
+    useAuthStore.setState({ accessToken: "token-123", bookmarks: [] });
+
+    useAuthStore.getState().toggleBookmark("5:1");
+    expect(useAuthStore.getState().isBookmarkBusy("5:1")).toBe(true);
+    expect(useAuthStore.getState().bookmarks).toContain("5:1");
+
+    // Second click before the first request resolves must be a no-op — no
+    // second fetch, and the optimistic state must not flip back to removed.
+    useAuthStore.getState().toggleBookmark("5:1");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState().bookmarks).toContain("5:1");
+
+    resolveFetch({ ok: true });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useAuthStore.getState().isBookmarkBusy("5:1")).toBe(false);
+    expect(useAuthStore.getState().bookmarks).toContain("5:1");
+  });
+
+  it("toggleBookmark clears the busy flag after the request settles, allowing a later toggle", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true });
+    useAuthStore.setState({ accessToken: "token-123", bookmarks: [] });
+
+    useAuthStore.getState().toggleBookmark("5:1");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useAuthStore.getState().isBookmarkBusy("5:1")).toBe(false);
+
+    mockFetch.mockResolvedValueOnce({ ok: true });
+    useAuthStore.getState().toggleBookmark("5:1");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(useAuthStore.getState().bookmarks).not.toContain("5:1");
+  });
+
+  it("toggleBookmark busy-guard is per-ref, not global", () => {
+    mockFetch.mockReturnValue(new Promise(() => {})); // never resolves
+    useAuthStore.setState({ accessToken: "token-123", bookmarks: [] });
+
+    useAuthStore.getState().toggleBookmark("5:1");
+    useAuthStore.getState().toggleBookmark("2:255");
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(useAuthStore.getState().bookmarks).toEqual(expect.arrayContaining(["5:1", "2:255"]));
+  });
+
+  it("a sign-out during an in-flight toggle does not corrupt a later session's toggle of the same ref", async () => {
+    let resolveStaleFetch!: (v: { ok: boolean }) => void;
+    mockFetch.mockReturnValueOnce(
+      new Promise((res) => {
+        resolveStaleFetch = res;
+      })
+    );
+    useAuthStore.setState({ accessToken: "old-session-token", bookmarks: [] });
+
+    // Old session: start toggling "5:1" — request never settles yet.
+    useAuthStore.getState().toggleBookmark("5:1");
+    expect(useAuthStore.getState().isBookmarkBusy("5:1")).toBe(true);
+
+    // Sign out mid-request — busy state must clear immediately so the next
+    // session isn't blocked by a request that belongs to the old session.
+    useAuthStore.getState().clearAuth();
+    expect(useAuthStore.getState().isBookmarkBusy("5:1")).toBe(false);
+    expect(useAuthStore.getState().bookmarks).toEqual([]);
+
+    // New session: sign in and toggle the same ref — must not be blocked.
+    let resolveNewFetch!: (v: { ok: boolean }) => void;
+    mockFetch.mockReturnValueOnce(
+      new Promise((res) => {
+        resolveNewFetch = res;
+      })
+    );
+    useAuthStore.setState({ accessToken: "new-session-token" });
+    useAuthStore.getState().toggleBookmark("5:1");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(useAuthStore.getState().bookmarks).toContain("5:1");
+    expect(useAuthStore.getState().isBookmarkBusy("5:1")).toBe(true);
+
+    // The stale request from the old session finally settles (as a failure,
+    // which would normally roll back and clear busy) — its clearBusy/rollback
+    // must be a no-op against the new session's still-in-flight request.
+    resolveStaleFetch({ ok: false });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useAuthStore.getState().isBookmarkBusy("5:1")).toBe(true);
+    expect(useAuthStore.getState().bookmarks).toContain("5:1");
+
+    // Once the new session's own request settles, it clears its own busy
+    // state normally.
+    resolveNewFetch({ ok: true });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useAuthStore.getState().isBookmarkBusy("5:1")).toBe(false);
     expect(useAuthStore.getState().bookmarks).toContain("5:1");
   });
 
