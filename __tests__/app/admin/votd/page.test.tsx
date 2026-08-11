@@ -20,6 +20,7 @@ vi.mock("@/components/admin/AdminContext", async () => {
 
 import VotdPage from "@/app/admin/votd/page";
 
+// en.sahih (Saheeh International, alquran.cloud) — Al-Baqarah 2:255.
 const verse = {
   surah: 2,
   ayah: 255,
