@@ -31,8 +31,15 @@ vi.mock("@/components/social/FriendList", () => ({
 }));
 
 vi.mock("@/components/social/LeaderboardTable", () => ({
-  LeaderboardTable: ({ entries }: { entries: unknown[] }) => (
-    <div data-testid="leaderboard-count">{entries.length}</div>
+  LeaderboardTable: ({ entries }: { entries: { id: number }[] }) => (
+    <div>
+      <div data-testid="leaderboard-count">{entries.length}</div>
+      <ul>
+        {entries.map((e) => (
+          <li key={e.id} data-testid={`leaderboard-entry-${e.id}`} />
+        ))}
+      </ul>
+    </div>
   ),
 }));
 
@@ -59,6 +66,17 @@ function friendsPage(offset: number, count: number, hasMore: boolean) {
       status: "accepted",
       direction: "sent",
       friend: { id: offset + i + 1, username: `user${offset + i + 1}`, streak: 0 },
+    })),
+    hasMore,
+  };
+}
+
+function leaderboardPage(offset: number, count: number, hasMore: boolean) {
+  return {
+    items: Array.from({ length: count }, (_, i) => ({
+      id: offset + i + 1,
+      username: `user${offset + i + 1}`,
+      streak: 0,
     })),
     hasMore,
   };
@@ -175,5 +193,57 @@ describe("SocialPage — friend actions preserve loaded pages", () => {
     expect(screen.getByTestId("friend-1")).toBeInTheDocument();
     expect(screen.getByTestId("friend-2")).toBeInTheDocument();
     expect(screen.getByTestId("friend-99")).toBeInTheDocument();
+  });
+
+  it("does not drop a loaded second page of the leaderboard when a friend action fires afterward", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.startsWith("/api/social/leaderboard?offset")) {
+        return Promise.resolve(
+          new Response(JSON.stringify(leaderboardPage(2, 2, false)), { status: 200 })
+        );
+      }
+      if (url === "/api/social/leaderboard") {
+        return Promise.resolve(
+          new Response(JSON.stringify(leaderboardPage(0, 2, true)), { status: 200 })
+        );
+      }
+      if (url.startsWith("/api/social/leaderboard?limit=")) {
+        // Server only ever has 4 entries total — a request for more than that
+        // (the fetchLeaderboard +1 buffer) is capped by what actually exists.
+        const requested = Number(new URL(url, "http://x").searchParams.get("limit"));
+        const count = Math.min(requested, 4);
+        return Promise.resolve(
+          new Response(JSON.stringify(leaderboardPage(0, count, false)), { status: 200 })
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ items: [], hasMore: false }), { status: 200 })
+      );
+    });
+
+    await act(async () => {
+      renderWithIntl(<SocialPage />);
+    });
+
+    // Leaderboard is the default tab — no tab click needed to see it.
+    await screen.findByTestId("leaderboard-count");
+    expect(screen.getByTestId("leaderboard-count")).toHaveTextContent("2");
+
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await act(async () => {});
+    expect(screen.getByTestId("leaderboard-count")).toHaveTextContent("4");
+
+    // Switching to Friends and firing a friend action re-fetches the
+    // leaderboard too (a new/changed friend can move leaderboard entries).
+    fireEvent.click(screen.getByRole("button", { name: "Friends" }));
+    fireEvent.click(screen.getByRole("button", { name: "friend-action-trigger" }));
+    await act(async () => {});
+
+    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
+    expect(screen.getByTestId("leaderboard-count")).toHaveTextContent("4");
+    expect(screen.getByTestId("leaderboard-entry-1")).toBeInTheDocument();
+    expect(screen.getByTestId("leaderboard-entry-2")).toBeInTheDocument();
+    expect(screen.getByTestId("leaderboard-entry-3")).toBeInTheDocument();
+    expect(screen.getByTestId("leaderboard-entry-4")).toBeInTheDocument();
   });
 });
