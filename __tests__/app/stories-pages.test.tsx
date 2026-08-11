@@ -100,13 +100,16 @@ describe("Stories pages — locale-aware rendering", () => {
   });
 
   it("index page shows the locale-specific name/tagline when present", async () => {
+    // First dynamic import of this module in the suite — under full-suite
+    // parallel load, first-time module transform/eval can exceed the
+    // default 5s test timeout even though the test itself is fast.
     mockGetUiLocale.mockResolvedValue("tr");
     const { default: StoriesPage } = await import("@/app/stories/page");
     const text = extractText(await StoriesPage());
     expect(text).toContain("Test Hikayesi");
     expect(text).toContain("Türkçe bir slogan");
     expect(text).not.toContain("Test Story");
-  });
+  }, 15000);
 
   it("index page falls back to English when no locale-specific field exists", async () => {
     mockGetUiLocale.mockResolvedValue("az");
