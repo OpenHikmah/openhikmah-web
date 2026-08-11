@@ -63,4 +63,29 @@ describe("MentionsPage — mark-as-read failure handling", () => {
     expect(useSocialStore.getState().pendingMentionCount).toBe(0);
     expect(screen.queryByText(/couldn.t mark mentions as read/i)).not.toBeInTheDocument();
   });
+
+  it("clears a stale mark-as-read error once a later retry succeeds", async () => {
+    let shouldFail = true;
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        return Promise.resolve(new Response(null, { status: shouldFail ? 500 : 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ items: [] }), { status: 200 }));
+    });
+
+    await act(async () => {
+      renderWithIntl(<MentionsPage />);
+    });
+
+    expect(await screen.findByText(/couldn.t mark mentions as read/i)).toBeInTheDocument();
+
+    // Simulate a token refresh, which re-runs the effect (deps: [accessToken]).
+    shouldFail = false;
+    await act(async () => {
+      useAuthStore.setState({ accessToken: "refreshed-token" });
+    });
+
+    expect(useSocialStore.getState().pendingMentionCount).toBe(0);
+    expect(screen.queryByText(/couldn.t mark mentions as read/i)).not.toBeInTheDocument();
+  });
 });

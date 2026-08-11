@@ -56,6 +56,7 @@ export default function MentionsPage() {
         if (cancelled) return;
         if (r.ok) {
           setPendingMentionCount(0);
+          setMarkReadError(false);
         } else {
           setMarkReadError(true);
         }
