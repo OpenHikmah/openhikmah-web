@@ -89,6 +89,19 @@ describe("useActivityTracker restore vs. genuine activity", () => {
     );
   });
 
+  it("does not fire an activity POST when appendWorkspace merges a loaded workspace", () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderHook(() => useActivityTracker());
+
+    act(() => {
+      useCanvasStore.getState().appendWorkspace(savedCanvasWith(2));
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("resumes firing for genuine additions after a restore", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
     vi.stubGlobal("fetch", fetchMock);

@@ -380,6 +380,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         edges,
         duplicateNodeIdsByRef: computeDuplicateMap(nodes),
         expansionCountsByNode: computeExpansionCountsMap(edges),
+        restoreToken: s.restoreToken + 1,
       };
     });
   },
