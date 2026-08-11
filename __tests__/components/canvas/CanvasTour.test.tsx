@@ -49,4 +49,15 @@ describe("CanvasTour", () => {
 
     document.body.removeChild(outside);
   });
+
+  it("positions in the top-right on desktop, not bottom-left where the canvas legend sits", async () => {
+    renderWithIntl(<CanvasTour />);
+    const dialog = await screen.findByRole("dialog");
+    const container = dialog.parentElement;
+
+    expect(container?.className).toMatch(/md:right-6/);
+    expect(container?.className).toMatch(/md:top-6/);
+    expect(container?.className).not.toMatch(/md:bottom-6/);
+    expect(container?.className).not.toMatch(/md:left-6/);
+  });
 });
