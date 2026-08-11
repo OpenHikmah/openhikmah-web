@@ -43,9 +43,8 @@ describe("ChallengeSuggestionsManager — duplicate-request guards", () => {
     render(<ChallengeSuggestionsManager />);
     await waitFor(() => expect(mockApi).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(screen.getByPlaceholderText("e.g. A week of patience"), {
-      target: { value: "New suggestion" },
-    });
+    const titleInput = screen.getByPlaceholderText("e.g. A week of patience");
+    fireEvent.change(titleInput, { target: { value: "New suggestion" } });
 
     const createButton = screen.getByRole("button", { name: "Create" });
     fireEvent.click(createButton);
@@ -53,7 +52,12 @@ describe("ChallengeSuggestionsManager — duplicate-request guards", () => {
     fireEvent.click(createButton);
 
     expect(mockApi).toHaveBeenCalledTimes(2); // initial load + exactly one POST
+
+    mockApi.mockResolvedValueOnce({ suggestions: [] }); // the reload() triggered after save
     save.resolve({});
+
+    // Settled: save() reset the form and re-enabled the (now-empty) input.
+    await waitFor(() => expect(titleInput).toHaveValue(""));
   });
 
   it("guards a row's toggle against a duplicate PUT on rapid double-click", async () => {
@@ -72,7 +76,12 @@ describe("ChallengeSuggestionsManager — duplicate-request guards", () => {
     fireEvent.click(toggleButton);
 
     expect(mockApi).toHaveBeenCalledTimes(2); // initial load + exactly one PUT
+
+    mockApi.mockResolvedValueOnce({ suggestions: [suggestion] }); // the reload() triggered after the PUT
     toggle.resolve({});
+
+    // Settled: busyId cleared, so the toggle can be clicked again.
+    await waitFor(() => expect(toggleButton).not.toBeDisabled());
   });
 
   it("disables Edit/Delete for other rows while one row's action is in flight", async () => {
@@ -88,9 +97,16 @@ describe("ChallengeSuggestionsManager — duplicate-request guards", () => {
     });
     fireEvent.click(toggleButton);
 
-    expect(screen.getByRole("button", { name: "Edit" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+    const editButton = screen.getByRole("button", { name: "Edit" });
+    const deleteButton = screen.getByRole("button", { name: "Delete" });
+    expect(editButton).toBeDisabled();
+    expect(deleteButton).toBeDisabled();
 
+    mockApi.mockResolvedValueOnce({ suggestions: [suggestion] }); // the reload() triggered after the PUT
     toggle.resolve({});
+
+    // Settled: busyId cleared, so the other row's controls are usable again.
+    await waitFor(() => expect(editButton).not.toBeDisabled());
+    expect(deleteButton).not.toBeDisabled();
   });
 });

@@ -43,9 +43,12 @@ export function ChallengeSuggestionsManager() {
 
   const editing = form.id !== null;
   const reset = () => setForm({ ...EMPTY });
+  // One request in flight at a time — save and row actions (toggle/remove)
+  // must not overlap, so guard and disable both against this single condition.
+  const busy = saving || busyId !== null;
 
   const save = async () => {
-    if (saving) return;
+    if (busy) return;
     setSaving(true);
     setMsg(null);
     const payload = {
@@ -80,7 +83,7 @@ export function ChallengeSuggestionsManager() {
     });
 
   const remove = async (id: number) => {
-    if (busyId !== null) return;
+    if (busy) return;
     setBusyId(id);
     setMsg(null);
     try {
@@ -95,7 +98,7 @@ export function ChallengeSuggestionsManager() {
   };
 
   const toggleActive = async (s: Suggestion) => {
-    if (busyId !== null) return;
+    if (busy) return;
     setBusyId(s.id);
     setMsg(null);
     try {
@@ -188,11 +191,11 @@ export function ChallengeSuggestionsManager() {
           </label>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="primary" onClick={save} disabled={saving || !form.title.trim()}>
+          <Button variant="primary" onClick={save} disabled={busy || !form.title.trim()}>
             {editing ? "Update" : "Create"}
           </Button>
           {editing && (
-            <Button variant="ghost" onClick={reset} disabled={saving}>
+            <Button variant="ghost" onClick={reset} disabled={busy}>
               Cancel
             </Button>
           )}
@@ -224,7 +227,7 @@ export function ChallengeSuggestionsManager() {
                 <Td>
                   <button
                     onClick={() => toggleActive(s)}
-                    disabled={busyId !== null}
+                    disabled={busy}
                     aria-label={`${s.isActive ? "Deactivate" : "Activate"} suggestion "${s.title}"`}
                     className="disabled:opacity-50"
                   >
@@ -235,17 +238,12 @@ export function ChallengeSuggestionsManager() {
                 </Td>
                 <Td>
                   <div className="flex justify-end gap-1.5">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => edit(s)}
-                      disabled={busyId !== null}
-                    >
+                    <Button size="sm" variant="secondary" onClick={() => edit(s)} disabled={busy}>
                       Edit
                     </Button>
                     <ConfirmButton
                       onConfirm={() => remove(s.id)}
-                      disabled={busyId !== null}
+                      disabled={busy}
                       confirmLabel="Delete?"
                     >
                       Delete
