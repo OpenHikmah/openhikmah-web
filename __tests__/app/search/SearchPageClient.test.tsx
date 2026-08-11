@@ -1,10 +1,11 @@
-import { screen, act } from "@testing-library/react";
+import { screen, act, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderWithIntl } from "../../test-utils/render-with-intl";
 
-const mockSearchParams = new URLSearchParams({ q: "mercy" });
+let mockSearchParams = new URLSearchParams({ q: "mercy" });
+const mockReplace = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: mockReplace }),
   useSearchParams: () => mockSearchParams,
   usePathname: () => "/search",
 }));
@@ -112,5 +113,93 @@ describe("SearchPageClient — re-fetches when the UI language changes", () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(screen.getByText(turkishResult.translation)).toBeInTheDocument();
+  });
+});
+
+describe("SearchPageClient — direct navigation clears a pending debounced navigation", () => {
+  const mockFetch = vi.fn();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockSearchParams = new URLSearchParams();
+    mockReplace.mockReset();
+    vi.stubGlobal("fetch", mockFetch);
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ results: [], total: 0, page: 1, pageSize: 20 }), {
+        status: 200,
+      })
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("clicking an example chip before the debounce fires wins, not the stale typed query", async () => {
+    renderWithIntl(<SearchPageClient />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: /search verses/i }), {
+      target: { value: "some other query" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Mercy" }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith(
+      expect.stringContaining(`q=${encodeURIComponent("Mercy")}`)
+    );
+  });
+
+  it("clicking a pagination link before the debounce fires cancels the stale debounce", async () => {
+    // Pagination navigates via a plain <Link>, not navigate() — it needs its
+    // own explicit debounce-cancel, unlike the chip/mode-toggle paths above.
+    mockSearchParams = new URLSearchParams({ q: "mercy" });
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          results: [
+            {
+              // en.sahih (Saheeh International, alquran.cloud) — Al-Baqarah 2:255.
+              ref: "2:255",
+              surahName: "Al-Baqarah",
+              surahNameArabic: "البقرة",
+              snippet: "Allah - there is no deity except Him.",
+              arabicText: "الله لا إله إلا هو",
+              translation: "Allah - there is no deity except Him.",
+            },
+          ],
+          total: 25,
+          page: 1,
+          pageSize: 20,
+        }),
+        { status: 200 }
+      )
+    );
+
+    await act(async () => {
+      renderWithIntl(<SearchPageClient />);
+    });
+
+    // Type a new query — arms the 400ms debounce for a *different* navigation.
+    fireEvent.change(screen.getByRole("textbox", { name: /search verses/i }), {
+      target: { value: "some other query" },
+    });
+
+    // Click a pagination link before the debounce elapses.
+    fireEvent.click(screen.getByRole("link", { name: "2" }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    // The stale debounced navigate() for the typed query must never fire.
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });
