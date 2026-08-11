@@ -242,8 +242,12 @@ export function Header({ onSearchOpen }: HeaderProps) {
       fetch("/api/social/friends?limit=200", {
         headers: { Authorization: `Bearer ${accessToken}` },
       })
-        .then((r) => (r.ok ? r.json() : { items: [] }))
-        .then((data: { items: { status: string; direction: string }[] }) => {
+        // A failed poll keeps the previously-displayed count rather than
+        // resetting it to 0 — a transient 5xx/network hiccup shouldn't make
+        // an already-shown badge disappear.
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data: { items: { status: string; direction: string }[] } | null) => {
+          if (!data) return;
           const count = data.items.filter(
             (f) => f.status === "pending" && f.direction === "received"
           ).length;
@@ -264,8 +268,13 @@ export function Header({ onSearchOpen }: HeaderProps) {
       fetch("/api/social/mentions?limit=1", {
         headers: { Authorization: `Bearer ${accessToken}` },
       })
-        .then((r) => (r.ok ? r.json() : { unreadCount: 0 }))
-        .then((data: { unreadCount: number }) => setPendingMentionCount(data.unreadCount))
+        // Same reasoning as the friend-request poll above: keep the
+        // previously-displayed count on failure instead of zeroing it.
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data: { unreadCount: number } | null) => {
+          if (!data) return;
+          setPendingMentionCount(data.unreadCount);
+        })
         .catch((e) => console.error("header: mention poll failed", e));
     load();
     const interval = setInterval(load, 60_000);
