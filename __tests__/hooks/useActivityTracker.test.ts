@@ -21,6 +21,8 @@ const baseVerse: Verse = {
   surahNameArabic: "البقرة",
 };
 
+// Every generated node reuses baseVerse's real ref/text — only id and position
+// vary — so no fixture ever pairs a synthetic ref with mismatched Arabic/translation.
 function savedCanvasWith(count: number) {
   return {
     v: 1 as const,
@@ -28,11 +30,7 @@ function savedCanvasWith(count: number) {
       id: `node-${i + 1}`,
       x: i * 300,
       y: 0,
-      verse: {
-        ...baseVerse,
-        ayah: 255 + i,
-        ref: `2:${255 + i}` as Verse["ref"],
-      },
+      verse: baseVerse,
     })),
     edges: [],
   };
