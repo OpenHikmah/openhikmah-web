@@ -86,7 +86,13 @@ export default function SocialPage() {
     if (!accessToken) return;
     setLoadingFriends(true);
     try {
-      const res = await fetch("/api/social/friends", {
+      // Re-fetch the same number of items already loaded (via "Load more")
+      // instead of always resetting to the first page — otherwise an
+      // unrelated friend action (accept/decline/remove) would silently
+      // discard any extra pages the user had loaded.
+      const url =
+        friends.length > 0 ? `/api/social/friends?limit=${friends.length}` : "/api/social/friends";
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (res.ok) {
@@ -104,7 +110,7 @@ export default function SocialPage() {
     } finally {
       setLoadingFriends(false);
     }
-  }, [accessToken, setPendingFriendCount]);
+  }, [accessToken, friends.length, setPendingFriendCount]);
 
   const loadMoreFriends = useCallback(async () => {
     if (!accessToken || loadingMoreFriends) return;
@@ -127,7 +133,13 @@ export default function SocialPage() {
     if (!accessToken) return;
     setLoadingLeaderboard(true);
     try {
-      const res = await fetch("/api/social/leaderboard", {
+      // Same reasoning as fetchFriends: preserve however many entries were
+      // already loaded rather than resetting to the first page.
+      const url =
+        leaderboard.length > 0
+          ? `/api/social/leaderboard?limit=${leaderboard.length}`
+          : "/api/social/leaderboard";
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (res.ok) {
@@ -143,7 +155,7 @@ export default function SocialPage() {
     } finally {
       setLoadingLeaderboard(false);
     }
-  }, [accessToken]);
+  }, [accessToken, leaderboard.length]);
 
   const loadMoreLeaderboard = useCallback(async () => {
     if (!accessToken || loadingMoreLeaderboard) return;
