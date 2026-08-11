@@ -42,4 +42,21 @@ describe("AdminShell — responsive mobile layout", () => {
 
     expect(screen.queryByRole("button", { name: "Close menu" })).not.toBeInTheDocument();
   });
+
+  it("closes on an outside click, but not on a click on the hamburger trigger itself", () => {
+    renderShell();
+
+    const trigger = screen.getByRole("button", { name: "Open menu" });
+    fireEvent.click(trigger);
+    expect(screen.getByRole("button", { name: "Close menu" })).toBeInTheDocument();
+
+    // A mousedown on the trigger (e.g. re-clicking it to close) must not be
+    // treated as an "outside" click — that raced with the trigger's own click
+    // toggle in a past bug (MoreSheet, commit d8ea69e) and reopened the panel.
+    fireEvent.mouseDown(trigger);
+    expect(screen.getByRole("button", { name: "Close menu" })).toBeInTheDocument();
+
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole("button", { name: "Close menu" })).not.toBeInTheDocument();
+  });
 });
