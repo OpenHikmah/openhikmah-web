@@ -127,6 +127,14 @@ export function SearchPageClient() {
 
   const navigate = useCallback(
     (nextQ: string, nextMode: SearchMode, nextPage: number) => {
+      // Any direct navigation (example chip, mode toggle, pagination) should win
+      // over a still-pending debounced navigation from earlier typing — otherwise
+      // the stale debounce fires ~400ms later and silently reverts the URL/search
+      // back to the query the user has already moved past.
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
       if (!nextQ.trim()) {
         router.replace("/search");
         return;

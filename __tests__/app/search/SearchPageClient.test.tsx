@@ -1,10 +1,11 @@
-import { screen, act } from "@testing-library/react";
+import { screen, act, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderWithIntl } from "../../test-utils/render-with-intl";
 
-const mockSearchParams = new URLSearchParams({ q: "mercy" });
+let mockSearchParams = new URLSearchParams({ q: "mercy" });
+const mockReplace = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: mockReplace }),
   useSearchParams: () => mockSearchParams,
   usePathname: () => "/search",
 }));
@@ -112,5 +113,52 @@ describe("SearchPageClient — re-fetches when the UI language changes", () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(screen.getByText(turkishResult.translation)).toBeInTheDocument();
+  });
+});
+
+describe("SearchPageClient — direct navigation clears a pending debounced navigation", () => {
+  const mockFetch = vi.fn();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockSearchParams = new URLSearchParams();
+    mockReplace.mockReset();
+    vi.stubGlobal("fetch", mockFetch);
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ results: [], total: 0, page: 1, pageSize: 20 }), {
+        status: 200,
+      })
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("clicking an example chip before the debounce fires wins, not the stale typed query", async () => {
+    renderWithIntl(<SearchPageClient />);
+
+    // Type a query — starts the 400ms debounce that would otherwise call
+    // navigate("Patience search term", ...) once it fires.
+    fireEvent.change(screen.getByRole("textbox", { name: /search verses/i }), {
+      target: { value: "some other query" },
+    });
+
+    // Click an example chip before the debounce elapses.
+    fireEvent.click(screen.getByRole("button", { name: "Mercy" }));
+
+    // Let the original 400ms debounce timer (if not cleared) fire.
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    // Only the chip's direct navigate() call should have gone through — the
+    // stale debounced call for the typed query must not have fired at all.
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith(
+      expect.stringContaining(`q=${encodeURIComponent("Mercy")}`)
+    );
   });
 });
