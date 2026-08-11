@@ -51,6 +51,10 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Separate from `abortRef` (the search/preview debounce) so selecting a result
+  // doesn't get cancelled by unrelated search-input activity — only by the
+  // dialog closing, which is the actual bug this guards against.
+  const selectAbortRef = useRef<AbortController | null>(null);
 
   const addVerseNode = useCanvasStore((s) => s.addVerseNode);
   const setPendingAutoExpand = useCanvasStore((s) => s.setPendingAutoExpand);
@@ -183,16 +187,24 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
   const loadSeedVerse = useCallback(
     async (ref: string) => {
+      selectAbortRef.current?.abort();
+      const controller = new AbortController();
+      selectAbortRef.current = controller;
       setLoading(true);
       try {
-        const res = await fetch(`/api/verse/${ref.replace(":", "/")}`);
+        const res = await fetch(`/api/verse/${ref.replace(":", "/")}`, {
+          signal: controller.signal,
+        });
         if (!res.ok) throw new Error();
         const verse: Verse = await res.json();
         mapConnections(verse);
-      } catch {
-        // silent — seed verses are curated and should always exist
+      } catch (err) {
+        // An abort (dialog closed mid-fetch) is expected, not a failure to surface.
+        if ((err as Error).name === "AbortError") return;
+        console.error("Failed to fetch seed verse:", err);
+        setSelectError(true);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     },
     [mapConnections]
@@ -200,18 +212,24 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
   const selectResult = useCallback(
     async (result: SearchResult) => {
+      selectAbortRef.current?.abort();
+      const controller = new AbortController();
+      selectAbortRef.current = controller;
       setLoading(true);
       setSelectError(false);
       try {
-        const res = await fetch(`/api/verse/${result.ref.replace(":", "/")}`);
+        const res = await fetch(`/api/verse/${result.ref.replace(":", "/")}`, {
+          signal: controller.signal,
+        });
         if (!res.ok) throw new Error();
         const verse: Verse = await res.json();
         mapConnections(verse);
       } catch (err) {
+        if ((err as Error).name === "AbortError") return;
         console.error("Failed to fetch selected search result:", err);
         setSelectError(true);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     },
     [mapConnections]
@@ -224,6 +242,37 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     onClose();
   }, [query, mode, router, onClose]);
 
+  // Cancels in-flight requests and resets all dialog state. Run from an effect
+  // on `open` rather than inline in onOpenChange/onClose, so a parent-controlled
+  // close (the `open` prop flipping to false from outside a Radix-internal
+  // trigger — e.g. the X button's onClick calling onClose directly) can't leave
+  // the selection request running with stale state underneath it.
+  const cancelAndReset = useCallback(() => {
+    abortRef.current?.abort();
+    selectAbortRef.current?.abort();
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setQuery("");
+    setPreviewVerse(null);
+    setSearchResults([]);
+    setTotalResults(0);
+    setPreviewError(false);
+    setLoading(false);
+    setIsSearching(false);
+    setFellBackToKeyword(false);
+    setSearchError(null);
+    setMode("keyword");
+    setHighlightedIndex(-1);
+    setSelectError(false);
+  }, []);
+
+  useEffect(() => {
+    // Legitimate external-prop sync: `open` is owned by the parent, not derived
+    // from this component's own state, so reacting to it here isn't the
+    // derived-state antipattern the set-state-in-effect rule normally guards.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!open) cancelAndReset();
+  }, [open, cancelAndReset]);
+
   const busy = loading || isSearching;
   const showSeedVerses = !query.trim();
   const showPreview = !!previewVerse && !loading;
@@ -233,24 +282,9 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     <Dialog.Root
       open={open}
       onOpenChange={(o) => {
-        if (!o) {
-          // Reset all state and cancel requests when dialog closes
-          abortRef.current?.abort();
-          if (debounceRef.current) clearTimeout(debounceRef.current);
-          setQuery("");
-          setPreviewVerse(null);
-          setSearchResults([]);
-          setTotalResults(0);
-          setPreviewError(false);
-          setLoading(false);
-          setIsSearching(false);
-          setFellBackToKeyword(false);
-          setSearchError(null);
-          setMode("keyword");
-          setHighlightedIndex(-1);
-          setSelectError(false);
-          onClose();
-        }
+        // cancelAndReset runs from the `open` effect above, regardless of what
+        // triggered the close — this just notifies the parent.
+        if (!o) onClose();
       }}
     >
       <Dialog.Portal>
