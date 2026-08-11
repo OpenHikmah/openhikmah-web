@@ -51,6 +51,10 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Separate from `abortRef` (the search/preview debounce) so selecting a result
+  // doesn't get cancelled by unrelated search-input activity — only by the
+  // dialog closing, which is the actual bug this guards against.
+  const selectAbortRef = useRef<AbortController | null>(null);
 
   const addVerseNode = useCanvasStore((s) => s.addVerseNode);
   const setPendingAutoExpand = useCanvasStore((s) => s.setPendingAutoExpand);
@@ -183,16 +187,23 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
   const loadSeedVerse = useCallback(
     async (ref: string) => {
+      selectAbortRef.current?.abort();
+      const controller = new AbortController();
+      selectAbortRef.current = controller;
       setLoading(true);
       try {
-        const res = await fetch(`/api/verse/${ref.replace(":", "/")}`);
+        const res = await fetch(`/api/verse/${ref.replace(":", "/")}`, {
+          signal: controller.signal,
+        });
         if (!res.ok) throw new Error();
         const verse: Verse = await res.json();
         mapConnections(verse);
-      } catch {
-        // silent — seed verses are curated and should always exist
+      } catch (err) {
+        // silent — seed verses are curated and should always exist; an abort
+        // (dialog closed mid-fetch) is expected, not a failure to surface
+        if ((err as Error).name === "AbortError") return;
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     },
     [mapConnections]
@@ -200,18 +211,24 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
   const selectResult = useCallback(
     async (result: SearchResult) => {
+      selectAbortRef.current?.abort();
+      const controller = new AbortController();
+      selectAbortRef.current = controller;
       setLoading(true);
       setSelectError(false);
       try {
-        const res = await fetch(`/api/verse/${result.ref.replace(":", "/")}`);
+        const res = await fetch(`/api/verse/${result.ref.replace(":", "/")}`, {
+          signal: controller.signal,
+        });
         if (!res.ok) throw new Error();
         const verse: Verse = await res.json();
         mapConnections(verse);
       } catch (err) {
+        if ((err as Error).name === "AbortError") return;
         console.error("Failed to fetch selected search result:", err);
         setSelectError(true);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     },
     [mapConnections]
@@ -236,6 +253,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
         if (!o) {
           // Reset all state and cancel requests when dialog closes
           abortRef.current?.abort();
+          selectAbortRef.current?.abort();
           if (debounceRef.current) clearTimeout(debounceRef.current);
           setQuery("");
           setPreviewVerse(null);
