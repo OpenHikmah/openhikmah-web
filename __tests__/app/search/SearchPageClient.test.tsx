@@ -161,4 +161,50 @@ describe("SearchPageClient — direct navigation clears a pending debounced navi
       expect.stringContaining(`q=${encodeURIComponent("Mercy")}`)
     );
   });
+
+  it("clicking a pagination link before the debounce fires cancels the stale debounce", async () => {
+    // Pagination navigates via a plain <Link>, not navigate() — it needs its
+    // own explicit debounce-cancel, unlike the chip/mode-toggle paths above.
+    mockSearchParams = new URLSearchParams({ q: "mercy" });
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          results: [
+            {
+              ref: "2:255",
+              surahName: "Al-Baqarah",
+              surahNameArabic: "البقرة",
+              snippet: "Allah - there is no deity except Him.",
+              arabicText: "الله لا إله إلا هو",
+              translation: "Allah - there is no deity except Him.",
+            },
+          ],
+          total: 25,
+          page: 1,
+          pageSize: 20,
+        }),
+        { status: 200 }
+      )
+    );
+
+    await act(async () => {
+      renderWithIntl(<SearchPageClient />);
+    });
+
+    // Type a new query — arms the 400ms debounce for a *different* navigation.
+    fireEvent.change(screen.getByRole("textbox", { name: /search verses/i }), {
+      target: { value: "some other query" },
+    });
+
+    // Click a pagination link before the debounce elapses.
+    fireEvent.click(screen.getByRole("link", { name: "2" }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    // The stale debounced navigate() for the typed query must never fire.
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
 });

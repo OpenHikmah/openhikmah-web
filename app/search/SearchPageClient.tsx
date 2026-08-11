@@ -125,23 +125,29 @@ export function SearchPageClient() {
     return () => controller.abort();
   }, [q, mode, page, retryCount, uiLocale]);
 
+  // Any direct navigation (example chip, mode toggle, navigate() calls in general)
+  // should win over a still-pending debounced navigation from earlier typing —
+  // otherwise the stale debounce fires ~400ms later and silently reverts the
+  // URL/search back to the query the user has already moved past. Pagination
+  // links navigate via plain <Link> rather than navigate(), so they call this
+  // directly too (see the Pagination onClick below).
+  const cancelPendingDebounce = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+  }, []);
+
   const navigate = useCallback(
     (nextQ: string, nextMode: SearchMode, nextPage: number) => {
-      // Any direct navigation (example chip, mode toggle, pagination) should win
-      // over a still-pending debounced navigation from earlier typing — otherwise
-      // the stale debounce fires ~400ms later and silently reverts the URL/search
-      // back to the query the user has already moved past.
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-        debounceRef.current = null;
-      }
+      cancelPendingDebounce();
       if (!nextQ.trim()) {
         router.replace("/search");
         return;
       }
       router.replace(buildHref(nextQ.trim(), nextMode, nextPage));
     },
-    [router]
+    [router, cancelPendingDebounce]
   );
 
   const onInputChange = (value: string) => {
@@ -267,6 +273,7 @@ export function SearchPageClient() {
               page={page}
               totalPages={totalPages}
               href={(p) => buildHref(q, mode, p)}
+              onClick={cancelPendingDebounce}
               className="mt-8"
             />
           </>

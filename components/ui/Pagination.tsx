@@ -8,6 +8,8 @@ export interface PaginationProps {
   /** Builds the href for a given page number, e.g. `(p) => `/search?q=x&page=${p}`` */
   href: (page: number) => string;
   className?: string;
+  /** Fired on click, before the Link navigates — e.g. to cancel a pending debounced navigation. */
+  onClick?: () => void;
 }
 
 const SIBLINGS = 1;
@@ -27,7 +29,7 @@ function pageRange(page: number, totalPages: number): Array<number | "ellipsis">
   return result;
 }
 
-export function Pagination({ page, totalPages, href, className }: PaginationProps) {
+export function Pagination({ page, totalPages, href, className, onClick }: PaginationProps) {
   if (totalPages <= 1) return null;
 
   return (
@@ -38,6 +40,7 @@ export function Pagination({ page, totalPages, href, className }: PaginationProp
       <PageLink
         page={page - 1}
         href={href}
+        onClick={onClick}
         disabled={page <= 1}
         aria-label="Previous page"
         className="px-2"
@@ -51,7 +54,7 @@ export function Pagination({ page, totalPages, href, className }: PaginationProp
             …
           </span>
         ) : (
-          <PageLink key={p} page={p} href={href} active={p === page}>
+          <PageLink key={p} page={p} href={href} onClick={onClick} active={p === page}>
             {p}
           </PageLink>
         )
@@ -60,6 +63,7 @@ export function Pagination({ page, totalPages, href, className }: PaginationProp
       <PageLink
         page={page + 1}
         href={href}
+        onClick={onClick}
         disabled={page >= totalPages}
         aria-label="Next page"
         className="px-2"
