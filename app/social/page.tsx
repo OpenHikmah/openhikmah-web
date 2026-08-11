@@ -89,9 +89,14 @@ export default function SocialPage() {
       // Re-fetch the same number of items already loaded (via "Load more")
       // instead of always resetting to the first page — otherwise an
       // unrelated friend action (accept/decline/remove) would silently
-      // discard any extra pages the user had loaded.
+      // discard any extra pages the user had loaded. +1 covers a request
+      // just sent (AddFriendForm's onAdded also calls this): rows are
+      // ordered newest-first, so without the buffer the new row would push
+      // the previously-last-visible friend out of the re-fetched count.
       const url =
-        friends.length > 0 ? `/api/social/friends?limit=${friends.length}` : "/api/social/friends";
+        friends.length > 0
+          ? `/api/social/friends?limit=${friends.length + 1}`
+          : "/api/social/friends";
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
@@ -133,11 +138,11 @@ export default function SocialPage() {
     if (!accessToken) return;
     setLoadingLeaderboard(true);
     try {
-      // Same reasoning as fetchFriends: preserve however many entries were
-      // already loaded rather than resetting to the first page.
+      // Same reasoning as fetchFriends (including the +1 buffer — a new
+      // friend also adds a leaderboard entry).
       const url =
         leaderboard.length > 0
-          ? `/api/social/leaderboard?limit=${leaderboard.length}`
+          ? `/api/social/leaderboard?limit=${leaderboard.length + 1}`
           : "/api/social/leaderboard";
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${accessToken}` },

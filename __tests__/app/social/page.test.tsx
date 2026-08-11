@@ -17,9 +17,14 @@ vi.mock("@/components/social/AddFriendForm", () => ({
 }));
 
 vi.mock("@/components/social/FriendList", () => ({
-  FriendList: ({ friends, onUpdate }: { friends: unknown[]; onUpdate: () => void }) => (
+  FriendList: ({ friends, onUpdate }: { friends: { id: number }[]; onUpdate: () => void }) => (
     <div>
       <div data-testid="friends-count">{friends.length}</div>
+      <ul>
+        {friends.map((f) => (
+          <li key={f.id} data-testid={`friend-${f.id}`} />
+        ))}
+      </ul>
       <button onClick={onUpdate}>friend-action-trigger</button>
     </div>
   ),
@@ -91,9 +96,13 @@ describe("SocialPage — friend actions preserve loaded pages", () => {
         );
       }
       if (url.startsWith("/api/social/friends?limit=")) {
-        const limit = Number(new URL(url, "http://x").searchParams.get("limit"));
+        // Server only ever has 4 friends total — a request for more than that
+        // (the fetchFriends +1 buffer) is capped by what actually exists,
+        // not fabricated, matching how a real paginated endpoint behaves.
+        const requested = Number(new URL(url, "http://x").searchParams.get("limit"));
+        const count = Math.min(requested, 4);
         return Promise.resolve(
-          new Response(JSON.stringify(friendsPage(0, limit, limit < 4)), { status: 200 })
+          new Response(JSON.stringify(friendsPage(0, count, false)), { status: 200 })
         );
       }
       return Promise.resolve(
@@ -120,5 +129,51 @@ describe("SocialPage — friend actions preserve loaded pages", () => {
     await act(async () => {});
 
     expect(screen.getByTestId("friends-count")).toHaveTextContent("4");
+  });
+
+  it("does not drop a previously-visible friend when a new friend is added", async () => {
+    // Server has 2 friends (ids 1, 2, newest-first). Adding a friend makes it
+    // 3 (id 99 newest). fetchFriends captures the OLD count (2) before the
+    // add — without the +1 buffer, requesting limit=2 against a newest-first
+    // list would return [99, 2], silently dropping id 1 from view.
+    mockFetch.mockImplementation((url: string) => {
+      if (url === "/api/social/friends") {
+        return Promise.resolve(
+          new Response(JSON.stringify(friendsPage(0, 2, false)), { status: 200 })
+        );
+      }
+      if (url.startsWith("/api/social/friends?limit=")) {
+        const requested = Number(new URL(url, "http://x").searchParams.get("limit"));
+        const all = [
+          { id: 99, status: "accepted", direction: "sent", friend: { id: 99, username: "new" } },
+          { id: 2, status: "accepted", direction: "sent", friend: { id: 2, username: "user2" } },
+          { id: 1, status: "accepted", direction: "sent", friend: { id: 1, username: "user1" } },
+        ];
+        return Promise.resolve(
+          new Response(JSON.stringify({ items: all.slice(0, requested), hasMore: false }), {
+            status: 200,
+          })
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ items: [], hasMore: false }), { status: 200 })
+      );
+    });
+
+    await act(async () => {
+      renderWithIntl(<SocialPage />);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Friends" }));
+    await screen.findByTestId("friends-count");
+    expect(screen.getByTestId("friend-1")).toBeInTheDocument();
+    expect(screen.getByTestId("friend-2")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "add-friend-trigger" }));
+    await act(async () => {});
+
+    expect(screen.getByTestId("friend-1")).toBeInTheDocument();
+    expect(screen.getByTestId("friend-2")).toBeInTheDocument();
+    expect(screen.getByTestId("friend-99")).toBeInTheDocument();
   });
 });
