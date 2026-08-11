@@ -36,11 +36,17 @@ export function ChallengeSuggestionsManager() {
   );
   const [form, setForm] = useState({ ...EMPTY });
   const [msg, setMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  // Id of the suggestion currently being toggled/removed — blocks overlapping
+  // row actions so a double-click can't fire duplicate PUT/DELETE requests.
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   const editing = form.id !== null;
   const reset = () => setForm({ ...EMPTY });
 
   const save = async () => {
+    if (saving) return;
+    setSaving(true);
     setMsg(null);
     const payload = {
       ...(editing ? { id: form.id } : {}),
@@ -57,6 +63,8 @@ export function ChallengeSuggestionsManager() {
       reload();
     } catch (e) {
       setMsg(e instanceof AdminApiError ? e.message : "Save failed.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -72,6 +80,8 @@ export function ChallengeSuggestionsManager() {
     });
 
   const remove = async (id: number) => {
+    if (busyId !== null) return;
+    setBusyId(id);
     setMsg(null);
     try {
       await api(`/challenge-suggestions?id=${id}`, { method: "DELETE" });
@@ -79,10 +89,14 @@ export function ChallengeSuggestionsManager() {
       reload();
     } catch (e) {
       setMsg(e instanceof AdminApiError ? e.message : "Delete failed.");
+    } finally {
+      setBusyId(null);
     }
   };
 
   const toggleActive = async (s: Suggestion) => {
+    if (busyId !== null) return;
+    setBusyId(s.id);
     setMsg(null);
     try {
       await api("/challenge-suggestions", {
@@ -100,6 +114,8 @@ export function ChallengeSuggestionsManager() {
       reload();
     } catch (e) {
       setMsg(e instanceof AdminApiError ? e.message : "Update failed.");
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -172,11 +188,11 @@ export function ChallengeSuggestionsManager() {
           </label>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="primary" onClick={save} disabled={!form.title.trim()}>
+          <Button variant="primary" onClick={save} disabled={saving || !form.title.trim()}>
             {editing ? "Update" : "Create"}
           </Button>
           {editing && (
-            <Button variant="ghost" onClick={reset}>
+            <Button variant="ghost" onClick={reset} disabled={saving}>
               Cancel
             </Button>
           )}
@@ -208,7 +224,9 @@ export function ChallengeSuggestionsManager() {
                 <Td>
                   <button
                     onClick={() => toggleActive(s)}
+                    disabled={busyId !== null}
                     aria-label={`${s.isActive ? "Deactivate" : "Activate"} suggestion "${s.title}"`}
+                    className="disabled:opacity-50"
                   >
                     <Pill tone={s.isActive ? "active" : "retired"}>
                       {s.isActive ? "on" : "off"}
@@ -217,10 +235,19 @@ export function ChallengeSuggestionsManager() {
                 </Td>
                 <Td>
                   <div className="flex justify-end gap-1.5">
-                    <Button size="sm" variant="secondary" onClick={() => edit(s)}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => edit(s)}
+                      disabled={busyId !== null}
+                    >
                       Edit
                     </Button>
-                    <ConfirmButton onConfirm={() => remove(s.id)} confirmLabel="Delete?">
+                    <ConfirmButton
+                      onConfirm={() => remove(s.id)}
+                      disabled={busyId !== null}
+                      confirmLabel="Delete?"
+                    >
                       Delete
                     </ConfirmButton>
                   </div>
