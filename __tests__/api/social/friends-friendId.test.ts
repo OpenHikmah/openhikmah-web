@@ -6,6 +6,11 @@ vi.mock("@/lib/auth/social-auth", () => ({
   requireUser: vi.fn(),
 }));
 
+// Captures each chained call's method name + arguments (in addition to the
+// usual thenable passthrough) so tests can assert on the actual .where()
+// predicate the route built — not just on the mocked resolved value, which
+// would pass identically even if the route queried by the wrong column.
+let whereCalls: unknown[] = [];
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
@@ -17,7 +22,10 @@ function makeDbChain(resolveWith: unknown = []) {
         if (prop === "then")
           return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
             Promise.resolve(resolveWith).then(res, rej);
-        return () => chain;
+        return (...args: unknown[]) => {
+          if (prop === "where") whereCalls.push(args[0]);
+          return chain;
+        };
       },
       apply() {
         return chain;
@@ -25,6 +33,16 @@ function makeDbChain(resolveWith: unknown = []) {
     }
   );
   return chain;
+}
+
+// drizzle's eq()/and() build a plain, JSON-serializable SQL-chunk tree (once
+// functions are stripped) — stringifying it is a cheap way to assert the
+// built predicate actually references the expected column and value,
+// without coupling to drizzle's exact internal shape.
+function whereJSON(cond: unknown): string {
+  // Drizzle column objects hold a circular back-reference to their table
+  // (column.table.columns[...] === column) — drop it along with functions.
+  return JSON.stringify(cond, (k, v) => (typeof v === "function" || k === "table" ? undefined : v));
 }
 
 const { mockSelect, mockUpdate, mockDelete } = vi.hoisted(() => ({
@@ -80,6 +98,7 @@ function params(friendId = "1") {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  whereCalls = [];
 });
 
 describe("PATCH /api/social/friends/[friendId]", () => {
@@ -117,6 +136,12 @@ describe("PATCH /api/social/friends/[friendId]", () => {
     const body = await res.json();
     expect(body).toEqual({ id: 1, status: "accepted" });
     expect(mockUpdate).toHaveBeenCalled();
+    // The lookup must be scoped by addresseeId (not e.g. requesterId) — this
+    // inspects the actual predicate the route built, not just the mocked
+    // return value, so a route bug that queried the wrong column would fail
+    // this assertion regardless of what mockSelect is told to resolve with.
+    expect(whereJSON(whereCalls[0])).toContain('"addressee_id"');
+    expect(whereJSON(whereCalls[0])).toContain("2");
   });
 
   it("the addressee can decline a pending request", async () => {
@@ -134,8 +159,11 @@ describe("PATCH /api/social/friends/[friendId]", () => {
   });
 
   it("rejects the requester (or any non-addressee) trying to accept/decline their own outgoing request", async () => {
-    // The requester's own id can never match the addresseeId filter the route
-    // queries by, so the DB lookup returns no row for them.
+    // A real DB would return no row here because the requester's id doesn't
+    // match the addresseeId filter — simulate that via an empty mock result,
+    // then separately assert (below) that the route actually queried by
+    // addresseeId=1 (the requester's own id), proving *why* a real lookup
+    // would find nothing: this scopes by addressee, not requester.
     const requester = makeUser({ id: 1 });
     authedAs(requester);
     mockSelect.mockReturnValue(makeDbChain([]));
@@ -144,6 +172,8 @@ describe("PATCH /api/social/friends/[friendId]", () => {
 
     expect(res.status).toBe(404);
     expect(mockUpdate).not.toHaveBeenCalled();
+    expect(whereJSON(whereCalls[0])).toContain('"addressee_id"');
+    expect(whereJSON(whereCalls[0])).not.toContain('"requester_id"');
   });
 
   it("rejects re-resolving a request that's already accepted/declined", async () => {
@@ -184,6 +214,10 @@ describe("DELETE /api/social/friends/[friendId]", () => {
 
     expect(res.status).toBe(200);
     expect(mockDelete).toHaveBeenCalled();
+    // Lookup must be OR'd across both requesterId and addresseeId — this
+    // inspects the actual predicate built, not just the mocked return value.
+    expect(whereJSON(whereCalls[0])).toContain('"requester_id"');
+    expect(whereJSON(whereCalls[0])).toContain('"addressee_id"');
   });
 
   it("the addressee can also remove the friendship", async () => {
@@ -195,11 +229,14 @@ describe("DELETE /api/social/friends/[friendId]", () => {
 
     expect(res.status).toBe(200);
     expect(mockDelete).toHaveBeenCalled();
+    expect(whereJSON(whereCalls[0])).toContain("2");
   });
 
   it("rejects an unrelated third party trying to remove someone else's friendship", async () => {
-    // Neither requesterId nor addresseeId matches this user, so the DB's
-    // OR-filtered lookup returns no row for them.
+    // A real DB would return no row here because this user's id matches
+    // neither requesterId nor addresseeId — simulate that via an empty mock
+    // result, then separately assert the route actually queried by both
+    // columns OR'd together, scoped to this user's id (99).
     const outsider = makeUser({ id: 99 });
     authedAs(outsider);
     mockSelect.mockReturnValue(makeDbChain([]));
@@ -208,5 +245,8 @@ describe("DELETE /api/social/friends/[friendId]", () => {
 
     expect(res.status).toBe(404);
     expect(mockDelete).not.toHaveBeenCalled();
+    expect(whereJSON(whereCalls[0])).toContain('"requester_id"');
+    expect(whereJSON(whereCalls[0])).toContain('"addressee_id"');
+    expect(whereJSON(whereCalls[0])).toContain("99");
   });
 });

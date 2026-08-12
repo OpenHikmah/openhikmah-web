@@ -28,7 +28,7 @@ function makeDbChain(resolveWith: unknown = []) {
 }
 
 const { mockSelect } = vi.hoisted(() => ({
-  mockSelect: vi.fn(() => makeDbChain([])),
+  mockSelect: vi.fn((_projection: Record<string, unknown>) => makeDbChain([])),
 }));
 vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect } }));
 
@@ -87,6 +87,15 @@ describe("GET /api/social/challenge-suggestions", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.suggestions).toEqual([row]);
+    // `db.select({...})`'s projection argument is the actual mechanism that
+    // drops createdBy — inspect it directly (mockSelect is called, not
+    // chained, so its own mock.calls captures the real argument) rather than
+    // relying only on the mocked row already matching the expected shape.
+    const projection = mockSelect.mock.calls[0][0];
+    expect(Object.keys(projection).sort()).toEqual(
+      ["description", "id", "suggestedDuration", "title", "verseRef"].sort()
+    );
+    expect(projection).not.toHaveProperty("createdBy");
   });
 
   it("returns an empty list when there are no active suggestions", async () => {

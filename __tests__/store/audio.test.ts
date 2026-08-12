@@ -88,23 +88,52 @@ describe("audio store", () => {
 
   it("a stale play() resolution does not clobber state from a newer play() call (playGen race guard)", async () => {
     // Rapidly switch tracks before the first play() settles — mirrors a user
-    // skipping tracks faster than playback can start.
+    // skipping tracks faster than playback can start. B is still loading when
+    // A's stale promise settles: this is the only ordering where the guard's
+    // effect is observable — if settled in the other order, isLoading would
+    // land on the same value (false) whether or not the guard exists.
     useAudioStore.getState().playVerse(verseA);
     useAudioStore.getState().playVerse(verseB);
     expect(pendingPlays).toHaveLength(2);
+    expect(useAudioStore.getState().isLoading).toBe(true);
 
-    // The newer (B) call settles first, clearing isLoading for B.
+    // The stale (A) call settles first, while B is still loading. Without the
+    // playGen check, A's .then would incorrectly clear isLoading for B's
+    // still-in-flight play().
+    pendingPlays[0].resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(useAudioStore.getState()).toMatchObject({ currentRef: "1:1", isLoading: true });
+
+    // B's own play() now settles — this is what should actually clear isLoading.
     pendingPlays[1].resolve();
     await Promise.resolve();
     await Promise.resolve();
     expect(useAudioStore.getState()).toMatchObject({ currentRef: "1:1", isLoading: false });
+  });
 
-    // The stale (A) call settles after — its .then callback must be a no-op,
-    // not silently flip isLoading back to reflect a track that's no longer current.
+  it("a stale settlement through next() does not clobber state from a newer next() call", async () => {
+    useAudioStore.getState().playGraph([verseA, verseB, verseC]);
     pendingPlays[0].resolve();
     await Promise.resolve();
     await Promise.resolve();
-    expect(useAudioStore.getState()).toMatchObject({ currentRef: "1:1", isLoading: false });
+
+    // Two rapid next() calls before either play() settles.
+    useAudioStore.getState().next(); // -> verseB, token N
+    useAudioStore.getState().next(); // -> verseC, token N+1 (stale: pendingPlays[2])
+    expect(pendingPlays).toHaveLength(3);
+    expect(useAudioStore.getState()).toMatchObject({ currentRef: "112:1", isLoading: true });
+
+    // The stale (verseB) call settles first — must not clear isLoading for verseC.
+    pendingPlays[1].resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(useAudioStore.getState()).toMatchObject({ currentRef: "112:1", isLoading: true });
+
+    pendingPlays[2].resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(useAudioStore.getState()).toMatchObject({ currentRef: "112:1", isLoading: false });
   });
 
   it("a stale play() rejection does not clobber isPlaying/isLoading from a newer call", async () => {

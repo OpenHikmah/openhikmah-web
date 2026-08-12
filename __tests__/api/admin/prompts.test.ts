@@ -12,6 +12,11 @@ vi.mock("@/lib/ai/prompt-registry", async (importOriginal) => {
   return { ...actual, invalidatePromptCache: vi.fn() };
 });
 
+// Captures each .set() call's argument (in call order) so tests can assert
+// what the transaction actually wrote, not just that some update happened —
+// e.g. that deactivate-old ({ active: false }) and activate-new
+// ({ active: true }) landed in the right order, not swapped.
+let setCalls: unknown[] = [];
 function makeDbChain(resolveWith: unknown = []) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
@@ -23,7 +28,10 @@ function makeDbChain(resolveWith: unknown = []) {
         if (prop === "then")
           return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
             Promise.resolve(resolveWith).then(res, rej);
-        return () => chain;
+        return (...args: unknown[]) => {
+          if (prop === "set") setCalls.push(args[0]);
+          return chain;
+        };
       },
       apply() {
         return chain;
@@ -51,6 +59,7 @@ import { GET, POST } from "@/app/api/admin/prompts/route";
 import { POST as ROLLBACK } from "@/app/api/admin/prompts/rollback/route";
 import { requireAdmin } from "@/lib/admin/admin-auth";
 import { invalidatePromptCache } from "@/lib/ai/prompt-registry";
+import { logAdminAction } from "@/lib/admin/admin-audit";
 
 const admin = { userId: 1, user: { qfId: "qf-admin" } as User };
 
@@ -64,6 +73,7 @@ function req(url: string, method: string, body?: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  setCalls = [];
   vi.mocked(requireAdmin).mockResolvedValue(admin);
   mockSelect.mockReturnValue(makeDbChain([]));
   txUpdate.mockReturnValue(makeDbChain([]));
@@ -157,6 +167,10 @@ describe("POST /api/admin/prompts — create + activate", () => {
     // interleave with a concurrent request.
     expect(txUpdate).toHaveBeenCalledOnce();
     expect(txInsert).toHaveBeenCalledOnce();
+    // The write itself must deactivate, not accidentally reactivate, the
+    // prior version — pins the actual { active: false } payload, not just
+    // that some update happened.
+    expect(setCalls).toEqual([{ active: false }]);
   });
 
   it("invalidates the prompt cache and logs the admin action after a successful create", async () => {
@@ -172,6 +186,15 @@ describe("POST /api/admin/prompts — create + activate", () => {
     );
 
     expect(invalidatePromptCache).toHaveBeenCalledWith("connection.legacy");
+    expect(logAdminAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        adminQfId: "qf-admin",
+        action: "prompt.version.create",
+        targetType: "prompt_version",
+        targetId: "2",
+        meta: { key: "connection.legacy" },
+      })
+    );
   });
 });
 
@@ -216,8 +239,20 @@ describe("POST /api/admin/prompts/rollback", () => {
     expect(body.version).toEqual(reactivated);
     expect(mockTransaction).toHaveBeenCalledOnce();
     // Two updates happen on the tx: deactivate whatever's currently active,
-    // then reactivate the target row.
+    // *then* reactivate the target row — asserting both the count and the
+    // order/payload rules out the two writes being swapped (which would
+    // deactivate the version this endpoint is supposed to be rolling back to).
     expect(txUpdate).toHaveBeenCalledTimes(2);
+    expect(setCalls).toEqual([{ active: false }, { active: true }]);
     expect(invalidatePromptCache).toHaveBeenCalledWith("connection.legacy");
+    expect(logAdminAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        adminQfId: "qf-admin",
+        action: "prompt.version.rollback",
+        targetType: "prompt_version",
+        targetId: "1",
+        meta: { key: "connection.legacy" },
+      })
+    );
   });
 });
