@@ -1,10 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { DIVINE_NAMES } from "../lib/names/divine-names";
+import { STORIES } from "../lib/stories";
 import { test, expect } from "./fixtures/auth";
 
 const BLOCKING_IMPACTS = new Set(["serious", "critical"]);
 const FIRST_DIVINE_NAME_SLUG = DIVINE_NAMES[0].slug;
+const FIRST_STORY_SLUG = STORIES[0].slug;
 
 async function gotoAndSettle(page: Page, path: string): Promise<void> {
   await page.goto(path, { waitUntil: "domcontentloaded" });
@@ -75,6 +77,26 @@ test.describe("accessibility", () => {
     await gotoAndSettle(page, "/onboarding");
     await scanAndAssert(page, "onboarding");
   });
+
+  test("settings page has no serious a11y violations", async ({ page }) => {
+    await gotoAndSettle(page, "/settings");
+    await scanAndAssert(page, "settings");
+  });
+
+  test("mentions page has no serious a11y violations", async ({ authenticatedPage: page }) => {
+    await gotoAndSettle(page, "/mentions");
+    await scanAndAssert(page, "mentions");
+  });
+
+  test("stories index has no serious a11y violations", async ({ page }) => {
+    await gotoAndSettle(page, "/stories");
+    await scanAndAssert(page, "stories index");
+  });
+
+  test("stories detail page has no serious a11y violations", async ({ page }) => {
+    await gotoAndSettle(page, `/stories/${FIRST_STORY_SLUG}`);
+    await scanAndAssert(page, "stories detail");
+  });
 });
 
 // `/admin/*` is gated client-side by AdminGate, which shows an "Authorising…"
@@ -93,6 +115,9 @@ const ADMIN_PAGES = [
   { path: "/admin/names", label: "admin names" },
   { path: "/admin/infra", label: "admin infra" },
   { path: "/admin/audit", label: "admin audit" },
+  { path: "/admin/analytics", label: "admin analytics" },
+  { path: "/admin/jobs", label: "admin jobs" },
+  { path: "/admin/prompts", label: "admin prompts" },
 ];
 
 test.describe("admin accessibility", () => {
