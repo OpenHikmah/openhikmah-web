@@ -4,6 +4,7 @@ import { renderWithIntl as render } from "../../test-utils/render-with-intl";
 import { useCanvasStore } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import type { Verse, VerseRef } from "@/types/quran";
+import type { Node } from "@xyflow/react";
 
 vi.mock("@xyflow/react", () => ({
   Panel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -12,7 +13,7 @@ vi.mock("@xyflow/react", () => ({
 
 import { CanvasToolbar } from "@/components/canvas/CanvasToolbar";
 
-function verseNode() {
+function verseNode(): Node {
   const verse: Verse = {
     surah: 1,
     ayah: 1,
@@ -22,13 +23,12 @@ function verseNode() {
     surahName: "Al-Fatihah",
     surahNameArabic: "الفاتحة",
   };
-  return { id: "n1", type: "verse", position: { x: 0, y: 0 }, data: verse };
+  return { id: "n1", type: "verse", position: { x: 0, y: 0 }, data: { ...verse } } as Node;
 }
 
 describe("CanvasToolbar export menu", () => {
   beforeEach(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    useCanvasStore.setState({ nodes: [verseNode() as any], edges: [] });
+    useCanvasStore.setState({ nodes: [verseNode()], edges: [] });
   });
 
   it("opens the export menu on click", () => {
@@ -71,8 +71,7 @@ describe("CanvasToolbar export menu", () => {
 
 describe("CanvasToolbar clear confirmation", () => {
   beforeEach(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    useCanvasStore.setState({ nodes: [verseNode() as any], edges: [] });
+    useCanvasStore.setState({ nodes: [verseNode()], edges: [] });
   });
 
   it("requires a second click before clearing the canvas", () => {
@@ -95,8 +94,7 @@ describe("CanvasToolbar save workspace name", () => {
   });
 
   it("pluralizes the ICU-formatted verse count in the saved workspace name", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    useCanvasStore.setState({ nodes: [verseNode() as any], edges: [] });
+    useCanvasStore.setState({ nodes: [verseNode()], edges: [] });
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -112,8 +110,7 @@ describe("CanvasToolbar save workspace name", () => {
 
   it("uses the plural form for more than one verse", async () => {
     useCanvasStore.setState({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      nodes: [verseNode(), { ...verseNode(), id: "n2" }] as any,
+      nodes: [verseNode(), { ...verseNode(), id: "n2" }],
       edges: [],
     });
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
