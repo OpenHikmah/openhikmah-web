@@ -53,10 +53,19 @@ async function getReflection(
     "reflection",
     locale,
     REFLECTION_VERSION,
-    () =>
-      callAI(
-        buildPrompt(name.arabic, name.transliteration, name.meaning, name.description, locale)
-      ),
+    async () => {
+      try {
+        return await callAI(
+          buildPrompt(name.arabic, name.transliteration, name.meaning, name.description, locale)
+        );
+      } catch (err) {
+        // Not cached (empty result), so the next request retries — mirrors how
+        // buildReasons/fallbackAIVerses in verses/route.ts tolerate a provider
+        // failure instead of 500ing the whole page section.
+        console.error(`Reflection: AI call failed for ${slug}:`, err);
+        return "";
+      }
+    },
     (s) => s.trim() === "",
     onBeforeGenerate
   );

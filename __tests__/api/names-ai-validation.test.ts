@@ -169,6 +169,24 @@ describe("names AI routes — model output validation", () => {
     expect(prompt).toMatch(/strict tanzih/i);
   });
 
+  it("reflection: an AI provider failure returns 200 with empty content, not a 500", async () => {
+    mockCallAI.mockRejectedValue(new Error("Your credit balance is too low to access the API."));
+
+    const res = await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ reflection: "" });
+  });
+
+  it("pairings: an AI provider failure returns 200 with an empty array, not a 500", async () => {
+    mockCallAI.mockRejectedValue(new Error("Your credit balance is too low to access the API."));
+
+    const res = await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([]);
+  });
+
   it("reflection: no language directive for the default (English) locale", async () => {
     mockCallAI.mockResolvedValue("A reflection paragraph.");
     await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));

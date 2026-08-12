@@ -61,9 +61,16 @@ async function getPairings(
     locale,
     PAIRINGS_VERSION,
     async () => {
-      const text = await callAI(
-        buildPrompt(name.transliteration, name.arabic, name.meaning, locale)
-      );
+      let text: string;
+      try {
+        text = await callAI(buildPrompt(name.transliteration, name.arabic, name.meaning, locale));
+      } catch (err) {
+        // Not cached (empty result), so the next request retries — mirrors how
+        // buildReasons/fallbackAIVerses in verses/route.ts tolerate a provider
+        // failure instead of 500ing the whole page section.
+        console.error(`Pairings: AI call failed for ${slug}:`, err);
+        return [];
+      }
 
       let raw: unknown;
       try {
