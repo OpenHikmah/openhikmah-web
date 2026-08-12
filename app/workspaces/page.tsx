@@ -8,6 +8,7 @@ import { useAuthStore } from "@/store/auth";
 import { useCanvasStore, type SavedCanvas } from "@/store/canvas";
 import { Card, IconButton, Tooltip } from "@/components/ui";
 import { AuthShell } from "@/components/layout/AuthShell";
+import { useArmedConfirm } from "@/hooks/useArmedConfirm";
 
 interface WorkspaceMeta {
   id: number;
@@ -15,6 +16,75 @@ interface WorkspaceMeta {
   nodeCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+function WorkspaceRow({
+  ws,
+  loadingId,
+  deletingId,
+  onLoad,
+  onDelete,
+}: {
+  ws: WorkspaceMeta;
+  loadingId: number | null;
+  deletingId: number | null;
+  onLoad: (id: number) => void;
+  onDelete: (id: number) => void;
+}) {
+  const { armed: deleteArmed, trigger: triggerDelete } = useArmedConfirm(() => onDelete(ws.id));
+
+  return (
+    <Card className="flex items-center justify-between gap-4 p-4">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-text-primary">{ws.name}</p>
+        <div className="mt-1 flex items-center gap-3">
+          <span className="rounded border border-border px-1.5 py-0.5 font-mono text-xs text-text-muted">
+            {ws.nodeCount} verse{ws.nodeCount === 1 ? "" : "s"}
+          </span>
+          <span className="text-xs text-text-muted">
+            {new Date(ws.updatedAt).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1.5">
+        <button
+          onClick={() => onLoad(ws.id)}
+          disabled={!!loadingId}
+          className="flex cursor-pointer items-center gap-1.5 rounded border border-teal px-2.5 py-1.5 text-xs text-teal transition-colors hover:bg-teal/10 disabled:opacity-50"
+        >
+          {loadingId === ws.id ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Upload className="h-3.5 w-3.5" />
+          )}
+          <span>Load</span>
+        </button>
+
+        <Tooltip label={deleteArmed ? "Confirm delete canvas?" : "Delete canvas"}>
+          <IconButton
+            tone="danger"
+            size="sm"
+            onClick={triggerDelete}
+            disabled={!!deletingId}
+            aria-label={deleteArmed ? "Confirm delete canvas?" : "Delete canvas"}
+          >
+            {deletingId === ws.id ? (
+              <Loader2 className="animate-spin" />
+            ) : deleteArmed ? (
+              <TriangleAlert />
+            ) : (
+              <Trash2 />
+            )}
+          </IconButton>
+        </Tooltip>
+      </div>
+    </Card>
+  );
 }
 
 export default function WorkspacesPage() {
@@ -135,50 +205,14 @@ export default function WorkspacesPage() {
         ) : (
           <div className="space-y-3">
             {workspaces.map((ws) => (
-              <Card key={ws.id} className="flex items-center justify-between gap-4 p-4">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-text-primary">{ws.name}</p>
-                  <div className="mt-1 flex items-center gap-3">
-                    <span className="rounded border border-border px-1.5 py-0.5 font-mono text-xs text-text-muted">
-                      {ws.nodeCount} verse{ws.nodeCount === 1 ? "" : "s"}
-                    </span>
-                    <span className="text-xs text-text-muted">
-                      {new Date(ws.updatedAt).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <button
-                    onClick={() => handleLoad(ws.id)}
-                    disabled={!!loadingId}
-                    className="flex cursor-pointer items-center gap-1.5 rounded border border-teal px-2.5 py-1.5 text-xs text-teal transition-colors hover:bg-teal/10 disabled:opacity-50"
-                  >
-                    {loadingId === ws.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Upload className="h-3.5 w-3.5" />
-                    )}
-                    <span>Load</span>
-                  </button>
-
-                  <Tooltip label="Delete canvas">
-                    <IconButton
-                      tone="danger"
-                      size="sm"
-                      onClick={() => handleDelete(ws.id)}
-                      disabled={!!deletingId}
-                      aria-label="Delete canvas"
-                    >
-                      {deletingId === ws.id ? <Loader2 className="animate-spin" /> : <Trash2 />}
-                    </IconButton>
-                  </Tooltip>
-                </div>
-              </Card>
+              <WorkspaceRow
+                key={ws.id}
+                ws={ws}
+                loadingId={loadingId}
+                deletingId={deletingId}
+                onLoad={handleLoad}
+                onDelete={handleDelete}
+              />
             ))}
           </div>
         )}
