@@ -97,6 +97,7 @@
     "play": "Воспроизвести",
     "playAll": "Воспроизвести все",
     "clear": "Очистить",
+    "clearConfirm": "Подтвердить очистку?",
     "workspaceName": "{count, plural, one {# аят} few {# аята} many {# аятов} other {# аята}} — {date}",
     "noMoreConnections": "Больше нет связей этого типа.",
     "connectionsFailed": "Не удалось найти связи. Попробуйте другой тип.",

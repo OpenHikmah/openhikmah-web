@@ -97,6 +97,7 @@
     "play": "Oynat",
     "playAll": "Tümünü oynat",
     "clear": "Temizle",
+    "clearConfirm": "Temizlemeyi onayla?",
     "workspaceName": "{count, plural, one {# ayet} other {# ayet}} — {date}",
     "noMoreConnections": "Bu türde başka bağlantı yok.",
     "connectionsFailed": "Bağlantı bulunamadı. Farklı bir tür deneyin.",

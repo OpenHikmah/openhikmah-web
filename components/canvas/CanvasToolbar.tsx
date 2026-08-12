@@ -21,6 +21,7 @@ import { useCanvasStore, serializeCanvas } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import { useAudioStore } from "@/store/audio";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
+import { useArmedConfirm } from "@/hooks/useArmedConfirm";
 import { buildShareUrl } from "@/hooks/useCanvasPersistence";
 import { buildAuthUrl } from "@/lib/auth/pkce";
 import {
@@ -119,6 +120,7 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const reset = useCanvasStore((s) => s.reset);
+  const { armed: clearArmed, trigger: triggerClear } = useArmedConfirm(reset);
 
   const accessToken = useAuthStore((s) => s.accessToken);
 
@@ -332,9 +334,9 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
 
         {divider}
 
-        <ToolbarBtn onClick={reset} danger>
+        <ToolbarBtn onClick={triggerClear} danger>
           <RotateCcw className="h-3.5 w-3.5" />
-          {t("clear")}
+          {clearArmed ? t("clearConfirm") : t("clear")}
         </ToolbarBtn>
       </div>
     </Panel>

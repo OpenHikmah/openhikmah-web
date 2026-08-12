@@ -26,6 +26,7 @@ import { buildShareUrl } from "@/hooks/useCanvasPersistence";
 import { useState, useEffect, useRef, forwardRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
+import { useArmedConfirm } from "@/hooks/useArmedConfirm";
 import {
   exportCanvasToPng,
   exportCanvasToPdf,
@@ -204,6 +205,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
   const reset = useCanvasStore((s) => s.reset);
+  const { armed: clearArmed, trigger: triggerClear } = useArmedConfirm(reset);
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const requestFit = useCanvasStore((s) => s.requestFit);
@@ -398,7 +400,12 @@ export function Header({ onSearchOpen }: HeaderProps) {
               onClick={() => setMoreOpen((v) => !v)}
               active={moreOpen}
             />
-            <BarButton icon={<RotateCcw />} label={t("clear")} onClick={reset} danger />
+            <BarButton
+              icon={<RotateCcw />}
+              label={clearArmed ? t("clearConfirm") : t("clear")}
+              onClick={triggerClear}
+              danger
+            />
           </div>
           {moreOpen && (
             <MoreSheet

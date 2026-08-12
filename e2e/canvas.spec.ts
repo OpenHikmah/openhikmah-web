@@ -11,7 +11,9 @@ test.describe("canvas", () => {
 
     await expect(page.getByText("2:255")).toBeVisible();
 
-    await page.getByRole("button", { name: /clear/i }).click();
+    const clearButton = page.getByRole("button", { name: /clear/i });
+    await clearButton.click();
+    await clearButton.click();
 
     await expect(page.getByRole("button", { name: /search verses/i })).toBeVisible();
     await expect(page.getByText("2:255")).toHaveCount(0);
