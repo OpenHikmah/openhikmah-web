@@ -47,3 +47,17 @@ describe("Header mobile bar — export-failed vs. clear icon", () => {
     expect(failedIconSvg).not.toBe(clearIconSvg);
   });
 });
+
+describe("Header mobile bar — Clear requires confirmation", () => {
+  it("requires a second click before clearing the canvas", () => {
+    renderWithIntl(<Header onSearchOpen={() => {}} />);
+
+    const clearButton = screen.getByRole("button", { name: "Clear" });
+    fireEvent.click(clearButton);
+    expect(useCanvasStore.getState().nodes).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Confirm clear?" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm clear?" }));
+    expect(useCanvasStore.getState().nodes).toHaveLength(0);
+  });
+});

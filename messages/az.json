@@ -97,6 +97,7 @@
     "play": "Oxut",
     "playAll": "Hamısını oxut",
     "clear": "Təmizlə",
+    "clearConfirm": "Təmizləməyi təsdiqlə?",
     "workspaceName": "{count, plural, one {# ayə} other {# ayə}} — {date}",
     "noMoreConnections": "Bu növdə başqa əlaqə yoxdur.",
     "connectionsFailed": "Əlaqə tapılmadı. Fərqli növ sınayın.",

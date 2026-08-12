@@ -97,6 +97,7 @@
     "play": "Play",
     "playAll": "Play all",
     "clear": "Clear",
+    "clearConfirm": "Confirm clear?",
     "workspaceName": "{count, plural, one {# verse} other {# verses}} — {date}",
     "noMoreConnections": "No more connections of this type.",
     "connectionsFailed": "Could not find connections. Try a different type.",

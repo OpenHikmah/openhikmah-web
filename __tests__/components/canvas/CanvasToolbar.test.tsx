@@ -69,6 +69,25 @@ describe("CanvasToolbar export menu", () => {
   });
 });
 
+describe("CanvasToolbar clear confirmation", () => {
+  beforeEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    useCanvasStore.setState({ nodes: [verseNode() as any], edges: [] });
+  });
+
+  it("requires a second click before clearing the canvas", () => {
+    render(<CanvasToolbar onSearchOpen={vi.fn()} />);
+    const clearButton = screen.getByRole("button", { name: "Clear" });
+
+    fireEvent.click(clearButton);
+    expect(useCanvasStore.getState().nodes).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Confirm clear?" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm clear?" }));
+    expect(useCanvasStore.getState().nodes).toHaveLength(0);
+  });
+});
+
 describe("CanvasToolbar save workspace name", () => {
   beforeEach(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
