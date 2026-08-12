@@ -169,22 +169,34 @@ describe("names AI routes — model output validation", () => {
     expect(prompt).toMatch(/strict tanzih/i);
   });
 
-  it("reflection: an AI provider failure returns 200 with empty content, not a 500", async () => {
+  it("reflection: an AI provider failure returns 200 with empty content, not a 500, and logs it", async () => {
     mockCallAI.mockRejectedValue(new Error("Your credit balance is too low to access the API."));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const res = await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ reflection: "" });
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Reflection: AI call failed"),
+      expect.any(Error)
+    );
+    errorSpy.mockRestore();
   });
 
-  it("pairings: an AI provider failure returns 200 with an empty array, not a 500", async () => {
+  it("pairings: an AI provider failure returns 200 with an empty array, not a 500, and logs it", async () => {
     mockCallAI.mockRejectedValue(new Error("Your credit balance is too low to access the API."));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const res = await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([]);
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Pairings: AI call failed"),
+      expect.any(Error)
+    );
+    errorSpy.mockRestore();
   });
 
   it("reflection: no language directive for the default (English) locale", async () => {

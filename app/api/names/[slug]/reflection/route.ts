@@ -7,6 +7,7 @@ import { clientKey } from "@/lib/infra/http";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
 import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
 import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
+import { incr } from "@/lib/infra/metrics";
 
 // Bump to force regeneration after a prompt change. Exported so page.tsx can
 // use the same version when checking the cache for a server-side prefetch.
@@ -63,6 +64,7 @@ async function getReflection(
         // buildReasons/fallbackAIVerses in verses/route.ts tolerate a provider
         // failure instead of 500ing the whole page section.
         console.error(`Reflection: AI call failed for ${slug}:`, err);
+        incr("names_ai_call_error");
         return "";
       }
     },

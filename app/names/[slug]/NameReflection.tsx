@@ -32,7 +32,11 @@ export function NameReflection({ slug, accent, initialReflection }: Props) {
     };
   }, [slug, initialReflection]);
 
-  if (error) {
+  // A loaded-but-empty reflection (the API degrades to "" rather than 500ing
+  // on an AI-provider failure — see /api/names/[slug]/reflection) is
+  // functionally the same "unavailable" case as a fetch error, not content
+  // still loading — otherwise the skeleton below would spin forever.
+  if (error || reflection === "") {
     return (
       <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
         {t("couldNotLoadReflection")}
@@ -57,7 +61,7 @@ export function NameReflection({ slug, accent, initialReflection }: Props) {
         </span>
       </div>
 
-      {!reflection ? (
+      {reflection === null ? (
         <div className="space-y-2 animate-pulse">
           {[100, 90, 95].map((w, i) => (
             <div
