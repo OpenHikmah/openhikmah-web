@@ -70,8 +70,15 @@ export function useCanvasPersistence() {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const restoreCanvas = useCanvasStore((s) => s.restoreCanvas);
+  // startedRef only guards the mount effect below from running its restore
+  // logic twice (e.g. React StrictMode's double-invoke). hydratedRef is the
+  // real "safe to autosave" signal — it's flipped only once the entire
+  // restore attempt has settled, including any pending ?share= fetch, so the
+  // debounced autosave/unload-flush effects can never see a premature
+  // "hydrated" state and mistake the still-empty initial nodes/edges for an
+  // intentional clear.
+  const startedRef = useRef(false);
   const hydratedRef = useRef(false);
-  const restoringRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestRef = useRef({ nodes, edges });
   useEffect(() => {
@@ -97,18 +104,13 @@ export function useCanvasPersistence() {
 
   // On mount: restore from ?share=<id> first, then localStorage
   useEffect(() => {
-    if (hydratedRef.current) return;
-    hydratedRef.current = true;
+    if (startedRef.current) return;
+    startedRef.current = true;
 
     const params = new URLSearchParams(window.location.search);
     const shareId = params.get("share");
 
     if (shareId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(shareId)) {
-      // While this fetch is in flight, nodes/edges are still their initial
-      // empty state — block the debounced save (and unload flush) from
-      // reading that state as "canvas cleared" and wiping out the real
-      // localStorage fallback this restore might fall back to.
-      restoringRef.current = true;
       fetch(`/api/share/${shareId}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((saved: SavedCanvas | null) => {
@@ -127,18 +129,22 @@ export function useCanvasPersistence() {
           tryRestoreFromLocalStorage();
         })
         .finally(() => {
-          restoringRef.current = false;
+          // Only now — once the share fetch (success, failure, or invalid
+          // data) has fully settled and any fallback restore has run — is it
+          // safe to let the effects below observe nodes/edges as "hydrated".
+          hydratedRef.current = true;
         });
       return;
     }
 
     tryRestoreFromLocalStorage();
+    hydratedRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-save to localStorage whenever nodes/edges change (debounced 800ms)
   useEffect(() => {
-    if (!hydratedRef.current || restoringRef.current) return;
+    if (!hydratedRef.current) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null;
@@ -155,7 +161,7 @@ export function useCanvasPersistence() {
   // beforeunload) so the page stays eligible for the back/forward cache.
   useEffect(() => {
     const flush = () => {
-      if (!hydratedRef.current || restoringRef.current || !saveTimerRef.current) return;
+      if (!hydratedRef.current || !saveTimerRef.current) return;
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
       saveToLocalStorage(latestRef.current.nodes, latestRef.current.edges);
