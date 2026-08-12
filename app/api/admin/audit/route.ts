@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     const rows = await db
       .select()
       .from(adminAuditLog)
-      .orderBy(desc(adminAuditLog.createdAt))
+      .orderBy(desc(adminAuditLog.createdAt), desc(adminAuditLog.id))
       .limit(limit + 1)
       .offset(offset);
 

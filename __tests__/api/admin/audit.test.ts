@@ -7,7 +7,8 @@ vi.mock("@/lib/admin/admin-auth", () => ({ requireAdmin: vi.fn() }));
 function makeDbChain(
   resolveWith: unknown = [],
   onLimit?: (n: number) => void,
-  onOffset?: (n: number) => void
+  onOffset?: (n: number) => void,
+  onOrderBy?: (cols: unknown[]) => void
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
@@ -21,6 +22,8 @@ function makeDbChain(
             Promise.resolve(resolveWith).then(res, rej);
         if (prop === "limit" && onLimit) return (n: number) => (onLimit(n), chain);
         if (prop === "offset" && onOffset) return (n: number) => (onOffset(n), chain);
+        if (prop === "orderBy" && onOrderBy)
+          return (...cols: unknown[]) => (onOrderBy(cols), chain);
         return () => chain;
       },
       apply() {
@@ -29,6 +32,18 @@ function makeDbChain(
     }
   );
   return chain;
+}
+
+/** Drizzle's `desc(column)` produces an SQL fragment whose queryChunks include the
+ *  column itself; the column's `name` is the underlying DB column name. */
+function orderedColumnNames(cols: unknown[]): string[] {
+  return cols.map((col) => {
+    const chunks = (col as { queryChunks?: unknown[] }).queryChunks ?? [];
+    const columnChunk = chunks.find(
+      (c): c is { name: string } => typeof c === "object" && c !== null && "name" in c
+    );
+    return columnChunk?.name ?? "";
+  });
 }
 
 const { mockSelect } = vi.hoisted(() => ({
@@ -169,5 +184,14 @@ describe("GET /api/admin/audit", () => {
     const body = await res.json();
     expect(body.entries).toHaveLength(1);
     expect(body.hasMore).toBe(false);
+  });
+
+  it("orders by id after createdAt so rows with equal timestamps have a stable, gap-free page order", async () => {
+    let capturedOrderBy: unknown[] = [];
+    mockSelect.mockReturnValue(
+      makeDbChain([], undefined, undefined, (cols) => (capturedOrderBy = cols))
+    );
+    await GET(req());
+    expect(orderedColumnNames(capturedOrderBy)).toEqual(["created_at", "id"]);
   });
 });
