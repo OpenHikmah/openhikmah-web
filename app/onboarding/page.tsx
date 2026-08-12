@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 export default function OnboardingPage() {
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
+  const isSessionLoading = useAuthStore((s) => s.isSessionLoading);
   const { setProfile } = useSocialStore();
 
   const [username, setUsername] = useState("");
@@ -18,10 +19,21 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    // accessToken starts null until SessionRestorer's async refresh resolves
+    // — redirecting on that transient null (instead of waiting for
+    // isSessionLoading to settle, as AuthShell.tsx does) would permanently
+    // bounce a new user who refreshes mid-onboarding.
+    if (isSessionLoading) return;
     if (!accessToken) router.replace("/");
-  }, [accessToken, router]);
+  }, [isSessionLoading, accessToken, router]);
 
-  if (!accessToken) return null;
+  if (isSessionLoading || !accessToken) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-bg">
+        <Loader2 className="h-5 w-5 animate-spin text-teal" />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
