@@ -180,6 +180,7 @@
     "greeting": "Ассаляму алейкум",
     "welcomeBack": "С возвращением",
     "welcomeBackNamed": "С возвращением, <gold>{name}</gold>",
+    "continueExploring": "Продолжить изучение",
     "continueCanvas": "Продолжить холст",
     "openCanvas": "Открыть холст",
     "versesInProgress": "{count, plural, one {# аят в процессе} few {# аята в процессе} many {# аятов в процессе} other {# аята в процессе}}",

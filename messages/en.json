@@ -180,6 +180,7 @@
     "greeting": "Assalamu alaykum",
     "welcomeBack": "Welcome back",
     "welcomeBackNamed": "Welcome back, <gold>{name}</gold>",
+    "continueExploring": "Continue exploring",
     "continueCanvas": "Continue your canvas",
     "openCanvas": "Open the canvas",
     "versesInProgress": "{count, plural, one {# verse in progress} other {# verses in progress}}",

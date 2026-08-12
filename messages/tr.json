@@ -180,6 +180,7 @@
     "greeting": "Selamün aleyküm",
     "welcomeBack": "Tekrar hoş geldin",
     "welcomeBackNamed": "Tekrar hoş geldin, <gold>{name}</gold>",
+    "continueExploring": "Keşfetmeye devam et",
     "continueCanvas": "Tuvaline devam et",
     "openCanvas": "Tuvali aç",
     "versesInProgress": "{count, plural, one {# ayet devam ediyor} other {# ayet devam ediyor}}",

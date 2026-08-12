@@ -180,6 +180,7 @@
     "greeting": "Əssəlamu aleykum",
     "welcomeBack": "Yenidən xoş gəldin",
     "welcomeBackNamed": "Yenidən xoş gəldin, <gold>{name}</gold>",
+    "continueExploring": "Kəşf etməyə davam et",
     "continueCanvas": "Lövhənə davam et",
     "openCanvas": "Lövhəni aç",
     "versesInProgress": "{count, plural, one {# ayə davam edir} other {# ayə davam edir}}",
