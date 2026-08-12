@@ -33,6 +33,7 @@ describe("OnboardingPage — redirect vs. session restoration race", () => {
 
     expect(mockReplace).not.toHaveBeenCalled();
     expect(screen.queryByText("Choose a username")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
   it("redirects home once the session has finished restoring and there is genuinely no token", async () => {
@@ -56,18 +57,28 @@ describe("OnboardingPage — redirect vs. session restoration race", () => {
     expect(screen.getByText("Choose a username")).toBeInTheDocument();
   });
 
-  it("does not redirect if isSessionLoading flips back to true after a token was already present", async () => {
-    useAuthStore.setState({ accessToken: "test-token", isSessionLoading: false });
-
+  it("never redirects across the real restore sequence: loading+null → token arrives → loading settles", async () => {
+    // Mirrors SessionRestorer's actual ordering (components/providers.tsx):
+    // setTokens() lands inside the refresh .then(), setSessionLoaded() only
+    // in the .finally() — so accessToken can be set for a while before
+    // isSessionLoading flips to false. This is the sequence the fix exists
+    // for, not a single static snapshot of state.
+    useAuthStore.setState({ accessToken: null, isSessionLoading: true });
     await act(async () => {
       renderWithIntl(<OnboardingPage />);
     });
-    expect(screen.getByText("Choose a username")).toBeInTheDocument();
+    expect(mockReplace).not.toHaveBeenCalled();
 
     await act(async () => {
-      useAuthStore.setState({ isSessionLoading: true });
+      useAuthStore.setState({ accessToken: "test-token" });
     });
-
     expect(mockReplace).not.toHaveBeenCalled();
+    expect(screen.queryByText("Choose a username")).not.toBeInTheDocument();
+
+    await act(async () => {
+      useAuthStore.setState({ isSessionLoading: false });
+    });
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(screen.getByText("Choose a username")).toBeInTheDocument();
   });
 });

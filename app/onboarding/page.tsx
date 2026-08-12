@@ -29,7 +29,11 @@ export default function OnboardingPage() {
 
   if (isSessionLoading || !accessToken) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-bg">
+      <div
+        className="flex min-h-screen items-center justify-center bg-bg"
+        role="status"
+        aria-label="Loading"
+      >
         <Loader2 className="h-5 w-5 animate-spin text-teal" />
       </div>
     );
