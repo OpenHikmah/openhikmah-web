@@ -5,23 +5,35 @@ import { db } from "@/lib/infra/db";
 import { adminAuditLog } from "@/lib/infra/db/schema";
 import { safeParse } from "@/lib/infra/http";
 
-/** Most-recent admin actions (newest first). `?limit=` caps the page (default 100). */
+/**
+ * Most-recent admin actions (newest first), paginated. `?limit=` caps the
+ * page (default 100, capped at 500 — kept distinct from the project-wide
+ * parsePagination default/cap since the audit log intentionally allows a
+ * larger page). `?offset=` pages further back.
+ */
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
 
   const limitParam = Number(req.nextUrl.searchParams.get("limit"));
   const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 500) : 100;
+  const offsetParam = Number(req.nextUrl.searchParams.get("offset"));
+  const offset = Number.isInteger(offsetParam) && offsetParam > 0 ? offsetParam : 0;
 
   try {
+    // Fetch one extra row to detect whether more entries exist beyond this page.
     const rows = await db
       .select()
       .from(adminAuditLog)
-      .orderBy(desc(adminAuditLog.createdAt))
-      .limit(limit);
+      .orderBy(desc(adminAuditLog.createdAt), desc(adminAuditLog.id))
+      .limit(limit + 1)
+      .offset(offset);
+
+    const hasMore = rows.length > limit;
+    const page = rows.slice(0, limit);
 
     return NextResponse.json({
-      entries: rows.map((r) => ({
+      entries: page.map((r) => ({
         id: r.id,
         adminQfId: r.adminQfId,
         action: r.action,
@@ -30,6 +42,7 @@ export async function GET(req: NextRequest) {
         meta: r.meta ? safeParse(r.meta) : null,
         createdAt: r.createdAt,
       })),
+      hasMore,
     });
   } catch (err) {
     console.error("admin audit GET db error:", err);

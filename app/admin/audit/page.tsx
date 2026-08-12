@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, StateNote } from "@/components/admin/primitives";
 import { useAdminFetch } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
+import { Button } from "@/components/ui";
 
 interface Entry {
   id: number;
@@ -15,9 +17,41 @@ interface Entry {
   createdAt: string;
 }
 
+interface AuditPageData {
+  entries: Entry[];
+  hasMore: boolean;
+}
+
 export default function AuditPage() {
   const api = useAdminFetch();
-  const { data, error, loading } = useAsync<{ entries: Entry[] }>(() => api("/audit"), "audit");
+  const { data, error, loading } = useAsync<AuditPageData>(() => api("/audit"), "audit");
+
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState(false);
+
+  useEffect(() => {
+    if (!data) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEntries(data.entries);
+    setHasMore(data.hasMore);
+  }, [data]);
+
+  const loadMore = async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    setLoadMoreError(false);
+    try {
+      const page = await api<AuditPageData>(`/audit?offset=${entries.length}`);
+      setEntries((prev) => [...prev, ...page.entries]);
+      setHasMore(page.hasMore);
+    } catch {
+      setLoadMoreError(true);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   return (
     <>
@@ -25,9 +59,9 @@ export default function AuditPage() {
       <div className="space-y-4 p-7">
         {error && <StateNote tone="error">{error}</StateNote>}
         {loading && <StateNote>Loading…</StateNote>}
-        {data && data.entries.length === 0 && <StateNote>No admin actions recorded yet.</StateNote>}
+        {data && entries.length === 0 && <StateNote>No admin actions recorded yet.</StateNote>}
 
-        {data && data.entries.length > 0 && (
+        {data && entries.length > 0 && (
           <Table>
             <thead>
               <tr>
@@ -38,7 +72,7 @@ export default function AuditPage() {
               </tr>
             </thead>
             <tbody>
-              {data.entries.map((e) => (
+              {entries.map((e) => (
                 <tr key={e.id}>
                   <Td className="whitespace-nowrap text-xs text-text-muted">
                     {new Date(e.createdAt).toLocaleString()}
@@ -56,6 +90,15 @@ export default function AuditPage() {
               ))}
             </tbody>
           </Table>
+        )}
+
+        {hasMore && (
+          <div className="flex flex-col items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? "Loading…" : "Load more"}
+            </Button>
+            {loadMoreError && <StateNote tone="error">Couldn&apos;t load more entries.</StateNote>}
+          </div>
         )}
       </div>
     </>
