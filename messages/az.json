@@ -224,5 +224,9 @@
     "rootTitle": "Nəsə səhv getdi",
     "rootBody": "Gözlənilməz xəta bu səhifəni kəsdi. Yenidən cəhd edə və ya ana səhifəyə qayıda bilərsiniz.",
     "todayVerseUnavailable": "Bugünkü ayə hazırda yüklənə bilmədi. Zəhmət olmasa sonra yenidən cəhd edin."
+  },
+  "authGate": {
+    "title": "Davam etmək üçün daxil olun",
+    "body": "Bu səhifəyə baxmaq üçün daxil olmalısınız."
   }
 }

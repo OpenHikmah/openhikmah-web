@@ -224,5 +224,9 @@
     "rootTitle": "Bir şeyler ters gitti",
     "rootBody": "Beklenmeyen bir hata bu sayfayı kesintiye uğrattı. Tekrar deneyebilir veya ana sayfaya dönebilirsiniz.",
     "todayVerseUnavailable": "Bugünün ayeti şu anda yüklenemedi. Lütfen daha sonra tekrar deneyin."
+  },
+  "authGate": {
+    "title": "Devam etmek için giriş yapın",
+    "body": "Bu sayfayı görüntülemek için giriş yapmanız gerekiyor."
   }
 }

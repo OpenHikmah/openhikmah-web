@@ -11,7 +11,7 @@ import OnboardingPage from "@/app/onboarding/page";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 
-describe("OnboardingPage — redirect vs. session restoration race", () => {
+describe("OnboardingPage — session restoration race and auth-gate behavior", () => {
   const previousAuth = useAuthStore.getState();
   const previousSocial = useSocialStore.getState();
 
@@ -36,14 +36,16 @@ describe("OnboardingPage — redirect vs. session restoration race", () => {
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
-  it("redirects home once the session has finished restoring and there is genuinely no token", async () => {
+  it("shows a sign-in prompt (not a silent redirect) once the session has finished restoring with genuinely no token", async () => {
     useAuthStore.setState({ accessToken: null, isSessionLoading: false });
 
     await act(async () => {
       renderWithIntl(<OnboardingPage />);
     });
 
-    expect(mockReplace).toHaveBeenCalledWith("/");
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(screen.getByText("Sign in to continue")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /log in/i })).toBeInTheDocument();
   });
 
   it("renders the onboarding form once session restoration completes with a token — the case a refresh mid-flow must not lose", async () => {
