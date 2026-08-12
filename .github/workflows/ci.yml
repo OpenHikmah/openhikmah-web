@@ -24,6 +24,10 @@ jobs:
           fetch-depth: 0
 
       - name: Run gitleaks
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.event.after }}
         run: |
           curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz \
             | tar -xz -C /usr/local/bin gitleaks
@@ -33,20 +37,28 @@ jobs:
           # are already public and don't need to be re-surfaced on every run.
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             RANGE="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          elif [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ] \
+            && git merge-base --is-ancestor "$PUSH_BEFORE" "$PUSH_AFTER" 2>/dev/null; then
+            RANGE="$PUSH_BEFORE..$PUSH_AFTER"
           else
-            # `before`/`after` from the push event are unreliable across a
-            # force-push (e.g. Dependabot rebasing a branch): `before` can
-            # end up pointing at a commit that's no longer an ancestor of
-            # `after`, and `git log` errors out on the range instead of
-            # scanning anything. The merge-base with the default branch is
-            # unaffected by how the branch's own history was rewritten and
-            # still captures every commit unique to it, so prefer that.
-            git fetch --quiet origin "${{ github.event.repository.default_branch }}"
-            BASE=$(git merge-base "origin/${{ github.event.repository.default_branch }}" HEAD 2>/dev/null || true)
-            if [ -n "$BASE" ]; then
+            # `before`/`after` are unreliable across a force-push (e.g.
+            # Dependabot rebasing a branch) or a branch's first-ever push:
+            # `before` can end up pointing at a commit that's no longer an
+            # ancestor of `after` (or be the all-zero SHA), and `git log`
+            # errors out on the range instead of scanning anything. Fall back
+            # to the merge-base with the default branch, which is unaffected
+            # by how the branch's own history was rewritten and still
+            # captures every commit unique to it. If there's no merge-base to
+            # diff against either (e.g. this push *is* to the default
+            # branch, so the merge-base is just HEAD itself, or the
+            # histories are unrelated), scan everything reachable from HEAD
+            # rather than only the latest commit, so nothing gets skipped.
+            git fetch --quiet origin "$DEFAULT_BRANCH"
+            BASE=$(git merge-base "origin/$DEFAULT_BRANCH" HEAD 2>/dev/null || true)
+            if [ -n "$BASE" ] && [ "$BASE" != "$(git rev-parse HEAD)" ]; then
               RANGE="$BASE..HEAD"
             else
-              RANGE="-1"
+              RANGE="HEAD"
             fi
           fi
           gitleaks detect --source . --redact --log-opts="$RANGE"
