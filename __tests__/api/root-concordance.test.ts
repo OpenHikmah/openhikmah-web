@@ -101,7 +101,8 @@ describe("GET /api/root/[root]", () => {
             ref: "2:255",
             surahName: "Al-Baqarah",
             surahNameArabic: "البقرة",
-            translation: "x".repeat(200),
+            translation:
+              "Allah - there is no deity except Him, the Ever-Living, the Sustainer of [all] existence. Neither drowsiness overtakes Him nor sleep. To Him belongs whatever is in the heavens and whatever is on the earth. Who is it that can intercede with Him except by His permission? He knows what is [presently] before them and what will be after them, and they encompass not a thing of His knowledge except for what He wills. His Kursi extends over the heavens and the earth, and their preservation tires Him not. And He is the Most High, the Most Great.",
           },
         ],
       ])
@@ -113,7 +114,7 @@ describe("GET /api/root/[root]", () => {
   });
 
   it("drops refs the corpus lookup didn't resolve, without failing the request", async () => {
-    mockSelectDistinct.mockReturnValue(makeDbChain([{ ref: "2:255" }, { ref: "999:999" }]));
+    mockSelectDistinct.mockReturnValue(makeDbChain([{ ref: "2:255" }, { ref: "114:6" }]));
     mockGetVerses.mockResolvedValue(
       new Map([
         [
