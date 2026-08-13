@@ -75,6 +75,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   if (body.action === "override-winner") {
+    // Matches the statuses the admin UI actually renders the override
+    // control for — a pending/declined/cancelled challenge was never played,
+    // so it has no result to correct.
+    if (challenge.status !== "active" && challenge.status !== "completed") {
+      return NextResponse.json(
+        { error: "Only active or completed challenges can have their winner overridden" },
+        { status: 409 }
+      );
+    }
     const winnerId = body.winnerId ?? null;
     if (
       winnerId !== null &&
@@ -86,13 +95,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         { status: 400 }
       );
     }
+    // Scope the WHERE to the state we just checked, so a concurrent status
+    // change loses the race cleanly instead of silently clobbering it.
     const [updated] = await db
       .update(challenges)
       .set({ status: "completed", winnerId })
-      .where(eq(challenges.id, challengeId))
+      .where(
+        and(
+          eq(challenges.id, challengeId),
+          challenge.status === "active"
+            ? eq(challenges.status, "active")
+            : eq(challenges.status, "completed")
+        )
+      )
       .returning();
     if (!updated) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Challenge status changed by a concurrent request" },
+        { status: 409 }
+      );
     }
     await logAdminAction({
       adminQfId: auth.user.qfId,

@@ -99,6 +99,30 @@ describe("admin challenges [id]", () => {
     expect(res.status).toBe(200);
   });
 
+  it("accepts override-winner on an already-completed challenge (correcting a mistaken result)", async () => {
+    mockSelect.mockReturnValue(makeDbChain([{ ...challenge, status: "completed" }]));
+    const res = await PATCH(
+      req("PATCH", { action: "override-winner", winnerId: challenge.challengerId }),
+      params
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it.each(["pending", "declined", "cancelled"])(
+    "rejects override-winner on a %s challenge",
+    async (status) => {
+      mockSelect.mockReturnValue(makeDbChain([{ ...challenge, status }]));
+      const res = await PATCH(req("PATCH", { action: "override-winner", winnerId: null }), params);
+      expect(res.status).toBe(409);
+    }
+  );
+
+  it("409s when override-winner races a concurrent status change", async () => {
+    mockUpdate.mockReturnValue(makeDbChain([])); // scoped update matched nothing
+    const res = await PATCH(req("PATCH", { action: "override-winner", winnerId: null }), params);
+    expect(res.status).toBe(409);
+  });
+
   it("rejects an unknown action", async () => {
     expect((await PATCH(req("PATCH", { action: "nope" }), params)).status).toBe(400);
   });
