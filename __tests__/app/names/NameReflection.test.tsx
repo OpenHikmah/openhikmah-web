@@ -45,4 +45,18 @@ describe("NameReflection", () => {
     );
     expect(container).not.toBeEmptyDOMElement();
   });
+
+  it("shows the error message, not a perpetual skeleton, when the API returns 200 with an empty reflection", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ reflection: "" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithIntl(<NameReflection slug="ar-rahman" accent="#000" />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Could not load the reflection at this time.")).toBeInTheDocument()
+    );
+  });
 });
