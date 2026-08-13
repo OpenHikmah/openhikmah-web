@@ -98,6 +98,7 @@ export default function ConnectionsPage() {
                 <Th>Edge</Th>
                 <Th>Kind</Th>
                 <Th>Why</Th>
+                <Th>Confidence</Th>
                 <Th>Status</Th>
                 <Th>Review</Th>
                 <Th className="text-right">Actions</Th>
@@ -114,6 +115,17 @@ export default function ConnectionsPage() {
                   </Td>
                   <Td className="max-w-md text-xs text-text-secondary">
                     <span className="line-clamp-2">{c.reason}</span>
+                  </Td>
+                  <Td className="whitespace-nowrap text-xs">
+                    {c.confidence === null ? (
+                      <span className="text-text-muted">—</span>
+                    ) : (
+                      <span
+                        className={cn(c.confidence < 50 ? "text-error" : "text-text-secondary")}
+                      >
+                        {c.confidence}%
+                      </span>
+                    )}
                   </Td>
                   <Td>
                     <Pill tone={c.status}>{c.status}</Pill>
