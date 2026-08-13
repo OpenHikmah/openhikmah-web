@@ -114,7 +114,7 @@ export function AccountMenu() {
         <button
           onClick={signIn}
           disabled={signingIn}
-          className="inline-flex items-center gap-1.5 rounded-md border border-gold px-3.5 py-1.5 text-[13px] font-semibold text-gold transition-colors duration-[120ms] hover:bg-gold/10 disabled:opacity-60"
+          className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-gold px-3.5 py-1.5 text-[13px] font-semibold text-gold transition-colors duration-[120ms] hover:bg-gold/10 disabled:opacity-60"
         >
           {signingIn ? (
             <Loader2 className="size-3.5 animate-spin" />
