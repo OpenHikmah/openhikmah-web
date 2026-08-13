@@ -148,7 +148,7 @@ function stripHtml(text: string): string {
 // target language, so the underlying theological justification stays exactly
 // what was already generated and validated in English.
 async function translateReason(reason: string, language: string): Promise<string> {
-  const prompt = `Translate the following sentence into ${language}. Preserve its meaning exactly — do not add, remove, or alter any theological claim, and maintain strict Tanzih (divine transcendence). Return ONLY the translated sentence, with no quotation marks, labels, or explanation.
+  const prompt = `Translate the following sentence into ${language}. Preserve its meaning exactly — do not add, remove, or alter any theological claim, and maintain ${TANZIH_CONSTRAINT}. Return ONLY the translated sentence, with no quotation marks, labels, or explanation.
 
 Sentence: "${reason}"`;
   const translated = await callAI(prompt);
