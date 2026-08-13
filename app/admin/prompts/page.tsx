@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
@@ -115,9 +114,15 @@ export default function PromptsPage() {
             className="w-full rounded-md border border-border bg-bg px-3 py-2 font-mono text-xs text-text-primary focus:border-gold-muted"
           />
           <div className="flex justify-end">
-            <Button size="sm" variant="primary" disabled={saving} onClick={createVersion}>
+            <ConfirmButton
+              size="sm"
+              variant="primary"
+              disabled={saving || !draft.trim()}
+              onConfirm={createVersion}
+              confirmLabel="Create & activate?"
+            >
               {saving ? "Saving…" : "Create & activate"}
-            </Button>
+            </ConfirmButton>
           </div>
         </div>
 
