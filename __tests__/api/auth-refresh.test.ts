@@ -22,6 +22,17 @@ describe("POST /api/auth/refresh", () => {
     expect(body.error).toMatch(/no session/i);
   });
 
+  it("clears a stale qf_has_session marker when there is no refresh cookie", async () => {
+    const req = new NextRequest("http://localhost/api/auth/refresh", {
+      method: "POST",
+      headers: { Cookie: "qf_has_session=1" },
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+    const setCookies = res.headers.getSetCookie();
+    expect(setCookies.some((c) => c.startsWith("qf_has_session=;"))).toBe(true);
+  });
+
   it("returns 200 with a new access token and rotates the cookie", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -32,10 +43,7 @@ describe("POST /api/auth/refresh", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.accessToken).toBe("access-1");
-    const setCookies =
-      typeof res.headers.getSetCookie === "function"
-        ? res.headers.getSetCookie()
-        : [res.headers.get("set-cookie") ?? ""];
+    const setCookies = res.headers.getSetCookie();
     const refreshCookie = setCookies.find((c) => c.startsWith("qf_refresh_token=")) ?? "";
     expect(refreshCookie).toContain("qf_refresh_token=refresh-rotated-1");
     expect(refreshCookie.toLowerCase()).toContain("httponly");
@@ -65,10 +73,7 @@ describe("POST /api/auth/refresh", () => {
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.error).toMatch(/session expired/i);
-    const setCookies =
-      typeof res.headers.getSetCookie === "function"
-        ? res.headers.getSetCookie()
-        : [res.headers.get("set-cookie") ?? ""];
+    const setCookies = res.headers.getSetCookie();
     expect(setCookies.some((c) => c.startsWith("qf_refresh_token=;"))).toBe(true);
     expect(setCookies.some((c) => c.startsWith("qf_has_session=;"))).toBe(true);
   });

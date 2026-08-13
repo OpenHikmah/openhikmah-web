@@ -70,10 +70,7 @@ describe("POST /api/auth/exchange", () => {
     const body = await res.json();
     expect(body.accessToken).toBe("access-123");
     expect(body.refreshToken).toBeUndefined();
-    const setCookies =
-      typeof res.headers.getSetCookie === "function"
-        ? res.headers.getSetCookie()
-        : [res.headers.get("set-cookie") ?? ""];
+    const setCookies = res.headers.getSetCookie();
     const refreshCookie = setCookies.find((c) => c.startsWith("qf_refresh_token=")) ?? "";
     expect(refreshCookie).toContain("qf_refresh_token=refresh-456");
     expect(refreshCookie.toLowerCase()).toContain("httponly");

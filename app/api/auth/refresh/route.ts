@@ -98,7 +98,9 @@ function refresh(refreshToken: string): Promise<RefreshOutcome> {
 export async function POST(req: NextRequest) {
   const refreshToken = req.cookies.get(COOKIE_NAME)?.value;
   if (!refreshToken) {
-    return NextResponse.json({ error: "No session" }, { status: 401 });
+    const response = NextResponse.json({ error: "No session" }, { status: 401 });
+    response.cookies.delete(HAS_SESSION_COOKIE_NAME);
+    return response;
   }
 
   const outcome = await refresh(refreshToken);

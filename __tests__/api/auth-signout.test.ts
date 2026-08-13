@@ -25,10 +25,7 @@ describe("POST /api/auth/signout", () => {
     const body = await res.json();
     expect(body.ok).toBe(true);
     expect(mockInvalidateTokenCache).toHaveBeenCalledWith("access-token-123");
-    const setCookies =
-      typeof res.headers.getSetCookie === "function"
-        ? res.headers.getSetCookie()
-        : [res.headers.get("set-cookie") ?? ""];
+    const setCookies = res.headers.getSetCookie();
     expect(setCookies.some((c) => c.startsWith("qf_refresh_token=;"))).toBe(true);
     expect(setCookies.some((c) => c.startsWith("qf_has_session=;"))).toBe(true);
   });
@@ -39,10 +36,7 @@ describe("POST /api/auth/signout", () => {
     const body = await res.json();
     expect(body.ok).toBe(true);
     expect(mockInvalidateTokenCache).not.toHaveBeenCalled();
-    const setCookies =
-      typeof res.headers.getSetCookie === "function"
-        ? res.headers.getSetCookie()
-        : [res.headers.get("set-cookie") ?? ""];
+    const setCookies = res.headers.getSetCookie();
     expect(setCookies.some((c) => c.startsWith("qf_refresh_token=;"))).toBe(true);
     expect(setCookies.some((c) => c.startsWith("qf_has_session=;"))).toBe(true);
   });
