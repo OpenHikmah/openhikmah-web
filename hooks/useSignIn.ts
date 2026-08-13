@@ -21,9 +21,10 @@ export function useSignIn() {
       sessionStorage.setItem("pkce_state", state);
       sessionStorage.setItem("pkce_nonce", nonce);
       window.location.href = url;
-    } catch {
+    } catch (err) {
       // Building the auth URL failed (e.g. crypto unavailable) — re-enable the
       // button instead of leaving it stuck on "signing in".
+      console.error("useSignIn: buildAuthUrl failed:", err);
       setSigningIn(false);
     }
   };

@@ -272,7 +272,10 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
             {saving ? t("saving") : saved ? t("saved") : saveError ? t("saveFailed") : t("save")}
           </ToolbarBtn>
         ) : (
-          // Don't silently hide Save when signed out — offer the way to enable it.
+          // Don't silently hide Save when signed out — offer the way to enable
+          // it. The canvas is persisted to localStorage, so signing in and
+          // coming back keeps the current graph — the user can save it the
+          // moment they return.
           <ToolbarBtn onClick={handleSignIn} disabled={signingIn}>
             {signingIn ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
