@@ -42,4 +42,25 @@ describe("PromptsPage — Create & activate requires confirmation", () => {
       })
     );
   });
+
+  it("locks the draft textarea while armed so the confirmed content can't change before the second click", async () => {
+    render(<PromptsPage />);
+
+    const textarea = await screen.findByPlaceholderText(/Reference: {{fromRef}}/);
+    fireEvent.change(textarea, { target: { value: "Template A" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Create & activate" }));
+    expect(await screen.findByRole("button", { name: "Create & activate?" })).toBeInTheDocument();
+
+    expect(textarea).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Create & activate?" }));
+
+    await waitFor(() =>
+      expect(mockApi).toHaveBeenCalledWith("/prompts", {
+        method: "POST",
+        json: { key: "connection.legacy", template: "Template A" },
+      })
+    );
+  });
 });

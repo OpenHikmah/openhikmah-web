@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
+import { useArmedConfirm } from "@/hooks/useArmedConfirm";
 import { cn } from "@/lib/utils";
 
 interface PromptVersionRow {
@@ -47,6 +49,12 @@ export default function PromptsPage() {
       setSaving(false);
     }
   };
+
+  // Deliberately not the ConfirmButton primitive: the draft textarea must be
+  // locked for the duration of the armed window, otherwise a user could edit
+  // the template between the arm click and the confirm click and activate
+  // content they never actually confirmed.
+  const { armed: createArmed, trigger: triggerCreate } = useArmedConfirm(createVersion);
 
   const rollback = async (id: number) => {
     setActionError(null);
@@ -105,24 +113,24 @@ export default function PromptsPage() {
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            disabled={createArmed || saving}
             placeholder={
               active
                 ? active.template
                 : "e.g. Reference: {{fromRef}}\nArabic: {{arabicText}}\n... Task: {{task}} ..."
             }
             rows={10}
-            className="w-full rounded-md border border-border bg-bg px-3 py-2 font-mono text-xs text-text-primary focus:border-gold-muted"
+            className="w-full rounded-md border border-border bg-bg px-3 py-2 font-mono text-xs text-text-primary focus:border-gold-muted disabled:opacity-60"
           />
           <div className="flex justify-end">
-            <ConfirmButton
+            <Button
               size="sm"
-              variant="primary"
+              variant={createArmed ? "danger" : "primary"}
               disabled={saving || !draft.trim()}
-              onConfirm={createVersion}
-              confirmLabel="Create & activate?"
+              onClick={triggerCreate}
             >
-              {saving ? "Saving…" : "Create & activate"}
-            </ConfirmButton>
+              {saving ? "Saving…" : createArmed ? "Create & activate?" : "Create & activate"}
+            </Button>
           </div>
         </div>
 
