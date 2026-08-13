@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { invalidateTokenCache } from "@/lib/auth/social-auth";
+import { HAS_SESSION_COOKIE_NAME } from "@/lib/auth/session-cookie";
 
 export async function POST(req: NextRequest) {
   // Drop the server-side token cache for this access token. This clears THIS
@@ -15,5 +16,6 @@ export async function POST(req: NextRequest) {
 
   const response = NextResponse.json({ ok: true });
   response.cookies.delete("qf_refresh_token");
+  response.cookies.delete(HAS_SESSION_COOKIE_NAME);
   return response;
 }

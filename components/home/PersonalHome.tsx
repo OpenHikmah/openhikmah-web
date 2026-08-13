@@ -88,12 +88,17 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
             {t("greeting")}
           </p>
           <h1 className="mt-1.5 text-[clamp(1.5rem,3.5vw,2.1rem)] font-semibold tracking-[-0.02em] text-text-primary">
-            {username
-              ? t.rich("welcomeBackNamed", {
-                  name: username,
-                  gold: (chunks) => <span className="text-gold">{chunks}</span>,
-                })
-              : t("welcomeBack")}
+            {!accessToken
+              ? // Anonymous visitor with local canvas progress (see HomeView.tsx) — a
+                // "welcome back" greeting would falsely imply a recognised, signed-in
+                // identity while the header still shows "Log in".
+                t("continueExploring")
+              : username
+                ? t.rich("welcomeBackNamed", {
+                    name: username,
+                    gold: (chunks) => <span className="text-gold">{chunks}</span>,
+                  })
+                : t("welcomeBack")}
           </h1>
         </div>
         {streak > 0 && (

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { HAS_SESSION_COOKIE_NAME, hasSessionCookieOptions } from "@/lib/auth/session-cookie";
 
 const COOKIE_NAME = "qf_refresh_token";
 
@@ -97,7 +98,9 @@ function refresh(refreshToken: string): Promise<RefreshOutcome> {
 export async function POST(req: NextRequest) {
   const refreshToken = req.cookies.get(COOKIE_NAME)?.value;
   if (!refreshToken) {
-    return NextResponse.json({ error: "No session" }, { status: 401 });
+    const response = NextResponse.json({ error: "No session" }, { status: 401 });
+    response.cookies.delete(HAS_SESSION_COOKIE_NAME);
+    return response;
   }
 
   const outcome = await refresh(refreshToken);
@@ -105,12 +108,14 @@ export async function POST(req: NextRequest) {
   if (outcome.kind === "ok") {
     const response = NextResponse.json({ accessToken: outcome.accessToken });
     response.cookies.set(COOKIE_NAME, outcome.refreshToken, cookieOptions(60 * 60 * 24 * 30));
+    response.cookies.set(HAS_SESSION_COOKIE_NAME, "1", hasSessionCookieOptions(60 * 60 * 24 * 30));
     return response;
   }
 
   if (outcome.kind === "invalid") {
     const response = NextResponse.json({ error: "Session expired" }, { status: 401 });
     response.cookies.delete(COOKIE_NAME);
+    response.cookies.delete(HAS_SESSION_COOKIE_NAME);
     return response;
   }
 

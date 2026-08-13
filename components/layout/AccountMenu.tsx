@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
-import { buildAuthUrl } from "@/lib/auth/pkce";
+import { useSignIn } from "@/hooks/useSignIn";
 import { cn } from "@/lib/utils";
 
 export function AccountMenu() {
@@ -32,7 +32,7 @@ export function AccountMenu() {
   const pendingMentionCount = useSocialStore((s) => s.pendingMentionCount);
 
   const [open, setOpen] = useState(false);
-  const [signingIn, setSigningIn] = useState(false);
+  const { signIn, signingIn } = useSignIn();
   const ref = useRef<HTMLDivElement>(null);
   const t = useTranslations("common");
   const tNav = useTranslations("nav");
@@ -52,22 +52,6 @@ export function AccountMenu() {
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
-
-  const signIn = async () => {
-    if (signingIn) return;
-    setSigningIn(true);
-    try {
-      const { url, codeVerifier, state, nonce } = await buildAuthUrl();
-      sessionStorage.setItem("pkce_code_verifier", codeVerifier);
-      sessionStorage.setItem("pkce_state", state);
-      sessionStorage.setItem("pkce_nonce", nonce);
-      window.location.href = url;
-    } catch {
-      // Building the auth URL failed — re-enable the button instead of leaving
-      // it stuck on "signing in".
-      setSigningIn(false);
-    }
-  };
 
   const signOut = async () => {
     setOpen(false);
