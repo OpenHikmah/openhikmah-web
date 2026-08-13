@@ -48,4 +48,16 @@ describe("ConnectionsPage — confidence column", () => {
     expect(await screen.findByText("2:255 → 24:35")).toBeInTheDocument();
     expect(screen.getByText("—")).toBeInTheDocument();
   });
+
+  it("flags sub-50% confidence for review instead of coloring it as an error", async () => {
+    mockApi.mockResolvedValue({
+      connections: [{ ...baseConnection, confidence: 42 }],
+    });
+
+    render(<ConnectionsPage />);
+
+    const confidence = await screen.findByText("42%");
+    expect(confidence.className).toContain("text-gold");
+    expect(confidence.className).not.toContain("text-error");
+  });
 });

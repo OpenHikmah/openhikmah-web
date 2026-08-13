@@ -120,9 +120,7 @@ export default function ConnectionsPage() {
                     {c.confidence === null ? (
                       <span className="text-text-muted">—</span>
                     ) : (
-                      <span
-                        className={cn(c.confidence < 50 ? "text-error" : "text-text-secondary")}
-                      >
+                      <span className={cn(c.confidence < 50 ? "text-gold" : "text-text-secondary")}>
                         {c.confidence}%
                       </span>
                     )}
