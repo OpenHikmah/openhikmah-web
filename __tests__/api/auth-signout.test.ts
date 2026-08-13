@@ -25,8 +25,12 @@ describe("POST /api/auth/signout", () => {
     const body = await res.json();
     expect(body.ok).toBe(true);
     expect(mockInvalidateTokenCache).toHaveBeenCalledWith("access-token-123");
-    const setCookie = res.headers.get("set-cookie") ?? "";
-    expect(setCookie).toContain("qf_refresh_token=;");
+    const setCookies =
+      typeof res.headers.getSetCookie === "function"
+        ? res.headers.getSetCookie()
+        : [res.headers.get("set-cookie") ?? ""];
+    expect(setCookies.some((c) => c.startsWith("qf_refresh_token=;"))).toBe(true);
+    expect(setCookies.some((c) => c.startsWith("qf_has_session=;"))).toBe(true);
   });
 
   it("still succeeds and clears the cookie when no Authorization header is present", async () => {
@@ -35,8 +39,12 @@ describe("POST /api/auth/signout", () => {
     const body = await res.json();
     expect(body.ok).toBe(true);
     expect(mockInvalidateTokenCache).not.toHaveBeenCalled();
-    const setCookie = res.headers.get("set-cookie") ?? "";
-    expect(setCookie).toContain("qf_refresh_token=;");
+    const setCookies =
+      typeof res.headers.getSetCookie === "function"
+        ? res.headers.getSetCookie()
+        : [res.headers.get("set-cookie") ?? ""];
+    expect(setCookies.some((c) => c.startsWith("qf_refresh_token=;"))).toBe(true);
+    expect(setCookies.some((c) => c.startsWith("qf_has_session=;"))).toBe(true);
   });
 
   it("does not invalidate the cache for a malformed (non-Bearer) Authorization header", async () => {

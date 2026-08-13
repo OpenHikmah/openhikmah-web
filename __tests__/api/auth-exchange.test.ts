@@ -70,9 +70,16 @@ describe("POST /api/auth/exchange", () => {
     const body = await res.json();
     expect(body.accessToken).toBe("access-123");
     expect(body.refreshToken).toBeUndefined();
-    const setCookie = res.headers.get("set-cookie") ?? "";
-    expect(setCookie).toContain("qf_refresh_token=refresh-456");
-    expect(setCookie.toLowerCase()).toContain("httponly");
+    const setCookies =
+      typeof res.headers.getSetCookie === "function"
+        ? res.headers.getSetCookie()
+        : [res.headers.get("set-cookie") ?? ""];
+    const refreshCookie = setCookies.find((c) => c.startsWith("qf_refresh_token=")) ?? "";
+    expect(refreshCookie).toContain("qf_refresh_token=refresh-456");
+    expect(refreshCookie.toLowerCase()).toContain("httponly");
+    const hasSessionCookie = setCookies.find((c) => c.startsWith("qf_has_session=")) ?? "";
+    expect(hasSessionCookie).toContain("qf_has_session=1");
+    expect(hasSessionCookie.toLowerCase()).not.toContain("httponly");
   });
 
   it("does not set cookie when server provides no refresh token", async () => {

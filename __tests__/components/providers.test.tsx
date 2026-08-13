@@ -47,9 +47,12 @@ describe("SessionRestorer", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    // Clear the marker cookie so it doesn't leak between tests.
+    document.cookie = "qf_has_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
   });
 
   it("logs a distinguishing message and still resolves session loading when refresh throws", async () => {
+    document.cookie = "qf_has_session=1";
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     mockFetch.mockRejectedValueOnce(new Error("network down"));
 
@@ -64,6 +67,7 @@ describe("SessionRestorer", () => {
   });
 
   it("does not log an error for the expected no-session case (non-OK refresh response)", async () => {
+    document.cookie = "qf_has_session=1";
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     mockFetch.mockResolvedValueOnce({ ok: false });
 
@@ -81,5 +85,25 @@ describe("SessionRestorer", () => {
 
     await waitFor(() => expect(useAuthStore.getState().isSessionLoading).toBe(false));
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("skips the refresh call entirely when there's no qf_has_session marker cookie", async () => {
+    // document.cookie is empty by default in jsdom — this is the common
+    // anonymous-visitor case that previously fired a doomed refresh request
+    // (and its resulting 401) on every page load.
+    render(<SessionRestorer />);
+
+    await waitFor(() => expect(useAuthStore.getState().isSessionLoading).toBe(false));
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("calls refresh when the qf_has_session marker cookie is present", async () => {
+    document.cookie = "qf_has_session=1";
+    mockFetch.mockResolvedValueOnce({ ok: false });
+
+    render(<SessionRestorer />);
+
+    await waitFor(() => expect(useAuthStore.getState().isSessionLoading).toBe(false));
+    expect(mockFetch).toHaveBeenCalledWith("/api/auth/refresh", expect.any(Object));
   });
 });

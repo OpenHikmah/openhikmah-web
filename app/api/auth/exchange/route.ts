@@ -5,6 +5,7 @@ import { users } from "@/lib/infra/db/schema";
 import { resolveQfId } from "@/lib/auth/social-auth";
 import { rateLimitOrNull } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
+import { HAS_SESSION_COOKIE_NAME, hasSessionCookieOptions } from "@/lib/auth/session-cookie";
 
 // Unauthenticated (pre-login) route — each request triggers an outbound
 // Basic-auth call to the QF token endpoint, so it's keyed per-IP rather than
@@ -179,6 +180,10 @@ export async function POST(req: NextRequest) {
     const response = NextResponse.json({ accessToken, userId, username, isNewUser });
 
     // Refresh token goes in an HttpOnly cookie — never exposed to JS (XSS-safe).
+    // A companion non-HttpOnly flag cookie (no token material, just a marker)
+    // lets client JS know a session-worth-refreshing exists, so SessionRestorer
+    // can skip the /api/auth/refresh call entirely for anonymous visitors
+    // instead of firing it (and logging a 401) on every page load.
     if (refreshToken) {
       response.cookies.set(COOKIE_NAME, refreshToken, {
         httpOnly: true,
@@ -187,6 +192,11 @@ export async function POST(req: NextRequest) {
         path: "/",
         maxAge: 60 * 60 * 24 * 30,
       });
+      response.cookies.set(
+        HAS_SESSION_COOKIE_NAME,
+        "1",
+        hasSessionCookieOptions(60 * 60 * 24 * 30)
+      );
     }
 
     return response;

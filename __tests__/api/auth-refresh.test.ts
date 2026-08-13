@@ -32,9 +32,16 @@ describe("POST /api/auth/refresh", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.accessToken).toBe("access-1");
-    const setCookie = res.headers.get("set-cookie") ?? "";
-    expect(setCookie).toContain("qf_refresh_token=refresh-rotated-1");
-    expect(setCookie.toLowerCase()).toContain("httponly");
+    const setCookies =
+      typeof res.headers.getSetCookie === "function"
+        ? res.headers.getSetCookie()
+        : [res.headers.get("set-cookie") ?? ""];
+    const refreshCookie = setCookies.find((c) => c.startsWith("qf_refresh_token=")) ?? "";
+    expect(refreshCookie).toContain("qf_refresh_token=refresh-rotated-1");
+    expect(refreshCookie.toLowerCase()).toContain("httponly");
+    const hasSessionCookie = setCookies.find((c) => c.startsWith("qf_has_session=")) ?? "";
+    expect(hasSessionCookie).toContain("qf_has_session=1");
+    expect(hasSessionCookie.toLowerCase()).not.toContain("httponly");
   });
 
   it("re-stamps the same refresh token when the provider doesn't rotate", async () => {
@@ -58,8 +65,12 @@ describe("POST /api/auth/refresh", () => {
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.error).toMatch(/session expired/i);
-    const setCookie = res.headers.get("set-cookie") ?? "";
-    expect(setCookie).toContain("qf_refresh_token=;");
+    const setCookies =
+      typeof res.headers.getSetCookie === "function"
+        ? res.headers.getSetCookie()
+        : [res.headers.get("set-cookie") ?? ""];
+    expect(setCookies.some((c) => c.startsWith("qf_refresh_token=;"))).toBe(true);
+    expect(setCookies.some((c) => c.startsWith("qf_has_session=;"))).toBe(true);
   });
 
   it("returns 503 and keeps the cookie on a transient upstream failure", async () => {
