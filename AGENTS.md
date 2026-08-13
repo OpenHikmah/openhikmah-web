@@ -59,7 +59,7 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (e.g
 All AI prompts, divine name descriptions, and verse connections must:
 
 1. **Stay within the Maturidi/Hanafi tradition** — this is the theological framework of the project. Don't introduce Ash'ari-only positions without noting the difference, and don't conflate schools.
-2. **Maintain strict Tanzih (transcendence)** — never describe divine attributes in ways that imply physical form, spatial location, or resemblance to created things (Tashbih). The prompts in `app/api/connections/route.ts` include this constraint explicitly.
+2. **Maintain strict Tanzih (transcendence)** — never describe divine attributes in ways that imply physical form, spatial location, or resemblance to created things (Tashbih). The shared `TANZIH_CONSTRAINT` in `lib/ai/theological-constraints.ts` defines this wording; `lib/ai/connection-generator.ts`'s `tanzihDirective()` is the call site that appends it to every connection-generation prompt.
 3. **Use verified verse references** — never fabricate a Quran verse reference. If a model returns a reference that cannot be verified via the alquran.cloud API, the system rejects it. In tests, use known valid refs (e.g. `2:255`, `1:1`, `112:1`).
 4. **Handle Quranic text as sacred data** — even in test fixtures and mock data, use real or plausible Arabic text. Don't use placeholder strings like `"lorem ipsum"` for Arabic fields.
 5. **Attribute translations correctly** — the project uses `en.sahih` (Saheeh International) from alquran.cloud. If you add a new translation source, document it clearly.

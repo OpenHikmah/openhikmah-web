@@ -12,7 +12,7 @@ vi.mock("next/cache", () => ({
 // so individual tests can override the locale/edition; the defaults below match
 // this suite's pre-existing English-only fixtures/assertions.
 const { mockGetUiLocale, mockGetQuranEdition } = vi.hoisted(() => ({
-  mockGetUiLocale: vi.fn(async () => "en" as const),
+  mockGetUiLocale: vi.fn(async (): Promise<"en" | "tr" | "ru" | "az"> => "en"),
   mockGetQuranEdition: vi.fn(async () => "en.sahih"),
 }));
 vi.mock("@/lib/i18n/request-prefs", () => ({
@@ -55,21 +55,29 @@ vi.mock("@/lib/infra/db", () => ({
   },
 }));
 
-vi.mock("@anthropic-ai/sdk", () => {
-  const mockText = JSON.stringify([
-    { ref: "2:255", reason: "Verse of the Throne manifests Al-Hayy and Al-Qayyum." },
-    { ref: "3:18", reason: "Allah witnesses His own oneness." },
-    { ref: "59:22", reason: "Enumerates divine attributes directly." },
-    { ref: "112:1", reason: "Al-Ahad — pure singularity." },
-    { ref: "24:35", reason: "The Light verse expresses An-Nur." },
-  ]);
+// Shared (not per-instance) so tests can inspect every prompt sent to the AI
+// across the module's several `new Anthropic()` call sites (callAI creates a
+// fresh client per call).
+const { mockCreate } = vi.hoisted(() => ({
+  mockCreate: vi.fn(async (_args: { messages: Array<{ content: string }> }) => ({
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify([
+          { ref: "2:255", reason: "Verse of the Throne manifests Al-Hayy and Al-Qayyum." },
+          { ref: "3:18", reason: "Allah witnesses His own oneness." },
+          { ref: "59:22", reason: "Enumerates divine attributes directly." },
+          { ref: "112:1", reason: "Al-Ahad — pure singularity." },
+          { ref: "24:35", reason: "The Light verse expresses An-Nur." },
+        ]),
+      },
+    ],
+  })),
+}));
 
+vi.mock("@anthropic-ai/sdk", () => {
   class MockAnthropic {
-    messages = {
-      create: vi.fn().mockResolvedValue({
-        content: [{ type: "text", text: mockText }],
-      }),
-    };
+    messages = { create: mockCreate };
   }
 
   return { default: MockAnthropic };
@@ -78,6 +86,7 @@ vi.mock("@anthropic-ai/sdk", () => {
 // Static imports — must come after vi.mock declarations so mocks are active
 import { GET as getAllNames } from "@/app/api/names/route";
 import { GET as getNameVerses } from "@/app/api/names/[slug]/verses/route";
+import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
 
 // Stub fetch AFTER static imports so vi.stubGlobal wins over any fetch patch
 // that next/server applies during module initialization
@@ -187,6 +196,31 @@ describe("GET /api/names/[slug]/verses", () => {
     expect(body.length).toBeGreaterThan(0);
     for (const verse of body) {
       expect(verse.translation).toBe("Türkçe çeviri");
+    }
+  });
+
+  it("translateReason's prompt carries the shared TANZIH_CONSTRAINT text, not a hardcoded duplicate", async () => {
+    mockGetUiLocale.mockResolvedValue("tr");
+    mockGetQuranEdition.mockResolvedValue("tr.diyanet");
+    mockFetch.mockImplementation(async (url: string) => {
+      if (typeof url !== "string") return { ok: false };
+      if (url.includes("ar.alafasy")) return arabicResp();
+      if (url.includes("tr.diyanet")) return transResp("Türkçe çeviri");
+      if (url.includes("en.sahih")) return transResp("English translation");
+      return { ok: false };
+    });
+    mockCreate.mockClear();
+
+    const req = new NextRequest("http://localhost/api/names/as-salam/verses");
+    const res = await getNameVerses(req, params("as-salam"));
+    expect(res.status).toBe(200);
+
+    const translationPrompts = mockCreate.mock.calls
+      .map(([arg]) => arg.messages[0].content as string)
+      .filter((prompt: string) => prompt.startsWith("Translate the following sentence"));
+    expect(translationPrompts.length).toBeGreaterThan(0);
+    for (const prompt of translationPrompts) {
+      expect(prompt).toContain(TANZIH_CONSTRAINT);
     }
   });
 });
