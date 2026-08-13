@@ -180,6 +180,7 @@
     "greeting": "Assalamu alaykum",
     "welcomeBack": "Welcome back",
     "welcomeBackNamed": "Welcome back, <gold>{name}</gold>",
+    "continueExploring": "Continue exploring",
     "continueCanvas": "Continue your canvas",
     "openCanvas": "Open the canvas",
     "versesInProgress": "{count, plural, one {# verse in progress} other {# verses in progress}}",
@@ -224,5 +225,9 @@
     "rootTitle": "Something went wrong",
     "rootBody": "An unexpected error interrupted this page. You can try again, or head back home.",
     "todayVerseUnavailable": "Couldn't load today's verse right now. Please try again later."
+  },
+  "authGate": {
+    "title": "Sign in to continue",
+    "body": "You need to be signed in to view this page."
   }
 }

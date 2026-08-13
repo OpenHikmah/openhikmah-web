@@ -9,6 +9,7 @@ import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { usePreferencesStore } from "@/store/preferences";
 import { mergeGuestWorkspace } from "@/hooks/useCanvasPersistence";
+import { HAS_SESSION_COOKIE_NAME } from "@/lib/auth/session-cookie";
 import type { Locale } from "@/lib/i18n/config";
 
 // The persisted-store rehydration path (store/preferences.ts's
@@ -92,6 +93,19 @@ export function SessionRestorer() {
     // the rotated cookie commits, Ory sees the old token reused and revokes the
     // whole session — leaving them stuck on "Sign in". Skip the redundant call.
     if (useAuthStore.getState().accessToken) {
+      setSessionLoaded();
+      return;
+    }
+
+    // qf_has_session is a non-HttpOnly marker cookie set alongside the real
+    // (HttpOnly) refresh-token cookie — see lib/auth/session-cookie.ts. Its
+    // absence means there's nothing to refresh, so skip the call entirely
+    // instead of hitting /api/auth/refresh and logging a 401 on every load
+    // for the common anonymous-visitor case.
+    const hasSession = document.cookie
+      .split("; ")
+      .some((c) => c.startsWith(`${HAS_SESSION_COOKIE_NAME}=`));
+    if (!hasSession) {
       setSessionLoaded();
       return;
     }

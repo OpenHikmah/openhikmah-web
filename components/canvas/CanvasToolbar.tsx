@@ -22,8 +22,8 @@ import { useAuthStore } from "@/store/auth";
 import { useAudioStore } from "@/store/audio";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
+import { useSignIn } from "@/hooks/useSignIn";
 import { buildShareUrl } from "@/hooks/useCanvasPersistence";
-import { buildAuthUrl } from "@/lib/auth/pkce";
 import {
   exportCanvasToPng,
   exportCanvasToPdf,
@@ -79,7 +79,7 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(false);
-  const [signingIn, setSigningIn] = useState(false);
+  const { signIn: handleSignIn, signingIn } = useSignIn();
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(false);
@@ -181,24 +181,6 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
       }, 2000);
     } finally {
       if (mountedRef.current) setSaving(false);
-    }
-  };
-
-  // The canvas is persisted to localStorage, so signing in and coming back keeps
-  // the current graph — the user can save it the moment they return.
-  const handleSignIn = async () => {
-    if (signingIn) return;
-    setSigningIn(true);
-    try {
-      const { url, codeVerifier, state, nonce } = await buildAuthUrl();
-      sessionStorage.setItem("pkce_code_verifier", codeVerifier);
-      sessionStorage.setItem("pkce_state", state);
-      sessionStorage.setItem("pkce_nonce", nonce);
-      window.location.href = url;
-    } catch {
-      // Building the auth URL failed (e.g. crypto unavailable) — re-enable the
-      // button instead of leaving it stuck on "signing in".
-      setSigningIn(false);
     }
   };
 

@@ -180,6 +180,7 @@
     "greeting": "Selamün aleyküm",
     "welcomeBack": "Tekrar hoş geldin",
     "welcomeBackNamed": "Tekrar hoş geldin, <gold>{name}</gold>",
+    "continueExploring": "Keşfetmeye devam et",
     "continueCanvas": "Tuvaline devam et",
     "openCanvas": "Tuvali aç",
     "versesInProgress": "{count, plural, one {# ayet devam ediyor} other {# ayet devam ediyor}}",
@@ -224,5 +225,9 @@
     "rootTitle": "Bir şeyler ters gitti",
     "rootBody": "Beklenmeyen bir hata bu sayfayı kesintiye uğrattı. Tekrar deneyebilir veya ana sayfaya dönebilirsiniz.",
     "todayVerseUnavailable": "Bugünün ayeti şu anda yüklenemedi. Lütfen daha sonra tekrar deneyin."
+  },
+  "authGate": {
+    "title": "Devam etmek için giriş yapın",
+    "body": "Bu sayfayı görüntülemek için giriş yapmanız gerekiyor."
   }
 }

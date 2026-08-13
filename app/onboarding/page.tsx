@@ -1,27 +1,62 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
-import { BookOpen, Loader2 } from "lucide-react";
+import { useSignIn } from "@/hooks/useSignIn";
+import { BookOpen, Loader2, LogIn } from "lucide-react";
 import { Card, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
+  const isSessionLoading = useAuthStore((s) => s.isSessionLoading);
   const { setProfile } = useSocialStore();
+  const { signIn, signingIn } = useSignIn();
+  const t = useTranslations("authGate");
+  const tCommon = useTranslations("common");
 
   const [username, setUsername] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!accessToken) router.replace("/");
-  }, [accessToken, router]);
+  if (isSessionLoading) {
+    return (
+      <div
+        className="flex min-h-screen items-center justify-center bg-bg"
+        role="status"
+        aria-label="Loading"
+      >
+        <Loader2 className="h-5 w-5 animate-spin text-teal" />
+      </div>
+    );
+  }
 
-  if (!accessToken) return null;
+  if (!accessToken) {
+    // Session restoration has finished and there's genuinely no token — show
+    // why instead of silently bouncing to "/" with no explanation.
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-bg px-4 text-center">
+        <h1 className="text-base font-medium text-text-primary">{t("title")}</h1>
+        <p className="max-w-sm text-sm text-text-muted">{t("body")}</p>
+        <button
+          onClick={signIn}
+          disabled={signingIn}
+          className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-gold px-3.5 py-1.5 text-[13px] font-semibold text-gold transition-colors duration-[120ms] hover:bg-gold/10 disabled:opacity-60"
+        >
+          {signingIn ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <LogIn className="size-3.5" />
+          )}
+          {signingIn ? tCommon("signingIn") : tCommon("signIn")}
+        </button>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

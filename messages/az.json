@@ -180,6 +180,7 @@
     "greeting": "Əssəlamu aleykum",
     "welcomeBack": "Yenidən xoş gəldin",
     "welcomeBackNamed": "Yenidən xoş gəldin, <gold>{name}</gold>",
+    "continueExploring": "Kəşf etməyə davam et",
     "continueCanvas": "Lövhənə davam et",
     "openCanvas": "Lövhəni aç",
     "versesInProgress": "{count, plural, one {# ayə davam edir} other {# ayə davam edir}}",
@@ -224,5 +225,9 @@
     "rootTitle": "Nəsə səhv getdi",
     "rootBody": "Gözlənilməz xəta bu səhifəni kəsdi. Yenidən cəhd edə və ya ana səhifəyə qayıda bilərsiniz.",
     "todayVerseUnavailable": "Bugünkü ayə hazırda yüklənə bilmədi. Zəhmət olmasa sonra yenidən cəhd edin."
+  },
+  "authGate": {
+    "title": "Davam etmək üçün daxil olun",
+    "body": "Bu səhifəyə baxmaq üçün daxil olmalısınız."
   }
 }
