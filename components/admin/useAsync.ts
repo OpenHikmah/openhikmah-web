@@ -43,8 +43,17 @@ export function useAsync<T>(loader: () => Promise<T>, cacheKey: string): AsyncSt
   });
 
   const keepDataOnErrorRef = useRef(false);
+  const prevCacheKeyRef = useRef(cacheKey);
 
   useEffect(() => {
+    // A cacheKey change is a different resource, not a same-key reload — a
+    // flag set by an earlier reload() for the old key must not leak into the
+    // new key's fetch and retain data that belongs to something else.
+    if (prevCacheKeyRef.current !== cacheKey) {
+      keepDataOnErrorRef.current = false;
+      prevCacheKeyRef.current = cacheKey;
+    }
+
     let active = true;
     // Legitimate external-data sync: kick off a fetch and reflect its result.
     // eslint-disable-next-line react-hooks/set-state-in-effect

@@ -105,4 +105,28 @@ describe("useAsync", () => {
     expect(result.current.data).toEqual({ v: 0 });
     expect(result.current.error).toBe("Something went wrong");
   });
+
+  it("doesn't let a retaining reload for one cacheKey leak into a later cacheKey's failed fetch", async () => {
+    const loader = vi
+      .fn()
+      .mockResolvedValueOnce({ value: "a" }) // initial load for key "a"
+      .mockRejectedValueOnce(new Error("poll failed")) // reload({ keepDataOnError: true }) for key "a"
+      .mockRejectedValueOnce(new Error("b failed")); // initial load for key "b", after switching keys
+    const { result, rerender } = renderHook(({ cacheKey }) => useAsync(loader, cacheKey), {
+      initialProps: { cacheKey: "a" },
+    });
+
+    await waitFor(() => expect(result.current.data).toEqual({ value: "a" }));
+
+    act(() => result.current.reload({ keepDataOnError: true }));
+    await waitFor(() => expect(result.current.error).toBe("Something went wrong"));
+    expect(result.current.data).toEqual({ value: "a" }); // retained, as intended for key "a"
+
+    // Switch to a different resource entirely (no reload() call — a plain
+    // cacheKey change). Its own fetch fails; without the fix this would
+    // incorrectly keep showing key "a"'s stale data.
+    rerender({ cacheKey: "b" });
+    await waitFor(() => expect(loader).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(result.current.data).toBeNull());
+  });
 });
