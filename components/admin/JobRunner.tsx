@@ -28,7 +28,13 @@ export function JobRunner() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const { data, error, loading, reload } = useAsync<JobsResponse>(() => api("/jobs"), "admin-jobs");
+  const { data, error, loading, reload } = useAsync<JobsResponse>(
+    () => api("/jobs"),
+    "admin-jobs",
+    {
+      keepDataOnError: true,
+    }
+  );
 
   // Poll while any job is running, so status/log-tail reflects progress
   // without a manual reload — but only while there's something to watch.
