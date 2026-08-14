@@ -67,8 +67,9 @@ describe("ContextSidebar — note delete checks response status", () => {
     vi.stubGlobal("fetch", mockFetch);
     mockFetch.mockReset();
     deleteResponse = async () => new Response(null, { status: 204 });
-    // Method-aware (rather than call-order-aware) so React 18's double-invoked
-    // effect in test mode doesn't consume the DELETE mock as the notes GET.
+    // Method-aware (rather than call-order-aware): sibling sections
+    // (InteractiveArabic's morphology fetch, etc.) also call this same mocked
+    // fetch, so a queued once-per-call mock can be consumed out of order.
     mockFetch.mockImplementation((_url: string, init?: RequestInit) =>
       init?.method === "DELETE"
         ? deleteResponse()
@@ -122,6 +123,47 @@ describe("ContextSidebar — note delete checks response status", () => {
 
     expect(screen.getByText("a private note")).toBeInTheDocument();
     expect(await screen.findByText("Delete failed")).toBeInTheDocument();
+  });
+
+  it("doesn't let an earlier note's error-clear timer wipe a later note's error", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const noteA = { id: 1, note: "note A", createdAt: new Date().toISOString() };
+    const noteB = { id: 2, note: "note B", createdAt: new Date().toISOString() };
+    mockFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === "DELETE"
+        ? Promise.resolve(new Response(null, { status: 500 }))
+        : Promise.resolve(new Response(JSON.stringify([noteA, noteB]), { status: 200 }))
+    );
+
+    await act(async () => {
+      renderWithIntl(<ContextSidebar />);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    expect(await screen.findByText("note A")).toBeInTheDocument();
+    const [deleteA, deleteB] = screen.getAllByRole("button", { name: "Delete note" });
+
+    await act(async () => {
+      fireEvent.click(deleteA);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    await act(async () => {
+      fireEvent.click(deleteB);
+    });
+
+    // note A's timer (scheduled at t=0, due at t=3000) would incorrectly clear
+    // note B's error here if it weren't cancelled when note B's delete failed.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(screen.getByText("Delete failed")).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(screen.queryByText("Delete failed")).not.toBeInTheDocument();
+    vi.useRealTimers();
   });
 
   it("keeps the note in state and surfaces an error when the DELETE request rejects", async () => {
