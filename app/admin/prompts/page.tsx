@@ -85,8 +85,12 @@ export default function PromptsPage() {
               <button
                 key={k}
                 onClick={() => setKey(k)}
+                // Locked with the draft/textarea during the armed window — otherwise
+                // a confirmed create could activate the draft in a slot the user
+                // never actually confirmed for.
+                disabled={createArmed || saving}
                 className={cn(
-                  "rounded border px-2 py-1 text-xs transition-colors",
+                  "rounded border px-2 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50",
                   key === k
                     ? "border-gold-muted bg-gold/10 text-gold"
                     : "border-border text-text-secondary hover:border-gold-muted"
