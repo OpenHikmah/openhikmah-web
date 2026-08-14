@@ -123,6 +123,18 @@ describe("admin challenges [id]", () => {
     expect(res.status).toBe(409);
   });
 
+  it("409s when two override-winner corrections race on an already-completed challenge", async () => {
+    // Status alone can't detect this race (it stays "completed" throughout),
+    // so the scoped update must also pin the previously-read winnerId.
+    mockSelect.mockReturnValue(makeDbChain([{ ...challenge, status: "completed", winnerId: 1 }]));
+    mockUpdate.mockReturnValue(makeDbChain([])); // winnerId changed underneath us, scoped update matched nothing
+    const res = await PATCH(
+      req("PATCH", { action: "override-winner", winnerId: challenge.challengedId }),
+      params
+    );
+    expect(res.status).toBe(409);
+  });
+
   it("rejects an unknown action", async () => {
     expect((await PATCH(req("PATCH", { action: "nope" }), params)).status).toBe(400);
   });

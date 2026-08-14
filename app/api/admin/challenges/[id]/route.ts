@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
@@ -95,8 +95,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         { status: 400 }
       );
     }
-    // Scope the WHERE to the state we just checked, so a concurrent status
-    // change loses the race cleanly instead of silently clobbering it.
+    // Scope the WHERE to the state we just checked. For the active->completed
+    // transition, the status flip itself makes a racing request's WHERE stop
+    // matching. For an already-completed challenge, status never changes, so
+    // also pin the previously-read winnerId — otherwise two concurrent
+    // corrections would both match and the second would silently clobber the
+    // first's winnerId with no 409.
     const [updated] = await db
       .update(challenges)
       .set({ status: "completed", winnerId })
@@ -105,7 +109,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           eq(challenges.id, challengeId),
           challenge.status === "active"
             ? eq(challenges.status, "active")
-            : eq(challenges.status, "completed")
+            : and(
+                eq(challenges.status, "completed"),
+                sql`${challenges.winnerId} is not distinct from ${challenge.winnerId}`
+              )
         )
       )
       .returning();
