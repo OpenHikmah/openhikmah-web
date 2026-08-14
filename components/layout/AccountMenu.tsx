@@ -34,6 +34,9 @@ export function AccountMenu() {
   const [open, setOpen] = useState(false);
   const { signIn, signingIn } = useSignIn();
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const firstItemRef = useRef<HTMLAnchorElement>(null);
+  const wasOpenRef = useRef(false);
   const t = useTranslations("common");
   const tNav = useTranslations("nav");
 
@@ -51,6 +54,20 @@ export function AccountMenu() {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
+  }, [open]);
+
+  // This is a plain nav popover (not a true ARIA menu — no roving-tabindex
+  // arrow-key navigation, so role="menu"/"menuitem" would overpromise), but
+  // it still needs standard popup-button focus management: move focus into
+  // it on open, and back to the trigger on close, however that close happens
+  // (Escape, outside click, or picking an item).
+  useEffect(() => {
+    if (open) {
+      firstItemRef.current?.focus();
+    } else if (wasOpenRef.current) {
+      triggerRef.current?.focus();
+    }
+    wasOpenRef.current = open;
   }, [open]);
 
   const signOut = async () => {
@@ -116,9 +133,10 @@ export function AccountMenu() {
   return (
     <div ref={ref} className="relative">
       <button
+        ref={triggerRef}
         onClick={() => setOpen((o) => !o)}
-        aria-haspopup="menu"
         aria-expanded={open}
+        aria-controls="account-menu-panel"
         aria-label={tNav("accountMenu")}
         className={cn(
           "flex items-center gap-2 rounded-full border bg-surface-raised py-[3px] pl-[3px] pr-2 transition-colors sm:pr-3",
@@ -149,7 +167,7 @@ export function AccountMenu() {
 
       {open && (
         <div
-          role="menu"
+          id="account-menu-panel"
           className="absolute right-0 top-[calc(100%+8px)] z-50 w-[268px] overflow-hidden rounded-2xl border border-border bg-surface-overlay shadow-floating"
         >
           <div
@@ -198,7 +216,12 @@ export function AccountMenu() {
           <div className="h-px bg-border" />
 
           <div className="p-1.5">
-            <Link href="/workspaces" onClick={() => setOpen(false)} className={linkRow}>
+            <Link
+              ref={firstItemRef}
+              href="/workspaces"
+              onClick={() => setOpen(false)}
+              className={linkRow}
+            >
               <FolderOpen /> {tNav("savedCanvases")}
             </Link>
             <Link href="/social" onClick={() => setOpen(false)} className={linkRow}>
@@ -235,7 +258,6 @@ export function AccountMenu() {
           <div className="p-1.5">
             <button
               onClick={signOut}
-              role="menuitem"
               className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-[13.5px] text-text-primary transition-colors hover:bg-error/10 hover:text-error [&_svg]:size-[17px] [&_svg]:text-text-secondary [&:hover_svg]:text-error"
             >
               <LogOut /> {t("signOut")}
