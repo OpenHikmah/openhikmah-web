@@ -114,4 +114,22 @@ describe("GET /api/admin/challenges", () => {
     expect(mockResolveEndedChallenges).not.toHaveBeenCalled();
     expect(mockResolveExpiredPending).not.toHaveBeenCalled();
   });
+
+  it("rate-limits a challenge that turns overdue between the ended-select and the list-select", async () => {
+    // Nothing in `ended`/`expiredPending`, but a `rows` entry is active and
+    // already past its endsAt — it slipped past the earlier gate.
+    const overdue = { id: 3, status: "active", endsAt: new Date(Date.now() - 1000) };
+    queueSelects([], [], [overdue]);
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+    expect(mockRateLimitAdminMutation).toHaveBeenCalledWith(admin);
+  });
+
+  it("does not double rate-limit when the earlier gate already checked", async () => {
+    const overdue = { id: 3, status: "active", endsAt: new Date(Date.now() - 1000) };
+    queueSelects([{ id: 1, status: "active" }], [], [overdue]);
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+    expect(mockRateLimitAdminMutation).toHaveBeenCalledTimes(1);
+  });
 });

@@ -32,8 +32,8 @@ export async function GET(req: NextRequest) {
   const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 200) : 50;
 
   try {
-    // Finalize any ended active challenges FIRST, so both the stats aggregation and
-    // the returned list reflect the same (post-finalization) state.
+    // Finalize any ended/expired challenges before the stats aggregation and the
+    // returned list are queried, so both reflect the same post-finalization state.
     const now = new Date();
     const ended = await db
       .select()
@@ -85,7 +85,16 @@ export async function GET(req: NextRequest) {
       .orderBy(desc(challenges.createdAt))
       .limit(limit);
 
-    const resolved = await resolveEndedChallenges(rows);
+    // A challenge can flip from active to overdue in the gap between the
+    // `ended` select above and this one, so it slips past the earlier gate.
+    // Reuse the same `now` snapshot (rather than resolveEndedChallenges's
+    // internal default) and rate-limit this write too if we haven't already.
+    const staleActive = rows.filter((c) => c.status === "active" && c.endsAt < now);
+    if (staleActive.length > 0 && ended.length === 0 && expiredPending.length === 0) {
+      const limited = await rateLimitAdminMutation(auth);
+      if (limited) return limited;
+    }
+    const resolved = await resolveEndedChallenges(rows, now);
 
     const userIds = [...new Set(rows.flatMap((c) => [c.challengerId, c.challengedId]))];
     const userRows = userIds.length
