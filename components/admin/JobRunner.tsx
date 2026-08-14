@@ -32,10 +32,14 @@ export function JobRunner() {
 
   // Poll while any job is running, so status/log-tail reflects progress
   // without a manual reload — but only while there's something to watch.
+  // keepDataOnError only on the poll's own reloads: a transient blip here
+  // shouldn't wipe the table, but the reload right after starting a job
+  // (below) should still clear stale data on failure, so a failure there
+  // can't silently strand `anyRunning` on data from before the job started.
   const anyRunning = data?.jobs.some((j) => j.status === "running") ?? false;
   useEffect(() => {
     if (!anyRunning) return;
-    const id = setInterval(reload, 4000);
+    const id = setInterval(() => reload({ keepDataOnError: true }), 4000);
     return () => clearInterval(id);
   }, [anyRunning, reload]);
 
