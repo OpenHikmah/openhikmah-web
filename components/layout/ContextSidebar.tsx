@@ -129,6 +129,7 @@ function NotesSection({ verseRef }: { verseRef: string }) {
         setDraft("");
       } else {
         setSaveError(true);
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = setTimeout(() => {
           if (mountedRef.current) setSaveError(false);
         }, 3000);
@@ -136,6 +137,7 @@ function NotesSection({ verseRef }: { verseRef: string }) {
     } catch {
       if (!mountedRef.current) return;
       setSaveError(true);
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
         if (mountedRef.current) setSaveError(false);
       }, 3000);
@@ -158,6 +160,10 @@ function NotesSection({ verseRef }: { verseRef: string }) {
         setNotes((prev) => prev.filter((n) => n.id !== id));
       } else {
         setDeleteErrorId(id);
+        // Two deletes can settle out of order: clear any timer a differently-
+        // ordered earlier delete already scheduled, so it can't fire and wipe
+        // this error before its own 3s window elapses.
+        if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
         deleteTimeoutRef.current = setTimeout(() => {
           if (mountedRef.current) setDeleteErrorId(null);
         }, 3000);
@@ -166,6 +172,7 @@ function NotesSection({ verseRef }: { verseRef: string }) {
       console.error("sidebar: note delete failed", e);
       if (!mountedRef.current) return;
       setDeleteErrorId(id);
+      if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
       deleteTimeoutRef.current = setTimeout(() => {
         if (mountedRef.current) setDeleteErrorId(null);
       }, 3000);

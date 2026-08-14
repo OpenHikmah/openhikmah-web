@@ -166,6 +166,69 @@ describe("ContextSidebar — note delete checks response status", () => {
     vi.useRealTimers();
   });
 
+  it("doesn't let an earlier-started delete's timer wipe a later-started delete's error when they settle out of order", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const noteA = { id: 1, note: "note A", createdAt: new Date().toISOString() };
+    const noteB = { id: 2, note: "note B", createdAt: new Date().toISOString() };
+
+    function deferred() {
+      let resolve!: (v: Response) => void;
+      const promise = new Promise<Response>((r) => {
+        resolve = r;
+      });
+      return { promise, resolve };
+    }
+    const deleteA = deferred();
+    const deleteB = deferred();
+
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method !== "DELETE") {
+        return Promise.resolve(new Response(JSON.stringify([noteA, noteB]), { status: 200 }));
+      }
+      return url.endsWith("/1") ? deleteA.promise : deleteB.promise;
+    });
+
+    await act(async () => {
+      renderWithIntl(<ContextSidebar />);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    expect(await screen.findByText("note A")).toBeInTheDocument();
+    const [deleteAButton, deleteBButton] = screen.getAllByRole("button", { name: "Delete note" });
+
+    // Start both deletes while both are still in flight (neither has settled).
+    await act(async () => {
+      fireEvent.click(deleteAButton);
+      fireEvent.click(deleteBButton);
+    });
+
+    // B (started second) settles first and fails, scheduling its own clear timer.
+    await act(async () => {
+      deleteB.resolve(new Response(null, { status: 500 }));
+      await Promise.resolve();
+    });
+    // A (started first) settles second, 1s later, and also fails — its error
+    // should now be showing, with its own fresh 3s window.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+      deleteA.resolve(new Response(null, { status: 500 }));
+      await Promise.resolve();
+    });
+    expect(screen.getByText("Delete failed")).toBeInTheDocument();
+
+    // B's stale timer (due at t=3000) firing here must not clear A's error,
+    // which only started its own window at t=1000 (due at t=4000).
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(screen.getByText("Delete failed")).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(screen.queryByText("Delete failed")).not.toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
   it("keeps the note in state and surfaces an error when the DELETE request rejects", async () => {
     deleteResponse = () => Promise.reject(new Error("network down"));
 
