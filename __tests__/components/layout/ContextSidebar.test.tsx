@@ -56,3 +56,88 @@ describe("ContextSidebar — notes textarea accessibility", () => {
     expect(await screen.findByRole("textbox", { name: /add a private note/i })).toBeInTheDocument();
   });
 });
+
+describe("ContextSidebar — note delete checks response status", () => {
+  const mockFetch = vi.fn();
+  const previousAuth = useAuthStore.getState();
+  const note = { id: 1, note: "a private note", createdAt: new Date().toISOString() };
+  let deleteResponse: () => Promise<Response> = async () => new Response(null, { status: 204 });
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", mockFetch);
+    mockFetch.mockReset();
+    deleteResponse = async () => new Response(null, { status: 204 });
+    // Method-aware (rather than call-order-aware) so React 18's double-invoked
+    // effect in test mode doesn't consume the DELETE mock as the notes GET.
+    mockFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === "DELETE"
+        ? deleteResponse()
+        : Promise.resolve(new Response(JSON.stringify([note]), { status: 200 }))
+    );
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }))
+    );
+    useAuthStore.setState({ accessToken: "test-token" });
+    useCanvasStore.getState().setSidebarContent({ type: "node", verse: baseVerse });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    useAuthStore.setState(previousAuth);
+    useCanvasStore.getState().setSidebarContent(null);
+  });
+
+  it("removes the note from state when the DELETE response is ok", async () => {
+    await act(async () => {
+      renderWithIntl(<ContextSidebar />);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    expect(await screen.findByText("a private note")).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Delete note" }));
+    });
+
+    expect(screen.queryByText("a private note")).not.toBeInTheDocument();
+  });
+
+  it("keeps the note in state and surfaces an error when the DELETE response is not ok", async () => {
+    deleteResponse = async () => new Response(null, { status: 500 });
+
+    await act(async () => {
+      renderWithIntl(<ContextSidebar />);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    expect(await screen.findByText("a private note")).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Delete note" }));
+    });
+
+    expect(screen.getByText("a private note")).toBeInTheDocument();
+    expect(await screen.findByText("Delete failed")).toBeInTheDocument();
+  });
+
+  it("keeps the note in state and surfaces an error when the DELETE request rejects", async () => {
+    deleteResponse = () => Promise.reject(new Error("network down"));
+
+    await act(async () => {
+      renderWithIntl(<ContextSidebar />);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    expect(await screen.findByText("a private note")).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Delete note" }));
+    });
+
+    expect(screen.getByText("a private note")).toBeInTheDocument();
+    expect(await screen.findByText("Delete failed")).toBeInTheDocument();
+  });
+});

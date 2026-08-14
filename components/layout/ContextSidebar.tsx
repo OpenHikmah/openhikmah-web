@@ -81,6 +81,7 @@ function NotesSection({ verseRef }: { verseRef: string }) {
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [deleteErrorId, setDeleteErrorId] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -124,11 +125,23 @@ function NotesSection({ verseRef }: { verseRef: string }) {
 
   const remove = async (id: number) => {
     if (!accessToken) return;
-    await fetch(`/api/notes/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${accessToken}` },
-    }).catch((e) => console.error("sidebar: note delete failed", e));
-    setNotes((prev) => prev.filter((n) => n.id !== id));
+    setDeleteErrorId(null);
+    try {
+      const res = await fetch(`/api/notes/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.ok) {
+        setNotes((prev) => prev.filter((n) => n.id !== id));
+      } else {
+        setDeleteErrorId(id);
+        setTimeout(() => setDeleteErrorId(null), 3000);
+      }
+    } catch (e) {
+      console.error("sidebar: note delete failed", e);
+      setDeleteErrorId(id);
+      setTimeout(() => setDeleteErrorId(null), 3000);
+    }
   };
 
   return (
@@ -150,10 +163,15 @@ function NotesSection({ verseRef }: { verseRef: string }) {
               {notes.map((n) => (
                 <div key={n.id} className="flex items-start gap-2 rounded border border-border p-2">
                   <p className="flex-1 text-xs leading-relaxed text-text-secondary">{n.note}</p>
+                  {deleteErrorId === n.id && (
+                    <span className="shrink-0 text-xs text-error">Delete failed</span>
+                  )}
                   <button
                     onClick={() => remove(n.id)}
                     aria-label="Delete note"
-                    className="shrink-0 cursor-pointer text-text-muted transition-colors hover:text-text-secondary"
+                    className={`shrink-0 cursor-pointer transition-colors hover:text-text-secondary ${
+                      deleteErrorId === n.id ? "text-error" : "text-text-muted"
+                    }`}
                   >
                     <X className="h-3 w-3" />
                   </button>
