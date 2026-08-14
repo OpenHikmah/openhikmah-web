@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin/admin-auth";
+import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { db } from "@/lib/infra/db";
 import { challenges, users } from "@/lib/infra/db/schema";
 import {
@@ -39,13 +39,22 @@ export async function GET(req: NextRequest) {
       .select()
       .from(challenges)
       .where(and(eq(challenges.status, "active"), lt(challenges.endsAt, now)));
-    await resolveEndedChallenges(ended, now);
 
     // Same self-heal for `pending` invites nobody acted on.
     const expiredPending = await db
       .select()
       .from(challenges)
       .where(and(eq(challenges.status, "pending"), lt(challenges.endsAt, now)));
+
+    // This GET is otherwise read-only, but self-healing performs real UPDATEs
+    // as a side effect. Only throttle when there's actually something to
+    // heal, so plain reads (the common case) stay unaffected.
+    if (ended.length > 0 || expiredPending.length > 0) {
+      const limited = await rateLimitAdminMutation(auth);
+      if (limited) return limited;
+    }
+
+    await resolveEndedChallenges(ended, now);
     await resolveExpiredPending(expiredPending, now);
 
     // Stats: counts per status + suggestion-attributed total.
