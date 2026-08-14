@@ -80,8 +80,11 @@ test.describe("mobile bottom nav", () => {
 
     await page.getByRole("button", { name: /account menu/i }).click();
     // Exact match: the loose /saved/i regex also matches the adjacent "Saved
-    // canvases" workspaces link in this same menu.
-    const savedLink = page.getByRole("menu").getByRole("link", { name: "Saved", exact: true });
+    // canvases" workspaces link in this same menu. AccountMenu is a plain nav
+    // popover (not role="menu" — see issue #265), so scope by its panel id.
+    const savedLink = page
+      .locator("#account-menu-panel")
+      .getByRole("link", { name: "Saved", exact: true });
     await expect(savedLink).toBeVisible();
     await savedLink.click();
     // 15s: Next dev serves routes with on-demand compilation, and this may be
