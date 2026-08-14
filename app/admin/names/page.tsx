@@ -6,6 +6,7 @@ import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
+import { useArmedConfirm } from "@/hooks/useArmedConfirm";
 
 interface Row {
   slug: string;
@@ -127,30 +128,13 @@ export default function NamesPage() {
                     {isEditing && (
                       <tr>
                         <td colSpan={5} className="border-b border-border-subtle bg-bg px-3.5 py-3">
-                          <textarea
-                            value={draft}
-                            onChange={(e) => setDraft(e.target.value)}
-                            rows={10}
-                            className="w-full rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary focus:border-gold-muted"
+                          <EditRow
+                            draft={draft}
+                            onDraftChange={setDraft}
+                            disabled={busyId === id}
+                            onSave={() => save(r)}
+                            onCancel={() => setEditing(null)}
                           />
-                          <div className="mt-2 flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              disabled={busyId === id}
-                              onClick={() => save(r)}
-                            >
-                              Save
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={busyId === id}
-                              onClick={() => setEditing(null)}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
                         </td>
                       </tr>
                     )}
@@ -160,6 +144,51 @@ export default function NamesPage() {
             </tbody>
           </Table>
         )}
+      </div>
+    </>
+  );
+}
+
+// A "Save" overwrites the cached payload outright with no history to revert
+// to (unlike Prompts, which is versioned) — armed here like Invalidate, and
+// the textarea locks while armed so the confirmed content can't change
+// between the two clicks.
+function EditRow({
+  draft,
+  onDraftChange,
+  disabled,
+  onSave,
+  onCancel,
+}: {
+  draft: string;
+  onDraftChange: (value: string) => void;
+  disabled: boolean;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  const { armed, trigger } = useArmedConfirm(onSave);
+
+  return (
+    <>
+      <textarea
+        value={draft}
+        onChange={(e) => onDraftChange(e.target.value)}
+        disabled={armed || disabled}
+        rows={10}
+        className="w-full rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary focus:border-gold-muted disabled:opacity-60"
+      />
+      <div className="mt-2 flex items-center gap-2">
+        <Button
+          size="sm"
+          variant={armed ? "danger" : "primary"}
+          disabled={disabled}
+          onClick={trigger}
+        >
+          {armed ? "Save?" : "Save"}
+        </Button>
+        <Button size="sm" variant="ghost" disabled={disabled} onClick={onCancel}>
+          Cancel
+        </Button>
       </div>
     </>
   );

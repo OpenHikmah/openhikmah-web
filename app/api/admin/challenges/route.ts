@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
-import { requireAdmin } from "@/lib/admin/admin-auth";
+import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { db } from "@/lib/infra/db";
 import { challenges, users } from "@/lib/infra/db/schema";
 import {
@@ -32,20 +32,29 @@ export async function GET(req: NextRequest) {
   const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 200) : 50;
 
   try {
-    // Finalize any ended active challenges FIRST, so both the stats aggregation and
-    // the returned list reflect the same (post-finalization) state.
+    // Finalize any ended/expired challenges before the stats aggregation and the
+    // returned list are queried, so both reflect the same post-finalization state.
     const now = new Date();
     const ended = await db
       .select()
       .from(challenges)
       .where(and(eq(challenges.status, "active"), lt(challenges.endsAt, now)));
-    await resolveEndedChallenges(ended, now);
 
     // Same self-heal for `pending` invites nobody acted on.
     const expiredPending = await db
       .select()
       .from(challenges)
       .where(and(eq(challenges.status, "pending"), lt(challenges.endsAt, now)));
+
+    // This GET is otherwise read-only, but self-healing performs real UPDATEs
+    // as a side effect. Only throttle when there's actually something to
+    // heal, so plain reads (the common case) stay unaffected.
+    if (ended.length > 0 || expiredPending.length > 0) {
+      const limited = await rateLimitAdminMutation(auth);
+      if (limited) return limited;
+    }
+
+    await resolveEndedChallenges(ended, now);
     await resolveExpiredPending(expiredPending, now);
 
     // Stats: counts per status + suggestion-attributed total.
@@ -76,7 +85,16 @@ export async function GET(req: NextRequest) {
       .orderBy(desc(challenges.createdAt))
       .limit(limit);
 
-    const resolved = await resolveEndedChallenges(rows);
+    // A challenge can flip from active to overdue in the gap between the
+    // `ended` select above and this one, so it slips past the earlier gate.
+    // Reuse the same `now` snapshot (rather than resolveEndedChallenges's
+    // internal default) and rate-limit this write too if we haven't already.
+    const staleActive = rows.filter((c) => c.status === "active" && c.endsAt < now);
+    if (staleActive.length > 0 && ended.length === 0 && expiredPending.length === 0) {
+      const limited = await rateLimitAdminMutation(auth);
+      if (limited) return limited;
+    }
+    const resolved = await resolveEndedChallenges(rows, now);
 
     const userIds = [...new Set(rows.flatMap((c) => [c.challengerId, c.challengedId]))];
     const userRows = userIds.length

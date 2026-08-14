@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
@@ -75,6 +75,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   if (body.action === "override-winner") {
+    // Matches the statuses the admin UI actually renders the override
+    // control for — a pending/declined/cancelled challenge was never played,
+    // so it has no result to correct.
+    if (challenge.status !== "active" && challenge.status !== "completed") {
+      return NextResponse.json(
+        { error: "Only active or completed challenges can have their winner overridden" },
+        { status: 409 }
+      );
+    }
     const winnerId = body.winnerId ?? null;
     if (
       winnerId !== null &&
@@ -86,13 +95,32 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         { status: 400 }
       );
     }
+    // Scope the WHERE to the state we just checked. For the active->completed
+    // transition, the status flip itself makes a racing request's WHERE stop
+    // matching. For an already-completed challenge, status never changes, so
+    // also pin the previously-read winnerId — otherwise two concurrent
+    // corrections would both match and the second would silently clobber the
+    // first's winnerId with no 409.
     const [updated] = await db
       .update(challenges)
       .set({ status: "completed", winnerId })
-      .where(eq(challenges.id, challengeId))
+      .where(
+        and(
+          eq(challenges.id, challengeId),
+          challenge.status === "active"
+            ? eq(challenges.status, "active")
+            : and(
+                eq(challenges.status, "completed"),
+                sql`${challenges.winnerId} is not distinct from ${challenge.winnerId}`
+              )
+        )
+      )
       .returning();
     if (!updated) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Challenge status changed by a concurrent request" },
+        { status: 409 }
+      );
     }
     await logAdminAction({
       adminQfId: auth.user.qfId,

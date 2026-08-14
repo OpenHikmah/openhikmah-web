@@ -5,7 +5,7 @@ import { X, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useCanvasStore } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSidebarResize } from "@/hooks/useSidebarResize";
 import type { EdgeKind } from "@/types/quran";
 import { Card } from "@/components/ui";
@@ -81,7 +81,23 @@ function NotesSection({ verseRef }: { verseRef: string }) {
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [deleteErrorId, setDeleteErrorId] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const mountedRef = useRef(true);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // NotesSection unmounts whenever the sidebar closes or a different verse is
+  // selected (it's keyed by verse ref) — clear any pending feedback-reset
+  // timeout and stop setting state after that point.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!open || !accessToken || loaded) return;
@@ -106,29 +122,61 @@ function NotesSection({ verseRef }: { verseRef: string }) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ ref: verseRef, note: draft.trim() }),
       });
+      if (!mountedRef.current) return;
       if (res.ok) {
         const created = await res.json();
         setNotes((prev) => [...prev, created]);
         setDraft("");
       } else {
         setSaveError(true);
-        setTimeout(() => setSaveError(false), 3000);
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = setTimeout(() => {
+          if (mountedRef.current) setSaveError(false);
+        }, 3000);
       }
     } catch {
+      if (!mountedRef.current) return;
       setSaveError(true);
-      setTimeout(() => setSaveError(false), 3000);
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        if (mountedRef.current) setSaveError(false);
+      }, 3000);
     } finally {
-      setSaving(false);
+      if (mountedRef.current) setSaving(false);
     }
   };
 
   const remove = async (id: number) => {
     if (!accessToken) return;
-    await fetch(`/api/notes/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${accessToken}` },
-    }).catch((e) => console.error("sidebar: note delete failed", e));
-    setNotes((prev) => prev.filter((n) => n.id !== id));
+    if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
+    setDeleteErrorId(null);
+    try {
+      const res = await fetch(`/api/notes/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!mountedRef.current) return;
+      if (res.ok) {
+        setNotes((prev) => prev.filter((n) => n.id !== id));
+      } else {
+        setDeleteErrorId(id);
+        // Two deletes can settle out of order: clear any timer a differently-
+        // ordered earlier delete already scheduled, so it can't fire and wipe
+        // this error before its own 3s window elapses.
+        if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
+        deleteTimeoutRef.current = setTimeout(() => {
+          if (mountedRef.current) setDeleteErrorId(null);
+        }, 3000);
+      }
+    } catch (e) {
+      console.error("sidebar: note delete failed", e);
+      if (!mountedRef.current) return;
+      setDeleteErrorId(id);
+      if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
+      deleteTimeoutRef.current = setTimeout(() => {
+        if (mountedRef.current) setDeleteErrorId(null);
+      }, 3000);
+    }
   };
 
   return (
@@ -150,10 +198,15 @@ function NotesSection({ verseRef }: { verseRef: string }) {
               {notes.map((n) => (
                 <div key={n.id} className="flex items-start gap-2 rounded border border-border p-2">
                   <p className="flex-1 text-xs leading-relaxed text-text-secondary">{n.note}</p>
+                  {deleteErrorId === n.id && (
+                    <span className="shrink-0 text-xs text-error">Delete failed</span>
+                  )}
                   <button
                     onClick={() => remove(n.id)}
                     aria-label="Delete note"
-                    className="shrink-0 cursor-pointer text-text-muted transition-colors hover:text-text-secondary"
+                    className={`shrink-0 cursor-pointer transition-colors hover:text-text-secondary ${
+                      deleteErrorId === n.id ? "text-error" : "text-text-muted"
+                    }`}
                   >
                     <X className="h-3 w-3" />
                   </button>
