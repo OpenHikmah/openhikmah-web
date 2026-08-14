@@ -1,4 +1,4 @@
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { renderWithIntl } from "../../test-utils/render-with-intl";
 
@@ -61,5 +61,32 @@ describe("AccountMenu — dropdown a11y", () => {
 
     fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("traps Tab within the open panel, wrapping last to first and first to last", async () => {
+    renderWithIntl(<AccountMenu />);
+    fireEvent.click(screen.getByRole("button", { name: /account menu/i }));
+
+    const firstLink = await screen.findByRole("link", { name: /saved canvases/i });
+    const signOutButton = screen.getByRole("button", { name: /sign out/i });
+
+    await act(async () => {
+      signOutButton.focus();
+    });
+    fireEvent.keyDown(signOutButton, { key: "Tab" });
+    expect(document.activeElement).toBe(firstLink);
+
+    fireEvent.keyDown(firstLink, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(signOutButton);
+  });
+
+  it("redirects focus to the Sign in button on sign-out, since the trigger unmounts", async () => {
+    renderWithIntl(<AccountMenu />);
+    fireEvent.click(screen.getByRole("button", { name: /account menu/i }));
+
+    const signOutButton = await screen.findByRole("button", { name: /sign out/i });
+    fireEvent.click(signOutButton);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /log in/i })).toHaveFocus());
   });
 });

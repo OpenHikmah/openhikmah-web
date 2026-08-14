@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { FocusScope } from "@radix-ui/react-focus-scope";
 import { useTranslations } from "next-intl";
 import {
   Flame,
@@ -36,7 +37,8 @@ export function AccountMenu() {
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const firstItemRef = useRef<HTMLAnchorElement>(null);
-  const wasOpenRef = useRef(false);
+  const signInRef = useRef<HTMLButtonElement>(null);
+  const hadAuthRef = useRef(!!accessToken);
   const t = useTranslations("common");
   const tNav = useTranslations("nav");
 
@@ -56,19 +58,16 @@ export function AccountMenu() {
     };
   }, [open]);
 
-  // This is a plain nav popover (not a true ARIA menu — no roving-tabindex
-  // arrow-key navigation, so role="menu"/"menuitem" would overpromise), but
-  // it still needs standard popup-button focus management: move focus into
-  // it on open, and back to the trigger on close, however that close happens
-  // (Escape, outside click, or picking an item).
   useEffect(() => {
-    if (open) {
-      firstItemRef.current?.focus();
-    } else if (wasOpenRef.current) {
-      triggerRef.current?.focus();
+    // Signing out swaps to an entirely different subtree, unmounting whatever
+    // had focus in the signed-in menu (including the trigger FocusScope would
+    // otherwise return focus to) — land keyboard focus on the persistent
+    // Sign in button instead of letting it fall through to <body>.
+    if (hadAuthRef.current && !accessToken) {
+      signInRef.current?.focus();
     }
-    wasOpenRef.current = open;
-  }, [open]);
+    hadAuthRef.current = !!accessToken;
+  }, [accessToken]);
 
   const signOut = async () => {
     setOpen(false);
@@ -113,6 +112,7 @@ export function AccountMenu() {
           <Settings />
         </Link>
         <button
+          ref={signInRef}
           onClick={signIn}
           disabled={signingIn}
           className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-gold px-3.5 py-1.5 text-[13px] font-semibold text-gold transition-colors duration-[120ms] hover:bg-gold/10 disabled:opacity-60"
@@ -166,104 +166,125 @@ export function AccountMenu() {
       </button>
 
       {open && (
-        <div
-          id="account-menu-panel"
-          className="absolute right-0 top-[calc(100%+8px)] z-50 w-[268px] overflow-hidden rounded-2xl border border-border bg-surface-overlay shadow-floating"
+        <FocusScope
+          asChild
+          trapped
+          loop
+          onMountAutoFocus={(e) => {
+            // Radix's default mount-autofocus explicitly excludes <a> elements
+            // from candidates, which would land focus on the sign-out button
+            // instead of the first (link) item — override to focus it directly.
+            e.preventDefault();
+            firstItemRef.current?.focus();
+          }}
+          onUnmountAutoFocus={(e) => {
+            // Radix's default restores focus to whatever `document.activeElement`
+            // was when the scope mounted — but a plain click doesn't reliably
+            // focus a <button> in every browser (e.g. Safari), so that can be
+            // unset. Target the trigger explicitly instead.
+            e.preventDefault();
+            triggerRef.current?.focus();
+          }}
         >
           <div
-            className="flex items-center gap-3 p-4"
-            style={{
-              background:
-                "radial-gradient(120% 100% at 0% 0%, color-mix(in srgb, var(--color-gold) 12%, transparent), transparent 60%), linear-gradient(180deg, color-mix(in srgb, var(--color-teal) 8%, transparent), transparent)",
-            }}
+            id="account-menu-panel"
+            className="absolute right-0 top-[calc(100%+8px)] z-50 w-[268px] overflow-hidden rounded-2xl border border-border bg-surface-overlay shadow-floating"
           >
-            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-teal text-[17px] font-bold text-bg shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-gold)_30%,transparent)]">
-              {initial}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-[15px] font-semibold text-text-primary">
-                {username ?? tNav("signedIn")}
-              </p>
-              <p className="text-xs text-text-secondary">
-                {streak > 0 ? tNav("dayStreak", { count: streak }) : tNav("signedIn")}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-2 px-4 pb-3.5">
-            <div className="flex-1 rounded-[10px] border border-border bg-surface px-2.5 py-2">
-              <div className="flex items-center gap-1.5">
-                <Flame className="size-[15px] text-gold" fill="currentColor" />
-                <span className="text-[18px] font-bold leading-none text-gold">{streak}</span>
+            <div
+              className="flex items-center gap-3 p-4"
+              style={{
+                background:
+                  "radial-gradient(120% 100% at 0% 0%, color-mix(in srgb, var(--color-gold) 12%, transparent), transparent 60%), linear-gradient(180deg, color-mix(in srgb, var(--color-teal) 8%, transparent), transparent)",
+              }}
+            >
+              <span className="grid size-11 shrink-0 place-items-center rounded-full bg-teal text-[17px] font-bold text-bg shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-gold)_30%,transparent)]">
+                {initial}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-[15px] font-semibold text-text-primary">
+                  {username ?? tNav("signedIn")}
+                </p>
+                <p className="text-xs text-text-secondary">
+                  {streak > 0 ? tNav("dayStreak", { count: streak }) : tNav("signedIn")}
+                </p>
               </div>
-              <p className="mt-1 text-[10.5px] uppercase tracking-[0.04em] text-text-muted">
-                {tNav("dayStreakLabel")}
-              </p>
             </div>
-            <div className="flex-1 rounded-[10px] border border-border bg-surface px-2.5 py-2">
-              <div className="flex items-center gap-1.5">
-                <Award className="size-[15px] text-gold" />
-                <span className="text-[18px] font-bold leading-none text-text-primary">
-                  {longestStreak}
-                </span>
+
+            <div className="flex gap-2 px-4 pb-3.5">
+              <div className="flex-1 rounded-[10px] border border-border bg-surface px-2.5 py-2">
+                <div className="flex items-center gap-1.5">
+                  <Flame className="size-[15px] text-gold" fill="currentColor" />
+                  <span className="text-[18px] font-bold leading-none text-gold">{streak}</span>
+                </div>
+                <p className="mt-1 text-[10.5px] uppercase tracking-[0.04em] text-text-muted">
+                  {tNav("dayStreakLabel")}
+                </p>
               </div>
-              <p className="mt-1 text-[10.5px] uppercase tracking-[0.04em] text-text-muted">
-                {tNav("longest")}
-              </p>
+              <div className="flex-1 rounded-[10px] border border-border bg-surface px-2.5 py-2">
+                <div className="flex items-center gap-1.5">
+                  <Award className="size-[15px] text-gold" />
+                  <span className="text-[18px] font-bold leading-none text-text-primary">
+                    {longestStreak}
+                  </span>
+                </div>
+                <p className="mt-1 text-[10.5px] uppercase tracking-[0.04em] text-text-muted">
+                  {tNav("longest")}
+                </p>
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="p-1.5">
+              <Link
+                ref={firstItemRef}
+                href="/workspaces"
+                onClick={() => setOpen(false)}
+                className={linkRow}
+              >
+                <FolderOpen /> {tNav("savedCanvases")}
+              </Link>
+              <Link href="/social" onClick={() => setOpen(false)} className={linkRow}>
+                <Trophy /> {tNav("friendsLeaderboard")}
+                {pendingFriendCount > 0 && (
+                  <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-gold px-1 text-[10px] font-bold text-bg">
+                    {pendingFriendCount > 9 ? "9+" : pendingFriendCount}
+                  </span>
+                )}
+              </Link>
+              <Link href="/mentions" onClick={() => setOpen(false)} className={linkRow}>
+                <AtSign /> {tNav("mentions")}
+                {pendingMentionCount > 0 && (
+                  <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-gold px-1 text-[10px] font-bold text-bg">
+                    {pendingMentionCount > 9 ? "9+" : pendingMentionCount}
+                  </span>
+                )}
+              </Link>
+              {/* Desktop nav already has Bookmarks — this is the mobile-only entry point since the bottom tab bar dropped it for a 4th tab. */}
+              <Link
+                href="/bookmarks"
+                onClick={() => setOpen(false)}
+                className={cn(linkRow, "md:hidden")}
+              >
+                <Bookmark /> {tNav("bookmarks")}
+              </Link>
+              <Link href="/settings" onClick={() => setOpen(false)} className={linkRow}>
+                <Settings /> {t("settings")}
+              </Link>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="p-1.5">
+              <button
+                onClick={signOut}
+                className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-[13.5px] text-text-primary transition-colors hover:bg-error/10 hover:text-error [&_svg]:size-[17px] [&_svg]:text-text-secondary [&:hover_svg]:text-error"
+              >
+                <LogOut /> {t("signOut")}
+              </button>
             </div>
           </div>
-
-          <div className="h-px bg-border" />
-
-          <div className="p-1.5">
-            <Link
-              ref={firstItemRef}
-              href="/workspaces"
-              onClick={() => setOpen(false)}
-              className={linkRow}
-            >
-              <FolderOpen /> {tNav("savedCanvases")}
-            </Link>
-            <Link href="/social" onClick={() => setOpen(false)} className={linkRow}>
-              <Trophy /> {tNav("friendsLeaderboard")}
-              {pendingFriendCount > 0 && (
-                <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-gold px-1 text-[10px] font-bold text-bg">
-                  {pendingFriendCount > 9 ? "9+" : pendingFriendCount}
-                </span>
-              )}
-            </Link>
-            <Link href="/mentions" onClick={() => setOpen(false)} className={linkRow}>
-              <AtSign /> {tNav("mentions")}
-              {pendingMentionCount > 0 && (
-                <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-gold px-1 text-[10px] font-bold text-bg">
-                  {pendingMentionCount > 9 ? "9+" : pendingMentionCount}
-                </span>
-              )}
-            </Link>
-            {/* Desktop nav already has Bookmarks — this is the mobile-only entry point since the bottom tab bar dropped it for a 4th tab. */}
-            <Link
-              href="/bookmarks"
-              onClick={() => setOpen(false)}
-              className={cn(linkRow, "md:hidden")}
-            >
-              <Bookmark /> {tNav("bookmarks")}
-            </Link>
-            <Link href="/settings" onClick={() => setOpen(false)} className={linkRow}>
-              <Settings /> {t("settings")}
-            </Link>
-          </div>
-
-          <div className="h-px bg-border" />
-
-          <div className="p-1.5">
-            <button
-              onClick={signOut}
-              className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-[13.5px] text-text-primary transition-colors hover:bg-error/10 hover:text-error [&_svg]:size-[17px] [&_svg]:text-text-secondary [&:hover_svg]:text-error"
-            >
-              <LogOut /> {t("signOut")}
-            </button>
-          </div>
-        </div>
+        </FocusScope>
       )}
     </div>
   );
