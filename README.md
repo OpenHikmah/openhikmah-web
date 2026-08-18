@@ -70,6 +70,13 @@ query.
 - **Bookmarks** — Save verses locally without signing in, or to your account for cross-device sync.
 - **Social** — Daily engagement streaks, a friends leaderboard, and head-to-head challenges
   (24h / 48h / 7d).
+- **Guest access** — Explore, bookmark, and use the canvas without creating an account.
+- **Workspaces** — Save multiple named canvases to your account, not just a single shared URL.
+- **@Mentions** — Tag friends in verse notes; they get a friends-only notification.
+- **Prophetic Stories** — Adam, Nuh, Ibrahim, Musa, Yusuf, Isa, and Muhammad, integrated with
+  the canvas.
+- **Multi-language** — UI, AI-generated connection reasons, and 99 Names content available in
+  English, Turkish, Russian, and Azerbaijani.
 
 ---
 
@@ -78,6 +85,7 @@ query.
 | Layer      | Choice                                                                                           |
 | ---------- | ------------------------------------------------------------------------------------------------ |
 | Framework  | Next.js 16 (App Router), React 19, TypeScript                                                    |
+| i18n       | next-intl (English, Turkish, Russian, Azerbaijani)                                               |
 | Canvas     | @xyflow/react                                                                                    |
 | State      | Zustand                                                                                          |
 | Styling    | Tailwind CSS v4                                                                                  |
