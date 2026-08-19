@@ -47,6 +47,7 @@ async function searchVerseRefs(arabic: string): Promise<string[]> {
     const res = await fetch(url, {
       headers: { Accept: "application/json" },
       next: { revalidate: 86400 },
+      signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return [];
     const data = await res.json();

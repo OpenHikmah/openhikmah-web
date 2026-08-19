@@ -23,10 +23,11 @@ function makeDbChain(resolveWith: unknown = []) {
   return chain;
 }
 
-const { mockSelect, mockInsert, mockConsume } = vi.hoisted(() => ({
+const { mockSelect, mockInsert, mockConsume, mockAnthropicCreate } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])), // no stored edges → cache miss
   mockInsert: vi.fn(() => makeDbChain([])),
   mockConsume: vi.fn(async () => true),
+  mockAnthropicCreate: vi.fn(),
 }));
 
 vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect, insert: mockInsert } }));
@@ -73,18 +74,8 @@ vi.mock("@/lib/infra/rate-limit", () => ({
 }));
 
 vi.mock("@anthropic-ai/sdk", () => {
-  const mockText = JSON.stringify([
-    { ref: "2:255", reason: "The Throne Verse manifests divine sovereignty." },
-    { ref: "3:18", reason: "Allah witnesses His own oneness directly." },
-    { ref: "112:1", reason: "Pure tawhid — the essence of divine singularity." },
-  ]);
-
   class MockAnthropic {
-    messages = {
-      create: vi.fn().mockResolvedValue({
-        content: [{ type: "text", text: mockText }],
-      }),
-    };
+    messages = { create: mockAnthropicCreate };
   }
 
   return { default: MockAnthropic };
@@ -113,6 +104,12 @@ function makeRequest(
   });
 }
 
+const defaultAnthropicText = JSON.stringify([
+  { ref: "2:255", reason: "The Throne Verse manifests divine sovereignty." },
+  { ref: "3:18", reason: "Allah witnesses His own oneness directly." },
+  { ref: "112:1", reason: "Pure tawhid — the essence of divine singularity." },
+]);
+
 describe("POST /api/connections", () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -121,6 +118,10 @@ describe("POST /api/connections", () => {
     mockConsume.mockReset();
     mockConsume.mockResolvedValue(true);
     mockSelect.mockReturnValue(makeDbChain([])); // default: cache miss
+    mockAnthropicCreate.mockReset();
+    mockAnthropicCreate.mockResolvedValue({
+      content: [{ type: "text", text: defaultAnthropicText }],
+    });
   });
 
   it("returns 400 when fromRef is missing", async () => {
@@ -286,7 +287,6 @@ describe("POST /api/connections", () => {
   });
 
   it("serves a cache HIT from the DB without generating", async () => {
-    const anthropic = await import("@anthropic-ai/sdk");
     // First select = connections query → returns the stored edge (HIT).
     // Subsequent selects = corpus verse lookup → empty, so resolveVerse falls
     // back to the live fetch. The AI must NOT be called on a hit.
@@ -322,8 +322,8 @@ describe("POST /api/connections", () => {
     expect(res.status).toBe(200);
     expect(body[0]).toMatchObject({ ref: "3:18", reason: "stored" });
     expect(mockInsert).not.toHaveBeenCalled();
-    // The mocked Anthropic client was never constructed/used for a hit.
-    expect(anthropic.default).toBeDefined();
+    // The AI was never called for a hit.
+    expect(mockAnthropicCreate).not.toHaveBeenCalled();
   });
 
   it("returns 400 for a non-array excludeRefs", async () => {
@@ -360,6 +360,24 @@ describe("POST /api/connections", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(400);
+  });
+
+  it("returns 200 with an empty array (not a 500) on a genuine first-time miss with no results", async () => {
+    // No stored edge (miss), and both the grounded-discovery and legacy AI paths
+    // come up empty — a legitimate "nothing found" outcome, not a server error.
+    mockSelect.mockReturnValue(makeDbChain([]));
+    mockAnthropicCreate.mockResolvedValue({ content: [{ type: "text", text: "[]" }] });
+
+    const req = makeRequest({
+      fromRef: "1:1",
+      kind: "thematic",
+      arabicText: "x",
+      translation: "y",
+    });
+    const res = await POST(req);
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body).toEqual([]);
   });
 
   it("returns 200 with an empty array (not a 500) when excludeRefs exhausts a repeat request", async () => {

@@ -37,9 +37,11 @@ async function fetchVerseLive(ref: string, edition: string): Promise<Verse | nul
     const [arabicRes, translationRes] = await Promise.all([
       fetch(`https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/ar.alafasy`, {
         next: { revalidate: 86400 },
+        signal: AbortSignal.timeout(5000),
       }),
       fetch(`https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/${edition}`, {
         next: { revalidate: 86400 },
+        signal: AbortSignal.timeout(5000),
       }),
     ]);
     if (!arabicRes.ok) return null;
@@ -53,7 +55,7 @@ async function fetchVerseLive(ref: string, edition: string): Promise<Verse | nul
     } else if (edition !== DEFAULT_EDITION) {
       const fallbackRes = await fetch(
         `https://api.alquran.cloud/v1/ayah/${surahNum}:${ayahNum}/${DEFAULT_EDITION}`,
-        { next: { revalidate: 86400 } }
+        { next: { revalidate: 86400 }, signal: AbortSignal.timeout(5000) }
       );
       if (!fallbackRes.ok) return null;
       translationData = await fallbackRes.json();

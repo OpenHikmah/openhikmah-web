@@ -125,6 +125,22 @@ describe("resolveVerse", () => {
     expect(result?.translation).toBe("Türkçe metin");
   });
 
+  it("live fallback fetches pass an abort signal so a hung upstream fails fast", async () => {
+    mockGetVerse.mockResolvedValue(null);
+    vi.mocked(fetch).mockImplementation(async (url: string | URL | Request) => {
+      const isArabic = String(url).includes("ar.alafasy");
+      return {
+        ok: true,
+        json: async () => ({ data: { text: isArabic ? "نص عربي" : "English text" } }),
+      } as Response;
+    });
+    await resolveVerse("2:255");
+    expect(fetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+  });
+
   it("live fallback falls back to en.sahih when the requested edition 404s upstream", async () => {
     mockGetVerse.mockResolvedValue(null);
     vi.mocked(fetch).mockImplementation(async (url: string | URL | Request) => {
