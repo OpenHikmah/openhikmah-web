@@ -378,6 +378,8 @@ describe("POST /api/connections", () => {
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body).toEqual([]);
+    // Confirms the test actually exercised the generation path, not a vacuous pass.
+    expect(mockAnthropicCreate).toHaveBeenCalled();
   });
 
   it("returns 200 with an empty array (not a 500) when excludeRefs exhausts a repeat request", async () => {

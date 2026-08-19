@@ -190,7 +190,9 @@ describe("GET /api/names/[slug]/verses", () => {
     const req = new NextRequest("http://localhost/api/names/ar-rahman/verses");
     await getNameVerses(req, params("ar-rahman"));
 
-    const searchCall = mockFetch.mock.calls.find(([url]) => String(url).includes("api.quran.com"));
+    const searchCall = mockFetch.mock.calls.find(
+      ([url]) => new URL(String(url)).hostname === "api.quran.com"
+    );
     expect(searchCall).toBeDefined();
     expect(searchCall?.[1]).toEqual(expect.objectContaining({ signal: expect.any(AbortSignal) }));
   });

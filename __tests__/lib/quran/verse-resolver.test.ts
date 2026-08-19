@@ -125,7 +125,7 @@ describe("resolveVerse", () => {
     expect(result?.translation).toBe("Türkçe metin");
   });
 
-  it("live fallback fetches pass an abort signal so a hung upstream fails fast", async () => {
+  it("both parallel live fallback fetches pass an abort signal so a hung upstream fails fast", async () => {
     mockGetVerse.mockResolvedValue(null);
     vi.mocked(fetch).mockImplementation(async (url: string | URL | Request) => {
       const isArabic = String(url).includes("ar.alafasy");
@@ -135,10 +135,30 @@ describe("resolveVerse", () => {
       } as Response;
     });
     await resolveVerse("2:255");
-    expect(fetch).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
-    );
+    expect(fetch).toHaveBeenCalledTimes(2);
+    for (const call of vi.mocked(fetch).mock.calls) {
+      expect(call[1]).toEqual(expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    }
+  });
+
+  it("the en.sahih fallback fetch (when the requested edition 404s) also passes an abort signal", async () => {
+    mockGetVerse.mockResolvedValue(null);
+    vi.mocked(fetch).mockImplementation(async (url: string | URL | Request) => {
+      const u = String(url);
+      if (u.includes("ar.alafasy")) {
+        return { ok: true, json: async () => ({ data: { text: "نص عربي" } }) } as Response;
+      }
+      if (u.includes("tr.diyanet")) {
+        return { ok: false } as Response;
+      }
+      return { ok: true, json: async () => ({ data: { text: "English fallback" } }) } as Response;
+    });
+    await resolveVerse("2:255", "tr.diyanet");
+    const fallbackCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([url]) => String(url).includes(`/en.sahih`));
+    expect(fallbackCall).toBeDefined();
+    expect(fallbackCall?.[1]).toEqual(expect.objectContaining({ signal: expect.any(AbortSignal) }));
   });
 
   it("live fallback falls back to en.sahih when the requested edition 404s upstream", async () => {
