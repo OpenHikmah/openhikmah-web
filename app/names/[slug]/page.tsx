@@ -82,83 +82,92 @@ export default async function NameDetailPage({ params }: Props) {
         </Link>
       </header>
 
-      {/* Name hero */}
-      <div className="mx-auto max-w-3xl border-b border-border-subtle px-6 pt-14 pb-12 text-center">
-        <div className="mb-6 inline-block rounded border border-border bg-surface-raised px-2 py-1 font-mono text-xs text-text-muted">
-          {t("ofNinetyNine", { id: name.id })}
+      <main>
+        {/* Name hero */}
+        <div className="mx-auto max-w-3xl border-b border-border-subtle px-6 pt-14 pb-12 text-center">
+          <div className="mb-6 inline-block rounded border border-border bg-surface-raised px-2 py-1 font-mono text-xs text-text-muted">
+            {t("ofNinetyNine", { id: name.id })}
+          </div>
+
+          <h1 className="mb-3 font-arabic text-7xl" style={{ color: styles.accent }}>
+            {name.arabic}
+          </h1>
+
+          <p className="mb-2 font-mono text-xl text-text-primary">{name.transliteration}</p>
+
+          <p className="mb-6 text-lg text-text-secondary">{name.meaning}</p>
+
+          <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
+            <span className={`rounded px-2.5 py-1 text-xs font-medium ${styles.badge}`}>
+              {t(categoryLabelKey)}
+            </span>
+            <span className="rounded border border-border bg-surface-raised px-2.5 py-1 font-mono text-xs text-text-secondary">
+              {t("root", { root: name.root })}
+            </span>
+          </div>
+
+          <p className="mx-auto max-w-xl text-sm leading-relaxed text-text-secondary">
+            {name.description}
+          </p>
         </div>
 
-        <h1 className="mb-3 font-arabic text-7xl" style={{ color: styles.accent }}>
-          {name.arabic}
-        </h1>
+        {/* Reflection + Pairings + Verses */}
+        <div className="max-w-3xl mx-auto px-6 py-10 space-y-10">
+          {/* Believer's Reflection */}
+          <NameReflection
+            slug={slug}
+            accent={styles.accent}
+            initialReflection={initialReflection}
+          />
 
-        <p className="mb-2 font-mono text-xl text-text-primary">{name.transliteration}</p>
+          {/* Structural Pairings */}
+          <NamePairings slug={slug} accent={styles.accent} initialPairings={initialPairings} />
 
-        <p className="mb-6 text-lg text-text-secondary">{name.meaning}</p>
-
-        <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
-          <span className={`rounded px-2.5 py-1 text-xs font-medium ${styles.badge}`}>
-            {t(categoryLabelKey)}
-          </span>
-          <span className="rounded border border-border bg-surface-raised px-2.5 py-1 font-mono text-xs text-text-secondary">
-            {t("root", { root: name.root })}
-          </span>
+          {/* Verse Feed */}
+          <div>
+            <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-text-muted">
+              {t("versesHeading")}
+            </h2>
+            <NameVerses slug={slug} accent={styles.accent} />
+          </div>
         </div>
 
-        <p className="mx-auto max-w-xl text-sm leading-relaxed text-text-secondary">
-          {name.description}
-        </p>
-      </div>
+        {/* Name navigation */}
+        <div className="mx-auto flex max-w-3xl items-center justify-between border-t border-border-subtle px-6 py-6">
+          {prevName ? (
+            <Link
+              href={`/names/${prevName.slug}`}
+              className="group flex items-center gap-2 text-xs text-text-secondary transition-opacity hover:opacity-80"
+            >
+              <ArrowLeft className="h-3 w-3" />
+              <span className="font-arabic text-base text-text-muted">{prevName.arabic}</span>
+              <span>{prevName.transliteration}</span>
+            </Link>
+          ) : (
+            <span />
+          )}
 
-      {/* Reflection + Pairings + Verses */}
-      <div className="max-w-3xl mx-auto px-6 py-10 space-y-10">
-        {/* Believer's Reflection */}
-        <NameReflection slug={slug} accent={styles.accent} initialReflection={initialReflection} />
-
-        {/* Structural Pairings */}
-        <NamePairings slug={slug} accent={styles.accent} initialPairings={initialPairings} />
-
-        {/* Verse Feed */}
-        <div>
-          <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-text-muted">
-            {t("versesHeading")}
-          </h2>
-          <NameVerses slug={slug} accent={styles.accent} />
-        </div>
-      </div>
-
-      {/* Name navigation */}
-      <div className="mx-auto flex max-w-3xl items-center justify-between border-t border-border-subtle px-6 py-6">
-        {prevName ? (
           <Link
-            href={`/names/${prevName.slug}`}
-            className="group flex items-center gap-2 text-xs text-text-secondary transition-opacity hover:opacity-80"
+            href="/names"
+            className="text-xs text-text-muted transition-opacity hover:opacity-80"
           >
-            <ArrowLeft className="h-3 w-3" />
-            <span className="font-arabic text-base text-text-muted">{prevName.arabic}</span>
-            <span>{prevName.transliteration}</span>
+            {t("allNinetyNine")}
           </Link>
-        ) : (
-          <span />
-        )}
 
-        <Link href="/names" className="text-xs text-text-muted transition-opacity hover:opacity-80">
-          {t("allNinetyNine")}
-        </Link>
-
-        {nextName ? (
-          <Link
-            href={`/names/${nextName.slug}`}
-            className="group flex items-center gap-2 text-xs text-text-secondary transition-opacity hover:opacity-80"
-          >
-            <span>{nextName.transliteration}</span>
-            <span className="font-arabic text-base text-text-muted">{nextName.arabic}</span>
-            <ArrowRight className="h-3 w-3" />
-          </Link>
-        ) : (
-          <span />
-        )}
-      </div>
+          {nextName ? (
+            <Link
+              href={`/names/${nextName.slug}`}
+              className="group flex items-center gap-2 text-xs text-text-secondary transition-opacity hover:opacity-80"
+            >
+              <span>{nextName.transliteration}</span>
+              <span className="font-arabic text-base text-text-muted">{nextName.arabic}</span>
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+          ) : (
+            <span />
+          )}
+        </div>
+      </main>
     </div>
   );
 }
