@@ -600,4 +600,68 @@ describe("appendWorkspace", () => {
     expect(s.getExpansionCounts(remappedId)).toEqual({ thematic: 1 });
     expect(s.getExpansionCounts(existingId)).toEqual({});
   });
+
+  it("regenerates edge ids on node-id remap, so a merged canvas never has two edges sharing an id (issue #474)", () => {
+    // Two canvases that both numbered nodes from scratch: both have an edge
+    // literally named "edge-node-1-node-2". Appending one into the other forces
+    // a node-id remap; the incoming edge's id must be regenerated from the new
+    // source/target, not carried forward, or it collides with the existing edge.
+    useCanvasStore.setState({
+      nodes: [
+        { id: "node-1", type: "verse", position: { x: 0, y: 0 }, data: { ...baseVerse } } as Node,
+        {
+          id: "node-2",
+          type: "verse",
+          position: { x: 300, y: 0 },
+          data: { ...baseVerse, ref: "1:1" as const, surah: 1, ayah: 1 },
+        } as Node,
+      ],
+      edges: [
+        {
+          id: "edge-node-1-node-2",
+          source: "node-1",
+          target: "node-2",
+          type: "hikmah",
+          data: { kind: "thematic", label: "", reason: "" },
+        } as Edge,
+      ],
+    });
+
+    useCanvasStore.getState().appendWorkspace({
+      v: 1,
+      nodes: [
+        {
+          id: "node-1",
+          x: 600,
+          y: 0,
+          verse: { ...baseVerse, ref: "112:1" as const, surah: 112, ayah: 1 },
+        },
+        {
+          id: "node-2",
+          x: 900,
+          y: 0,
+          verse: { ...baseVerse, ref: "3:18" as const, surah: 3, ayah: 18 },
+        },
+      ],
+      edges: [
+        {
+          id: "edge-node-1-node-2",
+          source: "node-1",
+          target: "node-2",
+          kind: "root",
+          label: "",
+          reason: "",
+        },
+      ],
+    });
+
+    const s = useCanvasStore.getState();
+    expect(s.edges).toHaveLength(2);
+    const ids = s.edges.map((e) => e.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    const incomingEdge = s.edges.find((e) => (e.data as { kind?: string })?.kind === "root")!;
+    expect(incomingEdge.id).not.toBe("edge-node-1-node-2");
+    expect(incomingEdge.id).toBe(`edge-${incomingEdge.source}-${incomingEdge.target}`);
+  });
 });

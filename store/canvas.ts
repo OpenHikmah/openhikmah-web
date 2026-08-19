@@ -358,11 +358,15 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     }
 
     const finalEdges = incomingEdges
-      .map((e) => ({
-        ...e,
-        source: idRemap.get(e.source) ?? e.source,
-        target: idRemap.get(e.target) ?? e.target,
-      }))
+      .map((e) => {
+        const source = idRemap.get(e.source) ?? e.source;
+        const target = idRemap.get(e.target) ?? e.target;
+        // Edge ids are derived from source/target (see buildConnectionEdge in
+        // lib/canvas/canvas-layout.ts) — regenerate on remap, or a remapped edge
+        // can collide with an unrelated edge of the same original id/formula
+        // already present in the destination canvas.
+        return { ...e, id: `edge-${source}-${target}`, source, target };
+      })
       .filter(
         (e) =>
           !get().edges.some(
