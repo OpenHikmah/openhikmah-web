@@ -80,7 +80,7 @@ function verse(ref: string): Verse {
     surah: parseInt(s, 10),
     ayah: parseInt(a, 10),
     ref: ref as VerseRef,
-    arabicText: "نص",
+    arabicText: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
     translation: "text",
     surahName: "Surah",
     surahNameArabic: "سورة",

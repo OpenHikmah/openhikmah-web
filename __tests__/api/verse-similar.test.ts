@@ -19,7 +19,7 @@ function match(ref: string) {
       surah: Number(s),
       ayah: Number(a),
       ref,
-      arabicText: "ar",
+      arabicText: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ",
       translation: `tr-${ref}`,
       surahName: "Surah",
       surahNameArabic: "سورة",

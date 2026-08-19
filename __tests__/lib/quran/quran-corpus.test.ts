@@ -35,7 +35,7 @@ function row(ref: string, surah: number, ayah: number) {
     ref,
     surah,
     ayah,
-    arabicText: "نص",
+    arabicText: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
     translation: "text",
     transliteration: null,
     createdAt: new Date(),

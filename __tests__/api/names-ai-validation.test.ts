@@ -235,7 +235,10 @@ describe("names AI routes — model output validation", () => {
     mockFetch.mockImplementation(async (url: unknown) => {
       if (typeof url !== "string") return { ok: false };
       if (url.includes("ar.alafasy"))
-        return { ok: true, json: async () => ({ data: { text: "نص عربي" } }) };
+        return {
+          ok: true,
+          json: async () => ({ data: { text: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ" } }),
+        };
       if (url.includes("en.sahih"))
         return { ok: true, json: async () => ({ data: { text: "English text" } }) };
       return { ok: false };

@@ -17,7 +17,7 @@ function verse(ref: string): Verse {
     surah: parseInt(s, 10),
     ayah: parseInt(a, 10),
     ref: ref as VerseRef,
-    arabicText: "نص",
+    arabicText: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
     translation: "text",
     surahName: "Surah",
     surahNameArabic: "سورة",
@@ -46,7 +46,9 @@ describe("resolveVerse", () => {
       const isArabic = String(url).includes("ar.alafasy");
       return {
         ok: true,
-        json: async () => ({ data: { text: isArabic ? "نص عربي" : "English text" } }),
+        json: async () => ({
+          data: { text: isArabic ? "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ" : "English text" },
+        }),
       } as Response;
     });
     const result = await resolveVerse("2:255");
@@ -54,7 +56,7 @@ describe("resolveVerse", () => {
       surah: 2,
       ayah: 255,
       ref: "2:255",
-      arabicText: "نص عربي",
+      arabicText: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ",
       translation: "English text",
     });
   });
@@ -117,7 +119,9 @@ describe("resolveVerse", () => {
       const isArabic = String(url).includes("ar.alafasy");
       return {
         ok: true,
-        json: async () => ({ data: { text: isArabic ? "نص عربي" : "Türkçe metin" } }),
+        json: async () => ({
+          data: { text: isArabic ? "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ" : "Türkçe metin" },
+        }),
       } as Response;
     });
     const result = await resolveVerse("2:255", "tr.diyanet");
@@ -131,7 +135,9 @@ describe("resolveVerse", () => {
       const isArabic = String(url).includes("ar.alafasy");
       return {
         ok: true,
-        json: async () => ({ data: { text: isArabic ? "نص عربي" : "English text" } }),
+        json: async () => ({
+          data: { text: isArabic ? "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ" : "English text" },
+        }),
       } as Response;
     });
     await resolveVerse("2:255");
@@ -146,7 +152,10 @@ describe("resolveVerse", () => {
     vi.mocked(fetch).mockImplementation(async (url: string | URL | Request) => {
       const u = String(url);
       if (u.includes("ar.alafasy")) {
-        return { ok: true, json: async () => ({ data: { text: "نص عربي" } }) } as Response;
+        return {
+          ok: true,
+          json: async () => ({ data: { text: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ" } }),
+        } as Response;
       }
       if (u.includes("tr.diyanet")) {
         return { ok: false } as Response;
@@ -166,7 +175,10 @@ describe("resolveVerse", () => {
     vi.mocked(fetch).mockImplementation(async (url: string | URL | Request) => {
       const u = String(url);
       if (u.includes("ar.alafasy")) {
-        return { ok: true, json: async () => ({ data: { text: "نص عربي" } }) } as Response;
+        return {
+          ok: true,
+          json: async () => ({ data: { text: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ" } }),
+        } as Response;
       }
       if (u.includes("tr.diyanet")) {
         return { ok: false } as Response;

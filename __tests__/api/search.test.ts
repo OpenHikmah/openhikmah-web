@@ -54,7 +54,7 @@ function verse(ref: string, translation: string): Verse {
     surah: Number(s),
     ayah: Number(a),
     ref: ref as Verse["ref"],
-    arabicText: "ar",
+    arabicText: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ",
     translation,
     surahName: "Surah",
     surahNameArabic: "سورة",
