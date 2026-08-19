@@ -22,7 +22,8 @@ const OPTIONS: Array<{
     kind: "thematic",
     labelKey: "byTheme",
     descriptionKey: "byThemeDescription",
-    color: "var(--color-teal)",
+    // Not plain --color-teal — fails WCAG AA contrast at this text size (issue #477).
+    color: "var(--color-teal-bright)",
     icon: "◈",
   },
   {
