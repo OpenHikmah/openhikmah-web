@@ -49,79 +49,81 @@ export default async function NamesPage() {
       <LandingHeader />
       <MobileNavBar />
 
-      {/* Hero */}
-      <div className="px-6 pt-12 pb-10 text-center border-b border-border-subtle">
-        <p className="text-xs uppercase tracking-[0.2em] font-mono mb-3 text-text-muted">
-          {t("eyebrow")}
-        </p>
-        <h1 className="font-arabic text-5xl mb-2 text-gold">أَسْمَاءُ اللَّه الْحُسْنَى</h1>
-        <p className="text-2xl font-light mb-4 text-text-primary">{t("heroTitle")}</p>
-        <p className="text-sm max-w-xl mx-auto text-text-secondary">{t("heroDescription")}</p>
+      <main>
+        {/* Hero */}
+        <div className="px-6 pt-12 pb-10 text-center border-b border-border-subtle">
+          <p className="text-xs uppercase tracking-[0.2em] font-mono mb-3 text-text-muted">
+            {t("eyebrow")}
+          </p>
+          <h1 className="font-arabic text-5xl mb-2 text-gold">أَسْمَاءُ اللَّه الْحُسْنَى</h1>
+          <p className="text-2xl font-light mb-4 text-text-primary">{t("heroTitle")}</p>
+          <p className="text-sm max-w-xl mx-auto text-text-secondary">{t("heroDescription")}</p>
 
-        {/* Legend */}
-        <div className="flex flex-wrap justify-center gap-4 mt-8">
-          {CATEGORY_ORDER.map((cat) => {
+          {/* Legend */}
+          <div className="flex flex-wrap justify-center gap-4 mt-8">
+            {CATEGORY_ORDER.map((cat) => {
+              const label = CATEGORY_LABELS[cat];
+              const labelKeys = CATEGORY_LABEL_KEYS[cat];
+              const colors = CATEGORY_COLORS[cat];
+              return (
+                <div key={cat} className="flex items-center gap-2 text-xs">
+                  <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
+                  <span className="text-text-secondary">{t(labelKeys.label)}</span>
+                  <span className="font-arabic text-sm text-text-muted">{label.ar}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Names by category */}
+        <div className="max-w-6xl mx-auto px-6 py-12 space-y-16">
+          {byCategory.map(({ cat, names }) => {
             const label = CATEGORY_LABELS[cat];
             const labelKeys = CATEGORY_LABEL_KEYS[cat];
             const colors = CATEGORY_COLORS[cat];
             return (
-              <div key={cat} className="flex items-center gap-2 text-xs">
-                <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
-                <span className="text-text-secondary">{t(labelKeys.label)}</span>
-                <span className="font-arabic text-sm text-text-muted">{label.ar}</span>
-              </div>
+              <section key={cat}>
+                {/* Category header */}
+                <div className="mb-6">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${colors.dot}`} />
+                    <h2 className="text-lg font-medium text-text-primary">{t(labelKeys.label)}</h2>
+                    <span className="font-arabic text-xl text-text-secondary">{label.ar}</span>
+                  </div>
+                  <p className="text-xs pl-5 text-text-muted">{t(labelKeys.description)}</p>
+                </div>
+
+                {/* Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {names.map((name) => (
+                    <Link
+                      key={name.id}
+                      href={`/names/${name.slug}`}
+                      className="group rounded-lg border border-border bg-surface p-3 transition-all duration-200 hover:scale-[1.02] hover:border-gold"
+                    >
+                      <div className="font-arabic text-xl text-center mb-2 leading-relaxed text-text-primary">
+                        {name.arabic}
+                      </div>
+                      <div className="text-xs text-center font-mono mb-1 text-text-secondary">
+                        {name.transliteration}
+                      </div>
+                      <div className="text-xs text-center text-text-muted">{name.meaning}</div>
+                      <div className="mt-2 flex justify-center">
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${colors.badge}`}
+                        >
+                          {name.root}
+                        </span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
             );
           })}
         </div>
-      </div>
-
-      {/* Names by category */}
-      <div className="max-w-6xl mx-auto px-6 py-12 space-y-16">
-        {byCategory.map(({ cat, names }) => {
-          const label = CATEGORY_LABELS[cat];
-          const labelKeys = CATEGORY_LABEL_KEYS[cat];
-          const colors = CATEGORY_COLORS[cat];
-          return (
-            <section key={cat}>
-              {/* Category header */}
-              <div className="mb-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${colors.dot}`} />
-                  <h2 className="text-lg font-medium text-text-primary">{t(labelKeys.label)}</h2>
-                  <span className="font-arabic text-xl text-text-secondary">{label.ar}</span>
-                </div>
-                <p className="text-xs pl-5 text-text-muted">{t(labelKeys.description)}</p>
-              </div>
-
-              {/* Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                {names.map((name) => (
-                  <Link
-                    key={name.id}
-                    href={`/names/${name.slug}`}
-                    className="group rounded-lg border border-border bg-surface p-3 transition-all duration-200 hover:scale-[1.02] hover:border-gold"
-                  >
-                    <div className="font-arabic text-xl text-center mb-2 leading-relaxed text-text-primary">
-                      {name.arabic}
-                    </div>
-                    <div className="text-xs text-center font-mono mb-1 text-text-secondary">
-                      {name.transliteration}
-                    </div>
-                    <div className="text-xs text-center text-text-muted">{name.meaning}</div>
-                    <div className="mt-2 flex justify-center">
-                      <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${colors.badge}`}
-                      >
-                        {name.root}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          );
-        })}
-      </div>
+      </main>
 
       {/* Footer */}
       <footer className="text-center py-6 text-xs border-t border-border-subtle text-text-muted">

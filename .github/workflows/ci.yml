@@ -262,7 +262,7 @@ jobs:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
     needs: [lint-typecheck-test]
-    timeout-minutes: 20
+    timeout-minutes: 25
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -331,11 +331,19 @@ jobs:
 
       - name: Install Playwright browsers (with system deps)
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: bunx playwright install --with-deps chromium
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 4
+          max_attempts: 3
+          command: bunx playwright install --with-deps chromium
 
       - name: Install Playwright system dependencies only
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: bunx playwright install-deps chromium
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 4
+          max_attempts: 3
+          command: bunx playwright install-deps chromium
 
       - name: E2E tests
         run: bun run test:e2e
