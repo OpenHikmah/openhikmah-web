@@ -262,6 +262,7 @@ jobs:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
     needs: [lint-typecheck-test]
+    timeout-minutes: 20
     services:
       postgres:
         image: pgvector/pgvector:pg16
