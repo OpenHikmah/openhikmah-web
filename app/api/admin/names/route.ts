@@ -5,6 +5,7 @@ import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { nameContent } from "@/lib/infra/db/schema";
 import { safeParse } from "@/lib/infra/http";
+import { isValidRef } from "@/lib/quran/quran-corpus";
 
 const KINDS = ["verses", "reflection", "pairings"] as const;
 type Kind = (typeof KINDS)[number];
@@ -45,6 +46,13 @@ function isValidVerses(data: unknown): boolean {
       v as Record<string, unknown>;
     return (
       isNonEmptyString(ref) &&
+      // Every AI-generation path validates refs against the local corpus
+      // before use (lib/ai/connection-generator.ts, fallbackAIVerses in
+      // names/[slug]/verses/route.ts) — this admin override path is the one
+      // place that persists a ref straight to end users, so it must be held
+      // to the same "never fabricate a Quran verse reference" bar, not just
+      // checked for non-empty-string shape.
+      isValidRef(ref) &&
       typeof surah === "number" &&
       typeof ayah === "number" &&
       isNonEmptyString(arabicText) &&

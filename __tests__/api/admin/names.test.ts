@@ -163,6 +163,53 @@ describe("PATCH /api/admin/names", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
+  it("rejects verses data with a corpus-invalid ref, without persisting it", async () => {
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "verses",
+        data: [
+          {
+            ref: "999:999",
+            surah: 999,
+            ayah: 999,
+            arabicText: "a",
+            translation: "t",
+            surahName: "s",
+            surahNameArabic: "s",
+            reason: "r",
+          },
+        ],
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("rejects verses data with a syntactically-plausible but non-existent ayah (ref out of range for a real surah)", async () => {
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "verses",
+        data: [
+          {
+            // Al-Fatiha only has 7 ayahs.
+            ref: "1:8",
+            surah: 1,
+            ayah: 8,
+            arabicText: "a",
+            translation: "t",
+            surahName: "Al-Fatihah",
+            surahNameArabic: "الفاتحة",
+            reason: "r",
+          },
+        ],
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
   it("rejects verses data with a wrong field type (surah as string)", async () => {
     const res = await PATCH(
       patch({
