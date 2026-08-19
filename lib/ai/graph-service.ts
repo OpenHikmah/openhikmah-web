@@ -215,7 +215,13 @@ async function generateAndPersist(
         });
       }
     } catch (err) {
+      // A swallowed persist failure would be invisible: the caller still gets
+      // their generated connections this request, but nothing is cached, so
+      // the same (costly) AI generation re-runs on every future request for
+      // this verse — quietly defeating this module's "AI cost trends toward
+      // zero" design. Surface it as a counted metric, not just a log line.
       console.error("Failed to persist connections:", err);
+      incr("gen_persist_failed");
     }
   }
 

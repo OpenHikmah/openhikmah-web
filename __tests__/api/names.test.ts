@@ -179,6 +179,24 @@ describe("GET /api/names/[slug]/verses", () => {
     }
   });
 
+  it("quran.com search fetch passes an abort signal so a hung upstream fails fast", async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (typeof url !== "string") return { ok: false };
+      if (url.includes("ar.alafasy")) return arabicResp();
+      if (url.includes("en.sahih")) return transResp();
+      return { ok: false };
+    });
+
+    const req = new NextRequest("http://localhost/api/names/ar-rahman/verses");
+    await getNameVerses(req, params("ar-rahman"));
+
+    const searchCall = mockFetch.mock.calls.find(
+      ([url]) => new URL(String(url)).hostname === "api.quran.com"
+    );
+    expect(searchCall).toBeDefined();
+    expect(searchCall?.[1]).toEqual(expect.objectContaining({ signal: expect.any(AbortSignal) }));
+  });
+
   it("hydrates verse translation for the requester's edition, not the en.sahih the selection was cached with", async () => {
     mockGetQuranEdition.mockResolvedValue("tr.diyanet");
     mockFetch.mockImplementation(async (url: string) => {

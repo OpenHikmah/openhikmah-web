@@ -66,12 +66,12 @@ export async function POST(req: NextRequest) {
       { clientKey: clientKey(req), excludeRefs, locale }
     );
 
-    // A "get more" request (excludeRefs non-empty) legitimately can run out of
-    // fresh connections — that's not a server error, just nothing left to give.
-    if (results.length === 0 && excludeRefs.length === 0) {
-      return NextResponse.json({ error: "Could not resolve any verses" }, { status: 500 });
-    }
-
+    // Empty results are not a server error, whether this is a "get more" request
+    // running out of fresh connections, or a genuine first-time miss where the
+    // grounding data isn't seeded for this verse yet and the AI proposed nothing
+    // that survived validation. Either way the client already distinguishes the
+    // two cases (see HikmahCanvas.tsx's runExpansion) and shows an appropriate
+    // notice — the route itself has nothing to treat as an error here.
     return NextResponse.json(results);
   } catch (err) {
     if (err instanceof RateLimitError) {

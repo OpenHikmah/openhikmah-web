@@ -28,24 +28,33 @@ const {
   mockInsert,
   mockValues,
   mockOnConflict,
+  mockReturning,
   mockGenerate,
   mockGenerateGrounded,
   mockDiscover,
   mockResolveVerse,
   mockConsume,
+  mockIncr,
 } = vi.hoisted(() => {
-  const mockOnConflict = vi.fn().mockResolvedValue(undefined);
+  // Mirrors the real chain: .values(...).onConflictDoNothing().returning(...) —
+  // `returning` resolves with the rows actually inserted (empty by default here,
+  // matching every existing test's assumption that no row won a genuine
+  // conflict-race; individual tests override this).
+  const mockReturning = vi.fn().mockResolvedValue([]);
+  const mockOnConflict = vi.fn(() => ({ returning: mockReturning }));
   const mockValues = vi.fn((..._args: unknown[]) => ({ onConflictDoNothing: mockOnConflict }));
   return {
     mockSelect: vi.fn(),
     mockInsert: vi.fn(() => ({ values: mockValues })),
     mockValues,
     mockOnConflict,
+    mockReturning,
     mockGenerate: vi.fn(),
     mockGenerateGrounded: vi.fn(),
     mockDiscover: vi.fn(),
     mockResolveVerse: vi.fn(),
     mockConsume: vi.fn(),
+    mockIncr: vi.fn(),
   };
 });
 
@@ -60,6 +69,7 @@ vi.mock("@/lib/infra/rate-limit", () => ({
   consume: mockConsume,
   RateLimitError: class RateLimitError extends Error {},
 }));
+vi.mock("@/lib/infra/metrics", () => ({ incr: mockIncr }));
 
 import { getConnections } from "@/lib/ai/graph-service";
 import { RateLimitError } from "@/lib/infra/rate-limit";
@@ -89,6 +99,8 @@ describe("getConnections", () => {
     mockInsert.mockClear();
     mockValues.mockClear();
     mockOnConflict.mockClear();
+    mockReturning.mockReset().mockResolvedValue([]);
+    mockIncr.mockClear();
     mockGenerate.mockReset();
     mockGenerateGrounded.mockReset();
     mockDiscover.mockReset();
@@ -141,6 +153,17 @@ describe("getConnections", () => {
       locale: "en",
     });
     expect(out).toHaveLength(2);
+  });
+
+  it("on a persist failure, still returns the generated results but counts it — not silent", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    mockGenerate.mockResolvedValue([result("2:255")]);
+    mockReturning.mockRejectedValue(new Error("db down"));
+
+    const out = await getConnections("1:1", "thematic", source);
+
+    expect(out).toHaveLength(1); // caller still gets this request's results
+    expect(mockIncr).toHaveBeenCalledWith("gen_persist_failed");
   });
 
   it("on a miss that generates nothing, does not write to the DB", async () => {
@@ -293,6 +316,8 @@ describe("getConnections — per-locale caching", () => {
     mockInsert.mockClear();
     mockValues.mockClear();
     mockOnConflict.mockClear();
+    mockReturning.mockReset().mockResolvedValue([]);
+    mockIncr.mockClear();
     mockGenerate.mockReset();
     mockGenerateGrounded.mockReset();
     mockDiscover.mockReset();
@@ -338,6 +363,8 @@ describe("getConnections — single-flight de-duplication", () => {
     mockInsert.mockClear();
     mockValues.mockClear();
     mockOnConflict.mockClear();
+    mockReturning.mockReset().mockResolvedValue([]);
+    mockIncr.mockClear();
     mockDiscover.mockReset().mockResolvedValue([]); // no grounding → legacy generate path
     mockResolveVerse.mockReset().mockImplementation(async (ref: string) => verse(ref));
     mockConsume.mockReset().mockResolvedValue(true);

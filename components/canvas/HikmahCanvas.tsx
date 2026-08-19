@@ -156,9 +156,14 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
         const connections: ConnectionResult[] = await res.json();
 
         // A repeat "get more" request can legitimately run dry — that's not a
-        // fetch failure, just nothing further to surface for this kind.
-        if (connections.length === 0 && excludeRefs.length > 0) {
-          throw new ExhaustedExpansionError();
+        // fetch failure, just nothing further to surface for this kind. A
+        // first-time request can also legitimately come back empty (grounding
+        // data not yet seeded for this verse, or the AI proposed nothing that
+        // survived validation) — surface that too, rather than silently doing
+        // nothing.
+        if (connections.length === 0) {
+          if (excludeRefs.length > 0) throw new ExhaustedExpansionError();
+          throw new Error("No connections found for this verse");
         }
 
         for (let i = 0; i < connections.length; i++) {
