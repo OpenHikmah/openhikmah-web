@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderWithIntl } from "../../test-utils/render-with-intl";
 
@@ -92,7 +92,7 @@ describe("AdminGate", () => {
   });
 
   it("calls /api/admin/me with the bearer token once the session resolves", async () => {
-    useAuthStore.setState({ accessToken: "tok", isSessionLoading: false });
+    useAuthStore.setState({ accessToken: null, isSessionLoading: true });
     const mockFetch = vi
       .fn()
       .mockResolvedValue(
@@ -105,6 +105,12 @@ describe("AdminGate", () => {
         <Child />
       </AdminGate>
     );
+
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    act(() => {
+      useAuthStore.setState({ accessToken: "tok", isSessionLoading: false });
+    });
 
     await waitFor(() =>
       expect(mockFetch).toHaveBeenCalledWith("/api/admin/me", {
