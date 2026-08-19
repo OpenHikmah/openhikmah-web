@@ -74,13 +74,24 @@ export async function startJob(jobId: string, adminQfId: string): Promise<{ runI
     throw new Error(`Missing required env var(s): ${missingEnv.join(", ")}`);
   }
 
-  const [row] = await db
-    .insert(jobRuns)
-    .values({ jobType: job.id, status: "running", triggeredBy: adminQfId })
-    .returning({ id: jobRuns.id });
-
-  const state: RunningJob = { jobId: job.id, runId: row.id, logTail: [] };
+  // Claim the slot synchronously (no await between the `if (running)` check
+  // above and this assignment) so two near-simultaneous calls can't both pass
+  // the guard — matches lib/names/name-content.ts's inFlight/reasonInFlight
+  // pattern. `runId` is filled in once the insert below resolves.
+  const state: RunningJob = { jobId: job.id, runId: -1, logTail: [] };
   running = state;
+
+  let row: { id: number };
+  try {
+    [row] = await db
+      .insert(jobRuns)
+      .values({ jobType: job.id, status: "running", triggeredBy: adminQfId })
+      .returning({ id: jobRuns.id });
+  } catch (err) {
+    if (running === state) running = null;
+    throw err;
+  }
+  state.runId = row.id;
 
   const child = spawn("bun", [job.script], { cwd: process.cwd(), env: process.env });
 
