@@ -91,7 +91,8 @@ function result(ref: string): ConnectionResult {
   return { ...verse(ref), reason: "because", kind: "thematic" };
 }
 
-const source = { arabicText: "ar", translation: "tr" };
+const SOURCE_ARABIC = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ";
+const source = { arabicText: SOURCE_ARABIC, translation: "tr" };
 
 describe("getConnections", () => {
   beforeEach(() => {
@@ -141,7 +142,7 @@ describe("getConnections", () => {
     const out = await getConnections("1:1", "thematic", source);
 
     expect(mockGenerate).toHaveBeenCalledTimes(1);
-    expect(mockGenerate).toHaveBeenCalledWith("1:1", "ar", "tr", "thematic", "en");
+    expect(mockGenerate).toHaveBeenCalledWith("1:1", SOURCE_ARABIC, "tr", "thematic", "en");
     expect(mockInsert).toHaveBeenCalledTimes(1);
     expect(mockValues).toHaveBeenCalledTimes(1);
     const persisted = mockValues.mock.calls[0][0] as Array<Record<string, unknown>>;
@@ -231,7 +232,7 @@ describe("getConnections", () => {
     expect(mockGenerateGrounded).toHaveBeenCalledTimes(1);
     expect(mockGenerateGrounded).toHaveBeenCalledWith(
       "1:1",
-      "ar",
+      SOURCE_ARABIC,
       "tr",
       "thematic",
       ["2:255", "3:18"],
@@ -250,7 +251,7 @@ describe("getConnections", () => {
     const out = await getConnections("1:1", "root", source);
 
     expect(mockGenerateGrounded).not.toHaveBeenCalled();
-    expect(mockGenerate).toHaveBeenCalledWith("1:1", "ar", "tr", "root", "en");
+    expect(mockGenerate).toHaveBeenCalledWith("1:1", SOURCE_ARABIC, "tr", "root", "en");
     expect(out).toHaveLength(1);
   });
 
@@ -334,7 +335,7 @@ describe("getConnections — per-locale caching", () => {
 
     await getConnections("1:1", "thematic", source, { locale: "tr" });
 
-    expect(mockGenerate).toHaveBeenCalledWith("1:1", "ar", "tr", "thematic", "tr");
+    expect(mockGenerate).toHaveBeenCalledWith("1:1", SOURCE_ARABIC, "tr", "thematic", "tr");
     const persisted = mockValues.mock.calls[0][0] as Array<Record<string, unknown>>;
     expect(persisted[0]).toMatchObject({ locale: "tr" });
   });
@@ -349,8 +350,8 @@ describe("getConnections — per-locale caching", () => {
     ]);
 
     expect(mockGenerate).toHaveBeenCalledTimes(2);
-    expect(mockGenerate).toHaveBeenCalledWith("1:1", "ar", "tr", "thematic", "en");
-    expect(mockGenerate).toHaveBeenCalledWith("1:1", "ar", "tr", "thematic", "tr");
+    expect(mockGenerate).toHaveBeenCalledWith("1:1", SOURCE_ARABIC, "tr", "thematic", "en");
+    expect(mockGenerate).toHaveBeenCalledWith("1:1", SOURCE_ARABIC, "tr", "thematic", "tr");
   });
 });
 

@@ -20,12 +20,18 @@ vi.mock("@xyflow/react", async (importOriginal) => {
 
 import { HikmahCanvas } from "@/components/canvas/HikmahCanvas";
 
+const ARABIC_BY_REF: Record<string, string> = {
+  "1:1": "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+  "2:255": "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ",
+};
+
 function verseNode(id: string, ref: string) {
+  const [s, a] = ref.split(":");
   const verse: Verse = {
-    surah: 1,
-    ayah: 1,
+    surah: Number(s),
+    ayah: Number(a),
     ref: ref as VerseRef,
-    arabicText: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+    arabicText: ARABIC_BY_REF[ref] ?? ARABIC_BY_REF["1:1"],
     translation: "text",
     surahName: "Al-Fatihah",
     surahNameArabic: "الفاتحة",

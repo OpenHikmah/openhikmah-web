@@ -30,12 +30,17 @@ vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect } }));
 
 import { getVerse, getVerses, existingRefs, isValidRef } from "@/lib/quran/quran-corpus";
 
+const ARABIC_BY_REF: Record<string, string> = {
+  "1:1": "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+  "2:255": "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ",
+};
+
 function row(ref: string, surah: number, ayah: number) {
   return {
     ref,
     surah,
     ayah,
-    arabicText: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+    arabicText: ARABIC_BY_REF[ref] ?? ARABIC_BY_REF["1:1"],
     translation: "text",
     transliteration: null,
     createdAt: new Date(),
