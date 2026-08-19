@@ -22,11 +22,11 @@ function makeDbChain(resolveWith: unknown = []) {
   return chain;
 }
 
-const { mockSelectDistinct, mockGetVerses } = vi.hoisted(() => ({
-  mockSelectDistinct: vi.fn(() => makeDbChain([])),
+const { mockSelect, mockGetVerses } = vi.hoisted(() => ({
+  mockSelect: vi.fn(() => makeDbChain([])),
   mockGetVerses: vi.fn(async () => new Map()),
 }));
-vi.mock("@/lib/infra/db", () => ({ db: { selectDistinct: mockSelectDistinct } }));
+vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect } }));
 vi.mock("@/lib/quran/quran-corpus", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/quran/quran-corpus")>();
   return { ...actual, getVerses: mockGetVerses };
@@ -43,7 +43,7 @@ function params(root: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockSelectDistinct.mockReturnValue(makeDbChain([]));
+  mockSelect.mockReturnValue(makeDbChain([]));
   mockGetVerses.mockResolvedValue(new Map());
 });
 
@@ -54,11 +54,12 @@ describe("GET /api/root/[root]", () => {
   });
 
   it("returns verses for a root in the order the DB query resolved them", async () => {
-    // The route does not re-sort after the query — see issue #360 (lexicographic
-    // vs. numeric ref ordering), which is a separate, already-tracked bug.
-    // This only pins the route's actual passthrough behavior: whatever order
-    // rows come back in is the order returned to the client.
-    mockSelectDistinct.mockReturnValue(makeDbChain([{ ref: "2:255" }, { ref: "10:5" }]));
+    // The route does no application-level re-sorting — ordering is entirely the
+    // DB query's responsibility (see __tests__/integration/root-concordance.integration.test.ts
+    // for the actual numeric-order assertion against real Postgres). This only
+    // pins the route's passthrough behavior: whatever order rows come back in
+    // is the order returned to the client.
+    mockSelect.mockReturnValue(makeDbChain([{ ref: "2:255" }, { ref: "10:5" }]));
     mockGetVerses.mockResolvedValue(
       new Map([
         [
@@ -92,7 +93,7 @@ describe("GET /api/root/[root]", () => {
   });
 
   it("truncates each verse's translation to a short snippet", async () => {
-    mockSelectDistinct.mockReturnValue(makeDbChain([{ ref: "2:255" }]));
+    mockSelect.mockReturnValue(makeDbChain([{ ref: "2:255" }]));
     mockGetVerses.mockResolvedValue(
       new Map([
         [
@@ -114,7 +115,7 @@ describe("GET /api/root/[root]", () => {
   });
 
   it("drops refs the corpus lookup didn't resolve, without failing the request", async () => {
-    mockSelectDistinct.mockReturnValue(makeDbChain([{ ref: "2:255" }, { ref: "114:6" }]));
+    mockSelect.mockReturnValue(makeDbChain([{ ref: "2:255" }, { ref: "114:6" }]));
     mockGetVerses.mockResolvedValue(
       new Map([
         [
@@ -136,7 +137,7 @@ describe("GET /api/root/[root]", () => {
   });
 
   it("degrades to an empty result on a DB error instead of failing the request", async () => {
-    mockSelectDistinct.mockImplementation(() => {
+    mockSelect.mockImplementation(() => {
       throw new Error("connection reset");
     });
 
