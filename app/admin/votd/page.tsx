@@ -159,6 +159,7 @@ export default function VotdPage() {
           key={`${selected ?? "none"}:${selected ? (byDate.get(selected)?.updatedAt ?? "new") : ""}`}
           date={selected}
           existing={selected ? (byDate.get(selected) ?? null) : null}
+          todayRef={data?.today?.date === selected ? (data.today.ref ?? null) : null}
           onSaved={reload}
         />
       </div>
@@ -206,14 +207,19 @@ function TodayPanel({ today, onEditToday }: { today: TodayInfo | null; onEditTod
 function DayEditor({
   date,
   existing,
+  todayRef,
   onSaved,
 }: {
   date: string | null;
   existing: Entry | null;
+  /** Today's live (algorithmic) pick, when `date` is today and nothing is
+   *  curated yet — pre-fills the form so the admin can see what's currently
+   *  showing and either keep it (save as-is) or overwrite it. */
+  todayRef?: string | null;
   onSaved: () => void;
 }) {
   const api = useAdminFetch();
-  const [verseRef, setVerseRef] = useState(existing?.verseRef ?? "");
+  const [verseRef, setVerseRef] = useState(existing?.verseRef ?? todayRef ?? "");
   const [reflection, setReflection] = useState(existing?.reflection ?? "");
   const [preview, setPreview] = useState<Verse | null>(null);
   const [busy, setBusy] = useState(false);
