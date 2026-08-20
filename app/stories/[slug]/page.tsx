@@ -9,6 +9,7 @@ import { resolveVerse } from "@/lib/quran/verse-resolver";
 import { getQuranEdition, getUiLocale } from "@/lib/i18n/request-prefs";
 import { StoryVerseCard } from "./StoryVerseCard";
 import { OpenOnCanvasButton } from "./OpenOnCanvasButton";
+import { StoryActivityTracker } from "./StoryActivityTracker";
 import type { Verse } from "@/types/quran";
 
 interface Props {
@@ -56,6 +57,7 @@ export default async function StoryDetailPage({ params }: Props) {
     <div className="min-h-screen bg-bg text-text-primary">
       <LandingHeader />
       <MobileNavBar />
+      <StoryActivityTracker slug={slug} />
 
       {/* Story hero */}
       <div className="mx-auto max-w-3xl border-b border-border-subtle px-6 pb-12 pt-14 text-center">
