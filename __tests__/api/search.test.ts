@@ -47,15 +47,10 @@ import { GET } from "@/app/api/search/route";
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
-function makeSearchReq(q: string, extra = "") {
-  return new NextRequest(`http://localhost/api/search?q=${encodeURIComponent(q)}${extra}`);
-}
-
-function makeMeaningReq(q: string, headers: Record<string, string> = {}, extra = "") {
-  return new NextRequest(
-    `http://localhost/api/search?q=${encodeURIComponent(q)}&mode=meaning${extra}`,
-    { headers }
-  );
+function makeSearchReq(q: string, extra = "", headers: Record<string, string> = {}) {
+  return new NextRequest(`http://localhost/api/search?q=${encodeURIComponent(q)}${extra}`, {
+    headers,
+  });
 }
 
 const ARABIC_BY_REF: Record<string, string> = {
@@ -92,6 +87,7 @@ describe("GET /api/search", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     mockSearchByMeaning.mockReset();
+    mockSearchByMeaning.mockResolvedValue([]);
     mockConsume.mockReset();
     mockConsume.mockResolvedValue(true);
     mockGetVerse.mockReset();
@@ -231,99 +227,103 @@ describe("GET /api/search", () => {
     expect(body.total).toBe(0);
   });
 
-  it("mode=meaning uses semantic search and maps matches to SearchResults", async () => {
+  it("includes deduplicated semantic matches as `related` alongside keyword results", async () => {
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([{ verse_key: "1:3", translations: [{ text: "the Lord of Mercy" }] }])
+    );
     mockSearchByMeaning.mockResolvedValueOnce([
+      semanticMatch("1:3", "the Lord of Mercy"), // duplicate of a keyword result — must be dropped
       semanticMatch("94:5", "For indeed, with hardship will be ease."),
       semanticMatch("2:286", "Allah does not burden a soul beyond that it can bear."),
     ]);
 
-    const res = await GET(makeMeaningReq("staying strong through hardship"));
+    const res = await GET(makeSearchReq("mercy"));
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.results.map((r: { ref: string }) => r.ref)).toEqual(["94:5", "2:286"]);
-    expect(body.results[0].snippet).toContain("hardship");
-    expect(mockFetch).not.toHaveBeenCalled(); // no quran.com call in meaning mode
-  });
-
-  it("mode=meaning paginates the capped ranked list in memory", async () => {
-    const matches = Array.from({ length: 30 }, (_, i) =>
-      semanticMatch(`1:${i + 1}`, `verse ${i + 1}`)
-    );
-    mockSearchByMeaning.mockResolvedValueOnce(matches);
-
-    const res = await GET(makeMeaningReq("mercy", {}, "&page=2&pageSize=10"));
-    const body = await res.json();
-    expect(body.results).toHaveLength(10);
-    expect(body.results[0].ref).toBe("1:11");
-    expect(body.total).toBe(30);
-    expect(body.page).toBe(2);
-  });
-
-  it("mode=meaning still answers ref-format queries directly", async () => {
-    mockGetVerse.mockResolvedValueOnce(null);
-    const res = await GET(makeMeaningReq("2:255"));
-    const body = await res.json();
-    expect(body.results).toHaveLength(1);
-    expect(body.results[0].ref).toBe("2:255");
-    expect(mockSearchByMeaning).not.toHaveBeenCalled();
-  });
-
-  it("mode=meaning falls back to keyword search when semantic search throws", async () => {
-    mockSearchByMeaning.mockRejectedValueOnce(new Error("no embeddings"));
-    mockFetch.mockResolvedValueOnce(
-      quranComResponse([{ verse_key: "1:3", translations: [{ text: "the Lord of Mercy" }] }])
-    );
-    const res = await GET(makeMeaningReq("mercy"));
-    expect(res.status).toBe(200);
-    expect(res.headers.get("x-search-fallback")).toBe("keyword");
     const body = await res.json();
     expect(body.results.map((r: { ref: string }) => r.ref)).toEqual(["1:3"]);
+    expect(body.related.map((r: { ref: string }) => r.ref)).toEqual(["94:5", "2:286"]);
   });
 
-  it("mode=meaning falls back to keyword when semantic search is empty (not seeded)", async () => {
-    mockSearchByMeaning.mockResolvedValueOnce([]);
+  it("caps `related` at RELATED_RESULT_CAP (5)", async () => {
+    mockFetch.mockResolvedValueOnce(quranComResponse([]));
+    mockSearchByMeaning.mockResolvedValueOnce(
+      Array.from({ length: 15 }, (_, i) => semanticMatch(`1:${i + 1}`, `verse ${i + 1}`))
+    );
+
+    const res = await GET(makeSearchReq("mercy"));
+    const body = await res.json();
+    expect(body.related).toHaveLength(5);
+  });
+
+  it("omits `related` entirely when semantic search finds nothing", async () => {
     mockFetch.mockResolvedValueOnce(
       quranComResponse([{ verse_key: "1:1", translations: [{ text: "In the name of God" }] }])
     );
-    const res = await GET(makeMeaningReq("mercy"));
+    mockSearchByMeaning.mockResolvedValueOnce([]);
+
+    const res = await GET(makeSearchReq("mercy"));
+    const body = await res.json();
+    expect(body.related).toBeUndefined();
+    expect(body.results).toHaveLength(1); // keyword results are unaffected
+  });
+
+  it("omits `related` and does not fail the response when semantic search throws", async () => {
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([{ verse_key: "1:3", translations: [{ text: "the Lord of Mercy" }] }])
+    );
+    mockSearchByMeaning.mockRejectedValueOnce(new Error("no embeddings"));
+
+    const res = await GET(makeSearchReq("mercy"));
     expect(res.status).toBe(200);
-    expect(res.headers.get("x-search-fallback")).toBe("keyword");
-    expect((await res.json()).results[0].ref).toBe("1:1");
+    const body = await res.json();
+    expect(body.related).toBeUndefined();
+    expect(body.results.map((r: { ref: string }) => r.ref)).toEqual(["1:3"]);
   });
 
-  it("mode=meaning rate-limits under the last (proxy-appended) hop of x-forwarded-for", async () => {
-    mockSearchByMeaning.mockResolvedValueOnce([]);
-    await GET(makeMeaningReq("mercy", { "x-forwarded-for": "203.0.113.7, 70.41.3.18" }));
-    expect(mockConsume).toHaveBeenCalledWith("search:70.41.3.18");
+  it("does not attempt semantic search beyond page 1", async () => {
+    mockFetch.mockResolvedValueOnce(quranComResponse([]));
+    await GET(makeSearchReq("mercy", "&page=2"));
+    expect(mockSearchByMeaning).not.toHaveBeenCalled();
   });
 
-  it("mode=meaning buckets a malformed x-forwarded-for under 'unknown'", async () => {
-    mockSearchByMeaning.mockResolvedValueOnce([]);
-    await GET(makeMeaningReq("mercy", { "x-forwarded-for": "x".repeat(500) }));
-    expect(mockConsume).toHaveBeenCalledWith("search:unknown");
-  });
-
-  it("mode=meaning falls back to keyword (not 429) when rate-limited, without embedding", async () => {
-    // Deny only the AI-generation "search:" budget — the keyword fallback has
-    // its own separate "searchkw:" budget, which is still within limit here.
+  it("skips semantic search (without 429ing the keyword response) when its own rate-limit budget is exhausted", async () => {
     mockConsume.mockImplementation(async (key: string) => !key.startsWith("search:"));
     mockFetch.mockResolvedValueOnce(
       quranComResponse([{ verse_key: "2:1", translations: [{ text: "Alif Lam Mim" }] }])
     );
-    const res = await GET(makeMeaningReq("mercy"));
+    const res = await GET(makeSearchReq("mercy"));
     expect(res.status).toBe(200);
-    expect(res.headers.get("x-search-fallback")).toBe("keyword");
     expect(mockSearchByMeaning).not.toHaveBeenCalled();
-    expect((await res.json()).results[0].ref).toBe("2:1");
+    const body = await res.json();
+    expect(body.related).toBeUndefined();
+    expect(body.results[0].ref).toBe("2:1");
   });
 
-  it("mode=meaning gates the keyword fallback under searchkw:, and 429s when that budget is exhausted", async () => {
+  it("rate-limits the semantic lookup under the last (proxy-appended) hop of x-forwarded-for", async () => {
+    mockFetch.mockResolvedValueOnce(quranComResponse([]));
     mockSearchByMeaning.mockResolvedValueOnce([]);
-    mockConsume.mockImplementation(async (key: string) => !key.startsWith("searchkw:"));
-    const res = await GET(makeMeaningReq("mercy"));
-    expect(mockConsume).toHaveBeenCalledWith(expect.stringMatching(/^searchkw:/), 60, 60);
-    expect(res.status).toBe(429);
-    expect((await res.json()).error).toBe("Too many search requests");
+    await GET(makeSearchReq("mercy", "", { "x-forwarded-for": "203.0.113.7, 70.41.3.18" }));
+    expect(mockConsume).toHaveBeenCalledWith("search:70.41.3.18");
+  });
+
+  it("logs a separate 'meaning' search-log entry when related results are found", async () => {
+    mockFetch.mockResolvedValueOnce(quranComResponse([]));
+    mockSearchByMeaning.mockResolvedValueOnce([semanticMatch("94:5", "...")]);
+    await GET(makeSearchReq("mercy"));
+    expect(mockLogSearchQuery).toHaveBeenCalledWith("mercy", "keyword", 0);
+    expect(mockLogSearchQuery).toHaveBeenCalledWith("mercy", "meaning", 1);
+  });
+
+  it("does not log a 'meaning' search-log entry when nothing semantic was found", async () => {
+    mockFetch.mockResolvedValueOnce(quranComResponse([]));
+    mockSearchByMeaning.mockResolvedValueOnce([]);
+    await GET(makeSearchReq("mercy"));
+    expect(mockLogSearchQuery).toHaveBeenCalledWith("mercy", "keyword", 0);
+    expect(mockLogSearchQuery).not.toHaveBeenCalledWith(
+      "mercy",
+      "meaning",
+      expect.anything()
+    );
   });
 
   it("rate-limits the keyword search response when the search budget is exhausted", async () => {
