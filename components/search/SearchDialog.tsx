@@ -309,11 +309,11 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                     if (debounceRef.current) clearTimeout(debounceRef.current);
                     setPreviewVerse(null);
                     setSearchResults([]);
+                    setRelatedResults([]);
                     setTotalResults(0);
                     setPreviewError(false);
                     setLoading(false);
                     setIsSearching(false);
-                    setFellBackToKeyword(false);
                     setHighlightedIndex(-1);
                     setSelectError(false);
                     setSearchError(null);
@@ -339,7 +339,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                     }
                   }
                 }}
-                placeholder={mode === "meaning" ? t("placeholderMeaning") : t("placeholderKeyword")}
+                placeholder={t("placeholder")}
                 className="flex-1 bg-transparent text-sm outline-none text-text-primary placeholder:text-text-muted"
               />
               <button
@@ -351,13 +351,6 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                 <X className="w-4 h-4" />
               </button>
             </div>
-
-            {/* Mode toggle — keyword (Quran.com text) vs by-meaning (semantic) */}
-            <SearchModeToggle
-              mode={mode}
-              onChange={setMode}
-              className="border-b border-border px-3 py-2"
-            />
 
             {/* Content area */}
             <div className="max-h-[60vh] overflow-y-auto">
@@ -385,12 +378,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
               {showResults && (
                 <div className="p-3 space-y-0.5" role="listbox" id="search-results-listbox">
-                  {fellBackToKeyword && (
-                    <p className="px-2 pb-1.5 text-[10px] text-text-muted">
-                      {t("fallbackKeyword")}
-                    </p>
-                  )}
-                  {uiLocale !== "en" && (
+                  {uiLocale !== "en" && relatedResults.length > 0 && (
                     <p className="px-2 pb-1.5 text-[10px] text-text-muted">{t("nonEnglishHint")}</p>
                   )}
                   {searchResults.map((result, index) => (
@@ -407,6 +395,25 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                 </div>
               )}
 
+              {showResults && relatedResults.length > 0 && (
+                <div className="border-t border-border p-3 space-y-0.5">
+                  <p className="px-2 pb-1.5 font-mono text-[10px] uppercase tracking-wide text-text-muted">
+                    {t("relatedByMeaning")}
+                  </p>
+                  {relatedResults.map((result) => (
+                    <SearchResultRow
+                      key={result.ref}
+                      id={`search-related-${result.ref}`}
+                      result={result}
+                      alreadyAdded={hasNode(result.ref)}
+                      isHighlighted={false}
+                      onHover={() => {}}
+                      onSelect={() => selectResult(result)}
+                    />
+                  ))}
+                </div>
+              )}
+
               {!showSeedVerses && !showPreview && !showResults && !busy && !previewError && (
                 <div className="px-4 py-8 text-center">
                   <p className="text-sm text-text-muted">
@@ -414,9 +421,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                       ? t("rateLimited")
                       : searchError === "unavailable"
                         ? t("searchUnavailable")
-                        : mode === "meaning"
-                          ? t("noMeaningMatches")
-                          : t("noResults")}
+                        : t("noResults")}
                   </p>
                 </div>
               )}
