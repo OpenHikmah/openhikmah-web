@@ -98,6 +98,27 @@ describe("startJob", () => {
     await expect(startJob("seed-quran", "qf-admin")).rejects.toThrow("already running");
   });
 
+  it("only lets one of two near-simultaneous (un-awaited) calls succeed", async () => {
+    const first = startJob("seed-morphology", "qf-admin");
+    const second = startJob("seed-quran", "qf-admin");
+    const results = await Promise.allSettled([first, second]);
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter((r) => r.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason.message).toMatch(/already running/);
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases the running guard when the insert rejects, allowing a retry to succeed", async () => {
+    mockInsert.mockReturnValueOnce(makeDbChain(Promise.reject(new Error("insert failed"))));
+    await expect(startJob("seed-morphology", "qf-admin")).rejects.toThrow("insert failed");
+
+    const { runId } = await startJob("seed-quran", "qf-admin");
+    expect(runId).toBe(42);
+    expect(mockInsert).toHaveBeenCalledTimes(2);
+  });
+
   it("clears the running guard once the child process closes", async () => {
     await startJob("seed-morphology", "qf-admin");
     lastChild.current?.emit("close", 0);
