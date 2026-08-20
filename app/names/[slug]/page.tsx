@@ -37,7 +37,7 @@ const CATEGORY_STYLES: Record<NameCategory, { accent: string; badge: string }> =
     badge: "border border-gold/30 bg-gold/15 text-gold",
   },
   sifat: {
-    // Not plain --color-teal: at 12px/normal weight it's 4.25:1 against
+    // Not plain --color-teal: at 12px/normal weight it's 4.35:1 against
     // --color-surface-raised, just under WCAG AA's 4.5:1 minimum (issue #477).
     accent: "var(--color-teal-bright)",
     badge: "border border-teal/30 bg-teal/15 text-text-primary",
