@@ -4,7 +4,7 @@ import { create } from "zustand";
 import type { Verse, CanvasEdge, SidebarContent, PendingExpand, EdgeKind } from "@/types/quran";
 import type { Node, Edge, NodeChange, EdgeChange } from "@xyflow/react";
 import { applyNodeChanges, applyEdgeChanges } from "@xyflow/react";
-import { findFreeSlot } from "@/lib/canvas/canvas-layout";
+import { findFreeSlot, NODE_HEIGHT, NODE_GAP } from "@/lib/canvas/canvas-layout";
 
 // ─── Persistence helpers ───────────────────────────────────────────────────────
 
@@ -107,6 +107,7 @@ interface CanvasStore {
   setViewport: (viewport: CanvasViewport) => void;
 
   addVerseNode: (verse: Verse, position?: { x: number; y: number }) => string;
+  addSurahNodes: (verses: Verse[]) => string[];
   addConnectionEdge: (edge: CanvasEdge) => AddConnectionEdgeResult;
   setSelectedNode: (id: string | null) => void;
   setExpandingNode: (id: string | null) => void;
@@ -219,6 +220,36 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     });
     get().setNewlyAddedNode(id);
     return id;
+  },
+
+  // Lays every ayah of a surah into a single top-to-bottom column, one
+  // `set()` call so the whole surah appears in one render. No edges between
+  // them — EdgeKind ("thematic"/"root"/"contrast") has no "next ayah" kind,
+  // and auto-triggering AI expansion per node (pendingAutoExpand) would fire
+  // one AI call per ayah, which nobody asked for here.
+  addSurahNodes: (verses) => {
+    if (verses.length === 0) return [];
+    const ids: string[] = [];
+    set((s) => {
+      const positions = [...s.nodes.map((n) => n.position)];
+      const newNodes: Node[] = verses.map((verse, i) => {
+        const id = nextId();
+        ids.push(id);
+        const anchor = { x: 0, y: i * (NODE_HEIGHT + NODE_GAP) };
+        const pos = findFreeSlot(positions, anchor);
+        positions.push(pos);
+        return {
+          id,
+          type: "verse",
+          position: pos,
+          data: { ...verse, isRoot: i === 0 },
+        } as Node;
+      });
+      const nodes = [...s.nodes, ...newNodes];
+      return { nodes, duplicateNodeIdsByRef: computeDuplicateMap(nodes) };
+    });
+    if (ids[0]) get().setNewlyAddedNode(ids[0]);
+    return ids;
   },
 
   addConnectionEdge: (edge) => {

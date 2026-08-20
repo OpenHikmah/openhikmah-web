@@ -43,11 +43,19 @@ export interface SearchResult {
   translation: string;
 }
 
+export interface MatchedSurah {
+  number: number;
+  name: string;
+  nameArabic: string;
+  ayahCount: number;
+}
+
 export interface SearchResponse {
   results: SearchResult[];
   total: number;
   page: number;
   pageSize: number;
+  matchedSurah?: MatchedSurah;
 }
 
 export type SidebarContent =

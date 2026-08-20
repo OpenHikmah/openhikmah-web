@@ -118,3 +118,29 @@ export const SURAH_NAMES: Record<number, [string, string]> = {
 export function getSurahName(surahNum: number): [string, string] {
   return SURAH_NAMES[surahNum] ?? [`Surah ${surahNum}`, `سورة ${surahNum}`];
 }
+
+// Strips the transliteration prefixes ("Al-", "An-", "Ash-", …) and any
+// non-letter characters so "kahf" normalizes the same as "Al-Kahf".
+function normalizeSurahName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/^(al|an|as|ash|at|ad|az)-/, "")
+    .replace(/[^a-z]/g, "");
+}
+
+let normalizedNameToSurah: Map<string, number> | null = null;
+
+/** Matches a search query against a surah's English name, e.g. "kahf" -> 18. */
+export function matchSurahByName(query: string): number | null {
+  if (!normalizedNameToSurah) {
+    normalizedNameToSurah = new Map(
+      Object.entries(SURAH_NAMES).map(([num, [name]]) => [
+        normalizeSurahName(name),
+        parseInt(num, 10),
+      ])
+    );
+  }
+  const normalized = normalizeSurahName(query);
+  if (!normalized) return null;
+  return normalizedNameToSurah.get(normalized) ?? null;
+}
