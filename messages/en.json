@@ -147,8 +147,7 @@
     "pauseListening": "Pause",
     "readSurah": "Read",
     "readSurahHint": "Opens the whole surah in a readable, listen-along view.",
-    "backToSearch": "Back to search",
-    "openInCanvasInstead": "Open in Canvas instead"
+    "backToSearch": "Back to search"
   },
   "bookmarks": {
     "title": "Saved",

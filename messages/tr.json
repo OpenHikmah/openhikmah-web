@@ -147,8 +147,7 @@
     "pauseListening": "Duraklat",
     "readSurah": "Oku",
     "readSurahHint": "Tüm sureyi dinlerken takip edilebilen, okunabilir bir görünümde açar.",
-    "backToSearch": "Aramaya dön",
-    "openInCanvasInstead": "Bunun yerine Tuvalde aç"
+    "backToSearch": "Aramaya dön"
   },
   "bookmarks": {
     "title": "Kaydedilenler",

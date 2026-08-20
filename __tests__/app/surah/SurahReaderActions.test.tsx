@@ -85,11 +85,8 @@ describe("SurahReaderActions", () => {
     expect(screen.queryByRole("button", { name: "Pause" })).not.toBeInTheDocument();
   });
 
-  it("links the Canvas escape hatch to this surah's bulk-load route", () => {
+  it("renders no Canvas link — the bulk graph dump this page replaces", () => {
     renderWithIntl(<SurahReaderActions surah={SURAH} />);
-    expect(screen.getByRole("link", { name: "Open in Canvas instead" })).toHaveAttribute(
-      "href",
-      "/canvas?surah=18"
-    );
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 });

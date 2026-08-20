@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, Input, ReflectionNote } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { StateNote, ConfirmButton, Pill } from "@/components/admin/primitives";
+import { StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { cn } from "@/lib/utils";
@@ -182,14 +182,9 @@ function TodayPanel({ today, onEditToday }: { today: TodayInfo | null; onEditTod
   return (
     <div className="flex items-start justify-between gap-4 rounded-lg border border-gold-muted bg-gold/[0.04] p-4">
       <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
-            Today · {today.date}
-          </span>
-          <Pill tone={today.source === "curated" ? "active" : "neutral"}>
-            {today.source === "curated" ? "Curated" : "Algorithmic pick"}
-          </Pill>
-        </div>
+        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
+          Today · {today.date}
+        </span>
         <p className="mt-1.5 font-mono text-xs text-text-secondary">{today.ref}</p>
         <p dir="rtl" className="mt-2 font-arabic text-lg leading-loose text-text-primary">
           {today.arabicText}
