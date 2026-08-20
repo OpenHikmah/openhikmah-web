@@ -7,9 +7,6 @@ import { Card, IconButton, Tooltip } from "@/components/ui";
 import { useSurahListen } from "./useSurahListen";
 import type { MatchedSurah } from "@/types/quran";
 
-/** Compact row for one surah among several partial-name matches (e.g.
- *  searching "ba" lists Al-Baqarah/Al-Balad/Al-Bayyinah) — the full-size
- *  SurahResultCard is reserved for a single unambiguous match. */
 export function SurahListItem({ surah }: { surah: MatchedSurah }) {
   const t = useTranslations("search");
   const { isThisPlaying, handleListen } = useSurahListen(surah);

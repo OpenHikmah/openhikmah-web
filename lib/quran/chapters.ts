@@ -30,7 +30,7 @@ export async function fetchLocalizedChapterNames(language: string): Promise<Map<
     const data = (await res.json()) as ChapterApiResponse;
     const names = new Map<number, string>();
     for (const chapter of data.chapters ?? []) {
-      if (typeof chapter.id === "number" && chapter.translated_name?.name) {
+      if (typeof chapter.id === "number" && typeof chapter.translated_name?.name === "string") {
         names.set(chapter.id, chapter.translated_name.name);
       }
     }

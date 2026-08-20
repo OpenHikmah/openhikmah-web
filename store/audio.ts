@@ -57,7 +57,10 @@ function loadAndPlay(verse: AudioVerse, onEnded: () => void) {
   a.onended = onEnded;
   a.onerror = () => {
     console.error(`audio: failed to load ${verse.ref}`, a.error);
-    onEnded();
+    // If the user had paused, a load error must not resume playback on the
+    // next track — stop cleanly instead of auto-advancing into autoplay.
+    if (useAudioStore.getState().isPlaying) onEnded();
+    else useAudioStore.getState().stop();
   };
   a.src = getAudioUrl(verse.surah, verse.ayah, usePreferencesStore.getState().reciter);
   a.load();
