@@ -398,6 +398,11 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
               {showRelated && (
                 <div className={cn("p-3 space-y-0.5", showResults && "border-t border-border")}>
+                  {!showResults && searchError && (
+                    <p className="px-2 pb-1.5 text-xs text-text-muted">
+                      {searchError === "rateLimited" ? t("rateLimited") : t("searchUnavailable")}
+                    </p>
+                  )}
                   <p className="px-2 pb-1.5 font-mono text-[10px] uppercase tracking-wide text-text-muted">
                     {t("relatedByMeaning")}
                   </p>
@@ -410,6 +415,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                       isHighlighted={false}
                       onHover={() => {}}
                       onSelect={() => selectResult(result)}
+                      optionSemantics={false}
                     />
                   ))}
                 </div>
@@ -550,6 +556,7 @@ function SearchResultRow({
   isHighlighted,
   onHover,
   onSelect,
+  optionSemantics = true,
 }: {
   id: string;
   result: SearchResult;
@@ -557,12 +564,17 @@ function SearchResultRow({
   isHighlighted: boolean;
   onHover: () => void;
   onSelect: () => void;
+  /** False for rows outside the arrow-key/Enter-navigable listbox (the
+   *  "related by meaning" section) — still clickable, just not exposed as a
+   *  combobox option, since keyboard nav and aria-activedescendant don't
+   *  reach them. */
+  optionSemantics?: boolean;
 }) {
   return (
     <button
       id={id}
-      role="option"
-      aria-selected={isHighlighted}
+      role={optionSemantics ? "option" : undefined}
+      aria-selected={optionSemantics ? isHighlighted : undefined}
       onClick={onSelect}
       onMouseEnter={onHover}
       className={cn(

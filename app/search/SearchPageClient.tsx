@@ -234,7 +234,7 @@ export function SearchPageClient() {
           </div>
         ) : (
           <>
-            {data.results.length > 0 && (
+            {data.results.length > 0 ? (
               <>
                 <p className="mb-4 text-sm text-text-muted">
                   {t.rich("showingResults", {
@@ -256,6 +256,24 @@ export function SearchPageClient() {
                   className="mt-8"
                 />
               </>
+            ) : (
+              // Keyword search itself hit a rate limit or upstream failure, but
+              // semantic search still turned up something — surface both instead
+              // of letting the related section silently stand in for the error.
+              (rateLimited || keywordUnavailable) && (
+                <div className="mb-4">
+                  <p className="text-sm text-text-muted">
+                    {rateLimited ? t("rateLimited") : t("searchUnavailable")}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setRetryCount((c) => c + 1)}
+                    className="mt-1 text-sm text-teal-bright hover:underline"
+                  >
+                    {t("tryAgain")}
+                  </button>
+                </div>
+              )
             )}
             {!!data.related?.length && (
               <div className={data.results.length > 0 ? "mt-8" : ""}>

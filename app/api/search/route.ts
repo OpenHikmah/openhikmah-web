@@ -23,6 +23,10 @@ export const dynamic = "force-dynamic";
 
 const MAX_QUERY_LENGTH = 200;
 const RELATED_RESULT_CAP = 5;
+// The embedding call has no bound of its own — this keeps a stalled Gemini
+// request from holding up the (otherwise fast) keyword response it runs
+// alongside in Promise.all.
+const RELATED_TIMEOUT_MS = 4000;
 
 interface KeywordSearchResult {
   results: SearchResult[];
@@ -116,11 +120,15 @@ async function relatedByMeaning(
 ): Promise<SemanticMatch[]> {
   const allowed = await consume(`search:${clientKey(req)}`);
   if (!allowed) return [];
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), RELATED_TIMEOUT_MS);
   try {
-    return await searchByMeaning(q, RELATED_RESULT_CAP + 10, edition);
+    return await searchByMeaning(q, RELATED_RESULT_CAP + 10, edition, controller.signal);
   } catch (err) {
     console.error("Semantic search route error:", err);
     return [];
+  } finally {
+    clearTimeout(timer);
   }
 }
 

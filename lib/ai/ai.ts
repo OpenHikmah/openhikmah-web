@@ -62,7 +62,7 @@ function embeddingModelName(): string {
   return process.env.GEMINI_EMBEDDING_MODEL ?? "gemini-embedding-001";
 }
 
-async function embedViaRest(texts: string[]): Promise<number[][]> {
+async function embedViaRest(texts: string[], signal?: AbortSignal): Promise<number[][]> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
   const model = embeddingModelName();
@@ -78,6 +78,7 @@ async function embedViaRest(texts: string[]): Promise<number[][]> {
           outputDimensionality: EMBEDDING_DIMENSIONS,
         })),
       }),
+      signal,
     }
   );
   if (!res.ok) {
@@ -101,8 +102,8 @@ async function embedViaRest(texts: string[]): Promise<number[][]> {
 }
 
 /** Embeds a single piece of text into a fixed-length semantic vector. */
-export async function embed(text: string): Promise<number[]> {
-  const [vector] = await embedViaRest([text]);
+export async function embed(text: string, signal?: AbortSignal): Promise<number[]> {
+  const [vector] = await embedViaRest([text], signal);
   if (!vector) throw new Error("No embedding returned");
   return vector;
 }
