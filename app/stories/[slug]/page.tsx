@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
-import { STORIES, getStoryBySlug, resolveLocalized } from "@/lib/stories";
+import { STORIES, getVisibleStoryBySlug, resolveLocalized } from "@/lib/stories";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
 import { getQuranEdition, getUiLocale } from "@/lib/i18n/request-prefs";
 import { StoryVerseCard } from "./StoryVerseCard";
@@ -26,7 +26,7 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const story = getStoryBySlug(slug);
+  const story = await getVisibleStoryBySlug(slug);
   if (!story) return {};
   const locale = await getUiLocale();
   return {
@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function StoryDetailPage({ params }: Props) {
   const { slug } = await params;
-  const story = getStoryBySlug(slug);
+  const story = await getVisibleStoryBySlug(slug);
   if (!story) notFound();
 
   const locale = await getUiLocale();

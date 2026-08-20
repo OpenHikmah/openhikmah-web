@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
-import { STORIES, resolveLocalized } from "@/lib/stories";
+import { listVisibleStories, resolveLocalized } from "@/lib/stories";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
 
 export const metadata = {
@@ -14,6 +14,7 @@ export const metadata = {
 export default async function StoriesPage() {
   const locale = await getUiLocale();
   const t = await getTranslations("stories");
+  const stories = await listVisibleStories();
   return (
     <div className="min-h-screen bg-bg pb-[calc(72px+env(safe-area-inset-bottom))] text-text-primary md:pb-0">
       <LandingHeader />
@@ -29,7 +30,7 @@ export default async function StoriesPage() {
         </div>
 
         <div className="mx-auto grid max-w-5xl gap-4 px-6 py-12 sm:grid-cols-2 lg:grid-cols-3">
-          {STORIES.map((story) => {
+          {stories.map((story) => {
             const verseCount = story.chapters.reduce((n, c) => n + c.verseRefs.length, 0);
             return (
               <Link
