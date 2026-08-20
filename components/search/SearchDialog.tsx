@@ -421,16 +421,16 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                 !showRelated &&
                 !busy &&
                 !previewError && (
-                <div className="px-4 py-8 text-center">
-                  <p className="text-sm text-text-muted">
-                    {searchError === "rateLimited"
-                      ? t("rateLimited")
-                      : searchError === "unavailable"
-                        ? t("searchUnavailable")
-                        : t("noResults")}
-                  </p>
-                </div>
-              )}
+                  <div className="px-4 py-8 text-center">
+                    <p className="text-sm text-text-muted">
+                      {searchError === "rateLimited"
+                        ? t("rateLimited")
+                        : searchError === "unavailable"
+                          ? t("searchUnavailable")
+                          : t("noResults")}
+                    </p>
+                  </div>
+                )}
 
               {showSeedVerses && (
                 <div className="p-3">

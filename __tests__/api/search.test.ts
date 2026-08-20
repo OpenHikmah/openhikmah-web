@@ -319,11 +319,7 @@ describe("GET /api/search", () => {
     mockSearchByMeaning.mockResolvedValueOnce([]);
     await GET(makeSearchReq("mercy"));
     expect(mockLogSearchQuery).toHaveBeenCalledWith("mercy", "keyword", 0);
-    expect(mockLogSearchQuery).not.toHaveBeenCalledWith(
-      "mercy",
-      "meaning",
-      expect.anything()
-    );
+    expect(mockLogSearchQuery).not.toHaveBeenCalledWith("mercy", "meaning", expect.anything());
   });
 
   it("rate-limits the keyword search response when the search budget is exhausted", async () => {
@@ -337,12 +333,13 @@ describe("GET /api/search", () => {
     expect(body.error).toBe("Too many search requests");
   });
 
-  it("gates plain keyword search under its own bucket, separate from the AI-generation budget", async () => {
+  it("gates plain keyword search under its own bucket, distinct from the AI-generation budget the semantic lookup uses", async () => {
     mockFetch.mockResolvedValueOnce(quranComResponse([]));
     await GET(makeSearchReq("mercy"));
     expect(mockConsume).toHaveBeenCalledWith(expect.stringMatching(/^searchkw:/), 60, 60);
-    // Never the shared AI-generation "search:" bucket keyword search used to share.
-    expect(mockConsume).not.toHaveBeenCalledWith(expect.stringMatching(/^search:/));
+    // The semantic "related" lookup still uses its own separate "search:" bucket
+    // (with no explicit limit/window args — that budget already has its own default).
+    expect(mockConsume).toHaveBeenCalledWith(expect.stringMatching(/^search:/));
   });
 
   it("rate-limits the search-log write on the keyword path, within budget", async () => {
@@ -361,9 +358,10 @@ describe("GET /api/search", () => {
 
   it("passes the caller's cookie-selected edition through to semantic search", async () => {
     mockGetQuranEdition.mockResolvedValue("ru.kuliev");
+    mockFetch.mockResolvedValueOnce(quranComResponse([]));
     mockSearchByMeaning.mockResolvedValueOnce([semanticMatch("94:5", "...")]);
-    await GET(makeMeaningReq("mercy"));
-    expect(mockSearchByMeaning).toHaveBeenCalledWith("mercy", 100, "ru.kuliev");
+    await GET(makeSearchReq("mercy"));
+    expect(mockSearchByMeaning).toHaveBeenCalledWith("mercy", 15, "ru.kuliev");
   });
 
   it("resolves ref-format queries against the caller's cookie-selected edition", async () => {
