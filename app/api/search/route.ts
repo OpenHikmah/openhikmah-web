@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SearchResponse, SearchResult, VerseRef } from "@/types/quran";
-import { getSurahName } from "@/lib/quran/surah-names";
+import { getSurahName, matchSurahByName } from "@/lib/quran/surah-names";
+import { SURAH_LENGTHS } from "@/lib/quran/audio";
 import { searchByMeaning } from "@/lib/quran/semantic-search";
 import { getVerses } from "@/lib/quran/quran-corpus";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
@@ -140,6 +141,27 @@ export async function GET(req: NextRequest) {
   }
 
   const edition = await getQuranEdition();
+
+  // A query matching a surah name (e.g. "kahf") surfaces the whole surah as
+  // its own result — not a list of individual ayah snippets — so the user can
+  // listen to or read it start to finish. See matchSurahByName.
+  const matchedSurahNumber = matchSurahByName(q);
+  if (matchedSurahNumber) {
+    const [name, nameArabic] = getSurahName(matchedSurahNumber);
+    const response: SearchResponse = {
+      results: [],
+      total: 0,
+      page: 1,
+      pageSize,
+      matchedSurah: {
+        number: matchedSurahNumber,
+        name,
+        nameArabic,
+        ayahCount: SURAH_LENGTHS[matchedSurahNumber - 1],
+      },
+    };
+    return NextResponse.json(response);
+  }
 
   if (/^\d+:\d+$/.test(q)) {
     // resolveVerse falls back to a live alquran.cloud fetch on a local DB

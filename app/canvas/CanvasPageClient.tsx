@@ -30,8 +30,11 @@ const HikmahCanvas = dynamic(
 function VerseLoader() {
   const searchParams = useSearchParams();
   const addVerseNode = useCanvasStore((s) => s.addVerseNode);
+  const addSurahNodes = useCanvasStore((s) => s.addSurahNodes);
   const setPendingAutoExpand = useCanvasStore((s) => s.setPendingAutoExpand);
+  const requestFit = useCanvasStore((s) => s.requestFit);
   const handledRef = useRef<string | null>(null);
+  const handledSurahRef = useRef<string | null>(null);
 
   useEffect(() => {
     const verseRef = searchParams.get("verse");
@@ -65,6 +68,42 @@ function VerseLoader() {
       })
       .catch((e) => console.error("canvas: incoming verse fetch failed", e));
   }, [searchParams, addVerseNode, setPendingAutoExpand]);
+
+  useEffect(() => {
+    const surahParam = searchParams.get("surah");
+    if (!surahParam || handledSurahRef.current === surahParam) return;
+    if (!/^\d+$/.test(surahParam)) return;
+    const surahNum = parseInt(surahParam, 10);
+    if (surahNum < 1 || surahNum > 114) return;
+
+    handledSurahRef.current = surahParam;
+
+    const cleanUrl = () => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("surah");
+      window.history.replaceState(null, "", url.toString());
+    };
+
+    fetch(`/api/verses/${surahNum}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((verses: Verse[] | null) => {
+        if (!verses || verses.length === 0) {
+          cleanUrl();
+          return;
+        }
+        // Whole surah already mapped (re-opened the same "Read" link)? Don't
+        // stack a duplicate set of nodes.
+        const { hasNode } = useCanvasStore.getState();
+        if (verses.every((v) => hasNode(v.ref))) {
+          cleanUrl();
+          return;
+        }
+        addSurahNodes(verses);
+        requestFit();
+        cleanUrl();
+      })
+      .catch((e) => console.error("canvas: incoming surah fetch failed", e));
+  }, [searchParams, addSurahNodes, requestFit]);
 
   return null;
 }

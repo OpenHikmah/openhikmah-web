@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
 import { SearchModeToggle, type SearchMode } from "@/components/search/SearchModeToggle";
+import { SurahResultCard } from "@/components/search/SurahResultCard";
 import { Card, Input, IconButton, Tooltip, Pagination, buttonVariants } from "@/components/ui";
 import { useAuthStore } from "@/store/auth";
 import { usePreferencesStore } from "@/store/preferences";
@@ -218,6 +219,8 @@ export function SearchPageClient() {
           <div className="py-20 text-center">
             <p className="text-sm text-text-muted">{t("somethingWentWrong")}</p>
           </div>
+        ) : data?.matchedSurah ? (
+          <SurahResultCard surah={data.matchedSurah} />
         ) : !data || data.results.length === 0 ? (
           <div className="py-20 text-center">
             <BookOpen className="mx-auto mb-4 h-8 w-8 text-text-muted/40" />
