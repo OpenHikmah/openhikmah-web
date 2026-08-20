@@ -10,10 +10,10 @@ export const DAWUD_STORY: Story = {
   },
   arabicName: "دَاوُود",
   tagline: {
-    en: "A king given strength and wisdom, who wept at being tested by his own judgment",
-    tr: "Kendisine güç ve hikmet verilen, kendi hükmüyle sınandığında gözyaşı döken bir kral",
-    az: "Özünə güc və hikmət verilən, öz hökmü ilə sınandıqda göz yaşı tökən bir padşah",
-    ru: "Царь, наделённый силой и мудростью, заплакавший, когда был испытан собственным судом",
+    en: "A king given strength and wisdom, who fell in repentance when tested by his own judgment",
+    tr: "Kendisine güç ve hikmet verilen, kendi hükmüyle sınandığında tövbeyle secdeye kapanan bir kral",
+    az: "Özünə güc və hikmət verilən, öz hökmü ilə sınandıqda tövbə ilə səcdəyə qapanan bir padşah",
+    ru: "Царь, наделённый силой и мудростью, павший ниц в раскаянии, когда был испытан собственным судом",
   },
   intro: {
     en: "Dawud enters the Quran as a soldier — the one who killed Goliath in the ranks of Talut's army — before God gives him kingship, wisdom, and a standing so favored that mountains and birds are described exalting God alongside him. He is given iron as pliable as wax, taught to make armor, and set up as a khalifa on earth with a single instruction: judge between people in truth. What makes his story distinct is what happens next — a test disguised as two disputing visitors, so pointed that Dawud does not defend himself when he recognizes it, but asks forgiveness and falls down in repentance on the spot.",
