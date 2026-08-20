@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, Input, ReflectionNote } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { StateNote, ConfirmButton } from "@/components/admin/primitives";
+import { StateNote, ConfirmButton, Pill } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,15 @@ interface Entry {
   verseRef: string;
   reflection: string | null;
   updatedAt: string;
+}
+
+interface TodayInfo {
+  date: string;
+  ref: string;
+  arabicText: string;
+  translation: string;
+  reflection: string | null;
+  source: "curated" | "algorithmic";
 }
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -34,6 +43,8 @@ function monthLabel(month: string): string {
   });
 }
 
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
 export default function VotdPage() {
   const api = useAdminFetch();
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
@@ -46,7 +57,7 @@ export default function VotdPage() {
     setSelected(null);
   };
 
-  const { data, error, loading, reload } = useAsync<{ entries: Entry[] }>(
+  const { data, error, loading, reload } = useAsync<{ entries: Entry[]; today: TodayInfo | null }>(
     () => api(`/votd?month=${month}`),
     `votd:${month}`
   );
@@ -55,6 +66,12 @@ export default function VotdPage() {
   const [y, m] = month.split("-").map(Number);
   const firstWeekday = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const today = todayStr();
+
+  const editToday = () => {
+    setMonth(today.slice(0, 7));
+    setSelected(today);
+  };
 
   return (
     <>
@@ -62,7 +79,10 @@ export default function VotdPage() {
         title="Verse of the Day"
         subtitle="Curate the daily verse. A set day overrides the algorithmic pick."
       />
-      <div className="grid gap-6 p-7 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="px-7 pt-7">
+        <TodayPanel today={data?.today ?? null} onEditToday={editToday} />
+      </div>
+      <div className="grid gap-6 p-7 pt-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-medium text-text-primary">{monthLabel(month)}</h2>
@@ -105,6 +125,7 @@ export default function VotdPage() {
               const date = `${month}-${String(day).padStart(2, "0")}`;
               const entry = byDate.get(date);
               const isSelected = selected === date;
+              const isToday = date === today;
               return (
                 <button
                   key={date}
@@ -115,7 +136,10 @@ export default function VotdPage() {
                       ? "border-gold bg-gold/10 text-gold"
                       : entry
                         ? "border-teal/40 bg-teal/5 text-text-primary hover:border-teal"
-                        : "border-border bg-surface text-text-secondary hover:border-gold-muted"
+                        : "border-border bg-surface text-text-secondary hover:border-gold-muted",
+                    // Marks the live day independent of curated/selected color, so
+                    // it's identifiable even on an uncurated (algorithmic-pick) day.
+                    isToday && !isSelected && "ring-1 ring-inset ring-gold/50"
                   )}
                 >
                   <span className="tabular-nums">{day}</span>
@@ -139,6 +163,49 @@ export default function VotdPage() {
         />
       </div>
     </>
+  );
+}
+
+/** Shows the verse actually live on the landing page today — curated or the
+ *  algorithmic fallback — so an admin doesn't have to leave the panel to see
+ *  what's currently showing. */
+function TodayPanel({
+  today,
+  onEditToday,
+}: {
+  today: TodayInfo | null;
+  onEditToday: () => void;
+}) {
+  if (!today) {
+    return (
+      <div className="rounded-lg border border-dashed border-border p-4 text-sm text-text-muted">
+        Today's verse could not be resolved.
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-lg border border-gold-muted bg-gold/[0.04] p-4">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
+            Today · {today.date}
+          </span>
+          <Pill tone={today.source === "curated" ? "active" : "neutral"}>
+            {today.source === "curated" ? "Curated" : "Algorithmic pick"}
+          </Pill>
+        </div>
+        <p className="mt-1.5 font-mono text-xs text-text-secondary">{today.ref}</p>
+        <p dir="rtl" className="mt-2 font-arabic text-lg leading-loose text-text-primary">
+          {today.arabicText}
+        </p>
+        <p className="mt-1 text-xs leading-relaxed text-text-secondary">{today.translation}</p>
+        {today.reflection && <ReflectionNote className="mt-2">{today.reflection}</ReflectionNote>}
+      </div>
+      <Button size="sm" variant="secondary" onClick={onEditToday} className="shrink-0">
+        Edit today
+      </Button>
+    </div>
   );
 }
 
