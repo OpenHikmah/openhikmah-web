@@ -4,8 +4,8 @@ import { isValidRef } from "@/lib/quran/quran-corpus";
 import { getNameBySlug } from "@/lib/names/divine-names";
 
 describe("STORIES", () => {
-  it("ships the launch set of 21 stories", () => {
-    expect(STORIES).toHaveLength(21);
+  it("ships the launch set of 24 stories", () => {
+    expect(STORIES).toHaveLength(24);
     expect(new Set(STORIES.map((s) => s.slug))).toEqual(
       new Set([
         "adam",
@@ -19,11 +19,14 @@ describe("STORIES", () => {
         "lut",
         "shuayb",
         "musa",
+        "dawud",
+        "sulaiman",
+        "yunus",
+        "ayyub",
         "yusuf",
         "ilyas",
         "alyasa",
         "dhul-kifl",
-        "ayyub",
         "yaqub",
         "zakariya",
         "yahya",

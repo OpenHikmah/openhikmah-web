@@ -11,6 +11,9 @@ import { ISHAQ_STORY } from "./data/ishaq";
 import { LUT_STORY } from "./data/lut";
 import { SHUAYB_STORY } from "./data/shuayb";
 import { MUSA_STORY } from "./data/musa";
+import { DAWUD_STORY } from "./data/dawud";
+import { SULAIMAN_STORY } from "./data/sulaiman";
+import { YUNUS_STORY } from "./data/yunus";
 import { AYYUB_STORY } from "./data/ayyub";
 import { YUSUF_STORY } from "./data/yusuf";
 import { ILYAS_STORY } from "./data/ilyas";
@@ -36,6 +39,9 @@ export const STORIES: Story[] = [
   LUT_STORY,
   SHUAYB_STORY,
   MUSA_STORY,
+  DAWUD_STORY,
+  SULAIMAN_STORY,
+  YUNUS_STORY,
   AYYUB_STORY,
   YUSUF_STORY,
   ILYAS_STORY,
