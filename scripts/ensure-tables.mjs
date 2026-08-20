@@ -223,6 +223,16 @@ try {
   `;
   await sql`CREATE INDEX IF NOT EXISTS challenges_suggestion_id_idx ON challenges (suggestion_id)`;
 
+  // ─── Story flags (hide a hardcoded story from prod without a redeploy) ──────
+  await sql`
+    CREATE TABLE IF NOT EXISTS story_flags (
+      slug        text PRIMARY KEY,
+      reason      text,
+      flagged_by  text,
+      flagged_at  timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
   console.log("Tables ensured successfully");
 } finally {
   await sql.end();
