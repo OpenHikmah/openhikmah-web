@@ -61,8 +61,9 @@ describe("VotdPage — today's live pick on the calendar", () => {
 
     render(<VotdPage />);
 
-    const todayCell = (await screen.findByText(todayDay, { selector: "span.tabular-nums" }))
-      .closest("button")!;
+    const todayCell = (
+      await screen.findByText(todayDay, { selector: "span.tabular-nums" })
+    ).closest("button")!;
     expect(await screen.findByText("1:1")).toBeInTheDocument();
     expect(todayCell).toContainElement(screen.getByText("1:1"));
     expect(screen.queryByRole("button", { name: "Edit today" })).not.toBeInTheDocument();
@@ -86,8 +87,9 @@ describe("VotdPage — today's live pick on the calendar", () => {
 
     render(<VotdPage />);
 
-    const todayCell = (await screen.findByText(todayDay, { selector: "span.tabular-nums" }))
-      .closest("button")!;
+    const todayCell = (
+      await screen.findByText(todayDay, { selector: "span.tabular-nums" })
+    ).closest("button")!;
     expect(todayCell).toContainElement(screen.getByText("2:255"));
     expect(screen.queryByText("A short reflection.")).not.toBeInTheDocument();
   });
@@ -184,7 +186,9 @@ describe("VotdPage — today's live pick on the calendar", () => {
 
     render(<VotdPage />);
 
-    expect(await screen.findByText(todayDay, { selector: "span.tabular-nums" })).toBeInTheDocument();
+    expect(
+      await screen.findByText(todayDay, { selector: "span.tabular-nums" })
+    ).toBeInTheDocument();
   });
 });
 
