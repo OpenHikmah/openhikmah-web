@@ -232,6 +232,33 @@ describe("PATCH /api/admin/names", () => {
     expect(res.status).toBe(400);
   });
 
+  it("rejects verses data where surah/ayah don't match the parsed ref", async () => {
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "verses",
+        data: [
+          {
+            // Valid ref, but surah/ayah point at a different verse (1:1) —
+            // downstream features that key off surah/ayah (e.g.
+            // InteractiveArabic morphology lookups) would then disagree
+            // with the ref-identified verse.
+            ref: "1:1",
+            surah: 2,
+            ayah: 255,
+            arabicText: "a",
+            translation: "t",
+            surahName: "s",
+            surahNameArabic: "s",
+            reason: "r",
+          },
+        ],
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
   it("accepts a valid reflection (plain string)", async () => {
     mockUpdate.mockReturnValue(makeDbChain([{ slug: "ar-rahman", kind: "reflection" }]));
     const res = await PATCH(
