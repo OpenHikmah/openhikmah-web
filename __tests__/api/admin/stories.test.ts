@@ -14,7 +14,7 @@ vi.mock("@/lib/stories/story-flags", () => ({
 }));
 
 import { GET, PATCH } from "@/app/api/admin/stories/route";
-import { requireAdmin } from "@/lib/admin/admin-auth";
+import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { getAllFlags, flagStory, unflagStory } from "@/lib/stories/story-flags";
 import { STORIES } from "@/lib/stories";
@@ -85,6 +85,27 @@ describe("PATCH /api/admin/stories", () => {
       body: "not-json",
     });
     expect((await PATCH(req)).status).toBe(400);
+  });
+
+  it("returns 400 for a JSON body that isn't an object (null)", async () => {
+    const res = await PATCH(patch(null));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns the rate limiter's own response without touching flags or the audit log", async () => {
+    const limitedResponse = NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    vi.mocked(rateLimitAdminMutation).mockResolvedValueOnce(limitedResponse);
+    const res = await PATCH(patch({ slug: realSlug, hidden: true }));
+    expect(res.status).toBe(429);
+    expect(flagStory).not.toHaveBeenCalled();
+    expect(unflagStory).not.toHaveBeenCalled();
+    expect(logAdminAction).not.toHaveBeenCalled();
+  });
+
+  it("treats a non-string reason as no reason instead of writing it to the DB", async () => {
+    const res = await PATCH(patch({ slug: realSlug, hidden: true, reason: 12345 }));
+    expect(res.status).toBe(200);
+    expect(flagStory).toHaveBeenCalledWith(realSlug, null, "qf-admin");
   });
 
   it("returns 400 for a missing slug", async () => {

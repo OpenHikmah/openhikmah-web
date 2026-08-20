@@ -51,8 +51,13 @@ export async function PATCH(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
 
-  const { slug, hidden, reason } = body;
+  const { slug, hidden } = body;
+  // Guard the runtime type — a client could send a non-string reason.
+  const reason = typeof body.reason === "string" ? body.reason.trim() || null : null;
   if (typeof slug !== "string" || !slug) {
     return NextResponse.json({ error: "Invalid slug" }, { status: 400 });
   }
@@ -65,13 +70,13 @@ export async function PATCH(req: NextRequest) {
 
   try {
     if (hidden) {
-      await flagStory(slug, reason ?? null, auth.user.qfId);
+      await flagStory(slug, reason, auth.user.qfId);
       await logAdminAction({
         adminQfId: auth.user.qfId,
         action: "story.flag",
         targetType: "story",
         targetId: slug,
-        meta: { reason: reason ?? null },
+        meta: { reason },
       });
     } else {
       await unflagStory(slug);

@@ -6,6 +6,10 @@ export const alt = "Prophetic Stories — Open Hikmah";
 export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
 
+// Must render per-request, not be prerendered/cached — a story flagged hidden
+// after build time must stop appearing in its own OG image immediately.
+export const dynamic = "force-dynamic";
+
 interface Props {
   params: Promise<{ slug: string }>;
 }

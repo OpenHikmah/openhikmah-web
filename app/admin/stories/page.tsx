@@ -100,6 +100,7 @@ export default function AdminStoriesPage() {
                       <input
                         type="text"
                         placeholder="Reason (optional)"
+                        aria-label={`Flag reason for ${s.name}`}
                         value={reasonDraft[s.slug] ?? ""}
                         onChange={(e) =>
                           setReasonDraft((prev) => ({ ...prev, [s.slug]: e.target.value }))
