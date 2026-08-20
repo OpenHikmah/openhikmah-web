@@ -4,8 +4,36 @@ import { isValidRef } from "@/lib/quran/quran-corpus";
 import { getNameBySlug } from "@/lib/names/divine-names";
 
 describe("STORIES", () => {
-  it("ships the launch set of 10 stories", () => {
-    expect(STORIES).toHaveLength(10);
+  it("ships the launch set of 24 stories", () => {
+    expect(STORIES).toHaveLength(24);
+    expect(new Set(STORIES.map((s) => s.slug))).toEqual(
+      new Set([
+        "adam",
+        "idris",
+        "nuh",
+        "hud",
+        "salih",
+        "ibrahim",
+        "ismail",
+        "ishaq",
+        "lut",
+        "shuayb",
+        "musa",
+        "dawud",
+        "sulaiman",
+        "yunus",
+        "ayyub",
+        "yusuf",
+        "ilyas",
+        "alyasa",
+        "dhul-kifl",
+        "yaqub",
+        "zakariya",
+        "yahya",
+        "isa",
+        "muhammad",
+      ])
+    );
   });
 
   it("every story slug is unique", () => {
