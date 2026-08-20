@@ -129,19 +129,45 @@ function normalizeSurahName(name: string): string {
     .replace(/[^a-z]/g, "");
 }
 
-let normalizedNameToSurah: Map<string, number> | null = null;
+// Script-agnostic normalizer for the Arabic name, any localized name, and the
+// non-English side of query matching: lowercase (locale-aware, so Turkish's
+// dotted/dotless I lowercases correctly) and keep only Unicode letters — NOT
+// `[a-z]`, which would silently discard Cyrillic/Arabic/accented text and is
+// why non-English matching didn't work at all before this existed. No
+// transliteration-prefix stripping here; translated/localized names don't
+// carry an "Al-"-style prefix to strip.
+function normalizeGeneric(text: string): string {
+  return text.toLocaleLowerCase().replace(/[^\p{L}]/gu, "");
+}
 
-/** Matches a search query against a surah's English name, e.g. "kahf" -> 18. */
-export function matchSurahByName(query: string): number | null {
-  if (!normalizedNameToSurah) {
-    normalizedNameToSurah = new Map(
-      Object.entries(SURAH_NAMES).map(([num, [name]]) => [
-        normalizeSurahName(name),
-        parseInt(num, 10),
-      ])
-    );
+const MIN_QUERY_LENGTH = 2;
+
+/**
+ * Matches a search query against every surah's English name, Arabic name,
+ * and (if provided) localized name — as a prefix, not just a full exact
+ * match, so "ba" lists Al-Baqarah/Al-Balad/Al-Bayyinah, and "Bakara" (Turkish)
+ * or "Пещера" (Russian, "the cave") match Al-Kahf when `localizedNames` (see
+ * lib/quran/chapters.ts) is passed. Returns surah numbers in ascending order.
+ */
+export function matchSurahsByQuery(query: string, localizedNames?: Map<number, string>): number[] {
+  const genericQuery = normalizeGeneric(query);
+  if (genericQuery.length < MIN_QUERY_LENGTH) return [];
+  // Empty when the query is pure non-Latin script (e.g. Arabic/Cyrillic) —
+  // skip the English-side check entirely rather than let an empty prefix
+  // match every surah.
+  const englishQuery = normalizeSurahName(query);
+
+  const matches: number[] = [];
+  for (const [numStr, [englishName, arabicName]] of Object.entries(SURAH_NAMES)) {
+    const num = parseInt(numStr, 10);
+    const englishHit =
+      englishQuery.length > 0 && normalizeSurahName(englishName).startsWith(englishQuery);
+    const arabicHit = normalizeGeneric(arabicName).startsWith(genericQuery);
+    const localizedName = localizedNames?.get(num);
+    const localizedHit =
+      !!localizedName && normalizeGeneric(localizedName).startsWith(genericQuery);
+
+    if (englishHit || arabicHit || localizedHit) matches.push(num);
   }
-  const normalized = normalizeSurahName(query);
-  if (!normalized) return null;
-  return normalizedNameToSurah.get(normalized) ?? null;
+  return matches;
 }

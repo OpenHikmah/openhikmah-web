@@ -45,9 +45,20 @@ function getAudio(): HTMLAudioElement {
 // when the user switches tracks faster than a play() promise settles.
 let playGen = 0;
 
+// A track can fail to load (404/network/unsupported on the CDN) without the
+// `<audio>` element ever firing `ended` — with no `onerror` handler that
+// silently freezes the whole queue on the broken track forever. Treat a load
+// error the same as a natural end (skip to the next track) so one missing
+// ayah doesn't kill playback for the rest of the surah. `error` and `ended`
+// are mutually exclusive outcomes of a single load per the HTMLMediaElement
+// spec, so no extra guard is needed against both firing for the same track.
 function loadAndPlay(verse: AudioVerse, onEnded: () => void) {
   const a = getAudio();
   a.onended = onEnded;
+  a.onerror = () => {
+    console.error(`audio: failed to load ${verse.ref}`, a.error);
+    onEnded();
+  };
   a.src = getAudioUrl(verse.surah, verse.ayah, usePreferencesStore.getState().reciter);
   a.load();
   return a.play();
