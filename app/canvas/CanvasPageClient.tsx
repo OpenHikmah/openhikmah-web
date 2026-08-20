@@ -27,11 +27,17 @@ const HikmahCanvas = dynamic(
   }
 );
 
-function VerseLoader() {
+// Exported for direct unit testing of the surah/verse loading effects,
+// without pulling in CanvasPageClient's full dependency tree (Header, Canvas
+// rendering, auth, etc).
+export function VerseLoader() {
   const searchParams = useSearchParams();
   const addVerseNode = useCanvasStore((s) => s.addVerseNode);
+  const addSurahNodes = useCanvasStore((s) => s.addSurahNodes);
   const setPendingAutoExpand = useCanvasStore((s) => s.setPendingAutoExpand);
+  const requestFit = useCanvasStore((s) => s.requestFit);
   const handledRef = useRef<string | null>(null);
+  const handledSurahRef = useRef<string | null>(null);
 
   useEffect(() => {
     const verseRef = searchParams.get("verse");
@@ -65,6 +71,45 @@ function VerseLoader() {
       })
       .catch((e) => console.error("canvas: incoming verse fetch failed", e));
   }, [searchParams, addVerseNode, setPendingAutoExpand]);
+
+  useEffect(() => {
+    const surahParam = searchParams.get("surah");
+    if (!surahParam || handledSurahRef.current === surahParam) return;
+    if (!/^\d+$/.test(surahParam)) return;
+    const surahNum = parseInt(surahParam, 10);
+    if (surahNum < 1 || surahNum > 114) return;
+
+    handledSurahRef.current = surahParam;
+
+    const cleanUrl = () => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("surah");
+      window.history.replaceState(null, "", url.toString());
+    };
+
+    fetch(`/api/verses/${surahNum}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((verses: Verse[] | null) => {
+        if (!verses || verses.length === 0) {
+          cleanUrl();
+          return;
+        }
+        // Some (or all) ayahs may already be on the canvas (re-opened the same
+        // "Read" link, or the user manually added a verse from this surah
+        // earlier) — only add the ones that aren't there yet, so a partial
+        // overlap doesn't stack duplicate nodes for the already-mapped ayahs.
+        const { hasNode } = useCanvasStore.getState();
+        const missing = verses.filter((v) => !hasNode(v.ref));
+        if (missing.length === 0) {
+          cleanUrl();
+          return;
+        }
+        addSurahNodes(missing);
+        requestFit();
+        cleanUrl();
+      })
+      .catch((e) => console.error("canvas: incoming surah fetch failed", e));
+  }, [searchParams, addSurahNodes, requestFit]);
 
   return null;
 }

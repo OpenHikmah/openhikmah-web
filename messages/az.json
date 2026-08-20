@@ -140,7 +140,13 @@
     "meaningFallbackNotice": "Bu sorğu üçün məna əsaslı nəticələr hələ hazır deyil — bunun əvəzinə açar söz nəticələri göstərilir.",
     "mapOnCanvas": "Lövhədə Xəritələndir",
     "searchVersesAria": "Ayə axtar",
-    "nonEnglishHint": "İngilis dilindəki tərcümələr axtarılır — nəticələr interfeys dilindən asılı olmayaraq ingilis dilində göstərilir."
+    "nonEnglishHint": "İngilis dilindəki tərcümələr axtarılır — nəticələr interfeys dilindən asılı olmayaraq ingilis dilində göstərilir.",
+    "fullSurah": "Bütün surə",
+    "ayahCount": "{count, plural, one {# ayə} other {# ayə}}",
+    "listen": "Dinlə",
+    "pauseListening": "Dayandır",
+    "readInCanvas": "Lövhədə oxu",
+    "surahReadHint": "Bütün surəni ayə-ayə Lövhədə xəritələndirir."
   },
   "bookmarks": {
     "title": "Yadda saxlanılanlar",

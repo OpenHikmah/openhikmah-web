@@ -66,6 +66,41 @@ describe("canvas store", () => {
     expect(dx >= 288 || dy >= 240).toBe(true);
   });
 
+  it("addSurahNodes adds one node per verse and returns their ids", () => {
+    const verses: Verse[] = [
+      baseVerse,
+      { ...baseVerse, ref: "2:256", ayah: 256 },
+      { ...baseVerse, ref: "2:257", ayah: 257 },
+    ];
+    const ids = useCanvasStore.getState().addSurahNodes(verses);
+    expect(ids).toHaveLength(3);
+    expect(useCanvasStore.getState().nodes).toHaveLength(3);
+    expect(new Set(ids).size).toBe(3);
+  });
+
+  it("addSurahNodes marks only the first verse as root and places nodes without overlap", () => {
+    const verses: Verse[] = [
+      baseVerse,
+      { ...baseVerse, ref: "2:256", ayah: 256 },
+      { ...baseVerse, ref: "2:257", ayah: 257 },
+    ];
+    const ids = useCanvasStore.getState().addSurahNodes(verses);
+    const nodes = ids.map((id) => useCanvasStore.getState().getNodeById(id)!);
+    expect((nodes[0].data as unknown as Verse).isRoot).toBe(true);
+    expect((nodes[1].data as unknown as Verse).isRoot).toBeFalsy();
+    expect((nodes[2].data as unknown as Verse).isRoot).toBeFalsy();
+
+    const positions = nodes.map((n) => n.position);
+    const distinct = new Set(positions.map((p) => `${p.x},${p.y}`));
+    expect(distinct.size).toBe(3);
+  });
+
+  it("addSurahNodes returns an empty array and adds nothing for an empty list", () => {
+    const ids = useCanvasStore.getState().addSurahNodes([]);
+    expect(ids).toEqual([]);
+    expect(useCanvasStore.getState().nodes).toHaveLength(0);
+  });
+
   it("hasNode returns true after addVerseNode", () => {
     useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
     expect(useCanvasStore.getState().hasNode("2:255")).toBe(true);

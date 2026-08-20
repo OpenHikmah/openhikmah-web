@@ -367,4 +367,34 @@ describe("GET /api/search", () => {
     await GET(makeSearchReq("mercy"));
     expect(mockGetVerses).toHaveBeenCalledWith(["2:30"], "az.mammadaliyev");
   });
+
+  describe("surah-name queries", () => {
+    it("returns a matchedSurah payload with no ayah results for a surah-name query", async () => {
+      const res = await GET(makeSearchReq("kahf"));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.results).toEqual([]);
+      expect(body.matchedSurah).toEqual({
+        number: 18,
+        name: "Al-Kahf",
+        nameArabic: "الكهف",
+        ayahCount: 110,
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(mockSearchByMeaning).not.toHaveBeenCalled();
+    });
+
+    it("takes priority over the normal keyword search path", async () => {
+      await GET(makeSearchReq("Al-Fatiha"));
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("does not match a topical query as a surah name", async () => {
+      mockFetch.mockResolvedValueOnce(quranComResponse([]));
+      const res = await GET(makeSearchReq("mercy"));
+      const body = await res.json();
+      expect(body.matchedSurah).toBeUndefined();
+      expect(mockFetch).toHaveBeenCalled();
+    });
+  });
 });
