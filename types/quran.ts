@@ -56,6 +56,9 @@ export interface SearchResponse {
   page: number;
   pageSize: number;
   matchedSurahs?: MatchedSurah[];
+  /** Best-effort semantic matches related to the query, deduplicated against
+   *  `results`. Only present when semantic search genuinely found something. */
+  related?: SearchResult[];
 }
 
 export type SidebarContent =

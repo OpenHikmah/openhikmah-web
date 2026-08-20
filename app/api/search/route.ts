@@ -3,7 +3,7 @@ import type { MatchedSurah, SearchResponse, SearchResult, VerseRef } from "@/typ
 import { getSurahName, matchSurahsByQuery } from "@/lib/quran/surah-names";
 import { fetchLocalizedChapterNames } from "@/lib/quran/chapters";
 import { SURAH_LENGTHS } from "@/lib/quran/audio";
-import { searchByMeaning } from "@/lib/quran/semantic-search";
+import { searchByMeaning, type SemanticMatch } from "@/lib/quran/semantic-search";
 import { getVerses } from "@/lib/quran/quran-corpus";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
 import {
@@ -22,7 +22,7 @@ import sanitizeHtml from "sanitize-html";
 export const dynamic = "force-dynamic";
 
 const MAX_QUERY_LENGTH = 200;
-const SEMANTIC_RESULT_CAP = 100;
+const RELATED_RESULT_CAP = 5;
 
 interface KeywordSearchResult {
   results: SearchResult[];
@@ -105,6 +105,25 @@ async function hydrate(
   });
 }
 
+/** Best-effort semantic lookup backing the "related by meaning" section — gated
+ *  under the same `search:` (AI-generation) budget as before, but any miss
+ *  (unseeded embeddings, provider error, rate limit) is swallowed to an empty
+ *  list rather than surfaced, since it's purely supplementary to keyword results. */
+async function relatedByMeaning(
+  req: NextRequest,
+  q: string,
+  edition: string
+): Promise<SemanticMatch[]> {
+  const allowed = await consume(`search:${clientKey(req)}`);
+  if (!allowed) return [];
+  try {
+    return await searchByMeaning(q, RELATED_RESULT_CAP + 10, edition);
+  } catch (err) {
+    console.error("Semantic search route error:", err);
+    return [];
+  }
+}
+
 /**
  * Records a search query for analytics, but only within a per-client budget.
  * Gating the *write* (not the response) keeps scripted/spam traffic from
@@ -183,62 +202,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(response);
   }
 
-  // Semantic ("by meaning") mode — ranks the local corpus by embedding similarity.
-  // It can come up empty for benign reasons: embeddings not yet seeded, the embedding
-  // provider unavailable, the free-tier quota exhausted, or this caller hitting the
-  // per-IP limit. In all of those we fall back to free keyword search so "by meaning"
-  // is never blank, and it self-upgrades to true semantic results once embeddings exist.
-  if (req.nextUrl.searchParams.get("mode") === "meaning") {
-    const allowed = await consume(`search:${clientKey(req)}`);
-    if (allowed) {
-      try {
-        const matches = await searchByMeaning(q, SEMANTIC_RESULT_CAP, edition);
-        if (matches.length > 0) {
-          const total = Math.min(SEMANTIC_RESULT_CAP, matches.length);
-          const start = (page - 1) * pageSize;
-          const pageMatches = matches.slice(start, start + pageSize);
-          const results: SearchResult[] = pageMatches.map((m) => ({
-            ref: m.verse.ref,
-            surahName: m.verse.surahName,
-            surahNameArabic: m.verse.surahNameArabic,
-            snippet: m.verse.translation.slice(0, 140),
-            arabicText: m.verse.arabicText,
-            translation: m.verse.translation,
-          }));
-          const response: SearchResponse = { results, total, page, pageSize };
-          await maybeLogSearchQuery(req, q, "meaning", total);
-          return NextResponse.json(response);
-        }
-      } catch (err) {
-        console.error("Semantic search route error:", err);
-      }
-    }
-    // The keyword fallback below is the same proxy call plain keyword search
-    // makes — gate it under the same searchkw: budget, or a caller could use
-    // mode=meaning to bypass the keyword limit indefinitely (semantic misses
-    // fall through to keyword on every request).
-    const keywordAllowed = await consume(
-      `searchkw:${clientKey(req)}`,
-      KEYWORD_SEARCH_LIMIT,
-      KEYWORD_SEARCH_WINDOW_SECONDS
-    );
-    if (!keywordAllowed) {
-      return NextResponse.json({ error: "Too many search requests" }, { status: 429 });
-    }
-    const { results, total, failed } = await keywordSearch(q, page, pageSize, edition);
-    const response: SearchResponse = { results, total, page, pageSize };
-    await maybeLogSearchQuery(req, q, "keyword", total);
-    return NextResponse.json(response, {
-      headers: {
-        "x-search-fallback": "keyword",
-        ...(failed ? { "x-search-error": "keyword-unavailable" } : {}),
-      },
-    });
-  }
-
   // Plain keyword search is a cheap proxy call, not an AI generation — its own
   // bucket so normal typing/paging never competes with the AI-generation
-  // budget (search: prefix, shared with the "by meaning" semantic attempt).
+  // budget (search: prefix, shared with the best-effort "related by meaning" lookup).
   const allowed = await consume(
     `searchkw:${clientKey(req)}`,
     KEYWORD_SEARCH_LIMIT,
@@ -247,9 +213,40 @@ export async function GET(req: NextRequest) {
   if (!allowed) {
     return NextResponse.json({ error: "Too many search requests" }, { status: 429 });
   }
-  const { results, total, failed } = await keywordSearch(q, page, pageSize, edition);
-  const response: SearchResponse = { results, total, page, pageSize };
+
+  // Semantic matches run alongside keyword search, best-effort — only on page 1
+  // (a small supplementary section, not paginated) and never surfaced as an error
+  // or fallback notice. A miss (unseeded embeddings, quota, rate limit) is simply
+  // an empty `related`, invisible to the user.
+  const [{ results, total, failed }, semanticMatches] = await Promise.all([
+    keywordSearch(q, page, pageSize, edition),
+    page === 1 ? relatedByMeaning(req, q, edition) : Promise.resolve([]),
+  ]);
+
+  const keywordRefs = new Set(results.map((r) => r.ref));
+  const related: SearchResult[] = semanticMatches
+    .filter((m) => !keywordRefs.has(m.verse.ref))
+    .slice(0, RELATED_RESULT_CAP)
+    .map((m) => ({
+      ref: m.verse.ref,
+      surahName: m.verse.surahName,
+      surahNameArabic: m.verse.surahNameArabic,
+      snippet: m.verse.translation.slice(0, 140),
+      arabicText: m.verse.arabicText,
+      translation: m.verse.translation,
+    }));
+
+  const response: SearchResponse = {
+    results,
+    total,
+    page,
+    pageSize,
+    ...(related.length > 0 ? { related } : {}),
+  };
   await maybeLogSearchQuery(req, q, "keyword", total);
+  if (related.length > 0) {
+    await maybeLogSearchQuery(req, q, "meaning", related.length);
+  }
   return NextResponse.json(response, {
     headers: failed ? { "x-search-error": "keyword-unavailable" } : {},
   });

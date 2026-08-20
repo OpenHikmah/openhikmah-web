@@ -11,7 +11,6 @@ import { findFreeSlot, viewportCenter, NODE_WIDTH, NODE_HEIGHT } from "@/lib/can
 import type { Verse, SearchResult, SearchResponse } from "@/types/quran";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui";
-import { SearchModeToggle, type SearchMode } from "@/components/search/SearchModeToggle";
 
 interface SearchDialogProps {
   open: boolean;
@@ -37,11 +36,10 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const [loading, setLoading] = useState(false);
   const [previewVerse, setPreviewVerse] = useState<Verse | null>(null);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [relatedResults, setRelatedResults] = useState<SearchResult[]>([]);
   const [totalResults, setTotalResults] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   const [previewError, setPreviewError] = useState(false);
-  const [mode, setMode] = useState<SearchMode>("keyword");
-  const [fellBackToKeyword, setFellBackToKeyword] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [selectError, setSelectError] = useState(false);
   // Distinguishes "the search itself couldn't run" (rate limited, or the
@@ -86,48 +84,39 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     }
   }, []);
 
-  const fetchSearch = useCallback(
-    async (q: string, signal: AbortSignal, searchMode: SearchMode) => {
-      setIsSearching(true);
-      setSearchResults([]);
-      setTotalResults(0);
-      setFellBackToKeyword(false);
-      setSelectError(false);
-      setSearchError(null);
-      try {
-        const url = `/api/search?q=${encodeURIComponent(q)}${
-          searchMode === "meaning" ? "&mode=meaning" : ""
-        }`;
-        const res = await fetch(url, { signal });
-        if (res.status === 429) {
-          setSearchError("rateLimited");
-          return;
-        }
-        if (!res.ok) throw new Error();
-        const data: SearchResponse = await res.json();
-        // In "by meaning" mode the server falls back to keyword search when
-        // semantic results aren't available; flag it so we can tell the user.
-        setFellBackToKeyword(
-          searchMode === "meaning" && res.headers.get("x-search-fallback") === "keyword"
-        );
-        if (res.headers.get("x-search-error") === "keyword-unavailable") {
-          setSearchError("unavailable");
-        }
-        setSearchResults(data.results);
-        setTotalResults(data.total);
-        setHighlightedIndex(-1);
-      } catch (err) {
-        if ((err as Error).name !== "AbortError") {
-          setSearchResults([]);
-          setTotalResults(0);
-          setSearchError("unavailable");
-        }
-      } finally {
-        if (!signal.aborted) setIsSearching(false);
+  const fetchSearch = useCallback(async (q: string, signal: AbortSignal) => {
+    setIsSearching(true);
+    setSearchResults([]);
+    setRelatedResults([]);
+    setTotalResults(0);
+    setSelectError(false);
+    setSearchError(null);
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal });
+      if (res.status === 429) {
+        setSearchError("rateLimited");
+        return;
       }
-    },
-    []
-  );
+      if (!res.ok) throw new Error();
+      const data: SearchResponse = await res.json();
+      if (res.headers.get("x-search-error") === "keyword-unavailable") {
+        setSearchError("unavailable");
+      }
+      setSearchResults(data.results);
+      setRelatedResults(data.related ?? []);
+      setTotalResults(data.total);
+      setHighlightedIndex(-1);
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        setSearchResults([]);
+        setRelatedResults([]);
+        setTotalResults(0);
+        setSearchError("unavailable");
+      }
+    } finally {
+      if (!signal.aborted) setIsSearching(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -142,13 +131,13 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     if (/^\d+:\d+$/.test(trimmed)) {
       debounceRef.current = setTimeout(() => fetchPreview(trimmed, controller.signal), 250);
     } else {
-      debounceRef.current = setTimeout(() => fetchSearch(trimmed, controller.signal, mode), 420);
+      debounceRef.current = setTimeout(() => fetchSearch(trimmed, controller.signal), 420);
     }
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, mode, fetchPreview, fetchSearch]);
+  }, [query, fetchPreview, fetchSearch]);
 
   const mapConnections = useCallback(
     (verse: Verse) => {
@@ -238,9 +227,9 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const viewAllResults = useCallback(() => {
     const trimmed = query.trim();
     if (!trimmed || /^\d+:\d+$/.test(trimmed)) return;
-    router.push(`/search?q=${encodeURIComponent(trimmed)}&type=${mode}`);
+    router.push(`/search?q=${encodeURIComponent(trimmed)}`);
     onClose();
-  }, [query, mode, router, onClose]);
+  }, [query, router, onClose]);
 
   // Cancels in-flight requests and resets all dialog state. Run from an effect
   // on `open` rather than inline in onOpenChange/onClose, so a parent-controlled
@@ -254,13 +243,12 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     setQuery("");
     setPreviewVerse(null);
     setSearchResults([]);
+    setRelatedResults([]);
     setTotalResults(0);
     setPreviewError(false);
     setLoading(false);
     setIsSearching(false);
-    setFellBackToKeyword(false);
     setSearchError(null);
-    setMode("keyword");
     setHighlightedIndex(-1);
     setSelectError(false);
   }, []);
