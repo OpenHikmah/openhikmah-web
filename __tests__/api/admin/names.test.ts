@@ -163,6 +163,53 @@ describe("PATCH /api/admin/names", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
+  it("rejects verses data with a corpus-invalid ref, without persisting it", async () => {
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "verses",
+        data: [
+          {
+            ref: "999:999",
+            surah: 999,
+            ayah: 999,
+            arabicText: "a",
+            translation: "t",
+            surahName: "s",
+            surahNameArabic: "s",
+            reason: "r",
+          },
+        ],
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("rejects verses data with a syntactically-plausible but non-existent ayah (ref out of range for a real surah)", async () => {
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "verses",
+        data: [
+          {
+            // Al-Fatiha only has 7 ayahs.
+            ref: "1:8",
+            surah: 1,
+            ayah: 8,
+            arabicText: "a",
+            translation: "t",
+            surahName: "Al-Fatihah",
+            surahNameArabic: "الفاتحة",
+            reason: "r",
+          },
+        ],
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
   it("rejects verses data with a wrong field type (surah as string)", async () => {
     const res = await PATCH(
       patch({
@@ -183,6 +230,33 @@ describe("PATCH /api/admin/names", () => {
       })
     );
     expect(res.status).toBe(400);
+  });
+
+  it("rejects verses data where surah/ayah don't match the parsed ref", async () => {
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "verses",
+        data: [
+          {
+            // Valid ref, but surah/ayah point at a different verse (1:1) —
+            // downstream features that key off surah/ayah (e.g.
+            // InteractiveArabic morphology lookups) would then disagree
+            // with the ref-identified verse.
+            ref: "1:1",
+            surah: 2,
+            ayah: 255,
+            arabicText: "a",
+            translation: "t",
+            surahName: "s",
+            surahNameArabic: "s",
+            reason: "r",
+          },
+        ],
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("accepts a valid reflection (plain string)", async () => {
