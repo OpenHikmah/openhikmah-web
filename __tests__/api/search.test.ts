@@ -394,6 +394,7 @@ describe("GET /api/search", () => {
       const res = await GET(makeSearchReq("mercy"));
       const body = await res.json();
       expect(body.matchedSurah).toBeUndefined();
+      expect(mockFetch).toHaveBeenCalled();
     });
   });
 });

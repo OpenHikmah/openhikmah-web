@@ -50,6 +50,12 @@ describe("GET /api/verses/[surah]", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 for a surah segment with trailing non-digit characters", async () => {
+    const res = await GET(new NextRequest("http://localhost/api/verses/18abc"), params("18abc"));
+    expect(res.status).toBe(400);
+    expect(mockGetVerses).not.toHaveBeenCalled();
+  });
+
   it("requests every ref of the surah in order and returns them in order", async () => {
     const map = new Map([
       ["1:1", verse("1:1")],

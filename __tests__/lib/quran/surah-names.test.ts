@@ -72,6 +72,14 @@ describe("matchSurahByName", () => {
     expect(matchSurahByName("Maryam")).toBe(19);
   });
 
+  it("matches a space-separated prefix", () => {
+    expect(matchSurahByName("Al Kahf")).toBe(18);
+  });
+
+  it("matches a bare name with the Ar- prefix stripped", () => {
+    expect(matchSurahByName("rad")).toBe(13);
+  });
+
   it("matches surah 1", () => {
     expect(matchSurahByName("fatiha")).toBe(1);
   });
