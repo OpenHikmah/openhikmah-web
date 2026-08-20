@@ -169,17 +169,11 @@ export default function VotdPage() {
 /** Shows the verse actually live on the landing page today — curated or the
  *  algorithmic fallback — so an admin doesn't have to leave the panel to see
  *  what's currently showing. */
-function TodayPanel({
-  today,
-  onEditToday,
-}: {
-  today: TodayInfo | null;
-  onEditToday: () => void;
-}) {
+function TodayPanel({ today, onEditToday }: { today: TodayInfo | null; onEditToday: () => void }) {
   if (!today) {
     return (
       <div className="rounded-lg border border-dashed border-border p-4 text-sm text-text-muted">
-        Today's verse could not be resolved.
+        Today&apos;s verse could not be resolved.
       </div>
     );
   }
