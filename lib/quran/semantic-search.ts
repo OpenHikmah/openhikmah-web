@@ -17,7 +17,7 @@ import type { Verse } from "@/types/quran";
  */
 const EMBED_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
-async function embedQueryCached(query: string): Promise<number[]> {
+async function embedQueryCached(query: string, signal?: AbortSignal): Promise<number[]> {
   const normalized = query.toLowerCase();
   const cacheKey = `emb:q:${createHash("sha256").update(normalized).digest("hex")}`;
 
@@ -35,7 +35,7 @@ async function embedQueryCached(query: string): Promise<number[]> {
   }
 
   incr("embed_cache_miss");
-  const vec = await embed(query);
+  const vec = await embed(query, signal);
   void redisSet(cacheKey, JSON.stringify(vec), EMBED_CACHE_TTL_SECONDS);
   return vec;
 }
@@ -93,11 +93,12 @@ async function hydrate(
 export async function searchByMeaning(
   query: string,
   limit = 10,
-  edition?: string
+  edition?: string,
+  signal?: AbortSignal
 ): Promise<SemanticMatch[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
-  const queryVec = await embedQueryCached(trimmed);
+  const queryVec = await embedQueryCached(trimmed, signal);
   return hydrate(await nearest(queryVec, limit), edition);
 }
 

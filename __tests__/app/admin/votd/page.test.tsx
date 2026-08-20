@@ -31,7 +31,7 @@ const verse = {
   surahNameArabic: "البقرة",
 };
 
-describe("VotdPage — Today panel", () => {
+describe("VotdPage — today's live pick on the calendar", () => {
   const mockFetch = vi.fn();
 
   beforeEach(() => {
@@ -44,11 +44,13 @@ describe("VotdPage — Today panel", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows today's verse ref, without a source label, when today has no curated entry", async () => {
+  it("shows today's algorithmic pick as a ref on today's calendar cell, with no separate header section", async () => {
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const todayDay = String(new Date().getUTCDate());
     mockApi.mockResolvedValue({
       entries: [],
       today: {
-        date: "2026-01-01",
+        date: todayIso,
         ref: "1:1",
         arabicText: "بِسْمِ اللَّهِ",
         translation: "In the name of Allah",
@@ -59,17 +61,22 @@ describe("VotdPage — Today panel", () => {
 
     render(<VotdPage />);
 
+    const todayCell = (
+      await screen.findByText(todayDay, { selector: "span.tabular-nums" })
+    ).closest("button")!;
     expect(await screen.findByText("1:1")).toBeInTheDocument();
-    expect(screen.getByText("In the name of Allah")).toBeInTheDocument();
-    expect(screen.queryByText("Algorithmic pick")).not.toBeInTheDocument();
-    expect(screen.queryByText("Curated")).not.toBeInTheDocument();
+    expect(todayCell).toContainElement(screen.getByText("1:1"));
+    expect(screen.queryByRole("button", { name: "Edit today" })).not.toBeInTheDocument();
+    expect(screen.queryByText("In the name of Allah")).not.toBeInTheDocument();
   });
 
-  it("shows today's reflection, without a source label, when today has a curated entry", async () => {
+  it("shows the curated ref (not the algorithmic pick) on today's cell once a day is curated", async () => {
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const todayDay = String(new Date().getUTCDate());
     mockApi.mockResolvedValue({
-      entries: [{ date: "2026-01-01", verseRef: "2:255", reflection: null, updatedAt: "" }],
+      entries: [{ date: todayIso, verseRef: "2:255", reflection: null, updatedAt: "" }],
       today: {
-        date: "2026-01-01",
+        date: todayIso,
         ref: "2:255",
         arabicText: "اللَّهُ لَا إِلَٰهَ",
         translation: "Allah — no deity",
@@ -80,34 +87,18 @@ describe("VotdPage — Today panel", () => {
 
     render(<VotdPage />);
 
-    expect(await screen.findByText("A short reflection.")).toBeInTheDocument();
-    expect(screen.queryByText("Curated")).not.toBeInTheDocument();
-    expect(screen.queryByText("Algorithmic pick")).not.toBeInTheDocument();
+    const todayCell = (
+      await screen.findByText(todayDay, { selector: "span.tabular-nums" })
+    ).closest("button")!;
+    expect(todayCell).toContainElement(screen.getByText("2:255"));
+    expect(screen.queryByText("A short reflection.")).not.toBeInTheDocument();
   });
 
-  it("Edit today selects today's date and opens the editor", async () => {
-    mockApi.mockResolvedValue({
-      entries: [],
-      today: {
-        date: "2026-01-01",
-        ref: "1:1",
-        arabicText: "بِسْمِ اللَّهِ",
-        translation: "In the name of Allah",
-        reflection: null,
-        source: "algorithmic",
-      },
-    });
-
-    render(<VotdPage />);
-    fireEvent.click(await screen.findByRole("button", { name: "Edit today" }));
-
-    expect(await screen.findByText("Editing")).toBeInTheDocument();
-  });
-
-  it("Edit today pre-fills the verse-reference field with today's live pick when nothing is curated yet", async () => {
-    // Matches VotdPage's own `todayStr()` computation, so the panel's `today`
-    // is recognized as actually being today without needing to fake the clock.
+  it("clicking today's cell pre-fills the verse-reference field with today's live pick when nothing is curated yet", async () => {
+    // Matches VotdPage's own `todayStr()` computation, so `today` is recognized
+    // as actually being today without needing to fake the clock.
     const todayIso = new Date().toISOString().slice(0, 10);
+    const todayDay = String(new Date().getUTCDate());
     mockApi.mockResolvedValue({
       entries: [],
       today: {
@@ -121,7 +112,7 @@ describe("VotdPage — Today panel", () => {
     });
 
     render(<VotdPage />);
-    fireEvent.click(await screen.findByRole("button", { name: "Edit today" }));
+    fireEvent.click(await screen.findByText(todayDay, { selector: "span.tabular-nums" }));
 
     const input = await screen.findByPlaceholderText("e.g. 2:255");
     expect(input).toHaveValue("18:10");
@@ -189,12 +180,15 @@ describe("VotdPage — Today panel", () => {
     expect(input).toHaveValue("2:255");
   });
 
-  it("shows a fallback message when today could not be resolved", async () => {
+  it("renders normally, with no error, when today could not be resolved", async () => {
+    const todayDay = String(new Date().getUTCDate());
     mockApi.mockResolvedValue({ entries: [], today: null });
 
     render(<VotdPage />);
 
-    expect(await screen.findByText("Today's verse could not be resolved.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(todayDay, { selector: "span.tabular-nums" })
+    ).toBeInTheDocument();
   });
 });
 

@@ -3,11 +3,11 @@
 import { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, Input, ReflectionNote } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
-import { cn } from "@/lib/utils";
 import type { Verse } from "@/types/quran";
 
 interface Entry {
@@ -68,21 +68,13 @@ export default function VotdPage() {
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
   const today = todayStr();
 
-  const editToday = () => {
-    setMonth(today.slice(0, 7));
-    setSelected(today);
-  };
-
   return (
     <>
       <AdminPageHeader
         title="Verse of the Day"
         subtitle="Curate the daily verse. A set day overrides the algorithmic pick."
       />
-      <div className="px-7 pt-7">
-        <TodayPanel today={data?.today ?? null} onEditToday={editToday} />
-      </div>
-      <div className="grid gap-6 p-7 pt-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid gap-6 p-7 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-medium text-text-primary">{monthLabel(month)}</h2>
@@ -143,8 +135,18 @@ export default function VotdPage() {
                   )}
                 >
                   <span className="tabular-nums">{day}</span>
-                  {entry && (
+                  {entry ? (
                     <span className="mt-0.5 font-mono text-[9px] text-teal">{entry.verseRef}</span>
+                  ) : (
+                    // No curated entry — for today, still surface the live
+                    // algorithmic pick so the admin can see it without leaving
+                    // the calendar, styled distinctly from a curated ref.
+                    isToday &&
+                    data?.today?.ref && (
+                      <span className="mt-0.5 font-mono text-[9px] text-gold">
+                        {data.today.ref}
+                      </span>
+                    )
                   )}
                 </button>
               );
@@ -164,38 +166,6 @@ export default function VotdPage() {
         />
       </div>
     </>
-  );
-}
-
-/** Shows the verse actually live on the landing page today — curated or the
- *  algorithmic fallback — so an admin doesn't have to leave the panel to see
- *  what's currently showing. */
-function TodayPanel({ today, onEditToday }: { today: TodayInfo | null; onEditToday: () => void }) {
-  if (!today) {
-    return (
-      <div className="rounded-lg border border-dashed border-border p-4 text-sm text-text-muted">
-        Today&apos;s verse could not be resolved.
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-start justify-between gap-4 rounded-lg border border-gold-muted bg-gold/[0.04] p-4">
-      <div className="min-w-0">
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
-          Today · {today.date}
-        </span>
-        <p className="mt-1.5 font-mono text-xs text-text-secondary">{today.ref}</p>
-        <p dir="rtl" className="mt-2 font-arabic text-lg leading-loose text-text-primary">
-          {today.arabicText}
-        </p>
-        <p className="mt-1 text-xs leading-relaxed text-text-secondary">{today.translation}</p>
-        {today.reflection && <ReflectionNote className="mt-2">{today.reflection}</ReflectionNote>}
-      </div>
-      <Button size="sm" variant="secondary" onClick={onEditToday} className="shrink-0">
-        Edit today
-      </Button>
-    </div>
   );
 }
 

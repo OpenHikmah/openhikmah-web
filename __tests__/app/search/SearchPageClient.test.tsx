@@ -254,3 +254,89 @@ describe("SearchPageClient — direct navigation clears a pending debounced navi
     expect(mockReplace).not.toHaveBeenCalled();
   });
 });
+
+describe("SearchPageClient — related-by-meaning results", () => {
+  const mockFetch = vi.fn();
+  const relatedResult = {
+    ref: "94:5",
+    surahName: "Ash-Sharh",
+    surahNameArabic: "الشرح",
+    snippet: "For indeed, with hardship will be ease.",
+    arabicText: "فَإِنَّ مَعَ الْعُسْرِ يُسْرًا",
+    translation: "For indeed, with hardship will be ease.",
+  };
+  const primaryResult = {
+    ref: "2:255",
+    surahName: "Al-Baqarah",
+    surahNameArabic: "البقرة",
+    snippet: "Allah - there is no deity except Him.",
+    arabicText: "الله لا إله إلا هو",
+    translation: "Allah - there is no deity except Him.",
+  };
+
+  beforeEach(() => {
+    mockSearchParams = new URLSearchParams({ q: "mercy" });
+    vi.stubGlobal("fetch", mockFetch);
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("shows a related-by-meaning section alongside primary results", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          results: [primaryResult],
+          related: [relatedResult],
+          total: 1,
+          page: 1,
+          pageSize: 20,
+        }),
+        { status: 200 }
+      )
+    );
+
+    await act(async () => {
+      renderWithIntl(<SearchPageClient />);
+    });
+
+    expect(screen.getByText(primaryResult.translation)).toBeInTheDocument();
+    expect(screen.getByText("Related by meaning")).toBeInTheDocument();
+    expect(screen.getByText(relatedResult.translation)).toBeInTheDocument();
+  });
+
+  it("shows only the related section, with no 'no exact matches' empty state, when keyword search found nothing", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ results: [], related: [relatedResult], total: 0, page: 1, pageSize: 20 }),
+        { status: 200 }
+      )
+    );
+
+    await act(async () => {
+      renderWithIntl(<SearchPageClient />);
+    });
+
+    expect(screen.queryByText(/no exact matches/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Related by meaning")).toBeInTheDocument();
+    expect(screen.getByText(relatedResult.translation)).toBeInTheDocument();
+  });
+
+  it("still surfaces the keyword-unavailable notice when related results are present", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ results: [], related: [relatedResult], total: 0, page: 1, pageSize: 20 }),
+        { status: 200, headers: { "x-search-error": "keyword-unavailable" } }
+      )
+    );
+
+    await act(async () => {
+      renderWithIntl(<SearchPageClient />);
+    });
+
+    expect(screen.getByText(/temporarily unavailable/i)).toBeInTheDocument();
+    expect(screen.getByText("Related by meaning")).toBeInTheDocument();
+  });
+});
