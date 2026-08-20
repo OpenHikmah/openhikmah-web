@@ -83,6 +83,19 @@ describe("SurahResultCard", () => {
     expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
   });
 
+  it("does not treat a same-length queue with a mismatched entry as this surah's queue", () => {
+    // Right length, starts correctly at ayah 1 of surah 18, but one entry
+    // partway through belongs to a different surah/ayah — must not be
+    // mistaken for a genuine full-surah queue.
+    const corrupted = fullQueueFor(SURAH);
+    corrupted[50] = { surah: 99, ayah: 1 };
+    storeState.queue = corrupted;
+    storeState.isPlaying = true;
+    renderWithIntl(<SurahResultCard surah={SURAH} />);
+
+    expect(screen.getByRole("button", { name: "Listen" })).toBeInTheDocument();
+  });
+
   it("does not treat a single verse from this surah (played elsewhere) as this surah's queue", () => {
     // e.g. StoryVerseCard playing just one ayah via playVerse — a 1-item
     // queue must not be mistaken for the full-surah queue.

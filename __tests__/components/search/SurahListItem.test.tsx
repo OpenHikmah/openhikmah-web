@@ -74,6 +74,16 @@ describe("SurahListItem", () => {
     expect(screen.getAllByRole("button", { name: "Listen" })).toHaveLength(1);
   });
 
+  it("does not treat a same-length queue with a mismatched entry as this surah's queue", () => {
+    const corrupted = fullQueueFor(BAQARAH);
+    corrupted[50] = { surah: 99, ayah: 1 };
+    storeState.queue = corrupted;
+    storeState.isPlaying = true;
+    render(<SurahListItem surah={BAQARAH} />);
+
+    expect(screen.getByRole("button", { name: "Listen" })).toBeInTheDocument();
+  });
+
   it("identifies the active row by surah number, not a shared/localized display name", () => {
     storeState.queue = fullQueueFor(BAQARAH);
     storeState.isPlaying = true;

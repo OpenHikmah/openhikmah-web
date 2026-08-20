@@ -13,7 +13,9 @@ export function useSurahListen(surah: MatchedSurah) {
   // name isn't unique across locales/components, and a single verse from
   // this surah playing via a different flow (e.g. StoryVerseCard) must not
   // be mistaken for this surah's own full-queue playback.
-  const isThisQueue = queue.length === surah.ayahCount && queue[0]?.surah === surah.number;
+  const isThisQueue =
+    queue.length === surah.ayahCount &&
+    queue.every((v, i) => v.surah === surah.number && v.ayah === i + 1);
   const isThisPlaying = isThisQueue && isPlaying;
 
   const handleListen = () => {
