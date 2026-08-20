@@ -9,6 +9,8 @@ const {
   mockGetVerses,
   mockLogSearchQuery,
   mockGetQuranEdition,
+  mockGetUiLocale,
+  mockFetchLocalizedChapterNames,
 } = vi.hoisted(() => ({
   mockSearchByMeaning: vi.fn(),
   mockConsume: vi.fn(async (_key: string, _limit?: number, _windowSeconds?: number) => true),
@@ -16,6 +18,8 @@ const {
   mockGetVerses: vi.fn(async () => new Map()),
   mockLogSearchQuery: vi.fn(async () => undefined),
   mockGetQuranEdition: vi.fn(async () => "en.sahih"),
+  mockGetUiLocale: vi.fn(async () => "en"),
+  mockFetchLocalizedChapterNames: vi.fn(async () => new Map<number, string>()),
 }));
 vi.mock("@/lib/quran/semantic-search", () => ({ searchByMeaning: mockSearchByMeaning }));
 vi.mock("@/lib/infra/rate-limit", () => ({
@@ -30,7 +34,13 @@ vi.mock("@/lib/quran/quran-corpus", () => ({
   getVerses: mockGetVerses,
 }));
 vi.mock("@/lib/infra/search-log", () => ({ logSearchQuery: mockLogSearchQuery }));
-vi.mock("@/lib/i18n/request-prefs", () => ({ getQuranEdition: mockGetQuranEdition }));
+vi.mock("@/lib/i18n/request-prefs", () => ({
+  getQuranEdition: mockGetQuranEdition,
+  getUiLocale: mockGetUiLocale,
+}));
+vi.mock("@/lib/quran/chapters", () => ({
+  fetchLocalizedChapterNames: mockFetchLocalizedChapterNames,
+}));
 
 import { GET } from "@/app/api/search/route";
 
@@ -91,6 +101,10 @@ describe("GET /api/search", () => {
     mockLogSearchQuery.mockResolvedValue(undefined);
     mockGetQuranEdition.mockReset();
     mockGetQuranEdition.mockResolvedValue("en.sahih");
+    mockGetUiLocale.mockReset();
+    mockGetUiLocale.mockResolvedValue("en");
+    mockFetchLocalizedChapterNames.mockReset();
+    mockFetchLocalizedChapterNames.mockResolvedValue(new Map());
   });
 
   it("returns 400 when query is missing", async () => {
@@ -369,17 +383,14 @@ describe("GET /api/search", () => {
   });
 
   describe("surah-name queries", () => {
-    it("returns a matchedSurah payload with no ayah results for a surah-name query", async () => {
+    it("returns a matchedSurahs payload with no ayah results for an exact surah-name query", async () => {
       const res = await GET(makeSearchReq("kahf"));
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.results).toEqual([]);
-      expect(body.matchedSurah).toEqual({
-        number: 18,
-        name: "Al-Kahf",
-        nameArabic: "الكهف",
-        ayahCount: 110,
-      });
+      expect(body.matchedSurahs).toEqual([
+        { number: 18, name: "Al-Kahf", nameArabic: "الكهف", ayahCount: 110 },
+      ]);
       expect(mockFetch).not.toHaveBeenCalled();
       expect(mockSearchByMeaning).not.toHaveBeenCalled();
     });
@@ -393,8 +404,31 @@ describe("GET /api/search", () => {
       mockFetch.mockResolvedValueOnce(quranComResponse([]));
       const res = await GET(makeSearchReq("mercy"));
       const body = await res.json();
-      expect(body.matchedSurah).toBeUndefined();
+      expect(body.matchedSurahs).toBeUndefined();
       expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it("lists every surah matching a partial name, in ascending order", async () => {
+      const res = await GET(makeSearchReq("ba"));
+      const body = await res.json();
+      expect(body.matchedSurahs.map((s: { number: number }) => s.number)).toEqual([2, 90, 98]);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("passes the caller's UI locale to the localized chapter-name fetch", async () => {
+      mockGetUiLocale.mockResolvedValue("tr");
+      await GET(makeSearchReq("kahf"));
+      expect(mockFetchLocalizedChapterNames).toHaveBeenCalledWith("tr");
+    });
+
+    it("matches a surah via its localized name for the caller's UI locale", async () => {
+      mockGetUiLocale.mockResolvedValue("ru");
+      mockFetchLocalizedChapterNames.mockResolvedValue(new Map([[18, "Пещера"]]));
+      const res = await GET(makeSearchReq("Пещера"));
+      const body = await res.json();
+      expect(body.matchedSurahs).toEqual([
+        { number: 18, name: "Al-Kahf", nameArabic: "الكهف", ayahCount: 110 },
+      ]);
     });
   });
 });

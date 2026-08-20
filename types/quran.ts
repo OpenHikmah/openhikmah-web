@@ -55,7 +55,7 @@ export interface SearchResponse {
   total: number;
   page: number;
   pageSize: number;
-  matchedSurah?: MatchedSurah;
+  matchedSurahs?: MatchedSurah[];
 }
 
 export type SidebarContent =

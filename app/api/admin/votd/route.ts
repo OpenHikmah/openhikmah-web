@@ -6,6 +6,7 @@ import { db } from "@/lib/infra/db";
 import { curatedVotd } from "@/lib/infra/db/schema";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
+import { getCuratedVerseOfDayEntry, verseOfDayRef, votdDateKey } from "@/lib/quran/verse-of-day";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -27,6 +28,49 @@ function nextMonthFirst(month: string): string {
   return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-01`;
 }
 
+/** Resolves the verse actually live on the landing page today — a curated
+ *  override if one is set, otherwise the algorithmic fallback pick — so the
+ *  admin calendar can show it even on days with no curated entry (the common
+ *  case). Never throws: on any resolution failure `today` is simply omitted
+ *  from the response rather than failing the whole request. */
+async function resolveTodayForAdmin(): Promise<{
+  date: string;
+  ref: string;
+  arabicText: string;
+  translation: string;
+  reflection: string | null;
+  source: "curated" | "algorithmic";
+} | null> {
+  const now = new Date();
+  const date = votdDateKey(now);
+  try {
+    const curated = await getCuratedVerseOfDayEntry(now);
+    if (curated) {
+      return {
+        date,
+        ref: curated.verse.ref,
+        arabicText: curated.verse.arabicText,
+        translation: curated.verse.translation,
+        reflection: curated.reflection,
+        source: "curated",
+      };
+    }
+    const verse = await resolveVerse(verseOfDayRef(now));
+    if (!verse) return null;
+    return {
+      date,
+      ref: verse.ref,
+      arabicText: verse.arabicText,
+      translation: verse.translation,
+      reflection: null,
+      source: "algorithmic",
+    };
+  } catch (err) {
+    console.error("admin votd: failed to resolve today's verse:", err);
+    return null;
+  }
+}
+
 /** List curated overrides for a month: `?month=YYYY-MM` (defaults to current). */
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req);
@@ -39,12 +83,15 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const rows = await db
-      .select()
-      .from(curatedVotd)
-      .where(
-        and(gte(curatedVotd.date, `${month}-01`), lt(curatedVotd.date, nextMonthFirst(month)))
-      );
+    const [rows, today] = await Promise.all([
+      db
+        .select()
+        .from(curatedVotd)
+        .where(
+          and(gte(curatedVotd.date, `${month}-01`), lt(curatedVotd.date, nextMonthFirst(month)))
+        ),
+      resolveTodayForAdmin(),
+    ]);
 
     return NextResponse.json({
       month,
@@ -54,6 +101,7 @@ export async function GET(req: NextRequest) {
         reflection: r.reflection,
         updatedAt: r.updatedAt,
       })),
+      today,
     });
   } catch (err) {
     console.error("admin votd GET db error:", err);
