@@ -147,8 +147,7 @@
     "pauseListening": "Пауза",
     "readSurah": "Читать",
     "readSurahHint": "Открывает всю суру в удобном для чтения виде с подсветкой во время прослушивания.",
-    "backToSearch": "Назад к поиску",
-    "openInCanvasInstead": "Открыть на холсте вместо этого"
+    "backToSearch": "Назад к поиску"
   },
   "bookmarks": {
     "title": "Сохраненное",
