@@ -89,3 +89,14 @@ export async function existingRefs(refs: string[]): Promise<Set<string>> {
   const rows = await db.select({ ref: verses.ref }).from(verses).where(inArray(verses.ref, refs));
   return new Set(rows.map((r) => r.ref));
 }
+
+/** Every ayah of a surah, in order (1..SURAH_LENGTHS[surah-1]). A ref missing
+ *  from the corpus is simply omitted rather than failing the whole request —
+ *  callers (the bulk verses API route, the surah reading page) both already
+ *  tolerate a gap-tolerant list. */
+export async function getSurahVerses(surahNum: number, edition?: string): Promise<Verse[]> {
+  const ayahCount = SURAH_LENGTHS[surahNum - 1];
+  const refs = Array.from({ length: ayahCount }, (_, i) => `${surahNum}:${i + 1}`);
+  const verseMap = await getVerses(refs, edition);
+  return refs.map((ref) => verseMap.get(ref)).filter((v): v is Verse => v !== undefined);
+}

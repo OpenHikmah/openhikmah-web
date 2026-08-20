@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Volume2, Pause, Network } from "lucide-react";
+import { Volume2, Pause, BookOpen } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Card, IconButton, Tooltip } from "@/components/ui";
 import { useSurahListen } from "./useSurahListen";
@@ -32,13 +32,13 @@ export function SurahListItem({ surah }: { surah: MatchedSurah }) {
             {isThisPlaying ? <Pause /> : <Volume2 />}
           </IconButton>
         </Tooltip>
-        <Tooltip label={t("readInCanvas")}>
+        <Tooltip label={t("readSurah")}>
           <Link
-            href={`/canvas?surah=${surah.number}`}
-            aria-label={t("readInCanvas")}
+            href={`/surah/${surah.number}`}
+            aria-label={t("readSurah")}
             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-primary transition-colors hover:border-gold-muted hover:bg-white/5"
           >
-            <Network className="h-3.5 w-3.5" />
+            <BookOpen className="h-3.5 w-3.5" />
           </Link>
         </Tooltip>
       </div>

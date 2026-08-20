@@ -145,8 +145,10 @@
     "ayahCount": "{count, plural, one {# ayə} other {# ayə}}",
     "listen": "Dinlə",
     "pauseListening": "Dayandır",
-    "readInCanvas": "Lövhədə oxu",
-    "surahReadHint": "Bütün surəni ayə-ayə Lövhədə xəritələndirir."
+    "readSurah": "Oxu",
+    "readSurahHint": "Bütün surəni oxunaqlı, dinləyə-dinləyə izlənən görünüşdə açır.",
+    "backToSearch": "Axtarışa qayıt",
+    "openInCanvasInstead": "Bunun əvəzinə Lövhədə aç"
   },
   "bookmarks": {
     "title": "Yadda saxlanılanlar",

@@ -106,11 +106,8 @@ describe("SurahResultCard", () => {
     expect(screen.getByRole("button", { name: "Listen" })).toBeInTheDocument();
   });
 
-  it("links Read in Canvas to the surah's bulk-load route", () => {
+  it("links Read to the surah's reading page", () => {
     renderWithIntl(<SurahResultCard surah={SURAH} />);
-    expect(screen.getByRole("link", { name: /Read in Canvas/ })).toHaveAttribute(
-      "href",
-      "/canvas?surah=18"
-    );
+    expect(screen.getByRole("link", { name: /Read/ })).toHaveAttribute("href", "/surah/18");
   });
 });

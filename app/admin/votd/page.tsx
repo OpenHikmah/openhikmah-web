@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, Input, ReflectionNote } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
@@ -159,6 +159,7 @@ export default function VotdPage() {
           key={`${selected ?? "none"}:${selected ? (byDate.get(selected)?.updatedAt ?? "new") : ""}`}
           date={selected}
           existing={selected ? (byDate.get(selected) ?? null) : null}
+          todayRef={data?.today?.date === selected ? (data.today.ref ?? null) : null}
           onSaved={reload}
         />
       </div>
@@ -206,19 +207,35 @@ function TodayPanel({ today, onEditToday }: { today: TodayInfo | null; onEditTod
 function DayEditor({
   date,
   existing,
+  todayRef,
   onSaved,
 }: {
   date: string | null;
   existing: Entry | null;
+  /** Today's live (algorithmic) pick, when `date` is today and nothing is
+   *  curated yet — pre-fills the form so the admin can see what's currently
+   *  showing and either keep it (save as-is) or overwrite it. */
+  todayRef?: string | null;
   onSaved: () => void;
 }) {
   const api = useAdminFetch();
-  const [verseRef, setVerseRef] = useState(existing?.verseRef ?? "");
+  const [verseRef, setVerseRef] = useState(existing?.verseRef ?? todayRef ?? "");
   const [reflection, setReflection] = useState(existing?.reflection ?? "");
   const [preview, setPreview] = useState<Verse | null>(null);
   const [busy, setBusy] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // `todayRef` arrives from an async fetch (useAsync) that can resolve after
+  // this component has already mounted with it still null/undefined — sync
+  // the field once it lands, but only while the admin hasn't started typing,
+  // so a resolution arriving after they've edited the field never clobbers it.
+  const touchedRef = useRef(false);
+
+  useEffect(() => {
+    if (!existing && !touchedRef.current && todayRef) {
+      setVerseRef(todayRef);
+    }
+  }, [existing, todayRef]);
 
   if (!date) {
     return (
@@ -294,7 +311,10 @@ function DayEditor({
         <div className="flex gap-2">
           <Input
             value={verseRef}
-            onChange={(e) => setVerseRef(e.target.value)}
+            onChange={(e) => {
+              touchedRef.current = true;
+              setVerseRef(e.target.value);
+            }}
             placeholder="e.g. 2:255"
           />
           <Button size="md" variant="secondary" onClick={doPreview} disabled={previewBusy}>

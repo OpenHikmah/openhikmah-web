@@ -102,6 +102,91 @@ describe("VotdPage — Today panel", () => {
     expect(await screen.findByText("Editing")).toBeInTheDocument();
   });
 
+  it("Edit today pre-fills the verse-reference field with today's live pick when nothing is curated yet", async () => {
+    // Matches VotdPage's own `todayStr()` computation, so the panel's `today`
+    // is recognized as actually being today without needing to fake the clock.
+    const todayIso = new Date().toISOString().slice(0, 10);
+    mockApi.mockResolvedValue({
+      entries: [],
+      today: {
+        date: todayIso,
+        ref: "18:10",
+        arabicText: "بِسْمِ اللَّهِ",
+        translation: "In the name of Allah",
+        reflection: null,
+        source: "algorithmic",
+      },
+    });
+
+    render(<VotdPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Edit today" }));
+
+    const input = await screen.findByPlaceholderText("e.g. 2:255");
+    expect(input).toHaveValue("18:10");
+  });
+
+  it("syncs the pre-filled ref once today resolves, even if the day was selected first", async () => {
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const todayDay = String(new Date().getUTCDate());
+    const pending = deferred<{
+      entries: unknown[];
+      today: { date: string; ref: string; source: string } | null;
+    }>();
+    mockApi.mockReturnValue(pending.promise);
+
+    render(<VotdPage />);
+
+    // Select today's cell before the calendar/today fetch has resolved.
+    fireEvent.click(screen.getByText(todayDay, { selector: "span.tabular-nums" }));
+    const input = await screen.findByPlaceholderText("e.g. 2:255");
+    expect(input).toHaveValue("");
+
+    pending.resolve({
+      entries: [],
+      today: {
+        date: todayIso,
+        ref: "18:10",
+        arabicText: "بِسْمِ اللَّهِ",
+        translation: "In the name of Allah",
+        reflection: null,
+        source: "algorithmic",
+      } as never,
+    });
+
+    await waitFor(() => expect(input).toHaveValue("18:10"));
+  });
+
+  it("does not overwrite an already-edited field once today resolves late", async () => {
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const todayDay = String(new Date().getUTCDate());
+    const pending = deferred<{
+      entries: unknown[];
+      today: { date: string; ref: string; source: string } | null;
+    }>();
+    mockApi.mockReturnValue(pending.promise);
+
+    render(<VotdPage />);
+
+    fireEvent.click(screen.getByText(todayDay, { selector: "span.tabular-nums" }));
+    const input = await screen.findByPlaceholderText("e.g. 2:255");
+    fireEvent.change(input, { target: { value: "2:255" } });
+
+    pending.resolve({
+      entries: [],
+      today: {
+        date: todayIso,
+        ref: "18:10",
+        arabicText: "بِسْمِ اللَّهِ",
+        translation: "In the name of Allah",
+        reflection: null,
+        source: "algorithmic",
+      } as never,
+    });
+
+    await waitFor(() => expect(screen.getByText("Algorithmic pick")).toBeInTheDocument());
+    expect(input).toHaveValue("2:255");
+  });
+
   it("shows a fallback message when today could not be resolved", async () => {
     mockApi.mockResolvedValue({ entries: [], today: null });
 

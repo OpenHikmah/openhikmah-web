@@ -145,8 +145,10 @@
     "ayahCount": "{count, plural, one {# аят} few {# аята} many {# аятов} other {# аята}}",
     "listen": "Слушать",
     "pauseListening": "Пауза",
-    "readInCanvas": "Читать на холсте",
-    "surahReadHint": "Открывает всю суру, аят за аятом, на холсте."
+    "readSurah": "Читать",
+    "readSurahHint": "Открывает всю суру в удобном для чтения виде с подсветкой во время прослушивания.",
+    "backToSearch": "Назад к поиску",
+    "openInCanvasInstead": "Открыть на холсте вместо этого"
   },
   "bookmarks": {
     "title": "Сохраненное",
