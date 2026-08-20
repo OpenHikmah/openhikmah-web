@@ -44,7 +44,7 @@ describe("VotdPage — Today panel", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows the Algorithmic pick label and verse when today has no curated entry", async () => {
+  it("shows today's verse ref, without a source label, when today has no curated entry", async () => {
     mockApi.mockResolvedValue({
       entries: [],
       today: {
@@ -59,12 +59,13 @@ describe("VotdPage — Today panel", () => {
 
     render(<VotdPage />);
 
-    expect(await screen.findByText("Algorithmic pick")).toBeInTheDocument();
-    expect(screen.getByText("1:1")).toBeInTheDocument();
+    expect(await screen.findByText("1:1")).toBeInTheDocument();
     expect(screen.getByText("In the name of Allah")).toBeInTheDocument();
+    expect(screen.queryByText("Algorithmic pick")).not.toBeInTheDocument();
+    expect(screen.queryByText("Curated")).not.toBeInTheDocument();
   });
 
-  it("shows the Curated label and reflection when today has a curated entry", async () => {
+  it("shows today's reflection, without a source label, when today has a curated entry", async () => {
     mockApi.mockResolvedValue({
       entries: [{ date: "2026-01-01", verseRef: "2:255", reflection: null, updatedAt: "" }],
       today: {
@@ -79,8 +80,9 @@ describe("VotdPage — Today panel", () => {
 
     render(<VotdPage />);
 
-    expect(await screen.findByText("Curated")).toBeInTheDocument();
-    expect(screen.getByText("A short reflection.")).toBeInTheDocument();
+    expect(await screen.findByText("A short reflection.")).toBeInTheDocument();
+    expect(screen.queryByText("Curated")).not.toBeInTheDocument();
+    expect(screen.queryByText("Algorithmic pick")).not.toBeInTheDocument();
   });
 
   it("Edit today selects today's date and opens the editor", async () => {
@@ -183,7 +185,7 @@ describe("VotdPage — Today panel", () => {
       } as never,
     });
 
-    await waitFor(() => expect(screen.getByText("Algorithmic pick")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("18:10")).toBeInTheDocument());
     expect(input).toHaveValue("2:255");
   });
 
