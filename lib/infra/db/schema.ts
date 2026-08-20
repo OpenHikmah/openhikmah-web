@@ -308,6 +308,22 @@ export const connections = pgTable(
   ]
 );
 
+// ─── Story Flags ───────────────────────────────────────────────────────────────
+// Stories (lib/stories/data/*.ts) are static, hardcoded content, not DB-backed.
+// A row here hides a story slug from production immediately (checked at request
+// time by the already-dynamic /stories pages) without a code change/redeploy —
+// the admin's way to pull a live narrative if something in it turns out to be
+// theologically or factually wrong, until the underlying data file is fixed.
+// Presence of a row = hidden; there's no separate boolean since there's no
+// "reviewed but kept active" state to track, unlike `connections` above.
+
+export const storyFlags = pgTable("story_flags", {
+  slug: text("slug").primaryKey(),
+  reason: text("reason"),
+  flaggedBy: text("flagged_by"), // admin qfId
+  flaggedAt: timestamp("flagged_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─── AI Generation Log ────────────────────────────────────────────────────────
 // Lightweight cost/audit trail: one row per actual AI generation (cache miss).
 // How we measure the bill flattening over time.

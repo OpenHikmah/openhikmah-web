@@ -1,10 +1,14 @@
 import { ImageResponse } from "next/og";
-import { getStoryBySlug } from "@/lib/stories";
+import { getVisibleStoryBySlug } from "@/lib/stories";
 import { renderOgCard, clampBody, OG_SIZE, OG_CONTENT_TYPE } from "@/lib/og-card";
 
 export const alt = "Prophetic Stories — Open Hikmah";
 export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
+
+// Must render per-request, not be prerendered/cached — a story flagged hidden
+// after build time must stop appearing in its own OG image immediately.
+export const dynamic = "force-dynamic";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -12,7 +16,7 @@ interface Props {
 
 export default async function Image({ params }: Props) {
   const { slug } = await params;
-  const story = getStoryBySlug(slug);
+  const story = await getVisibleStoryBySlug(slug);
 
   if (!story) {
     return new ImageResponse(

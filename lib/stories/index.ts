@@ -1,5 +1,6 @@
 import type { Locale } from "@/lib/i18n/config";
 import type { LocalizedText, Story } from "./types";
+import { getHiddenSlugs } from "./story-flags";
 import { ADAM_STORY } from "./data/adam";
 import { IDRIS_STORY } from "./data/idris";
 import { NUH_STORY } from "./data/nuh";
@@ -60,6 +61,20 @@ export function getStoryBySlug(slug: string): Story | undefined {
 
 export function listStories(): Story[] {
   return STORIES;
+}
+
+/** `STORIES` minus anything an admin has flagged hidden — what production shows. */
+export async function listVisibleStories(): Promise<Story[]> {
+  const hidden = await getHiddenSlugs();
+  return STORIES.filter((s) => !hidden.has(s.slug));
+}
+
+/** `getStoryBySlug`, but `undefined` for a hidden slug too — for public-facing pages. */
+export async function getVisibleStoryBySlug(slug: string): Promise<Story | undefined> {
+  const story = getStoryBySlug(slug);
+  if (!story) return undefined;
+  const hidden = await getHiddenSlugs();
+  return hidden.has(slug) ? undefined : story;
 }
 
 /** Falls back to English when a locale-specific field hasn't been authored yet. */
