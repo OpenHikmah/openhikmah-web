@@ -110,6 +110,15 @@ describe("startJob", () => {
     expect(mockInsert).toHaveBeenCalledTimes(1);
   });
 
+  it("releases the running guard when the insert rejects, allowing a retry to succeed", async () => {
+    mockInsert.mockReturnValueOnce(makeDbChain(Promise.reject(new Error("insert failed"))));
+    await expect(startJob("seed-morphology", "qf-admin")).rejects.toThrow("insert failed");
+
+    const { runId } = await startJob("seed-quran", "qf-admin");
+    expect(runId).toBe(42);
+    expect(mockInsert).toHaveBeenCalledTimes(2);
+  });
+
   it("clears the running guard once the child process closes", async () => {
     await startJob("seed-morphology", "qf-admin");
     lastChild.current?.emit("close", 0);
