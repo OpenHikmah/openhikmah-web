@@ -14,7 +14,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mockPush }) }));
 import { useCanvasStore } from "@/store/canvas";
 import { SearchDialog } from "@/components/search/SearchDialog";
 
-// Real, verified text (Sahih International / ar-simple-clean) for 2:1-2:2 —
+// Real, verified text (Sahih International / ar-simple-clean) —
 // test fixtures render Quranic text and must not use placeholder strings.
 const VERSE_TEXT: Record<string, { arabic: string; translation: string }> = {
   "2:1": { arabic: "الم", translation: "Alif, Lam, Meem." },
@@ -23,6 +23,7 @@ const VERSE_TEXT: Record<string, { arabic: string; translation: string }> = {
     translation:
       "This is the Book about which there is no doubt, a guidance for those conscious of Allah -",
   },
+  "94:5": { arabic: "فَإِنَّ مَعَ الْعُسْرِ يُسْرًا", translation: "For indeed, with hardship will be ease." },
 };
 
 function makeResult(ref: string, surahName: string): SearchResult {
@@ -307,5 +308,74 @@ describe("SearchDialog — rate-limit vs. genuine empty results", () => {
     await typeQuery("zzzzznotreal");
 
     expect(screen.getByText(/no results found/i)).toBeInTheDocument();
+  });
+});
+
+describe("SearchDialog — related-by-meaning results", () => {
+  const mockFetch = vi.fn();
+  const related = [makeResult("94:5", "Ash-Sharh")];
+
+  beforeEach(() => {
+    useCanvasStore.getState().reset();
+    mockPush.mockReset();
+    vi.stubGlobal("fetch", mockFetch);
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function respondWith(body: SearchResponse) {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.startsWith("/api/search")) {
+        return { ok: true, json: async () => body, headers: new Headers() } as Response;
+      }
+      if (url.startsWith("/api/verse/")) {
+        const ref = url.replace("/api/verse/", "").replace("/", ":");
+        return { ok: true, json: async () => makeVerse(ref) } as Response;
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    });
+  }
+
+  it("renders related results below the primary results, outside keyboard-nav option semantics", async () => {
+    const results = [makeResult("2:1", "Al-Baqarah")];
+    await respondWith({ results, related, total: results.length, page: 1, pageSize: 10 });
+
+    renderWithIntl(<SearchDialog open onClose={vi.fn()} />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "guidance" } });
+
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(1));
+    expect(screen.getByText("Related by meaning")).toBeInTheDocument();
+    expect(screen.getByText(related[0].translation)).toBeInTheDocument();
+    // Only the primary result is a navigable combobox option — the related
+    // row is clickable but not part of arrow-key/Enter navigation.
+    expect(screen.getAllByRole("option")).toHaveLength(1);
+  });
+
+  it("selecting a related result maps it onto the canvas, same as a primary result", async () => {
+    await respondWith({ results: [], related, total: 0, page: 1, pageSize: 10 });
+
+    renderWithIntl(<SearchDialog open onClose={vi.fn()} />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "hardship" } });
+
+    const relatedRow = await screen.findByText(related[0].translation);
+    fireEvent.click(relatedRow.closest("button")!);
+
+    await waitFor(() => expect(useCanvasStore.getState().nodes).toHaveLength(1));
+    expect(useCanvasStore.getState().nodes[0].data).toMatchObject({ ref: "94:5" });
+  });
+
+  it("clears related results once the query changes", async () => {
+    await respondWith({ results: [], related, total: 0, page: 1, pageSize: 10 });
+
+    renderWithIntl(<SearchDialog open onClose={vi.fn()} />);
+    const input = screen.getByRole("combobox");
+    fireEvent.change(input, { target: { value: "hardship" } });
+    await screen.findByText("Related by meaning");
+
+    fireEvent.change(input, { target: { value: "" } });
+    expect(screen.queryByText("Related by meaning")).not.toBeInTheDocument();
   });
 });

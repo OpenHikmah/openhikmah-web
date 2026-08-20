@@ -361,7 +361,12 @@ describe("GET /api/search", () => {
     mockFetch.mockResolvedValueOnce(quranComResponse([]));
     mockSearchByMeaning.mockResolvedValueOnce([semanticMatch("94:5", "...")]);
     await GET(makeSearchReq("mercy"));
-    expect(mockSearchByMeaning).toHaveBeenCalledWith("mercy", 15, "ru.kuliev");
+    expect(mockSearchByMeaning).toHaveBeenCalledWith(
+      "mercy",
+      15,
+      "ru.kuliev",
+      expect.any(AbortSignal)
+    );
   });
 
   it("resolves ref-format queries against the caller's cookie-selected edition", async () => {
