@@ -23,7 +23,10 @@ const VERSE_TEXT: Record<string, { arabic: string; translation: string }> = {
     translation:
       "This is the Book about which there is no doubt, a guidance for those conscious of Allah -",
   },
-  "94:5": { arabic: "فَإِنَّ مَعَ الْعُسْرِ يُسْرًا", translation: "For indeed, with hardship will be ease." },
+  "94:5": {
+    arabic: "فَإِنَّ مَعَ الْعُسْرِ يُسْرًا",
+    translation: "For indeed, with hardship will be ease.",
+  },
 };
 
 function makeResult(ref: string, surahName: string): SearchResult {
