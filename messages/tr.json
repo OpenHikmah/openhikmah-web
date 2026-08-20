@@ -140,7 +140,13 @@
     "meaningFallbackNotice": "Bu sorgu için anlam bazlı sonuçlar henüz hazır değil — bunun yerine anahtar kelime sonuçları gösteriliyor.",
     "mapOnCanvas": "Tuvalde Haritala",
     "searchVersesAria": "Ayet ara",
-    "nonEnglishHint": "İngilizce çeviriler aranıyor — sonuçlar arayüz dilinden bağımsız olarak İngilizce gösterilir."
+    "nonEnglishHint": "İngilizce çeviriler aranıyor — sonuçlar arayüz dilinden bağımsız olarak İngilizce gösterilir.",
+    "fullSurah": "Tüm sure",
+    "ayahCount": "{count, plural, one {# ayet} other {# ayet}}",
+    "listen": "Dinle",
+    "pauseListening": "Duraklat",
+    "readInCanvas": "Tuvalde oku",
+    "surahReadHint": "Tüm sureyi ayet ayet Tuvalde açar."
   },
   "bookmarks": {
     "title": "Kaydedilenler",

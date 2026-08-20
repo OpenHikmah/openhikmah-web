@@ -140,7 +140,13 @@
     "meaningFallbackNotice": "Meaning-based results aren't ready for this query yet — showing keyword matches instead.",
     "mapOnCanvas": "Map on Canvas",
     "searchVersesAria": "Search verses",
-    "nonEnglishHint": "Searching English translations — results are shown in English regardless of interface language."
+    "nonEnglishHint": "Searching English translations — results are shown in English regardless of interface language.",
+    "fullSurah": "Full surah",
+    "ayahCount": "{count, plural, one {# ayah} other {# ayahs}}",
+    "listen": "Listen",
+    "pauseListening": "Pause",
+    "readInCanvas": "Read in Canvas",
+    "surahReadHint": "Opens the whole surah, mapped ayah by ayah, in Canvas."
   },
   "bookmarks": {
     "title": "Saved",
