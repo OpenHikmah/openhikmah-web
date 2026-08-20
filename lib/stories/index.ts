@@ -4,7 +4,11 @@ import { ADAM_STORY } from "./data/adam";
 import { NUH_STORY } from "./data/nuh";
 import { IBRAHIM_STORY } from "./data/ibrahim";
 import { MUSA_STORY } from "./data/musa";
+import { AYYUB_STORY } from "./data/ayyub";
 import { YUSUF_STORY } from "./data/yusuf";
+import { YAQUB_STORY } from "./data/yaqub";
+import { ZAKARIYA_STORY } from "./data/zakariya";
+import { YAHYA_STORY } from "./data/yahya";
 import { ISA_STORY } from "./data/isa";
 import { MUHAMMAD_STORY } from "./data/muhammad";
 
@@ -15,7 +19,11 @@ export const STORIES: Story[] = [
   NUH_STORY,
   IBRAHIM_STORY,
   MUSA_STORY,
+  AYYUB_STORY,
   YUSUF_STORY,
+  YAQUB_STORY,
+  ZAKARIYA_STORY,
+  YAHYA_STORY,
   ISA_STORY,
   MUHAMMAD_STORY,
 ];
