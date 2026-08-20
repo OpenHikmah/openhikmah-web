@@ -58,6 +58,12 @@ vi.mock("@/lib/stories", async (importOriginal) => {
     ...actual,
     STORIES: [SYNTHETIC_STORY],
     getStoryBySlug: (slug: string) => (slug === SYNTHETIC_STORY.slug ? SYNTHETIC_STORY : undefined),
+    // Pages call the flag-aware accessors, not STORIES/getStoryBySlug directly —
+    // mirror the same synthetic-only fixture so these locale tests are unaffected
+    // by story_flags (that filtering is covered by stories-visibility.test.ts).
+    listVisibleStories: async () => [SYNTHETIC_STORY],
+    getVisibleStoryBySlug: async (slug: string) =>
+      slug === SYNTHETIC_STORY.slug ? SYNTHETIC_STORY : undefined,
   };
 });
 
