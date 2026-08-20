@@ -305,5 +305,26 @@ describe("audio store", () => {
       expect(s.isPlaying).toBe(false);
       expect(s.queue).toEqual([]);
     });
+
+    it("stops cleanly instead of autoplaying the next track when the user had paused", async () => {
+      useAudioStore.getState().playGraph([verseA, verseB, verseC]);
+      pendingPlays[0].resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      useAudioStore.getState().pause();
+      expect(useAudioStore.getState().isPlaying).toBe(false);
+      const playCallsBeforeError = pendingPlays.length;
+
+      // The paused track's load still fails in the background — must not
+      // resume playback by advancing into the next track.
+      capturedAudioEl!.dispatchEvent(new Event("error"));
+
+      expect(pendingPlays.length).toBe(playCallsBeforeError); // no new play() call
+      const s = useAudioStore.getState();
+      expect(s.isPlaying).toBe(false);
+      expect(s.currentRef).toBeNull();
+      expect(s.queue).toEqual([]);
+    });
   });
 });

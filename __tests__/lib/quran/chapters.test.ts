@@ -48,6 +48,18 @@ describe("fetchLocalizedChapterNames", () => {
     expect(result.get(1)).toBe("Fâtiha");
   });
 
+  it("skips a chapter whose translated_name.name is not a string", async () => {
+    mockFetch.mockResolvedValueOnce(
+      chaptersResponse([
+        { id: 1, translated_name: { name: "Fâtiha" } },
+        { id: 2, translated_name: { name: 12345 } },
+      ])
+    );
+    const result = await fetchLocalizedChapterNames("tr");
+    expect(result.size).toBe(1);
+    expect(result.has(2)).toBe(false);
+  });
+
   it("returns an empty map when the response is not ok", async () => {
     mockFetch.mockResolvedValueOnce({ ok: false });
     const result = await fetchLocalizedChapterNames("ru");

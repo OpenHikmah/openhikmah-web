@@ -13,14 +13,14 @@ const { mockPlayGraph, mockPause, mockResume, storeState } = vi.hoisted(() => ({
   mockPlayGraph: vi.fn(),
   mockPause: vi.fn(),
   mockResume: vi.fn(),
-  storeState: { currentSurahName: null as string | null, isPlaying: false },
+  storeState: { isPlaying: false, queue: [] as { surah: number; ayah: number }[] },
 }));
 
 vi.mock("@/store/audio", () => ({
   useAudioStore: (selector: (s: Record<string, unknown>) => unknown) =>
     selector({
-      currentSurahName: storeState.currentSurahName,
       isPlaying: storeState.isPlaying,
+      queue: storeState.queue,
       playGraph: mockPlayGraph,
       pause: mockPause,
       resume: mockResume,
@@ -37,13 +37,17 @@ const BAQARAH: MatchedSurah = {
 };
 const BALAD: MatchedSurah = { number: 90, name: "Al-Balad", nameArabic: "البلد", ayahCount: 20 };
 
+function fullQueueFor(surah: MatchedSurah) {
+  return Array.from({ length: surah.ayahCount }, (_, i) => ({ surah: surah.number, ayah: i + 1 }));
+}
+
 describe("SurahListItem", () => {
   beforeEach(() => {
     mockPlayGraph.mockReset();
     mockPause.mockReset();
     mockResume.mockReset();
-    storeState.currentSurahName = null;
     storeState.isPlaying = false;
+    storeState.queue = [];
   });
 
   it("queues this row's own surah when Listen is clicked", () => {
@@ -57,7 +61,7 @@ describe("SurahListItem", () => {
   });
 
   it("shows Pause only for the row that is actually playing", () => {
-    storeState.currentSurahName = "Al-Baqarah";
+    storeState.queue = fullQueueFor(BAQARAH);
     storeState.isPlaying = true;
     render(
       <>
@@ -68,6 +72,15 @@ describe("SurahListItem", () => {
 
     expect(screen.getAllByRole("button", { name: "Pause" })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Listen" })).toHaveLength(1);
+  });
+
+  it("identifies the active row by surah number, not a shared/localized display name", () => {
+    storeState.queue = fullQueueFor(BAQARAH);
+    storeState.isPlaying = true;
+    const relabeled: MatchedSurah = { ...BAQARAH, name: "Bakara" };
+    render(<SurahListItem surah={relabeled} />);
+
+    expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
   });
 
   it("links Read in Canvas to this row's own surah number", () => {
