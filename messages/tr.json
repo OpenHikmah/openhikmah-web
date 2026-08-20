@@ -145,8 +145,10 @@
     "ayahCount": "{count, plural, one {# ayet} other {# ayet}}",
     "listen": "Dinle",
     "pauseListening": "Duraklat",
-    "readInCanvas": "Tuvalde oku",
-    "surahReadHint": "Tüm sureyi ayet ayet Tuvalde açar."
+    "readSurah": "Oku",
+    "readSurahHint": "Tüm sureyi dinlerken takip edilebilen, okunabilir bir görünümde açar.",
+    "backToSearch": "Aramaya dön",
+    "openInCanvasInstead": "Bunun yerine Tuvalde aç"
   },
   "bookmarks": {
     "title": "Kaydedilenler",
