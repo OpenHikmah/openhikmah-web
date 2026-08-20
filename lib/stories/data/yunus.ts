@@ -37,7 +37,7 @@ export const YUNUS_STORY: Story = {
         az: "Yunus elçilərdən biri idi; buna baxmayaraq, Quran onun bir an üçün qaçıb getdiyini qeyd edir — xalqını tərk edib yüklü bir gəmiyə minir, qəzəblə çıxıb gedir və mətnin bildirdiyinə görə, bu səbəbdən Allahın ona heç nə təqdir etməyəcəyini düşünür. Gəminin heyəti bir çətinliklə üzləşəndə, aralarından kimin dənizə atılacağına püşk ataraq qərar verirlər; püşk Yunusa düşür və o, uduzanlardan olur.",
         ru: "Юнус был одним из посланников, и всё же Коран запечатлел момент, когда он бежал — оставил свой народ, взошёл на нагруженный корабль, ушёл в гневе и, как говорит текст, думал, что Бог ничего не предопределит ему за это. Экипаж корабля, столкнувшись с какой-то бедой, бросил жребий, чтобы решить, кому из них придётся оказаться за бортом; жребий пал на Юнуса, и он оказался среди проигравших.",
       },
-      verseRefs: ["37:139", "37:140", "37:141"],
+      verseRefs: ["21:87", "37:139", "37:140", "37:141"],
     },
     {
       id: "in-the-three-darknesses",
