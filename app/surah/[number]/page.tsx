@@ -57,7 +57,6 @@ export default async function SurahReaderPage({ params }: Props) {
       <LandingHeader />
       <MobileNavBar />
 
-      {/* Surah hero */}
       <div className="mx-auto max-w-3xl border-b border-border-subtle px-6 pb-10 pt-14 text-center">
         <Link
           href="/search"
@@ -74,7 +73,6 @@ export default async function SurahReaderPage({ params }: Props) {
         <SurahReaderActions surah={surah} />
       </div>
 
-      {/* Verses */}
       <div className="mx-auto max-w-3xl px-6 py-10">
         <SurahReaderList verses={verses} />
       </div>

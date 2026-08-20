@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, Input, ReflectionNote } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
@@ -225,6 +225,17 @@ function DayEditor({
   const [busy, setBusy] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // `todayRef` arrives from an async fetch (useAsync) that can resolve after
+  // this component has already mounted with it still null/undefined — sync
+  // the field once it lands, but only while the admin hasn't started typing,
+  // so a resolution arriving after they've edited the field never clobbers it.
+  const touchedRef = useRef(false);
+
+  useEffect(() => {
+    if (!existing && !touchedRef.current && todayRef) {
+      setVerseRef(todayRef);
+    }
+  }, [existing, todayRef]);
 
   if (!date) {
     return (
@@ -300,7 +311,10 @@ function DayEditor({
         <div className="flex gap-2">
           <Input
             value={verseRef}
-            onChange={(e) => setVerseRef(e.target.value)}
+            onChange={(e) => {
+              touchedRef.current = true;
+              setVerseRef(e.target.value);
+            }}
             placeholder="e.g. 2:255"
           />
           <Button size="md" variant="secondary" onClick={doPreview} disabled={previewBusy}>
