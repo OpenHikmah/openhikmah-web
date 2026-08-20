@@ -6,6 +6,21 @@ import { getNameBySlug } from "@/lib/names/divine-names";
 describe("STORIES", () => {
   it("ships the launch set of 11 stories", () => {
     expect(STORIES).toHaveLength(11);
+    expect(new Set(STORIES.map((s) => s.slug))).toEqual(
+      new Set([
+        "adam",
+        "ayyub",
+        "ibrahim",
+        "isa",
+        "muhammad",
+        "musa",
+        "nuh",
+        "yahya",
+        "yaqub",
+        "yusuf",
+        "zakariya",
+      ])
+    );
   });
 
   it("every story slug is unique", () => {
