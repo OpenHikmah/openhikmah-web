@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { getStoryBySlug } from "@/lib/stories";
+import { getVisibleStoryBySlug } from "@/lib/stories";
 import { renderOgCard, clampBody, OG_SIZE, OG_CONTENT_TYPE } from "@/lib/og-card";
 
 export const alt = "Prophetic Stories — Open Hikmah";
@@ -12,7 +12,7 @@ interface Props {
 
 export default async function Image({ params }: Props) {
   const { slug } = await params;
-  const story = getStoryBySlug(slug);
+  const story = await getVisibleStoryBySlug(slug);
 
   if (!story) {
     return new ImageResponse(
