@@ -31,6 +31,86 @@ const verse = {
   surahNameArabic: "البقرة",
 };
 
+describe("VotdPage — Today panel", () => {
+  const mockFetch = vi.fn();
+
+  beforeEach(() => {
+    mockApi.mockReset();
+    mockFetch.mockReset();
+    vi.stubGlobal("fetch", mockFetch);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("shows the Algorithmic pick label and verse when today has no curated entry", async () => {
+    mockApi.mockResolvedValue({
+      entries: [],
+      today: {
+        date: "2026-01-01",
+        ref: "1:1",
+        arabicText: "بِسْمِ اللَّهِ",
+        translation: "In the name of Allah",
+        reflection: null,
+        source: "algorithmic",
+      },
+    });
+
+    render(<VotdPage />);
+
+    expect(await screen.findByText("Algorithmic pick")).toBeInTheDocument();
+    expect(screen.getByText("1:1")).toBeInTheDocument();
+    expect(screen.getByText("In the name of Allah")).toBeInTheDocument();
+  });
+
+  it("shows the Curated label and reflection when today has a curated entry", async () => {
+    mockApi.mockResolvedValue({
+      entries: [{ date: "2026-01-01", verseRef: "2:255", reflection: null, updatedAt: "" }],
+      today: {
+        date: "2026-01-01",
+        ref: "2:255",
+        arabicText: "اللَّهُ لَا إِلَٰهَ",
+        translation: "Allah — no deity",
+        reflection: "A short reflection.",
+        source: "curated",
+      },
+    });
+
+    render(<VotdPage />);
+
+    expect(await screen.findByText("Curated")).toBeInTheDocument();
+    expect(screen.getByText("A short reflection.")).toBeInTheDocument();
+  });
+
+  it("Edit today selects today's date and opens the editor", async () => {
+    mockApi.mockResolvedValue({
+      entries: [],
+      today: {
+        date: "2026-01-01",
+        ref: "1:1",
+        arabicText: "بِسْمِ اللَّهِ",
+        translation: "In the name of Allah",
+        reflection: null,
+        source: "algorithmic",
+      },
+    });
+
+    render(<VotdPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Edit today" }));
+
+    expect(await screen.findByText("Editing")).toBeInTheDocument();
+  });
+
+  it("shows a fallback message when today could not be resolved", async () => {
+    mockApi.mockResolvedValue({ entries: [], today: null });
+
+    render(<VotdPage />);
+
+    expect(await screen.findByText("Today's verse could not be resolved.")).toBeInTheDocument();
+  });
+});
+
 describe("VotdPage — Preview button guards against overlapping requests", () => {
   const mockFetch = vi.fn();
 
