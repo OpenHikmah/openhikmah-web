@@ -28,7 +28,13 @@ const { mockSelect } = vi.hoisted(() => ({ mockSelect: vi.fn(() => makeDbChain([
 
 vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect } }));
 
-import { getVerse, getVerses, existingRefs, isValidRef } from "@/lib/quran/quran-corpus";
+import {
+  getVerse,
+  getVerses,
+  getSurahVerses,
+  existingRefs,
+  isValidRef,
+} from "@/lib/quran/quran-corpus";
 
 const ARABIC_BY_REF: Record<string, string> = {
   "1:1": "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
@@ -146,6 +152,31 @@ describe("quran-corpus", () => {
       const map = await getVerses(["1:1", "2:255"], "tr.diyanet");
       expect(map.get("1:1")?.translation).toBe("Türkçe 1");
       expect(map.get("2:255")?.translation).toBe("text");
+    });
+  });
+
+  describe("getSurahVerses", () => {
+    it("requests every ref of the surah, in order, and returns them in order", async () => {
+      mockSelect.mockReturnValue(
+        makeDbChain([row("1:3", 1, 3), row("1:1", 1, 1), row("1:2", 1, 2)])
+      );
+      const list = await getSurahVerses(1);
+      expect(list.map((v) => v.ref)).toEqual(["1:1", "1:2", "1:3"]);
+    });
+
+    it("omits refs missing from the corpus rather than erroring", async () => {
+      mockSelect.mockReturnValue(makeDbChain([row("1:1", 1, 1), row("1:3", 1, 3)]));
+      const list = await getSurahVerses(1);
+      expect(list.map((v) => v.ref)).toEqual(["1:1", "1:3"]);
+    });
+
+    it("passes the edition through to the underlying batch lookup", async () => {
+      mockSelect.mockReturnValue(makeDbChain([]));
+      await getSurahVerses(1, "tr.diyanet");
+      // getVerses(refs, edition) takes the edition-join path when edition is set.
+      expect(mockSelect).toHaveBeenCalledWith(
+        expect.objectContaining({ verse: expect.anything(), translationText: expect.anything() })
+      );
     });
   });
 

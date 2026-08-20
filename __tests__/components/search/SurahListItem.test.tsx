@@ -93,12 +93,9 @@ describe("SurahListItem", () => {
     expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
   });
 
-  it("links Read in Canvas to this row's own surah number", () => {
+  it("links Read to this row's own surah reading page", () => {
     render(<SurahListItem surah={BALAD} />);
-    expect(screen.getByRole("link", { name: "Read in Canvas" })).toHaveAttribute(
-      "href",
-      "/canvas?surah=90"
-    );
+    expect(screen.getByRole("link", { name: "Read" })).toHaveAttribute("href", "/surah/90");
   });
 
   it("renders the ayah count and Arabic name", () => {

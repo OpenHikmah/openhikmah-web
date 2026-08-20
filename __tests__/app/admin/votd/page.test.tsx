@@ -102,6 +102,29 @@ describe("VotdPage — Today panel", () => {
     expect(await screen.findByText("Editing")).toBeInTheDocument();
   });
 
+  it("Edit today pre-fills the verse-reference field with today's live pick when nothing is curated yet", async () => {
+    // Matches VotdPage's own `todayStr()` computation, so the panel's `today`
+    // is recognized as actually being today without needing to fake the clock.
+    const todayIso = new Date().toISOString().slice(0, 10);
+    mockApi.mockResolvedValue({
+      entries: [],
+      today: {
+        date: todayIso,
+        ref: "18:10",
+        arabicText: "بِسْمِ اللَّهِ",
+        translation: "In the name of Allah",
+        reflection: null,
+        source: "algorithmic",
+      },
+    });
+
+    render(<VotdPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Edit today" }));
+
+    const input = await screen.findByPlaceholderText("e.g. 2:255");
+    expect(input).toHaveValue("18:10");
+  });
+
   it("shows a fallback message when today could not be resolved", async () => {
     mockApi.mockResolvedValue({ entries: [], today: null });
 
