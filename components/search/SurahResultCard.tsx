@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Volume2, Pause, Network, BookOpen } from "lucide-react";
+import { Volume2, Pause, BookOpen } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Card, buttonVariants } from "@/components/ui";
 import { useSurahListen } from "./useSurahListen";
@@ -36,17 +36,17 @@ export function SurahResultCard({ surah }: { surah: MatchedSurah }) {
           {isThisPlaying ? t("pauseListening") : t("listen")}
         </button>
         <Link
-          href={`/canvas?surah=${surah.number}`}
+          href={`/surah/${surah.number}`}
           className={buttonVariants({ variant: "secondary", size: "sm" })}
         >
-          <Network className="h-3.5 w-3.5" />
-          {t("readInCanvas")}
+          <BookOpen className="h-3.5 w-3.5" />
+          {t("readSurah")}
         </Link>
       </div>
 
       <p className="mt-4 flex items-center gap-1.5 text-xs text-text-muted">
         <BookOpen className="h-3 w-3" />
-        {t("surahReadHint")}
+        {t("readSurahHint")}
       </p>
     </Card>
   );
