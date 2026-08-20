@@ -359,6 +359,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
         onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}
         onMove={handleMove}
+        onlyRenderVisibleElements
         fitView
         fitViewOptions={{ padding: 0.4, maxZoom: 1 }}
         minZoom={0.1}

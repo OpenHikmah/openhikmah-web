@@ -4,35 +4,12 @@ import Link from "next/link";
 import { Volume2, Pause, Network, BookOpen } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Card, buttonVariants } from "@/components/ui";
-import { useAudioStore, type AudioVerse } from "@/store/audio";
+import { useSurahListen } from "./useSurahListen";
 import type { MatchedSurah } from "@/types/quran";
 
 export function SurahResultCard({ surah }: { surah: MatchedSurah }) {
   const t = useTranslations("search");
-  const currentSurahName = useAudioStore((s) => s.currentSurahName);
-  const isPlaying = useAudioStore((s) => s.isPlaying);
-  const playGraph = useAudioStore((s) => s.playGraph);
-  const pause = useAudioStore((s) => s.pause);
-  const resume = useAudioStore((s) => s.resume);
-  const isThisPlaying = currentSurahName === surah.name && isPlaying;
-
-  const handleListen = () => {
-    if (isThisPlaying) {
-      pause();
-      return;
-    }
-    if (currentSurahName === surah.name) {
-      resume();
-      return;
-    }
-    const queue: AudioVerse[] = Array.from({ length: surah.ayahCount }, (_, i) => ({
-      ref: `${surah.number}:${i + 1}`,
-      surah: surah.number,
-      ayah: i + 1,
-      surahName: surah.name,
-    }));
-    playGraph(queue);
-  };
+  const { isThisPlaying, handleListen } = useSurahListen(surah);
 
   return (
     <Card className="p-6">
