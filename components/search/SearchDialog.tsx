@@ -265,6 +265,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const showSeedVerses = !query.trim();
   const showPreview = !!previewVerse && !loading;
   const showResults = searchResults.length > 0 && !isSearching;
+  const showRelated = relatedResults.length > 0 && !isSearching;
 
   return (
     <Dialog.Root
@@ -395,8 +396,8 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                 </div>
               )}
 
-              {showResults && relatedResults.length > 0 && (
-                <div className="border-t border-border p-3 space-y-0.5">
+              {showRelated && (
+                <div className={cn("p-3 space-y-0.5", showResults && "border-t border-border")}>
                   <p className="px-2 pb-1.5 font-mono text-[10px] uppercase tracking-wide text-text-muted">
                     {t("relatedByMeaning")}
                   </p>
@@ -414,7 +415,12 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                 </div>
               )}
 
-              {!showSeedVerses && !showPreview && !showResults && !busy && !previewError && (
+              {!showSeedVerses &&
+                !showPreview &&
+                !showResults &&
+                !showRelated &&
+                !busy &&
+                !previewError && (
                 <div className="px-4 py-8 text-center">
                   <p className="text-sm text-text-muted">
                     {searchError === "rateLimited"

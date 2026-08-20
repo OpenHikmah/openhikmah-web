@@ -7,7 +7,6 @@ import { Search, Network, Heart, BookOpen } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
-import { SearchModeToggle, type SearchMode } from "@/components/search/SearchModeToggle";
 import { SurahResultCard } from "@/components/search/SurahResultCard";
 import { SurahListItem } from "@/components/search/SurahListItem";
 import { Card, Input, IconButton, Tooltip, Pagination, buttonVariants } from "@/components/ui";
@@ -18,11 +17,9 @@ import type { SearchResponse, SearchResult } from "@/types/quran";
 
 const PAGE_SIZE = 20;
 
-// Curated starting points for the empty state — natural-language topics search
-// best in "meaning" mode, so chips navigate there rather than defaulting to Keyword.
-// Kept untranslated: "meaning" search only matches against the English corpus
-// (see the nonEnglishHint message), so a translated chip would search for a
-// phrase the backend can't match.
+// Curated starting points for the empty state. Kept untranslated: topic chips
+// search against the English corpus (see the nonEnglishHint message), so a
+// translated chip would search for a phrase the backend can't match.
 const EXAMPLE_SEARCHES = [
   "2:255 — Ayat al-Kursi",
   "Patience",
@@ -32,8 +29,8 @@ const EXAMPLE_SEARCHES = [
   "The Night Journey",
 ];
 
-function buildHref(q: string, mode: SearchMode, page: number) {
-  const params = new URLSearchParams({ q, type: mode, page: String(page) });
+function buildHref(q: string, page: number) {
+  const params = new URLSearchParams({ q, page: String(page) });
   return `/search?${params.toString()}`;
 }
 
@@ -44,14 +41,12 @@ export function SearchPageClient() {
   const searchParams = useSearchParams();
 
   const q = searchParams.get("q") ?? "";
-  const mode: SearchMode = searchParams.get("type") === "meaning" ? "meaning" : "keyword";
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
 
   const [inputValue, setInputValue] = useState(q);
   const [data, setData] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(!!q.trim());
   const [error, setError] = useState(false);
-  const [fellBackToKeyword, setFellBackToKeyword] = useState(false);
   // Keyword search calls an upstream API — this distinguishes "the search itself
   // failed" from a genuine zero-match result, which call for different copy.
   const [keywordUnavailable, setKeywordUnavailable] = useState(false);
@@ -59,7 +54,7 @@ export function SearchPageClient() {
   // "no results" and a generic upstream failure.
   const [rateLimited, setRateLimited] = useState(false);
   // Bumped by the "Try again" button so the fetch effect re-runs even when
-  // q/mode/page are unchanged (router.replace to the same URL is a no-op).
+  // q/page are unchanged (router.replace to the same URL is a no-op).
   const [retryCount, setRetryCount] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,16 +85,12 @@ export function SearchPageClient() {
     abortRef.current = controller;
     setLoading(true);
     setError(false);
-    setFellBackToKeyword(false);
     setKeywordUnavailable(false);
     setRateLimited(false);
 
-    fetch(
-      `/api/search?q=${encodeURIComponent(trimmed)}${
-        mode === "meaning" ? "&mode=meaning" : ""
-      }&page=${page}&pageSize=${PAGE_SIZE}`,
-      { signal: controller.signal }
-    )
+    fetch(`/api/search?q=${encodeURIComponent(trimmed)}&page=${page}&pageSize=${PAGE_SIZE}`, {
+      signal: controller.signal,
+    })
       .then(async (res) => {
         if (res.status === 429) {
           setRateLimited(true);
@@ -108,9 +99,6 @@ export function SearchPageClient() {
         }
         if (!res.ok) throw new Error();
         const json: SearchResponse = await res.json();
-        setFellBackToKeyword(
-          mode === "meaning" && res.headers.get("x-search-fallback") === "keyword"
-        );
         setKeywordUnavailable(res.headers.get("x-search-error") === "keyword-unavailable");
         setData(json);
       })
@@ -125,13 +113,13 @@ export function SearchPageClient() {
       });
 
     return () => controller.abort();
-  }, [q, mode, page, retryCount, uiLocale]);
+  }, [q, page, retryCount, uiLocale]);
 
-  // Any direct navigation (example chip, mode toggle, navigate() calls in general)
-  // should win over a still-pending debounced navigation from earlier typing —
-  // otherwise the stale debounce fires ~400ms later and silently reverts the
-  // URL/search back to the query the user has already moved past. Pagination
-  // links navigate via plain <Link> rather than navigate(), so they call this
+  // Any direct navigation (example chip, navigate() calls in general) should win
+  // over a still-pending debounced navigation from earlier typing — otherwise
+  // the stale debounce fires ~400ms later and silently reverts the URL/search
+  // back to the query the user has already moved past. Pagination links
+  // navigate via plain <Link> rather than navigate(), so they call this
   // directly too (see the Pagination onClick below).
   const cancelPendingDebounce = useCallback(() => {
     if (debounceRef.current) {
@@ -141,13 +129,13 @@ export function SearchPageClient() {
   }, []);
 
   const navigate = useCallback(
-    (nextQ: string, nextMode: SearchMode, nextPage: number) => {
+    (nextQ: string, nextPage: number) => {
       cancelPendingDebounce();
       if (!nextQ.trim()) {
         router.replace("/search");
         return;
       }
-      router.replace(buildHref(nextQ.trim(), nextMode, nextPage));
+      router.replace(buildHref(nextQ.trim(), nextPage));
     },
     [router, cancelPendingDebounce]
   );
@@ -155,7 +143,7 @@ export function SearchPageClient() {
   const onInputChange = (value: string) => {
     setInputValue(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => navigate(value, mode, 1), 400);
+    debounceRef.current = setTimeout(() => navigate(value, 1), 400);
   };
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
@@ -174,11 +162,10 @@ export function SearchPageClient() {
             value={inputValue}
             onChange={(e) => onInputChange(e.target.value)}
             aria-label={t("searchVersesAria")}
-            placeholder={mode === "meaning" ? t("placeholderMeaning") : t("placeholderKeyword")}
+            placeholder={t("placeholder")}
             className="flex-1"
           />
         </div>
-        <SearchModeToggle mode={mode} onChange={(m) => navigate(q, m, 1)} className="mb-6" />
 
         {!q.trim() ? (
           <div className="py-16 text-center">
@@ -186,15 +173,12 @@ export function SearchPageClient() {
             <p className="mb-6 text-sm text-text-muted">{t("enterSearchTerm")}</p>
             <div className="mx-auto flex max-w-md flex-wrap justify-center gap-2">
               {EXAMPLE_SEARCHES.map((example) => {
-                // Ref-shaped examples (e.g. "2:255 — Ayat al-Kursi") search fine in either
-                // mode; plain topics only work in "meaning" mode.
-                const isRef = /^\d+:\d+/.test(example);
                 const [term] = example.split(" — ");
                 return (
                   <button
                     key={example}
                     type="button"
-                    onClick={() => navigate(term, isRef ? "keyword" : "meaning", 1)}
+                    onClick={() => navigate(term, 1)}
                     className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-teal/40 hover:text-teal-bright"
                   >
                     {example}
@@ -228,7 +212,7 @@ export function SearchPageClient() {
               <SurahListItem key={surah.number} surah={surah} />
             ))}
           </div>
-        ) : !data || data.results.length === 0 ? (
+        ) : !data || (data.results.length === 0 && !data.related?.length) ? (
           <div className="py-20 text-center">
             <BookOpen className="mx-auto mb-4 h-8 w-8 text-text-muted/40" />
             <p className="text-sm text-text-muted">
@@ -236,11 +220,9 @@ export function SearchPageClient() {
                 ? t("rateLimited")
                 : keywordUnavailable
                   ? t("searchUnavailable")
-                  : mode === "meaning"
-                    ? t("noMeaningMatches")
-                    : t("noExactMatches")}
+                  : t("noExactMatches")}
             </p>
-            {rateLimited || keywordUnavailable ? (
+            {(rateLimited || keywordUnavailable) && (
               <button
                 type="button"
                 onClick={() => setRetryCount((c) => c + 1)}
@@ -248,45 +230,48 @@ export function SearchPageClient() {
               >
                 {t("tryAgain")}
               </button>
-            ) : (
-              mode === "keyword" && (
-                <button
-                  type="button"
-                  onClick={() => navigate(q, "meaning", 1)}
-                  className="mt-3 text-sm text-teal-bright hover:underline"
-                >
-                  {t("tryByMeaning")}
-                </button>
-              )
             )}
           </div>
         ) : (
           <>
-            <p className="mb-4 text-sm text-text-muted">
-              {t.rich("showingResults", {
-                count: data.total,
-                query: q,
-                b: (chunks) => <span className="font-medium text-text-primary">{chunks}</span>,
-              })}
-            </p>
-            {fellBackToKeyword && (
-              <p className="mb-4 text-xs text-text-muted">{t("meaningFallbackNotice")}</p>
+            {data.results.length > 0 && (
+              <>
+                <p className="mb-4 text-sm text-text-muted">
+                  {t.rich("showingResults", {
+                    count: data.total,
+                    query: q,
+                    b: (chunks) => <span className="font-medium text-text-primary">{chunks}</span>,
+                  })}
+                </p>
+                <div className="space-y-3">
+                  {data.results.map((result) => (
+                    <ResultCard key={result.ref} result={result} />
+                  ))}
+                </div>
+                <Pagination
+                  page={page}
+                  totalPages={totalPages}
+                  href={(p) => buildHref(q, p)}
+                  onClick={cancelPendingDebounce}
+                  className="mt-8"
+                />
+              </>
             )}
-            {uiLocale !== "en" && (
-              <p className="mb-4 text-xs text-text-muted">{t("nonEnglishHint")}</p>
+            {!!data.related?.length && (
+              <div className={data.results.length > 0 ? "mt-8" : ""}>
+                <p className="mb-4 text-sm font-medium text-text-primary">
+                  {t("relatedByMeaning")}
+                </p>
+                {uiLocale !== "en" && (
+                  <p className="mb-4 text-xs text-text-muted">{t("nonEnglishHint")}</p>
+                )}
+                <div className="space-y-3">
+                  {data.related.map((result) => (
+                    <ResultCard key={result.ref} result={result} />
+                  ))}
+                </div>
+              </div>
             )}
-            <div className="space-y-3">
-              {data.results.map((result) => (
-                <ResultCard key={result.ref} result={result} />
-              ))}
-            </div>
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              href={(p) => buildHref(q, mode, p)}
-              onClick={cancelPendingDebounce}
-              className="mt-8"
-            />
           </>
         )}
       </main>
