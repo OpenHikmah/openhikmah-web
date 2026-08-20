@@ -27,7 +27,10 @@ const HikmahCanvas = dynamic(
   }
 );
 
-function VerseLoader() {
+// Exported for direct unit testing of the surah/verse loading effects,
+// without pulling in CanvasPageClient's full dependency tree (Header, Canvas
+// rendering, auth, etc).
+export function VerseLoader() {
   const searchParams = useSearchParams();
   const addVerseNode = useCanvasStore((s) => s.addVerseNode);
   const addSurahNodes = useCanvasStore((s) => s.addSurahNodes);
@@ -91,14 +94,17 @@ function VerseLoader() {
           cleanUrl();
           return;
         }
-        // Whole surah already mapped (re-opened the same "Read" link)? Don't
-        // stack a duplicate set of nodes.
+        // Some (or all) ayahs may already be on the canvas (re-opened the same
+        // "Read" link, or the user manually added a verse from this surah
+        // earlier) — only add the ones that aren't there yet, so a partial
+        // overlap doesn't stack duplicate nodes for the already-mapped ayahs.
         const { hasNode } = useCanvasStore.getState();
-        if (verses.every((v) => hasNode(v.ref))) {
+        const missing = verses.filter((v) => !hasNode(v.ref));
+        if (missing.length === 0) {
           cleanUrl();
           return;
         }
-        addSurahNodes(verses);
+        addSurahNodes(missing);
         requestFit();
         cleanUrl();
       })

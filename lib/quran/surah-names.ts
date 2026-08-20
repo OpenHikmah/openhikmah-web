@@ -119,12 +119,13 @@ export function getSurahName(surahNum: number): [string, string] {
   return SURAH_NAMES[surahNum] ?? [`Surah ${surahNum}`, `سورة ${surahNum}`];
 }
 
-// Strips the transliteration prefixes ("Al-", "An-", "Ash-", …) and any
-// non-letter characters so "kahf" normalizes the same as "Al-Kahf".
+// Strips the transliteration prefixes ("Al-", "An-", "Ash-", "Ar-", …),
+// separated by either a hyphen or a space, and any non-letter characters so
+// "kahf", "rad", and "Al Kahf" all normalize the same as "Al-Kahf"/"Ar-Rad".
 function normalizeSurahName(name: string): string {
   return name
     .toLowerCase()
-    .replace(/^(al|an|as|ash|at|ad|az)-/, "")
+    .replace(/^(al|an|as|ash|at|ad|az|ar)[-\s]/, "")
     .replace(/[^a-z]/g, "");
 }
 

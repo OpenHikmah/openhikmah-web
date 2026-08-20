@@ -10,9 +10,12 @@ export const dynamic = "force-dynamic";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ surah: string }> }) {
   const { surah } = await params;
+  if (!/^\d+$/.test(surah)) {
+    return NextResponse.json({ error: "Invalid surah" }, { status: 400 });
+  }
   const surahNum = parseInt(surah, 10);
 
-  if (!surahNum || surahNum < 1 || surahNum > 114) {
+  if (surahNum < 1 || surahNum > 114) {
     return NextResponse.json({ error: "Invalid surah" }, { status: 400 });
   }
 
