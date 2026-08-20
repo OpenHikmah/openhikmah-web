@@ -2,7 +2,7 @@ import { test, expect } from "./fixtures/auth";
 
 test.describe("search page", () => {
   test("ref shortcut shows the exact verse with a Map on Canvas link", async ({ page }) => {
-    await page.goto("/search?q=2:255&type=keyword");
+    await page.goto("/search?q=2:255");
 
     await expect(page.getByText("2:255", { exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: /map on canvas/i })).toHaveAttribute(
@@ -11,7 +11,9 @@ test.describe("search page", () => {
     );
   });
 
-  test("keyword search returns results for a common query", async ({ page }) => {
+  test("keyword search returns results for a common query, with no search-mode toggle", async ({
+    page,
+  }) => {
     await page.goto("/search");
 
     await page.getByPlaceholder(/search topics/i).fill("mercy");
@@ -19,15 +21,8 @@ test.describe("search page", () => {
     // digits/separators loosely rather than assuming a bare number.
     await expect(page.getByText(/showing [\d,.]+ results? for/i)).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole("link", { name: /map on canvas/i }).first()).toBeVisible();
-  });
-
-  test("by-meaning mode falls back to keyword search when embeddings are unavailable", async ({
-    page,
-  }) => {
-    await page.goto("/search?q=mercy&type=keyword");
-
-    await page.getByRole("button", { name: "By meaning" }).click();
-    await expect(page.getByText(/showing keyword matches/i)).toBeVisible({ timeout: 15000 });
+    // There's a single unified search now — no Keyword/By meaning mode picker.
+    await expect(page.getByRole("button", { name: "By meaning" })).toHaveCount(0);
   });
 });
 
