@@ -69,7 +69,7 @@ export const SALIH_STORY: Story = {
         az: "Rəbbinin əmrinə qarşı təkəbbürlə, dişi dəvəni kəsdilər və Salehə dedilər: əgər bir elçisənsə, bizə vəd etdiyini gətir. Saleh cavab verdi: üç gün daha evlərinizdə kef edin — bu, boşa çıxmayacaq bir vəddir.",
         ru: "Дерзко нарушив повеление своего Господа, они подрезали поджилки верблюдице и сказали Салиху: приведи нам то, что ты нам обещаешь, если ты посланник. Салих ответил: наслаждайтесь в своих домах ещё три дня — это обещание, которое не подведёт.",
       },
-      verseRefs: ["7:77", "26:157", "91:13", "91:14"],
+      verseRefs: ["7:77", "11:65", "26:157", "91:13", "91:14"],
     },
     {
       id: "the-blast",
