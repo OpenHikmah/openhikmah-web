@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SURAH_NAMES, getSurahName } from "@/lib/quran/surah-names";
+import { SURAH_NAMES, getSurahName, matchSurahByName } from "@/lib/quran/surah-names";
 
 describe("SURAH_NAMES", () => {
   it("contains exactly 114 entries", () => {
@@ -52,5 +52,39 @@ describe("getSurahName", () => {
 
   it("returns fallback for negative number", () => {
     expect(getSurahName(-1)).toEqual(["Surah -1", "سورة -1"]);
+  });
+});
+
+describe("matchSurahByName", () => {
+  it("matches a bare transliteration without the Al- prefix", () => {
+    expect(matchSurahByName("kahf")).toBe(18);
+  });
+
+  it("matches the full hyphenated name", () => {
+    expect(matchSurahByName("Al-Kahf")).toBe(18);
+  });
+
+  it("is case-insensitive", () => {
+    expect(matchSurahByName("KAHF")).toBe(18);
+  });
+
+  it("matches a surah name with no Al-/An- prefix", () => {
+    expect(matchSurahByName("Maryam")).toBe(19);
+  });
+
+  it("matches surah 1", () => {
+    expect(matchSurahByName("fatiha")).toBe(1);
+  });
+
+  it("returns null for a non-surah topic search", () => {
+    expect(matchSurahByName("mercy")).toBeNull();
+  });
+
+  it("returns null for a verse-ref-shaped query", () => {
+    expect(matchSurahByName("2:255")).toBeNull();
+  });
+
+  it("returns null for an empty query", () => {
+    expect(matchSurahByName("")).toBeNull();
   });
 });
