@@ -48,13 +48,19 @@ function makeMeaningReq(q: string, headers: Record<string, string> = {}, extra =
   );
 }
 
+const ARABIC_BY_REF: Record<string, string> = {
+  "2:255": "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ",
+  "94:5": "فَإِنَّ مَعَ الْعُسْرِ يُسْرًا",
+  "2:286": "لَا يُكَلِّفُ اللَّهُ نَفْسًا إِلَّا وُسْعَهَا",
+};
+
 function verse(ref: string, translation: string): Verse {
   const [s, a] = ref.split(":");
   return {
     surah: Number(s),
     ayah: Number(a),
     ref: ref as Verse["ref"],
-    arabicText: "ar",
+    arabicText: ARABIC_BY_REF[ref] ?? ARABIC_BY_REF["2:255"],
     translation,
     surahName: "Surah",
     surahNameArabic: "سورة",

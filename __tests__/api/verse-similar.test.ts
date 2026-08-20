@@ -12,6 +12,11 @@ function call(surah: string, ayah: string) {
   });
 }
 
+const ARABIC_BY_REF: Record<string, string> = {
+  "2:255": "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ",
+  "3:18": "شَهِدَ اللَّهُ أَنَّهُ لَا إِلَٰهَ إِلَّا هُوَ",
+};
+
 function match(ref: string) {
   const [s, a] = ref.split(":");
   return {
@@ -19,7 +24,7 @@ function match(ref: string) {
       surah: Number(s),
       ayah: Number(a),
       ref,
-      arabicText: "ar",
+      arabicText: ARABIC_BY_REF[ref] ?? ARABIC_BY_REF["2:255"],
       translation: `tr-${ref}`,
       surahName: "Surah",
       surahNameArabic: "سورة",

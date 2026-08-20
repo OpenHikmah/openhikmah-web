@@ -25,7 +25,7 @@ function verseNode(id: string, ref: string) {
     surah: 1,
     ayah: 1,
     ref: ref as VerseRef,
-    arabicText: "نص",
+    arabicText: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
     translation: "text",
     surahName: "Al-Fatihah",
     surahNameArabic: "الفاتحة",

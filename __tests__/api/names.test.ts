@@ -160,7 +160,7 @@ describe("GET /api/names/[slug]/verses", () => {
   it("each verse has ref, arabicText, translation, surahName, and reason", async () => {
     mockFetch.mockImplementation(async (url: string) => {
       if (typeof url !== "string") return { ok: false };
-      if (url.includes("ar.alafasy")) return arabicResp("نص عربي");
+      if (url.includes("ar.alafasy")) return arabicResp("اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ");
       if (url.includes("en.sahih")) return transResp("English translation");
       return { ok: false };
     });

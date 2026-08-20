@@ -55,7 +55,7 @@ const validVerse = {
   surah: 2,
   ayah: 255,
   ref: "2:255",
-  arabicText: "arabic",
+  arabicText: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ",
   translation: "Allah - there is no deity except Him.",
   surahName: "Al-Baqarah",
   surahNameArabic: "البقرة",

@@ -52,7 +52,7 @@ vi.mock("@/lib/quran/quran-corpus", async (importOriginal) => {
                 surah: parseInt(s, 10),
                 ayah: parseInt(a, 10),
                 ref: r,
-                arabicText: "نص عربي",
+                arabicText: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ",
                 translation: "English translation",
                 surahName: "Surah",
                 surahNameArabic: "سورة",
@@ -196,7 +196,7 @@ describe("POST /api/connections", () => {
   it("returns 200 with 3 ConnectionResult objects for a valid request (cache miss → generate)", async () => {
     mockFetch.mockImplementation(async (url: string) => {
       if (typeof url !== "string") return { ok: false };
-      if (url.includes("ar.alafasy")) return arabicResp("نص عربي");
+      if (url.includes("ar.alafasy")) return arabicResp("اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ");
       if (url.includes("en.sahih")) return transResp("English translation");
       return { ok: false };
     });
@@ -219,7 +219,7 @@ describe("POST /api/connections", () => {
   it("each result has ref, arabicText, translation, surahName, reason, and kind", async () => {
     mockFetch.mockImplementation(async (url: string) => {
       if (typeof url !== "string") return { ok: false };
-      if (url.includes("ar.alafasy")) return arabicResp("نص عربي");
+      if (url.includes("ar.alafasy")) return arabicResp("اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ");
       if (url.includes("en.sahih")) return transResp("English translation");
       return { ok: false };
     });
