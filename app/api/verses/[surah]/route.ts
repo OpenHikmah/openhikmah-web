@@ -8,10 +8,7 @@ import type { Verse } from "@/types/quran";
 // cache entry across locales.
 export const dynamic = "force-dynamic";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ surah: string }> }
-) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ surah: string }> }) {
   const { surah } = await params;
   const surahNum = parseInt(surah, 10);
 

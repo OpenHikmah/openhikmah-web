@@ -55,11 +55,7 @@ export function SurahResultCard({ surah }: { surah: MatchedSurah }) {
           onClick={handleListen}
           className={buttonVariants({ variant: "primary", size: "sm" })}
         >
-          {isThisPlaying ? (
-            <Pause className="h-3.5 w-3.5" />
-          ) : (
-            <Volume2 className="h-3.5 w-3.5" />
-          )}
+          {isThisPlaying ? <Pause className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
           {isThisPlaying ? t("pauseListening") : t("listen")}
         </button>
         <Link
