@@ -46,8 +46,15 @@ describe("SurahReaderActions", () => {
     fireEvent.click(button);
     expect(mockPlayGraph).toHaveBeenCalledTimes(1);
     const queue = mockPlayGraph.mock.calls[0][0];
-    expect(queue).toHaveLength(110);
-    expect(queue[0]).toEqual({ ref: "18:1", surah: 18, ayah: 1, surahName: "Al-Kahf" });
+    expect(queue).toHaveLength(SURAH.ayahCount);
+    for (let i = 0; i < SURAH.ayahCount; i++) {
+      expect(queue[i]).toEqual({
+        ref: `18:${i + 1}`,
+        surah: 18,
+        ayah: i + 1,
+        surahName: "Al-Kahf",
+      });
+    }
   });
 
   it("shows the Pause label while this surah's queue is actively playing", () => {
@@ -61,6 +68,21 @@ describe("SurahReaderActions", () => {
     fireEvent.click(button);
     expect(mockPause).toHaveBeenCalledTimes(1);
     expect(mockPlayGraph).not.toHaveBeenCalled();
+  });
+
+  it("shows the Listen label, not Pause, when a different surah's queue is actively playing", () => {
+    const OTHER_SURAH: MatchedSurah = {
+      number: 2,
+      name: "Al-Baqarah",
+      nameArabic: "البقرة",
+      ayahCount: 286,
+    };
+    storeState.queue = fullQueueFor(OTHER_SURAH);
+    storeState.isPlaying = true;
+    renderWithIntl(<SurahReaderActions surah={SURAH} />);
+
+    expect(screen.getByRole("button", { name: "Listen" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pause" })).not.toBeInTheDocument();
   });
 
   it("links the Canvas escape hatch to this surah's bulk-load route", () => {
