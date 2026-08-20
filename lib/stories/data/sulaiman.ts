@@ -1,0 +1,158 @@
+import type { Story } from "../types";
+
+export const SULAIMAN_STORY: Story = {
+  slug: "sulaiman",
+  name: {
+    en: "Sulaiman (Solomon)",
+    tr: "Süleyman",
+    az: "Süleyman",
+    ru: "Сулейман",
+  },
+  arabicName: "سُلَيْمَان",
+  tagline: {
+    en: "A kingdom none after him would match — wind, jinn, birds, and a queen who submitted",
+    tr: "Kendisinden sonra kimsenin ulaşamayacağı bir krallık — rüzgâr, cinler, kuşlar ve teslim olan bir kraliçe",
+    az: "Ondan sonra heç kəsin çata bilməyəcəyi bir padşahlıq — külək, cinlər, quşlar və təslim olan bir kraliça",
+    ru: "Царство, которого не достигнет никто после него, — ветер, джинны, птицы и покорившаяся царица",
+  },
+  intro: {
+    en: "Sulaiman inherits Dawud's knowledge and prophethood, and with it a dominion the Quran describes as unmatched: command over the wind, understanding of the speech of birds, and jinn who work at his direction. His story moves through a valley of ants, a missing hoopoe carrying news of a foreign queen, a throne brought across the distance in an instant, and a palace floor mistaken for water — each episode turning on the same axis as everything given to him: whether he will be grateful. Even his one recorded lapse, and eventually his death, are framed the same way, as tests of a servant repeatedly turning back to God rather than as triumphs of power for their own sake.",
+    tr: "Süleyman, Davud'un ilmini ve peygamberliğini miras alır ve bununla birlikte Kur'an'ın eşi benzeri olmadığını belirttiği bir hükümranlığa sahip olur: rüzgâre hükmetme, kuşların dilini anlama ve emri altında çalışan cinler. Onun hikâyesi bir karınca vadisinden, yabancı bir kraliçenin haberini getiren kayıp bir hüdhüdden, bir anda uzak mesafeden getirilen bir taht'tan ve su sanılan bir saray zemininden geçer — her bölüm, kendisine verilen her şeyle aynı eksende döner: şükredip etmeyeceği. Kaydedilen tek zaafı ve nihayetinde ölümü bile aynı çerçevede sunulur: güç için gücün zaferleri olarak değil, durmaksızın Allah'a yönelen bir kulun sınavları olarak.",
+    az: "Süleyman Davudun elmini və peyğəmbərliyini miras alır və bununla birlikdə Quranın bənzərsiz olduğunu bildirdiyi bir hökmranlığa sahib olur: küləyə hökm etmə, quşların dilini anlama və əmri altında işləyən cinlər. Onun hekayəsi bir qarışqa vadisindən, yad bir padşahın xəbərini gətirən itkin bir hüdhüddən, bir anda uzaq məsafədən gətirilən bir taxtdan və su sanılan bir saray döşəməsindən keçir — hər bölüm ona verilən hər şeylə eyni oxda dönür: şükür edib-etməyəcəyi. Qeydə alınan tək zəifliyi və nəhayət ölümü belə eyni çərçivədə təqdim olunur: güc üçün gücün zəfərləri kimi deyil, daim Allaha üz tutan bir qulun sınaqları kimi.",
+    ru: "Сулейман наследует знание и пророчество Дауда, а вместе с ними — владычество, которое Коран описывает как непревзойдённое: власть над ветром, понимание речи птиц и джиннов, работающих по его приказу. Его история проходит через долину муравьёв, пропавшего удода, принёсшего весть о чужеземной царице, трон, доставленный через огромное расстояние в мгновение ока, и пол дворца, принятый за воду — каждый эпизод вращается вокруг одной оси: будет ли он благодарен за всё это. Даже его единственная зафиксированная оплошность и в конце концов его смерть поданы в той же рамке — не как торжество власти ради самой власти, а как испытания раба, неизменно обращающегося к Богу.",
+  },
+  primarySurahs: [27, 34, 38, 21],
+  chapters: [
+    {
+      id: "inheriting-knowledge",
+      title: {
+        en: "We have been taught the language of birds",
+        tr: "Bize kuşların dili öğretildi",
+        az: "Bizə quşların dili öyrədildi",
+        ru: "Нас научили языку птиц",
+      },
+      narrative: {
+        en: "God gave both Dawud and Sulaiman knowledge, and both said: praise belongs to God, who favored us over many of His believing servants. Sulaiman inherited Dawud — in prophethood and knowledge, not merely wealth — and told his people that they had been taught the language of birds and given from all things, an evident bounty. Elsewhere Sulaiman is named as an excellent servant, one who repeatedly turned back to God.",
+        tr: "Allah, Davud'a da Süleyman'a da ilim bahşetti ve ikisi de şöyle dedi: hamd, bizi birçok mümin kulundan üstün kılan Allah'a mahsustur. Süleyman, Davud'a vâris oldu — sırf maldan değil, peygamberlik ve ilimden — ve halkına, kendilerine kuşların dilinin öğretildiğini ve her şeyden kendilerine verildiğini, bunun apaçık bir lütuf olduğunu söyledi. Başka bir yerde Süleyman, mükemmel bir kul, durmaksızın Allah'a yönelen biri olarak anılır.",
+        az: "Allah həm Davuda, həm də Süleymana elm bəxş etdi və hər ikisi dedi: həmd bizi bir çox mömin qulundan üstün edən Allaha məxsusdur. Süleyman Davuda varis oldu — sadəcə maldan deyil, peyğəmbərlik və elmdən — və xalqına, özlərinə quşların dilinin öyrədildiyini və hər şeydən özlərinə verildiyini, bunun açıq-aşkar bir lütf olduğunu söylədi. Başqa bir yerdə Süleyman mükəmməl bir qul, daim Allaha üz tutan biri kimi xatırlanır.",
+        ru: "Бог даровал знание и Дауду, и Сулейману, и оба сказали: хвала принадлежит Богу, возвысившему нас над многими Своими верующими рабами. Сулейман унаследовал от Дауда — не просто богатство, а пророчество и знание — и сказал своему народу, что их научили языку птиц и даровали им от всякой вещи, что было явной милостью. В другом месте Сулейман назван прекрасным рабом, неизменно обращавшимся к Богу.",
+      },
+      verseRefs: ["27:15", "27:16", "38:30"],
+    },
+    {
+      id: "the-valley-of-ants",
+      title: {
+        en: "O ants, enter your dwellings",
+        tr: "Ey karıncalar, yuvalarınıza girin",
+        az: "Ey qarışqalar, yuvalarınıza girin",
+        ru: "О муравьи, войдите в свои жилища",
+      },
+      narrative: {
+        en: "Sulaiman's army — jinn, men, and birds together, marching in ranks — came upon a valley of ants. One ant called to the others to enter their dwellings so that Sulaiman and his soldiers would not crush them without perceiving it. Sulaiman smiled, amused at hearing her, and prayed: my Lord, enable me to be grateful for Your favor upon me and upon my parents, and to do righteousness that pleases You, and admit me by Your mercy among Your righteous servants.",
+        tr: "Süleyman'ın ordusu — cinler, insanlar ve kuşlar birlikte, saf saf yürüyerek — bir karınca vadisine geldi. Bir karınca diğerlerine, farkına varmadan Süleyman ve ordusunun kendilerini ezmemesi için yuvalarına girmelerini seslendi. Süleyman onu duyunca gülümsedi ve şöyle dua etti: Rabbim, bana ve anne-babama verdiğin nimete şükretmemi ve senin razı olacağın salih ameli işlememi nasip et, beni rahmetinle salih kullarının arasına kat.",
+        az: "Süleymanın ordusu — cinlər, insanlar və quşlar birlikdə, sıra ilə yürüyərək — bir qarışqa vadisinə gəldi. Bir qarışqa digərlərinə, fərqinə varmadan Süleyman və ordusunun onları əzməməsi üçün yuvalarına girmələrini səsləndi. Süleyman onu eşidəndə gülümsədi və belə dua etdi: Rəbbim, mənə və valideynlərimə verdiyin nemətə şükür etməyi və Sənin razı olacağın saleh əməli işləməyi mənə nəsib et, məni mərhəmətinlə saleh qullarının arasına qat.",
+        ru: "Войско Сулеймана — джинны, люди и птицы вместе, шагающие рядами, — подошло к долине муравьёв. Один муравей воззвал к остальным войти в свои жилища, чтобы Сулейман и его воины не раздавили их, не заметив того. Сулейман улыбнулся, услышав это, и взмолился: Господь мой, дай мне быть благодарным за милость Твою ко мне и к моим родителям и творить праведность, которой Ты доволен, и введи меня по милости Твоей в число Твоих праведных рабов.",
+      },
+      verseRefs: ["27:17", "27:18", "27:19"],
+    },
+    {
+      id: "the-hoopoe-and-the-queen",
+      title: {
+        en: "News from Sheba",
+        tr: "Sebe'den bir haber",
+        az: "Səbadan bir xəbər",
+        ru: "Весть из Сабы",
+      },
+      narrative: {
+        en: "Taking attendance of the birds, Sulaiman noticed the hoopoe was missing and threatened it with severe punishment, or slaughter, unless it produced a clear reason. The hoopoe did not stay away long: it had come from Sheba with certain news — a woman ruling that people, given of all things and possessing a great throne, whom it found prostrating to the sun instead of God, their deeds made pleasing to them by Satan and turned away from the true path, from prostrating to the God who brings forth what is hidden in the heavens and earth and knows what is concealed and what is declared. Sulaiman said they would see whether the hoopoe had spoken truly, and sent it back with a letter, telling it to deliver the message and then withdraw to see what answer would return.",
+        tr: "Kuşları yoklarken Süleyman hüdhüdün eksik olduğunu fark eder ve açık bir gerekçe getirmedikçe onu şiddetli bir azapla cezalandıracağını ya da kesip atacağını söyler. Hüdhüd fazla gecikmez: Sebe'den kesin bir haberle gelmiştir — o halka hükmeden, her şeyden kendisine verilmiş ve büyük bir tahta sahip bir kadın; onun Allah yerine güneşe secde ettiğini, şeytanın amellerini kendilerine süslediğini ve doğru yoldan alıkoyduğunu, göklerde ve yerde gizli olanı ortaya çıkaran, gizleneni de açığa vurulanı da bilen Allah'a secde etmekten alıkoyduğunu görmüştür. Süleyman, hüdhüdün doğru mu söylediğini görecekleri yanıtını verir ve onu bir mektupla geri gönderir, mesajı iletip ardından geri çekilerek nasıl bir cevap döneceğini görmesini ister.",
+        az: "Quşları yoxlayarkən Süleyman hüdhüdün olmadığını görür və açıq bir dəlil gətirmədikcə onu şiddətli bir əzabla cəzalandıracağını, ya da kəsib atacağını söyləyir. Hüdhüd çox gecikmir: Səbadan kəsin bir xəbərlə gəlmişdir — o xalqa hökm edən, hər şeydən özünə verilmiş və böyük bir taxta sahib bir qadın; onun Allah yerinə günəşə səcdə etdiyini, şeytanın əməllərini onlara bəzədiyini və doğru yoldan sapdırdığını, göylərdə və yerdə gizli olanı üzə çıxaran, gizlədiləni də aşkar ediləni də bilən Allaha səcdə etməkdən sapdırdığını görmüşdür. Süleyman, hüdhüdün doğru deyib-demədiyini görəcəklərini söyləyir və onu bir məktubla geri göndərir, mesajı çatdırıb sonra geri çəkilərək hansı cavabın qayıdacağını görməsini istəyir.",
+        ru: "Пересчитывая птиц, Сулейман заметил отсутствие удода и пригрозил ему суровым наказанием или закланием, если тот не приведёт ясной причины. Удод не задержался надолго: он прибыл из Сабы с достоверной вестью — женщина правит тем народом, ей дано всё, и у неё великий трон; он застал её и её народ поклоняющимися солнцу вместо Бога, шайтан представил им их деяния прекрасными и отвратил их от истинного пути — от поклонения Богу, выводящему наружу сокрытое на небесах и земле и знающему, что скрывается и что открывается. Сулейман сказал, что они увидят, правду ли сказал удод, и отправил его назад с письмом, велев доставить послание и затем отойти, чтобы увидеть, какой ответ вернётся.",
+      },
+      verseRefs: ["27:20", "27:21", "27:22", "27:23", "27:24", "27:25", "27:26", "27:27", "27:28"],
+    },
+    {
+      id: "before-her-eyes-returned-to-her",
+      title: {
+        en: "My Lord, I have wronged myself",
+        tr: "Rabbim, kendime zulmettim",
+        az: "Rəbbim, özümə zülm etdim",
+        ru: "Господь мой, я поступила несправедливо с собой",
+      },
+      narrative: {
+        en: "The queen received the letter — bearing God's name, and a call to come in submission rather than haughtiness — and consulted her court. Her advisors offered military strength but deferred to her command; she judged, from experience, that kings ruin the cities they conquer and humble their honored people, and chose instead to send a gift and watch what her envoys reported back. When they reached Sulaiman, he refused the gift, saying what God had given him was better, and sent them back with a warning that soldiers would come they could not resist. Turning to his own assembly, he asked who could bring her throne before she arrived in submission. A powerful jinn offered to bring it before Sulaiman rose from his seat; one who had knowledge from the Scripture said he would bring it before Sulaiman's glance returned to him — and it was done. Sulaiman had the throne disguised and, when the queen arrived, asked if it resembled her own; she answered carefully, \"it is as though it was it.\" Brought into a palace with a floor of smoothed glass, she mistook it for water and bared her shins to wade through — and there, recognizing what she had seen, she said: my Lord, I have wronged myself, and I submit, with Sulaiman, to God, Lord of the worlds.",
+        tr: "Kraliçe mektubu alır — Allah'ın adını taşıyan ve kibirlenmeden teslimiyetle gelmeye çağıran bir mektup — ve meclisine danışır. Danışmanları askeri güç önerir, fakat kararı ona bırakırlar; o ise tecrübeyle, kralların fethettikleri şehirleri harap ettiğini ve şerefli halkını alçalttığını değerlendirir, bunun yerine bir hediye gönderip elçilerinin ne getireceğini görmeyi tercih eder. Elçiler Süleyman'a ulaştığında, o hediyeyi reddeder, Allah'ın kendisine verdiğinin daha hayırlı olduğunu söyler ve onları, karşı koyamayacakları askerlerin geleceği uyarısıyla geri gönderir. Kendi meclisine dönerek, kraliçe teslimiyetle gelmeden önce tahtını kim getirebilir diye sorar. Güçlü bir cin, Süleyman yerinden kalkmadan getirebileceğini söyler; kitaptan bir ilme sahip olan biri ise, Süleyman'ın gözü kendisine dönmeden getirebileceğini söyler — ve öyle olur. Süleyman tahtı değiştirtir ve kraliçe geldiğinde, onun kendi tahtına benzeyip benzemediğini sorar; kraliçe dikkatle şöyle cevap verir: \"Sanki oymuş gibi.\" Cilalı camdan bir zemine sahip saraya alındığında onu su sanıp bacaklarını sıvar — ve orada, gördüğünü fark ederek şöyle der: Rabbim, kendime zulmettim ve Süleyman'la birlikte, âlemlerin Rabbi olan Allah'a teslim oluyorum.",
+        az: 'Padşah məktubu alır — Allahın adını daşıyan və təkəbbürsüz təslimiyyətlə gəlməyə çağıran bir məktub — və məclisi ilə məsləhətləşir. Məsləhətçiləri hərbi güc təklif edir, lakin qərarı ona buraxırlar; o isə təcrübəyə əsaslanaraq, padşahların fəth etdikləri şəhərləri xarabaya çevirdiyini və şərəfli xalqını alçaltdığını dəyərləndirir, bunun əvəzinə bir hədiyyə göndərib elçilərinin nə gətirəcəyini görməyi seçir. Elçilər Süleymana çatanda, o hədiyyəni rədd edir, Allahın ona verdiyinin daha xeyirli olduğunu söyləyir və onları qarşı dura bilməyəcəkləri əsgərlərin gələcəyi xəbərdarlığı ilə geri göndərir. Öz məclisinə dönərək, padşah təslimiyyətlə gəlmədən əvvəl onun taxtını kimin gətirə biləcəyini soruşur. Güclü bir cin, Süleyman yerindən qalxmadan gətirə biləcəyini söyləyir; kitabdan elmə sahib olan biri isə, Süleymanın gözü ona qayıtmadan gətirə biləcəyini söyləyir — və elə olur. Süleyman taxtı dəyişdirir və padşah gələndə, onun öz taxtına bənzəyib-bənzəmədiyini soruşur; padşah diqqətlə belə cavab verir: "Sanki elə odur." Cilalanmış şüşədən döşəməsi olan saraya aparılanda onu su sanıb baldırlarını açır — və orada, gördüyünü anlayaraq belə deyir: Rəbbim, özümə zülm etdim və Süleymanla birlikdə, aləmlərin Rəbbi olan Allaha təslim oluram.',
+        ru: "Царица получила письмо — с именем Бога и призывом прийти с покорностью, а не с высокомерием, — и обратилась к своей знати. Советники предложили военную силу, но оставили решение за ней; она же, исходя из опыта, рассудила, что цари, завоёвывая города, разрушают их и унижают их знатных людей, и решила вместо этого отправить дар и посмотреть, что доложат её послы. Когда те достигли Сулеймана, он отказался от дара, сказав, что данное ему Богом лучше, и отправил их назад с предупреждением о войске, которому они не смогут противостоять. Обратившись к своему собранию, он спросил, кто принесёт её трон прежде, чем она прибудет с покорностью. Могучий джинн предложил принести его прежде, чем Сулейман поднимется со своего места; тот же, у кого было знание из Писания, сказал, что принесёт его прежде, чем взгляд Сулеймана вернётся к нему, — и так и было. Сулейман велел изменить облик трона и, когда царица прибыла, спросил, похож ли он на её собственный; она осторожно ответила: «Как будто это он». Введённая во дворец с полом из гладкого стекла, она приняла его за воду и обнажила голени, чтобы перейти вброд, — и тогда, осознав увиденное, сказала: Господь мой, я поступила несправедливо с собой, и я покоряюсь, вместе с Сулейманом, Богу, Господу миров.",
+      },
+      verseRefs: [
+        "27:29",
+        "27:30",
+        "27:31",
+        "27:32",
+        "27:33",
+        "27:34",
+        "27:35",
+        "27:36",
+        "27:37",
+        "27:38",
+        "27:39",
+        "27:40",
+        "27:41",
+        "27:42",
+        "27:43",
+        "27:44",
+      ],
+    },
+    {
+      id: "dominion-over-wind-and-jinn",
+      title: {
+        en: "The wind blowing by his command",
+        tr: "Emriyle esen rüzgâr",
+        az: "Onun əmri ilə əsən külək",
+        ru: "Ветер, дующий по его повелению",
+      },
+      narrative: {
+        en: "The wind was subjected to Sulaiman — a month's journey in the morning and a month's journey in the afternoon — and a spring of molten copper was made to flow for him. Among the jinn were those who worked for him by his Lord's permission, building for him what he willed: elevated chambers, statues, basins like reservoirs, and stationary kettles — with the instruction, work, family of David, in gratitude, though few of God's servants are grateful. Elsewhere the wind is described blowing gently, wherever he directed, and the jinn as builders and divers, others bound together, with the closing line that this was God's gift, to be granted or withheld without account.",
+        tr: "Rüzgâr, Süleyman'ın emrine verilir — sabah bir aylık, akşam bir aylık mesafe alacak şekilde — ve kendisi için erimiş bakırdan bir pınar akıtılır. Cinlerden Rabbinin izniyle onun için çalışanlar vardır, dilediği şeyleri inşa ederler: yüksek köşkler, heykeller, havuzlar gibi çanaklar ve yerinden kaldırılamayan kazanlar — buyruk şöyledir: Ey Davud ailesi, şükrederek çalışın; ne var ki Allah'ın kullarından şükreden azdır. Başka bir yerde rüzgârın onun yönlendirdiği her yere yumuşacık estiği, cinlerin ise yapıcılar ve dalgıçlar, bir kısmının da bağlı olduğu anlatılır; kapanışta ise bunun Allah'ın hesapsızca bağışlanan ya da esirgenen bir lütfu olduğu belirtilir.",
+        az: "Külək Süleymana ram edilir — səhər bir aylıq, axşam bir aylıq məsafə qət edəcək şəkildə — və onun üçün əridilmiş misdən bir bulaq axıdılır. Cinlərdən Rəbbinin izni ilə onun üçün işləyənlər var, istədiyi şeyləri inşa edirlər: hündür köşklər, heykəllər, hovuzlar kimi qablar və yerindən qaldırılmayan qazanlar — əmr belədir: Ey Davud ailəsi, şükür edərək çalışın; lakin Allahın qullarından şükür edən azdır. Başqa bir yerdə küləyin onun yönləndirdiyi hər yerə yumşaq əsdiyi, cinlərin isə tikici və dalğıc, bəzilərinin də bağlı olduğu təsvir edilir; sonda isə bunun Allahın hesabsız bəxş edilən və ya əsirgənən lütfü olduğu bildirilir.",
+        ru: "Ветер был подчинён Сулейману — путь в месяц утром и путь в месяц вечером, — и для него был пущен источник расплавленной меди. Среди джиннов были те, кто трудился на него с дозволения его Господа, возводя всё, что он пожелает: высокие покои, изваяния, чаши, подобные водоёмам, и неподвижные котлы — с наказом: трудитесь, семья Дауда, в благодарности, хотя мало кто из рабов Бога благодарен. В другом месте ветер описан как дующий мягко, куда бы он ни направил, а джинны — как строители и ныряльщики, а иные скованы вместе, с заключительной строкой о том, что это дар Бога, даруемый или удерживаемый без счёта.",
+      },
+      verseRefs: ["34:12", "34:13", "38:36", "38:37", "38:38", "38:39", "21:81", "21:82"],
+    },
+    {
+      id: "the-test-of-the-horses",
+      title: {
+        en: "My Lord, forgive me",
+        tr: "Rabbim, beni bağışla",
+        az: "Rəbbim, məni bağışla",
+        ru: "Господь мой, прости меня",
+      },
+      narrative: {
+        en: "One afternoon the poised racehorses were paraded before Sulaiman, and he said that he had given preference to his love of these good things over remembrance of his Lord until the sun disappeared from view. He ordered them returned to him and set about the animals. God then tried Sulaiman further, placing something on his throne, and Sulaiman turned back to his Lord, praying: my Lord, forgive me, and grant me a kingdom that will not belong to anyone after me — indeed, You are the Bestower. The Quran affirms, as with Dawud, that for him too is nearness to God and a good place of return.",
+        tr: "Bir öğleden sonra, iyi eğitilmiş yarış atları Süleyman'ın önünden geçirilir ve o, güneş görünmez olana kadar bu güzel şeylere olan sevgisini Rabbini anmaya tercih ettiğini söyler. Onları kendisine geri getirtir ve hayvanlarla meşgul olur. Allah, Süleyman'ı bir kez daha sınar, tahtına bir şey koyar, Süleyman ise Rabbine yönelerek şöyle dua eder: Rabbim, beni bağışla ve bana benden sonra kimseye nasip olmayacak bir mülk bahşet — şüphesiz sen çok bağışlayansın. Kur'an, tıpkı Davud'da olduğu gibi, onun için de Allah'a yakınlığın ve güzel bir dönüş yerinin bulunduğunu doğrular.",
+        az: "Bir günorta yaxşı öyrədilmiş yarış atları Süleymanın önündən keçirilir və o, günəş görünməz olana qədər bu gözəl şeylərə olan sevgisini Rəbbini anmaqdan üstün tutduğunu söyləyir. Onları özünə qaytartdırır və heyvanlarla məşğul olur. Allah Süleymanı bir daha sınayır, taxtına bir şey qoyur, Süleyman isə Rəbbinə üz tutaraq belə dua edir: Rəbbim, məni bağışla və mənə məndən sonra heç kəsə nəsib olmayacaq bir mülk bəxş et — şübhəsiz Sən çox bağışlayansan. Quran, Davudda olduğu kimi, onun üçün də Allaha yaxınlığın və gözəl bir dönüş yerinin olduğunu təsdiqləyir.",
+        ru: "Однажды днём перед Сулейманом провели статных скаковых коней, и он сказал, что предпочёл любовь к этим прекрасным вещам поминанию своего Господа, пока солнце не скрылось из виду. Он велел вернуть их к нему и занялся животными. Затем Бог подверг Сулеймана ещё одному испытанию, поместив нечто на его трон, и Сулейман обратился к своему Господу с мольбой: Господь мой, прости меня и даруй мне царство, которое не будет принадлежать никому после меня, — поистине, Ты Податель. Коран подтверждает, как и в случае с Даудом, что и для него есть близость к Богу и благое место возвращения.",
+      },
+      verseRefs: ["38:31", "38:32", "38:33", "38:34", "38:35", "38:40"],
+    },
+    {
+      id: "death-leaning-on-his-staff",
+      title: {
+        en: "A creature of the earth ate his staff",
+        tr: "Bir yer canlısı asasını yedi",
+        az: "Bir yer canlısı əsasını yedi",
+        ru: "Земное существо съело его посох",
+      },
+      narrative: {
+        en: "When God decreed Sulaiman's death, nothing indicated it to the jinn who had been working for him — he remained standing, leaning on his staff — until a creature of the earth ate through it and he fell. Only then did it become clear to the jinn that, had they truly known the unseen, they would not have remained in that humiliating labor. The Quran leaves the point unstated but plain: their claims to hidden knowledge had never been real.",
+        tr: "Allah, Süleyman'ın ölümüne hükmettiğinde, onun için çalışan cinlere bunu gösteren hiçbir şey olmadı — o, asasına yaslanmış olarak ayakta kaldı — ta ki bir yer canlısı asasını için için yiyip onu düşürene kadar. Ancak o zaman cinlere, eğer gerçekten gaybı bilselerdi bu alçaltıcı emekte kalmayacakları açıkça belli oldu. Kur'an, noktayı açıkça belirtmez ama gayet açıktır: onların gizli bilgiye sahip olma iddiaları hiçbir zaman gerçek olmamıştır.",
+        az: "Allah Süleymanın ölümünə hökm etdikdə, onun üçün işləyən cinlərə bunu göstərən heç nə olmadı — o, əsasına söykənmiş halda ayaqda qaldı — nəhayət bir yer canlısı əsasını için-için yeyib onu yerə salana qədər. Yalnız o zaman cinlərə, əgər həqiqətən qeybi bilsəydilər bu alçaldıcı əməkdə qalmayacaqları aydın oldu. Quran nöqtəni açıq bildirmir, amma tamamilə aydındır: onların gizli bilik iddiaları heç vaxt həqiqi olmamışdır.",
+        ru: "Когда Бог предопределил смерть Сулеймана, ничто не указало на это джиннам, работавшим на него, — он оставался стоящим, опираясь на свой посох, — пока земное существо не проело его насквозь, и он не упал. Лишь тогда джиннам стало ясно, что, знай они на самом деле сокровенное, они не оставались бы в этом унизительном труде. Коран оставляет вывод невысказанным, но очевидным: их притязания на тайное знание никогда не были подлинными.",
+      },
+      verseRefs: ["34:14"],
+    },
+  ],
+  themes: ["wisdom", "dominion", "gratitude", "humility"],
+  relatedNames: ["al-alim", "al-wahhab"],
+};
