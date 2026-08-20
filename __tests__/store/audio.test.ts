@@ -11,6 +11,13 @@ const verseC: AudioVerse = { ref: "112:1", surah: 112, ayah: 1, surahName: "Al-I
 // race guard, which depends on settlement order).
 let pendingPlays: Array<{ resolve: () => void; reject: (e: unknown) => void }>;
 
+// The module-level Audio instance (store/audio.ts's `_audio`) is created once
+// and reused for the whole file — capture it via a constructor spy so tests
+// can dispatch real `error`/`ended` events on it directly, the same way a
+// browser would, rather than reaching into the store's private closures.
+let capturedAudioEl: HTMLAudioElement | null = null;
+const RealAudio = window.Audio;
+
 beforeEach(() => {
   pendingPlays = [];
   window.HTMLMediaElement.prototype.play = vi.fn(
@@ -21,6 +28,14 @@ beforeEach(() => {
   );
   window.HTMLMediaElement.prototype.pause = vi.fn();
   window.HTMLMediaElement.prototype.load = vi.fn();
+  // Re-installed each test (restored by afterEach's restoreAllMocks) — but
+  // store/audio.ts's module-level `_audio` is only ever constructed once for
+  // the whole file, so `capturedAudioEl` naturally stays set after that.
+  vi.spyOn(window, "Audio").mockImplementation(function (...args: unknown[]) {
+    const el = new (RealAudio as unknown as new (...a: unknown[]) => HTMLAudioElement)(...args);
+    capturedAudioEl = el;
+    return el;
+  } as unknown as typeof Audio);
 
   useAudioStore.setState({
     currentRef: null,
@@ -257,5 +272,38 @@ describe("audio store", () => {
     expect(s.isLoading).toBe(false);
     expect(s.queue).toEqual([]);
     expect(s.queueIndex).toBe(0);
+  });
+
+  describe("a track failing to load (CDN 404/network error)", () => {
+    beforeEach(() => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    it("advances to the next track instead of freezing the queue", async () => {
+      useAudioStore.getState().playGraph([verseA, verseB, verseC]);
+      pendingPlays[0].resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(useAudioStore.getState().currentRef).toBe("2:255");
+
+      // Simulate the CDN failing to serve verseA's audio — the browser fires
+      // `error` on the element, never `ended`.
+      capturedAudioEl!.dispatchEvent(new Event("error"));
+      expect(useAudioStore.getState().currentRef).toBe("1:1");
+      expect(useAudioStore.getState().queueIndex).toBe(1);
+    });
+
+    it("stops cleanly (rather than looping) when a single playVerse() track fails", async () => {
+      useAudioStore.getState().playVerse(verseA);
+      pendingPlays[0].resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      capturedAudioEl!.dispatchEvent(new Event("error"));
+      const s = useAudioStore.getState();
+      expect(s.currentRef).toBeNull();
+      expect(s.isPlaying).toBe(false);
+      expect(s.queue).toEqual([]);
+    });
   });
 });
