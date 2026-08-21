@@ -151,7 +151,17 @@ const MIN_QUERY_LENGTH = 2;
  */
 export function matchSurahsByQuery(query: string, localizedNames?: Map<number, string>): number[] {
   const genericQuery = normalizeGeneric(query);
-  if (genericQuery.length < MIN_QUERY_LENGTH) return [];
+  if (genericQuery.length < MIN_QUERY_LENGTH) {
+    // Below the general prefix-matching minimum, only allow an exact hit
+    // against a surah's canonical Arabic name — two surahs (Sad "ص", Qaf "ق")
+    // have single-character canonical Arabic names, which the two-character
+    // minimum would otherwise make permanently unsearchable by their own name.
+    const exactSingleCharMatch = Object.entries(SURAH_NAMES).find(
+      ([, [, arabicName]]) =>
+        genericQuery.length > 0 && normalizeGeneric(arabicName) === genericQuery
+    );
+    return exactSingleCharMatch ? [parseInt(exactSingleCharMatch[0], 10)] : [];
+  }
   // Empty when the query is pure non-Latin script (e.g. Arabic/Cyrillic) —
   // skip the English-side check entirely rather than let an empty prefix
   // match every surah.
@@ -170,4 +180,29 @@ export function matchSurahsByQuery(query: string, localizedNames?: Map<number, s
     if (englishHit || arabicHit || localizedHit) matches.push(num);
   }
   return matches;
+}
+
+/**
+ * True if `query` exactly equals (not just prefixes) the English, Arabic, or
+ * localized name of at least one of `matchedNumbers` — the "kahf" / "Al-Fatiha"
+ * case where the user's intent is unambiguous, vs. a short prefix like "sa"
+ * that merely starts several names and shouldn't suppress verse search.
+ */
+export function isExactSurahNameMatch(
+  query: string,
+  matchedNumbers: number[],
+  localizedNames?: Map<number, string>
+): boolean {
+  const genericQuery = normalizeGeneric(query);
+  const englishQuery = normalizeSurahName(query);
+
+  return matchedNumbers.some((num) => {
+    const [englishName, arabicName] = SURAH_NAMES[num] ?? ["", ""];
+    const localizedName = localizedNames?.get(num);
+    return (
+      (englishQuery.length > 0 && normalizeSurahName(englishName) === englishQuery) ||
+      normalizeGeneric(arabicName) === genericQuery ||
+      (!!localizedName && normalizeGeneric(localizedName) === genericQuery)
+    );
+  });
 }

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { SURAH_NAMES, getSurahName, matchSurahsByQuery } from "@/lib/quran/surah-names";
+import {
+  SURAH_NAMES,
+  getSurahName,
+  matchSurahsByQuery,
+  isExactSurahNameMatch,
+} from "@/lib/quran/surah-names";
 
 describe("SURAH_NAMES", () => {
   it("contains exactly 114 entries", () => {
@@ -100,6 +105,19 @@ describe("matchSurahsByQuery", () => {
     expect(matchSurahsByQuery("b")).toEqual([]);
   });
 
+  it("matches Surah 38 (Sad) by its single-character canonical Arabic name, below the general minimum length", () => {
+    expect(matchSurahsByQuery("ص")).toEqual([38]);
+  });
+
+  it("matches Surah 50 (Qaf) by its single-character canonical Arabic name, below the general minimum length", () => {
+    expect(matchSurahsByQuery("ق")).toEqual([50]);
+  });
+
+  it("still rejects a single-character query that isn't a canonical single-character Arabic name", () => {
+    expect(matchSurahsByQuery("a")).toEqual([]);
+    expect(matchSurahsByQuery("ا")).toEqual([]);
+  });
+
   it("lists every surah whose name starts with a short partial query, in ascending order", () => {
     // Al-Baqarah (2), Al-Balad (90), Al-Bayyinah (98) — all start with "ba"
     // once their Al-/An- style prefix is stripped.
@@ -124,5 +142,45 @@ describe("matchSurahsByQuery", () => {
   it("matches against the localizedNames entry's own surah number, not a hardcoded one", () => {
     const localized = new Map([[5, "Kehf"]]); // deliberately not surah 18
     expect(matchSurahsByQuery("Kehf", localized)).toEqual([5]);
+  });
+});
+
+describe("isExactSurahNameMatch", () => {
+  it("is true for a bare transliteration equal to the full name", () => {
+    expect(isExactSurahNameMatch("kahf", [18])).toBe(true);
+  });
+
+  it("is true for the full hyphenated name", () => {
+    expect(isExactSurahNameMatch("Al-Fatiha", [1])).toBe(true);
+  });
+
+  it("is true for an exact Arabic name match", () => {
+    expect(isExactSurahNameMatch("الكهف", [18])).toBe(true);
+  });
+
+  it("is true for an exact localized name match", () => {
+    const localized = new Map([[18, "Пещера"]]);
+    expect(isExactSurahNameMatch("Пещера", [18], localized)).toBe(true);
+  });
+
+  it("is false for a short prefix that only partially matches several names", () => {
+    // "ba" only starts Al-Baqarah/Al-Balad/Al-Bayyinah, it isn't equal to any of them.
+    expect(isExactSurahNameMatch("ba", [2, 90, 98])).toBe(false);
+  });
+
+  it("is false for a prefix match of a single surah", () => {
+    expect(isExactSurahNameMatch("sa", [34, 37, 38, 61])).toBe(false);
+  });
+
+  it("is false when matchedNumbers is empty", () => {
+    expect(isExactSurahNameMatch("kahf", [])).toBe(false);
+  });
+
+  it("is true for Surah 38 (Sad)'s single-character canonical Arabic name", () => {
+    expect(isExactSurahNameMatch("ص", [38])).toBe(true);
+  });
+
+  it("is true for Surah 50 (Qaf)'s single-character canonical Arabic name", () => {
+    expect(isExactSurahNameMatch("ق", [50])).toBe(true);
   });
 });

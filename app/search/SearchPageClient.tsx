@@ -204,15 +204,8 @@ export function SearchPageClient() {
           <div className="py-20 text-center">
             <p className="text-sm text-text-muted">{t("somethingWentWrong")}</p>
           </div>
-        ) : data?.matchedSurahs && data.matchedSurahs.length === 1 ? (
-          <SurahResultCard surah={data.matchedSurahs[0]} />
-        ) : data?.matchedSurahs && data.matchedSurahs.length > 1 ? (
-          <div className="space-y-2">
-            {data.matchedSurahs.map((surah) => (
-              <SurahListItem key={surah.number} surah={surah} />
-            ))}
-          </div>
-        ) : !data || (data.results.length === 0 && !data.related?.length) ? (
+        ) : !data ||
+          (!data.matchedSurahs?.length && data.results.length === 0 && !data.related?.length) ? (
           <div className="py-20 text-center">
             <BookOpen className="mx-auto mb-4 h-8 w-8 text-text-muted/40" />
             <p className="text-sm text-text-muted">
@@ -234,6 +227,17 @@ export function SearchPageClient() {
           </div>
         ) : (
           <>
+            {data.matchedSurahs && data.matchedSurahs.length === 1 ? (
+              <div className="mb-8">
+                <SurahResultCard surah={data.matchedSurahs[0]} />
+              </div>
+            ) : data.matchedSurahs && data.matchedSurahs.length > 1 ? (
+              <div className="mb-8 space-y-2">
+                {data.matchedSurahs.map((surah) => (
+                  <SurahListItem key={surah.number} surah={surah} />
+                ))}
+              </div>
+            ) : null}
             {data.results.length > 0 ? (
               <>
                 <p className="mb-4 text-sm text-text-muted">

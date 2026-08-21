@@ -411,10 +411,49 @@ describe("GET /api/search", () => {
       expect(mockFetch).toHaveBeenCalled();
     });
 
-    it("lists every surah matching a partial name, in ascending order", async () => {
+    it("lists every surah matching a partial name, in ascending order, alongside verse results", async () => {
+      mockFetch.mockResolvedValueOnce(
+        quranComResponse([{ verse_key: "2:30", translations: [{ text: "..." }] }])
+      );
       const res = await GET(makeSearchReq("ba"));
       const body = await res.json();
       expect(body.matchedSurahs.map((s: { number: number }) => s.number)).toEqual([2, 90, 98]);
+      expect(body.results).toHaveLength(1);
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it("surfaces a partial surah-name prefix match alongside keyword search (regression: 'sa' must not suppress verse results)", async () => {
+      mockFetch.mockResolvedValueOnce(
+        quranComResponse([{ verse_key: "1:1", translations: [{ text: "In the name of Allah" }] }])
+      );
+      const res = await GET(makeSearchReq("sa"));
+      const body = await res.json();
+      expect(body.matchedSurahs.map((s: { number: number }) => s.number)).toEqual([
+        32, 34, 37, 38, 61,
+      ]);
+      expect(body.results).toHaveLength(1);
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it("returns a matchedSurahs payload with no ayah results for Surah 38 (Sad)'s single-character canonical Arabic name", async () => {
+      const res = await GET(makeSearchReq("ص"));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.results).toEqual([]);
+      expect(body.matchedSurahs).toEqual([
+        { number: 38, name: "Sad", nameArabic: "ص", ayahCount: 88 },
+      ]);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("returns a matchedSurahs payload with no ayah results for Surah 50 (Qaf)'s single-character canonical Arabic name", async () => {
+      const res = await GET(makeSearchReq("ق"));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.results).toEqual([]);
+      expect(body.matchedSurahs).toEqual([
+        { number: 50, name: "Qaf", nameArabic: "ق", ayahCount: 45 },
+      ]);
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
