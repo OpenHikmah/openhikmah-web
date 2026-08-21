@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { MatchedSurah, SearchResponse, SearchResult, VerseRef } from "@/types/quran";
-import { getSurahName, matchSurahsByQuery } from "@/lib/quran/surah-names";
+import { getSurahName, isExactSurahNameMatch, matchSurahsByQuery } from "@/lib/quran/surah-names";
 import { fetchLocalizedChapterNames } from "@/lib/quran/chapters";
 import { SURAH_LENGTHS } from "@/lib/quran/audio";
 import { searchByMeaning, type SemanticMatch } from "@/lib/quran/semantic-search";
@@ -170,19 +170,20 @@ export async function GET(req: NextRequest) {
 
   const edition = await getQuranEdition();
 
-  // A query matching a surah name (fully or as a prefix, e.g. "kahf" or "ba")
-  // surfaces the matching surah(s) as their own result — not a list of
-  // individual ayah snippets — so the user can listen to or read one start to
-  // finish. Matches the English name, Arabic name, and (for non-English UI
-  // locales) the localized chapter name. See matchSurahsByQuery.
+  // A query that exactly matches a surah name (e.g. "kahf" or "Al-Fatiha", as
+  // opposed to a short ambiguous prefix like "sa" or "ba") surfaces the
+  // matching surah(s) as their own result — not a list of individual ayah
+  // snippets — so the user can listen to or read one start to finish.
+  // Matches the English name, Arabic name, and (for non-English UI locales)
+  // the localized chapter name. See matchSurahsByQuery/isExactSurahNameMatch.
   const uiLocale = await getUiLocale();
   const localizedNames = await fetchLocalizedChapterNames(uiLocale);
   const matchedSurahNumbers = matchSurahsByQuery(q, localizedNames);
-  if (matchedSurahNumbers.length > 0) {
-    const matchedSurahs: MatchedSurah[] = matchedSurahNumbers.map((num) => {
-      const [name, nameArabic] = getSurahName(num);
-      return { number: num, name, nameArabic, ayahCount: SURAH_LENGTHS[num - 1] };
-    });
+  const matchedSurahs: MatchedSurah[] = matchedSurahNumbers.map((num) => {
+    const [name, nameArabic] = getSurahName(num);
+    return { number: num, name, nameArabic, ayahCount: SURAH_LENGTHS[num - 1] };
+  });
+  if (matchedSurahs.length > 0 && isExactSurahNameMatch(q, matchedSurahNumbers, localizedNames)) {
     const response: SearchResponse = {
       results: [],
       total: 0,
@@ -250,6 +251,7 @@ export async function GET(req: NextRequest) {
     page,
     pageSize,
     ...(related.length > 0 ? { related } : {}),
+    ...(matchedSurahs.length > 0 ? { matchedSurahs } : {}),
   };
   await maybeLogSearchQuery(req, q, "keyword", total);
   if (related.length > 0) {

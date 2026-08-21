@@ -411,11 +411,28 @@ describe("GET /api/search", () => {
       expect(mockFetch).toHaveBeenCalled();
     });
 
-    it("lists every surah matching a partial name, in ascending order", async () => {
+    it("lists every surah matching a partial name, in ascending order, alongside verse results", async () => {
+      mockFetch.mockResolvedValueOnce(
+        quranComResponse([{ verse_key: "2:30", translations: [{ text: "..." }] }])
+      );
       const res = await GET(makeSearchReq("ba"));
       const body = await res.json();
       expect(body.matchedSurahs.map((s: { number: number }) => s.number)).toEqual([2, 90, 98]);
-      expect(mockFetch).not.toHaveBeenCalled();
+      expect(body.results).toHaveLength(1);
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it("surfaces a partial surah-name prefix match alongside keyword search (regression: 'sa' must not suppress verse results)", async () => {
+      mockFetch.mockResolvedValueOnce(
+        quranComResponse([{ verse_key: "1:1", translations: [{ text: "In the name of Allah" }] }])
+      );
+      const res = await GET(makeSearchReq("sa"));
+      const body = await res.json();
+      expect(body.matchedSurahs.map((s: { number: number }) => s.number)).toEqual([
+        32, 34, 37, 38, 61,
+      ]);
+      expect(body.results).toHaveLength(1);
+      expect(mockFetch).toHaveBeenCalled();
     });
 
     it("passes the caller's UI locale to the localized chapter-name fetch", async () => {

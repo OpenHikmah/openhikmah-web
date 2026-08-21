@@ -171,3 +171,28 @@ export function matchSurahsByQuery(query: string, localizedNames?: Map<number, s
   }
   return matches;
 }
+
+/**
+ * True if `query` exactly equals (not just prefixes) the English, Arabic, or
+ * localized name of at least one of `matchedNumbers` — the "kahf" / "Al-Fatiha"
+ * case where the user's intent is unambiguous, vs. a short prefix like "sa"
+ * that merely starts several names and shouldn't suppress verse search.
+ */
+export function isExactSurahNameMatch(
+  query: string,
+  matchedNumbers: number[],
+  localizedNames?: Map<number, string>
+): boolean {
+  const genericQuery = normalizeGeneric(query);
+  const englishQuery = normalizeSurahName(query);
+
+  return matchedNumbers.some((num) => {
+    const [englishName, arabicName] = SURAH_NAMES[num] ?? ["", ""];
+    const localizedName = localizedNames?.get(num);
+    return (
+      (englishQuery.length > 0 && normalizeSurahName(englishName) === englishQuery) ||
+      normalizeGeneric(arabicName) === genericQuery ||
+      (!!localizedName && normalizeGeneric(localizedName) === genericQuery)
+    );
+  });
+}

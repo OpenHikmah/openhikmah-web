@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { SURAH_NAMES, getSurahName, matchSurahsByQuery } from "@/lib/quran/surah-names";
+import {
+  SURAH_NAMES,
+  getSurahName,
+  matchSurahsByQuery,
+  isExactSurahNameMatch,
+} from "@/lib/quran/surah-names";
 
 describe("SURAH_NAMES", () => {
   it("contains exactly 114 entries", () => {
@@ -124,5 +129,37 @@ describe("matchSurahsByQuery", () => {
   it("matches against the localizedNames entry's own surah number, not a hardcoded one", () => {
     const localized = new Map([[5, "Kehf"]]); // deliberately not surah 18
     expect(matchSurahsByQuery("Kehf", localized)).toEqual([5]);
+  });
+});
+
+describe("isExactSurahNameMatch", () => {
+  it("is true for a bare transliteration equal to the full name", () => {
+    expect(isExactSurahNameMatch("kahf", [18])).toBe(true);
+  });
+
+  it("is true for the full hyphenated name", () => {
+    expect(isExactSurahNameMatch("Al-Fatiha", [1])).toBe(true);
+  });
+
+  it("is true for an exact Arabic name match", () => {
+    expect(isExactSurahNameMatch("الكهف", [18])).toBe(true);
+  });
+
+  it("is true for an exact localized name match", () => {
+    const localized = new Map([[18, "Пещера"]]);
+    expect(isExactSurahNameMatch("Пещера", [18], localized)).toBe(true);
+  });
+
+  it("is false for a short prefix that only partially matches several names", () => {
+    // "ba" only starts Al-Baqarah/Al-Balad/Al-Bayyinah, it isn't equal to any of them.
+    expect(isExactSurahNameMatch("ba", [2, 90, 98])).toBe(false);
+  });
+
+  it("is false for a prefix match of a single surah", () => {
+    expect(isExactSurahNameMatch("sa", [34, 37, 38, 61])).toBe(false);
+  });
+
+  it("is false when matchedNumbers is empty", () => {
+    expect(isExactSurahNameMatch("kahf", [])).toBe(false);
   });
 });
