@@ -103,7 +103,7 @@ query.
 Want to run this locally or contribute? See [CONTRIBUTING.md](CONTRIBUTING.md) — it covers local
 setup, running tests, and commit conventions. Read it fully before opening a PR: the project
 touches sacred content, and theological changes (AI prompts, divine name data, verse framing) have
-extra requirements detailed in [Theological Standards](CONTRIBUTING.md#theological-standards).
+extra requirements detailed in [Theological Standards](CONTRIBUTING.md#code-style-and-theological-standards).
 
 ## Security
 
