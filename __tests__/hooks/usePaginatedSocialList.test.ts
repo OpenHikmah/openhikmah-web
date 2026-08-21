@@ -126,6 +126,74 @@ describe("usePaginatedSocialList", () => {
     expect(result.current.items).toEqual([]);
   });
 
+  it("ignores a stale response that lands after a newer overlapping request already resolved", async () => {
+    // The mock fetch below doesn't honor AbortSignal the way a real fetch
+    // does, so calling .abort() on the stale request's controller doesn't
+    // stop its promise from eventually resolving — this exercises the
+    // isCurrent() guard, which is what actually protects state here.
+    let resolveStale!: (r: Response) => void;
+    let resolveFresh!: (r: Response) => void;
+    mockFetch
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveStale = resolve;
+          })
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFresh = resolve;
+          })
+      );
+
+    const { result } = renderHook(() =>
+      usePaginatedSocialList<Item>({ accessToken: "t", enabled: false, baseUrl: "/api/x" })
+    );
+
+    let p1!: Promise<void>;
+    let p2!: Promise<void>;
+    act(() => {
+      p1 = result.current.refresh();
+      p2 = result.current.refresh();
+    });
+
+    // The fresh (second) request resolves first; the stale (first) request's
+    // response lands afterward and must not overwrite it.
+    await act(async () => {
+      resolveFresh(new Response(JSON.stringify(page(0, 1, false)), { status: 200 }));
+      await p2;
+      resolveStale(new Response(JSON.stringify(page(0, 9, false)), { status: 200 }));
+      await p1;
+    });
+
+    expect(result.current.items).toHaveLength(1);
+  });
+
+  it("sets error on a loadMore failure and clears it on a subsequent successful retry", async () => {
+    mockFetch
+      .mockResolvedValueOnce(new Response(JSON.stringify(page(0, 2, true)), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(page(2, 2, false)), { status: 200 }));
+
+    const { result } = renderHook(() =>
+      usePaginatedSocialList<Item>({ accessToken: "t", enabled: true, baseUrl: "/api/x" })
+    );
+    await waitFor(() => expect(result.current.items).toHaveLength(2));
+
+    await act(async () => {
+      await result.current.loadMore();
+    });
+    expect(result.current.error).toBe(true);
+    expect(result.current.items).toHaveLength(2);
+
+    await act(async () => {
+      await result.current.loadMore();
+    });
+    expect(result.current.error).toBe(false);
+    expect(result.current.items).toHaveLength(4);
+  });
+
   it("calls onData with each successfully replaced page", async () => {
     mockFetch.mockResolvedValue(new Response(JSON.stringify(page(0, 2, false)), { status: 200 }));
     const onData = vi.fn();

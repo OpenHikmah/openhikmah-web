@@ -54,6 +54,11 @@ export function usePaginatedSocialList<T>({ accessToken, enabled, baseUrl, onDat
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
+      // Aborting the previous controller doesn't retroactively cancel a
+      // request whose response already landed on the wire — only whichever
+      // request is still the current one may apply its result to state,
+      // so an out-of-order resolution can't clobber a newer request's data.
+      const isCurrent = () => abortRef.current === ctrl;
 
       if (mode === "replace") setLoading(true);
       else setLoadingMore(true);
@@ -62,25 +67,30 @@ export function usePaginatedSocialList<T>({ accessToken, enabled, baseUrl, onDat
           headers: { Authorization: `Bearer ${accessToken}` },
           signal: ctrl.signal,
         });
+        if (!isCurrent()) return;
         if (!res.ok) {
-          if (mode === "replace") setError(true);
+          setError(true);
           return;
         }
         const data: PagedResponse<T> = await res.json();
+        if (!isCurrent()) return;
         if (mode === "replace") {
           setItems(data.items);
           onDataRef.current?.(data.items);
-          setError(false);
         } else {
           setItems((prev) => [...prev, ...data.items]);
         }
         setHasMore(data.hasMore);
+        setError(false);
       } catch (e) {
         if ((e as { name?: string }).name === "AbortError") return;
-        if (mode === "replace") setError(true);
+        if (!isCurrent()) return;
+        setError(true);
       } finally {
-        if (mode === "replace") setLoading(false);
-        else setLoadingMore(false);
+        if (isCurrent()) {
+          if (mode === "replace") setLoading(false);
+          else setLoadingMore(false);
+        }
       }
     },
     [accessToken]
