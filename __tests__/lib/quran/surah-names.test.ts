@@ -105,6 +105,19 @@ describe("matchSurahsByQuery", () => {
     expect(matchSurahsByQuery("b")).toEqual([]);
   });
 
+  it("matches Surah 38 (Sad) by its single-character canonical Arabic name, below the general minimum length", () => {
+    expect(matchSurahsByQuery("ص")).toEqual([38]);
+  });
+
+  it("matches Surah 50 (Qaf) by its single-character canonical Arabic name, below the general minimum length", () => {
+    expect(matchSurahsByQuery("ق")).toEqual([50]);
+  });
+
+  it("still rejects a single-character query that isn't a canonical single-character Arabic name", () => {
+    expect(matchSurahsByQuery("a")).toEqual([]);
+    expect(matchSurahsByQuery("ا")).toEqual([]);
+  });
+
   it("lists every surah whose name starts with a short partial query, in ascending order", () => {
     // Al-Baqarah (2), Al-Balad (90), Al-Bayyinah (98) — all start with "ba"
     // once their Al-/An- style prefix is stripped.
@@ -161,5 +174,13 @@ describe("isExactSurahNameMatch", () => {
 
   it("is false when matchedNumbers is empty", () => {
     expect(isExactSurahNameMatch("kahf", [])).toBe(false);
+  });
+
+  it("is true for Surah 38 (Sad)'s single-character canonical Arabic name", () => {
+    expect(isExactSurahNameMatch("ص", [38])).toBe(true);
+  });
+
+  it("is true for Surah 50 (Qaf)'s single-character canonical Arabic name", () => {
+    expect(isExactSurahNameMatch("ق", [50])).toBe(true);
   });
 });

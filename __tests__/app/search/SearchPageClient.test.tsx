@@ -340,3 +340,71 @@ describe("SearchPageClient — related-by-meaning results", () => {
     expect(screen.getByText("Related by meaning")).toBeInTheDocument();
   });
 });
+
+describe("SearchPageClient — matched-surah results", () => {
+  const mockFetch = vi.fn();
+  const matchedSurah = { number: 34, name: "Saba", nameArabic: "سبأ", ayahCount: 54 };
+  const verseResult = {
+    ref: "1:1",
+    surahName: "Al-Fatiha",
+    surahNameArabic: "الفاتحة",
+    snippet: "In the name of Allah.",
+    arabicText: "بِسْمِ اللَّهِ",
+    translation: "In the name of Allah.",
+  };
+
+  beforeEach(() => {
+    mockSearchParams = new URLSearchParams({ q: "sa" });
+    vi.stubGlobal("fetch", mockFetch);
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("renders both the matched-surah section and verse results when the response has both", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          results: [verseResult],
+          total: 1,
+          page: 1,
+          pageSize: 20,
+          matchedSurahs: [matchedSurah],
+        }),
+        { status: 200 }
+      )
+    );
+
+    await act(async () => {
+      renderWithIntl(<SearchPageClient />);
+    });
+
+    expect(screen.getByText(matchedSurah.name)).toBeInTheDocument();
+    expect(screen.getByText(verseResult.translation)).toBeInTheDocument();
+    expect(screen.queryByText(/no exact matches/i)).not.toBeInTheDocument();
+  });
+
+  it("renders only the matched-surah section, with no 'no exact matches' empty state, when there are no verse results", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          results: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+          matchedSurahs: [matchedSurah],
+        }),
+        { status: 200 }
+      )
+    );
+
+    await act(async () => {
+      renderWithIntl(<SearchPageClient />);
+    });
+
+    expect(screen.getByText(matchedSurah.name)).toBeInTheDocument();
+    expect(screen.queryByText(/no exact matches/i)).not.toBeInTheDocument();
+  });
+});
