@@ -5,6 +5,7 @@ import { friendships, users } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
 import { rateLimitOrNull } from "@/lib/infra/rate-limit";
 import { isUniqueViolation, parsePagination } from "@/lib/infra/http";
+import { effectiveStreak } from "@/lib/social/streak";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
@@ -21,10 +22,8 @@ export async function GET(req: NextRequest) {
       addresseeId: friendships.addresseeId,
       status: friendships.status,
       createdAt: friendships.createdAt,
-      requesterUsername: users.username,
     })
     .from(friendships)
-    .innerJoin(users, eq(users.id, friendships.requesterId))
     .where(or(eq(friendships.requesterId, userId), eq(friendships.addresseeId, userId)))
     .orderBy(desc(friendships.createdAt))
     .limit(limit + 1)
@@ -39,7 +38,12 @@ export async function GET(req: NextRequest) {
   const friendUsers =
     friendIds.length > 0
       ? await db
-          .select({ id: users.id, username: users.username, currentStreak: users.currentStreak })
+          .select({
+            id: users.id,
+            username: users.username,
+            currentStreak: users.currentStreak,
+            lastActivityDate: users.lastActivityDate,
+          })
           .from(users)
           .where(
             friendIds.length === 1
@@ -58,7 +62,11 @@ export async function GET(req: NextRequest) {
       status: r.status,
       direction: r.requesterId === userId ? "sent" : "received",
       friend: friend
-        ? { id: friend.id, username: friend.username, streak: friend.currentStreak }
+        ? {
+            id: friend.id,
+            username: friend.username,
+            streak: effectiveStreak(friend.currentStreak, friend.lastActivityDate),
+          }
         : null,
       createdAt: r.createdAt,
     };
@@ -145,18 +153,11 @@ export async function POST(req: NextRequest) {
       }
       return NextResponse.json({ error: "Request already sent" }, { status: 409 });
     }
-    // A previously declined request — re-open it as a fresh outgoing request.
-    const [reopened] = await db
-      .update(friendships)
-      .set({
-        requesterId: userId,
-        addresseeId: target.id,
-        status: "pending",
-        updatedAt: new Date(),
-      })
-      .where(eq(friendships.id, existing.id))
-      .returning();
-    return NextResponse.json({ id: reopened.id, status: reopened.status, friend }, { status: 201 });
+    // A "declined" row here is historical data from before declines were
+    // deleted outright (see PATCH .../[friendId]) — remove it first so it
+    // can't collide with the unique (requesterId, addresseeId) index below;
+    // a fresh request should behave identically to a first-time request.
+    await db.delete(friendships).where(eq(friendships.id, existing.id));
   }
 
   try {

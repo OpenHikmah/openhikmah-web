@@ -40,17 +40,7 @@ describe("Header — polling badges survive a transient failure", () => {
           mockFetch.mock.calls.filter((c) => String(c[0]).startsWith("/api/social/friends"))
             .length === 1
         ) {
-          return Promise.resolve(
-            new Response(
-              JSON.stringify({
-                items: [
-                  { status: "pending", direction: "received" },
-                  { status: "pending", direction: "received" },
-                ],
-              }),
-              { status: 200 }
-            )
-          );
+          return Promise.resolve(new Response(JSON.stringify({ count: 2 }), { status: 200 }));
         }
         return Promise.resolve(new Response(null, { status: 500 }));
       }

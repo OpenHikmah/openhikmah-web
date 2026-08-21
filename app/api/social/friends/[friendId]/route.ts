@@ -46,11 +46,36 @@ export async function PATCH(
     return NextResponse.json({ error: "Request already resolved" }, { status: 409 });
   }
 
+  // Re-check `status = "pending"` in the mutation's own WHERE (not just the
+  // read above) so two concurrent accept/decline calls can't both pass the
+  // read and then both mutate — whichever loses the race affects zero rows
+  // and gets a 409 instead of silently succeeding or throwing on a missing row.
+  const pendingGuard = and(
+    eq(friendships.id, friendshipId),
+    eq(friendships.addresseeId, userId),
+    eq(friendships.status, "pending")
+  );
+
+  if (action === "decline") {
+    // Declines are deleted outright rather than kept as a "declined" row —
+    // a re-request after a decline should look identical to a first-time
+    // request, and nothing reads declined history.
+    const deleted = await db.delete(friendships).where(pendingGuard).returning();
+    if (deleted.length === 0) {
+      return NextResponse.json({ error: "Request already resolved" }, { status: 409 });
+    }
+    return NextResponse.json({ id: friendshipId, status: "declined" });
+  }
+
   const [updated] = await db
     .update(friendships)
-    .set({ status: action === "accept" ? "accepted" : "declined", updatedAt: new Date() })
-    .where(eq(friendships.id, friendshipId))
+    .set({ status: "accepted", updatedAt: new Date() })
+    .where(pendingGuard)
     .returning();
+
+  if (!updated) {
+    return NextResponse.json({ error: "Request already resolved" }, { status: 409 });
+  }
 
   return NextResponse.json({ id: updated.id, status: updated.status });
 }

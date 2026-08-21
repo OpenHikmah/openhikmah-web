@@ -144,18 +144,52 @@ describe("PATCH /api/social/friends/[friendId]", () => {
     expect(whereJSON(whereCalls[0])).toContain("2");
   });
 
-  it("the addressee can decline a pending request", async () => {
+  it("the addressee can decline a pending request, deleting the row rather than soft-marking it", async () => {
     const addressee = makeUser({ id: 2 });
     authedAs(addressee);
     mockSelect.mockReturnValue(
       makeDbChain([{ id: 1, requesterId: 1, addresseeId: 2, status: "pending" }])
     );
-    mockUpdate.mockReturnValue(makeDbChain([{ id: 1, status: "declined" }]));
+    mockDelete.mockReturnValue(makeDbChain([{ id: 1 }]));
 
     const res = await PATCH(patchReq({ action: "decline" }), params());
 
     expect(res.status).toBe(200);
     expect((await res.json()).status).toBe("declined");
+    expect(mockDelete).toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+    // The delete itself must be re-scoped to status='pending' (not just the
+    // id looked up above) so a concurrent resolve can't be raced past.
+    expect(whereJSON(whereCalls[1])).toContain('"status"');
+  });
+
+  it("409s an accept that loses a race to a concurrent resolve, without dereferencing an empty update result", async () => {
+    // The initial read sees "pending", but by the time the UPDATE's own
+    // WHERE (id + addresseeId + status='pending') runs, a concurrent
+    // request already resolved it — .returning() comes back empty.
+    const addressee = makeUser({ id: 2 });
+    authedAs(addressee);
+    mockSelect.mockReturnValue(
+      makeDbChain([{ id: 1, requesterId: 1, addresseeId: 2, status: "pending" }])
+    );
+    mockUpdate.mockReturnValue(makeDbChain([]));
+
+    const res = await PATCH(patchReq({ action: "accept" }), params());
+
+    expect(res.status).toBe(409);
+  });
+
+  it("409s a decline that loses a race to a concurrent resolve, without treating zero deleted rows as success", async () => {
+    const addressee = makeUser({ id: 2 });
+    authedAs(addressee);
+    mockSelect.mockReturnValue(
+      makeDbChain([{ id: 1, requesterId: 1, addresseeId: 2, status: "pending" }])
+    );
+    mockDelete.mockReturnValue(makeDbChain([]));
+
+    const res = await PATCH(patchReq({ action: "decline" }), params());
+
+    expect(res.status).toBe(409);
   });
 
   it("rejects the requester (or any non-addressee) trying to accept/decline their own outgoing request", async () => {

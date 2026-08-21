@@ -32,10 +32,11 @@ function makeDbChain(resolveWith: unknown = []) {
   return chain;
 }
 
-const { mockSelect, mockInsert, mockUpdate, mockRateLimitOrNull } = vi.hoisted(() => ({
+const { mockSelect, mockInsert, mockUpdate, mockDelete, mockRateLimitOrNull } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
   mockInsert: vi.fn(() => makeDbChain([])),
   mockUpdate: vi.fn(() => makeDbChain([])),
+  mockDelete: vi.fn(() => makeDbChain([])),
   mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
 }));
 
@@ -44,6 +45,7 @@ vi.mock("@/lib/infra/db", () => ({
     select: mockSelect,
     insert: mockInsert,
     update: mockUpdate,
+    delete: mockDelete,
   },
 }));
 vi.mock("@/lib/infra/rate-limit", () => ({
@@ -156,6 +158,62 @@ describe("GET /api/social/friends", () => {
     expect(body.items).toHaveLength(1);
     expect(body.hasMore).toBe(false);
   });
+
+  it("shows the decayed streak (0), not the stale stored value, for a broken streak", async () => {
+    // Same decay rule as the leaderboard route: a friend's currentStreak is
+    // only real while lastActivityDate is today or yesterday. Without
+    // applying effectiveStreak here, this friend would show a stale nonzero
+    // streak in the Friends tab that disagrees with the Leaderboard tab.
+    authedAs(makeUser({ id: 1 }));
+    mockSelect
+      .mockReturnValueOnce(
+        makeDbChain([
+          { id: 1, requesterId: 1, addresseeId: 2, status: "accepted", createdAt: new Date() },
+        ])
+      )
+      .mockReturnValueOnce(
+        makeDbChain([
+          { id: 2, username: "friend2", currentStreak: 7, lastActivityDate: "2000-01-01" },
+        ])
+      );
+    const res = await GET(makeGetReq());
+    const body = await res.json();
+    expect(body.items[0].friend.streak).toBe(0);
+  });
+
+  it("shows the live streak for a friend active today", async () => {
+    authedAs(makeUser({ id: 1 }));
+    const today = new Date().toISOString().slice(0, 10);
+    mockSelect
+      .mockReturnValueOnce(
+        makeDbChain([
+          { id: 1, requesterId: 1, addresseeId: 2, status: "accepted", createdAt: new Date() },
+        ])
+      )
+      .mockReturnValueOnce(
+        makeDbChain([{ id: 2, username: "friend2", currentStreak: 7, lastActivityDate: today }])
+      );
+    const res = await GET(makeGetReq());
+    const body = await res.json();
+    expect(body.items[0].friend.streak).toBe(7);
+  });
+
+  it("still shows the live streak for a friend last active yesterday (the decay boundary)", async () => {
+    authedAs(makeUser({ id: 1 }));
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    mockSelect
+      .mockReturnValueOnce(
+        makeDbChain([
+          { id: 1, requesterId: 1, addresseeId: 2, status: "accepted", createdAt: new Date() },
+        ])
+      )
+      .mockReturnValueOnce(
+        makeDbChain([{ id: 2, username: "friend2", currentStreak: 7, lastActivityDate: yesterday }])
+      );
+    const res = await GET(makeGetReq());
+    const body = await res.json();
+    expect(body.items[0].friend.streak).toBe(7);
+  });
 });
 
 describe("POST /api/social/friends", () => {
@@ -166,6 +224,7 @@ describe("POST /api/social/friends", () => {
       makeDbChain([{ id: 10, status: "pending", requesterId: 1, addresseeId: 2 }])
     );
     mockUpdate.mockReturnValue(makeDbChain([]));
+    mockDelete.mockReturnValue(makeDbChain([]));
     mockRateLimitOrNull.mockReset();
     mockRateLimitOrNull.mockResolvedValue(null);
   });
@@ -233,6 +292,24 @@ describe("POST /api/social/friends", () => {
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body.error).toMatch(/already friends/i);
+  });
+
+  it("re-requesting after a historical declined row deletes it and inserts fresh (not a 409)", async () => {
+    // Declines are deleted going forward (see PATCH .../[friendId]), but a
+    // "declined" row can still exist from before that change shipped. It
+    // must not collide with the unique (requesterId, addresseeId) index.
+    authedAs(makeUser({ id: 1 }));
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([{ id: 2, username: "friend99" }]))
+      .mockReturnValueOnce(makeDbChain([{ id: 10, status: "declined", requesterId: 1 }]));
+    mockInsert.mockReturnValue(
+      makeDbChain([{ id: 11, status: "pending", requesterId: 1, addresseeId: 2 }])
+    );
+    const res = await POST(makePostReq({ username: "friend99" }));
+    expect(mockDelete).toHaveBeenCalled();
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.status).toBe("pending");
   });
 
   it("returns 409 when an outgoing request is already pending", async () => {
