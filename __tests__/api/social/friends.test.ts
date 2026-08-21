@@ -156,6 +156,45 @@ describe("GET /api/social/friends", () => {
     expect(body.items).toHaveLength(1);
     expect(body.hasMore).toBe(false);
   });
+
+  it("shows the decayed streak (0), not the stale stored value, for a broken streak", async () => {
+    // Same decay rule as the leaderboard route: a friend's currentStreak is
+    // only real while lastActivityDate is today or yesterday. Without
+    // applying effectiveStreak here, this friend would show a stale nonzero
+    // streak in the Friends tab that disagrees with the Leaderboard tab.
+    authedAs(makeUser({ id: 1 }));
+    mockSelect
+      .mockReturnValueOnce(
+        makeDbChain([
+          { id: 1, requesterId: 1, addresseeId: 2, status: "accepted", createdAt: new Date() },
+        ])
+      )
+      .mockReturnValueOnce(
+        makeDbChain([
+          { id: 2, username: "friend2", currentStreak: 7, lastActivityDate: "2000-01-01" },
+        ])
+      );
+    const res = await GET(makeGetReq());
+    const body = await res.json();
+    expect(body.items[0].friend.streak).toBe(0);
+  });
+
+  it("shows the live streak for a friend active today or yesterday", async () => {
+    authedAs(makeUser({ id: 1 }));
+    const today = new Date().toISOString().slice(0, 10);
+    mockSelect
+      .mockReturnValueOnce(
+        makeDbChain([
+          { id: 1, requesterId: 1, addresseeId: 2, status: "accepted", createdAt: new Date() },
+        ])
+      )
+      .mockReturnValueOnce(
+        makeDbChain([{ id: 2, username: "friend2", currentStreak: 7, lastActivityDate: today }])
+      );
+    const res = await GET(makeGetReq());
+    const body = await res.json();
+    expect(body.items[0].friend.streak).toBe(7);
+  });
 });
 
 describe("POST /api/social/friends", () => {

@@ -144,18 +144,19 @@ describe("PATCH /api/social/friends/[friendId]", () => {
     expect(whereJSON(whereCalls[0])).toContain("2");
   });
 
-  it("the addressee can decline a pending request", async () => {
+  it("the addressee can decline a pending request, deleting the row rather than soft-marking it", async () => {
     const addressee = makeUser({ id: 2 });
     authedAs(addressee);
     mockSelect.mockReturnValue(
       makeDbChain([{ id: 1, requesterId: 1, addresseeId: 2, status: "pending" }])
     );
-    mockUpdate.mockReturnValue(makeDbChain([{ id: 1, status: "declined" }]));
 
     const res = await PATCH(patchReq({ action: "decline" }), params());
 
     expect(res.status).toBe(200);
     expect((await res.json()).status).toBe("declined");
+    expect(mockDelete).toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("rejects the requester (or any non-addressee) trying to accept/decline their own outgoing request", async () => {
