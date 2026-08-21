@@ -37,10 +37,16 @@ export function usePaginatedSocialList<T>({ accessToken, enabled, baseUrl, onDat
   const [error, setError] = useState(false);
 
   const itemsRef = useRef(items);
-  itemsRef.current = items;
   const abortRef = useRef<AbortController | null>(null);
   const onDataRef = useRef(onData);
-  onDataRef.current = onData;
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  useEffect(() => {
+    onDataRef.current = onData;
+  }, [onData]);
 
   const runFetch = useCallback(
     async (url: string, mode: "replace" | "append") => {
