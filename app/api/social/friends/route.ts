@@ -153,9 +153,11 @@ export async function POST(req: NextRequest) {
       }
       return NextResponse.json({ error: "Request already sent" }, { status: 409 });
     }
-    // Declined friendships are deleted (see PATCH .../[friendId]), so a
-    // "declined" status here should be unreachable — kept as a defensive
-    // fallthrough to the fresh-insert path below rather than a silent no-op.
+    // A "declined" row here is historical data from before declines were
+    // deleted outright (see PATCH .../[friendId]) — remove it first so it
+    // can't collide with the unique (requesterId, addresseeId) index below;
+    // a fresh request should behave identically to a first-time request.
+    await db.delete(friendships).where(eq(friendships.id, existing.id));
   }
 
   try {

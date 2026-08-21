@@ -20,8 +20,6 @@ import { useCanvasStore, serializeCanvas } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { useAudioStore } from "@/store/audio";
-import { countPendingReceived } from "@/lib/social/friends";
-import { MAX_LIMIT } from "@/lib/infra/http";
 import type { AudioVerse } from "@/store/audio";
 import type { Verse } from "@/types/quran";
 import { buildShareUrl } from "@/hooks/useCanvasPersistence";
@@ -239,20 +237,20 @@ export function Header({ onSearchOpen }: HeaderProps) {
   // Poll for incoming friend requests every 60 s while signed in
   useEffect(() => {
     if (!accessToken || !userId) return;
-    // Use the pagination max rather than the default page size: this poll
-    // only needs an accurate pending-request count, and defaulting to a
-    // small page could undercount for a user with many friends.
+    // A dedicated COUNT endpoint, not a page of friendship rows filtered
+    // client-side — a user with more pending requests than any single page
+    // would otherwise have their badge silently undercount.
     const load = () =>
-      fetch(`/api/social/friends?limit=${MAX_LIMIT}`, {
+      fetch("/api/social/friends/pending-count", {
         headers: { Authorization: `Bearer ${accessToken}` },
       })
         // A failed poll keeps the previously-displayed count rather than
         // resetting it to 0 — a transient 5xx/network hiccup shouldn't make
         // an already-shown badge disappear.
         .then((r) => (r.ok ? r.json() : null))
-        .then((data: { items: { status: string; direction: string }[] } | null) => {
+        .then((data: { count: number } | null) => {
           if (!data) return;
-          setPendingFriendCount(countPendingReceived(data.items));
+          setPendingFriendCount(data.count);
         })
         .catch((e) => console.error("header: friend-request poll failed", e));
     load();
