@@ -204,4 +204,26 @@ describe("usePaginatedSocialList", () => {
 
     await waitFor(() => expect(onData).toHaveBeenCalledWith(page(0, 2, false).items));
   });
+
+  it("calls onData with the complete combined list after loadMore appends a page", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("offset=2")) {
+        return Promise.resolve(new Response(JSON.stringify(page(2, 2, false)), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify(page(0, 2, true)), { status: 200 }));
+    });
+    const onData = vi.fn();
+
+    const { result } = renderHook(() =>
+      usePaginatedSocialList<Item>({ accessToken: "t", enabled: true, baseUrl: "/api/x", onData })
+    );
+    await waitFor(() => expect(result.current.items).toHaveLength(2));
+    onData.mockClear();
+
+    await act(async () => {
+      await result.current.loadMore();
+    });
+
+    expect(onData).toHaveBeenCalledWith(page(0, 4, false).items);
+  });
 });

@@ -78,7 +78,9 @@ export function usePaginatedSocialList<T>({ accessToken, enabled, baseUrl, onDat
           setItems(data.items);
           onDataRef.current?.(data.items);
         } else {
-          setItems((prev) => [...prev, ...data.items]);
+          const combined = [...itemsRef.current, ...data.items];
+          setItems(combined);
+          onDataRef.current?.(combined);
         }
         setHasMore(data.hasMore);
         setError(false);
@@ -111,8 +113,7 @@ export function usePaginatedSocialList<T>({ accessToken, enabled, baseUrl, onDat
     if (!enabled || !accessToken) return;
     refresh();
     return () => abortRef.current?.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, accessToken, baseUrl]);
+  }, [enabled, accessToken, baseUrl, refresh]);
 
   return { items, hasMore, loading, loadingMore, error, refresh, loadMore };
 }
