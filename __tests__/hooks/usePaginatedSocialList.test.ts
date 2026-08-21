@@ -29,7 +29,7 @@ describe("usePaginatedSocialList", () => {
     mockFetch.mockResolvedValue(new Response(JSON.stringify(page(0, 2, true)), { status: 200 }));
 
     const { result } = renderHook(() =>
-      usePaginatedSocialList({ accessToken: "t", enabled: true, baseUrl: "/api/x" })
+      usePaginatedSocialList<Item>({ accessToken: "t", enabled: true, baseUrl: "/api/x" })
     );
 
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -43,10 +43,10 @@ describe("usePaginatedSocialList", () => {
 
   it("does not fetch when disabled or missing a token", () => {
     renderHook(() =>
-      usePaginatedSocialList({ accessToken: null, enabled: true, baseUrl: "/api/x" })
+      usePaginatedSocialList<Item>({ accessToken: null, enabled: true, baseUrl: "/api/x" })
     );
     renderHook(() =>
-      usePaginatedSocialList({ accessToken: "t", enabled: false, baseUrl: "/api/x" })
+      usePaginatedSocialList<Item>({ accessToken: "t", enabled: false, baseUrl: "/api/x" })
     );
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -60,7 +60,7 @@ describe("usePaginatedSocialList", () => {
     });
 
     const { result } = renderHook(() =>
-      usePaginatedSocialList({ accessToken: "t", enabled: true, baseUrl: "/api/x" })
+      usePaginatedSocialList<Item>({ accessToken: "t", enabled: true, baseUrl: "/api/x" })
     );
     await waitFor(() => expect(result.current.items).toHaveLength(2));
 
@@ -83,7 +83,7 @@ describe("usePaginatedSocialList", () => {
     });
 
     const { result } = renderHook(() =>
-      usePaginatedSocialList({ accessToken: "t", enabled: true, baseUrl: "/api/x" })
+      usePaginatedSocialList<Item>({ accessToken: "t", enabled: true, baseUrl: "/api/x" })
     );
     await waitFor(() => expect(result.current.items).toHaveLength(2));
 
@@ -99,7 +99,7 @@ describe("usePaginatedSocialList", () => {
     mockFetch.mockResolvedValue(new Response(null, { status: 500 }));
 
     const { result } = renderHook(() =>
-      usePaginatedSocialList({ accessToken: "t", enabled: true, baseUrl: "/api/x" })
+      usePaginatedSocialList<Item>({ accessToken: "t", enabled: true, baseUrl: "/api/x" })
     );
 
     await waitFor(() => expect(result.current.error).toBe(true));
@@ -118,7 +118,7 @@ describe("usePaginatedSocialList", () => {
     mockFetch.mockRejectedValue(abortError);
 
     const { result } = renderHook(() =>
-      usePaginatedSocialList({ accessToken: "t", enabled: true, baseUrl: "/api/x" })
+      usePaginatedSocialList<Item>({ accessToken: "t", enabled: true, baseUrl: "/api/x" })
     );
 
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -131,7 +131,7 @@ describe("usePaginatedSocialList", () => {
     const onData = vi.fn();
 
     renderHook(() =>
-      usePaginatedSocialList({ accessToken: "t", enabled: true, baseUrl: "/api/x", onData })
+      usePaginatedSocialList<Item>({ accessToken: "t", enabled: true, baseUrl: "/api/x", onData })
     );
 
     await waitFor(() => expect(onData).toHaveBeenCalledWith(page(0, 2, false).items));
