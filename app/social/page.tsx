@@ -15,14 +15,27 @@ import type { Suggestion } from "@/components/social/ChallengeSuggestions";
 import { Loader2, Users, Trophy, Swords } from "lucide-react";
 import Link from "next/link";
 import { AuthShell } from "@/components/layout/AuthShell";
+import { usePaginatedSocialList } from "@/hooks/usePaginatedSocialList";
+import { countPendingReceived } from "@/lib/social/friends";
 
 type Tab = "friends" | "leaderboard" | "challenges";
 
-/** Count of incoming pending friend requests — drives the friends badge. */
-function countPendingReceived(friends: unknown[]): number {
-  return (friends as { status?: string; direction?: string }[]).filter(
-    (f) => f.status === "pending" && f.direction === "received"
-  ).length;
+interface FriendEntry {
+  id: number;
+  status: "pending" | "accepted" | "declined";
+  direction: "sent" | "received";
+  friend: { id: number; username: string; streak: number } | null;
+  createdAt: string;
+}
+
+interface LeaderboardEntry {
+  rank: number;
+  id: number;
+  username: string;
+  displayName: string | null;
+  streak: number;
+  longestStreak: number;
+  isYou: boolean;
 }
 
 /** Count of incoming challenges awaiting my response — drives the challenges badge. */
@@ -40,12 +53,6 @@ export default function SocialPage() {
   const pendingChallengeCount = useSocialStore((s) => s.pendingChallengeCount);
 
   const [tab, setTab] = useState<Tab>("leaderboard");
-  const [friends, setFriends] = useState<unknown[]>([]);
-  const [friendsHasMore, setFriendsHasMore] = useState(false);
-  const [loadingMoreFriends, setLoadingMoreFriends] = useState(false);
-  const [leaderboard, setLeaderboard] = useState<unknown[]>([]);
-  const [leaderboardHasMore, setLeaderboardHasMore] = useState(false);
-  const [loadingMoreLeaderboard, setLoadingMoreLeaderboard] = useState(false);
   const [challengesList, setChallengesList] = useState<EnrichedChallenge[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [prefill, setPrefill] = useState<ChallengePrefill | null>(null);
@@ -55,17 +62,43 @@ export default function SocialPage() {
   // run (or has just run) and its `finally` always clears these. Defaulting to
   // false let the empty-state UI (e.g. "Add friends to see them here.") flash
   // for one frame before the real data arrived.
-  const [loadingFriends, setLoadingFriends] = useState(true);
-  const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
   const [loadingChallenges, setLoadingChallenges] = useState(true);
   // Tracked per section (not one shared flag) — otherwise a later-resolving
   // fetch that succeeds would clear the banner even though a different
   // section actually failed and is showing stale/missing data.
-  const [friendsError, setFriendsError] = useState(false);
-  const [leaderboardError, setLeaderboardError] = useState(false);
   const [challengesError, setChallengesError] = useState(false);
-  const loadError = friendsError || leaderboardError || challengesError;
   const [profileTimedOut, setProfileTimedOut] = useState(false);
+
+  const {
+    items: friends,
+    hasMore: friendsHasMore,
+    loading: loadingFriends,
+    loadingMore: loadingMoreFriends,
+    error: friendsError,
+    refresh: fetchFriends,
+    loadMore: loadMoreFriends,
+  } = usePaginatedSocialList<FriendEntry>({
+    accessToken,
+    enabled: !!userId,
+    baseUrl: "/api/social/friends",
+    onData: (items) => setPendingFriendCount(countPendingReceived(items)),
+  });
+
+  const {
+    items: leaderboard,
+    hasMore: leaderboardHasMore,
+    loading: loadingLeaderboard,
+    loadingMore: loadingMoreLeaderboard,
+    error: leaderboardError,
+    refresh: fetchLeaderboard,
+    loadMore: loadMoreLeaderboard,
+  } = usePaginatedSocialList<LeaderboardEntry>({
+    accessToken,
+    enabled: !!userId,
+    baseUrl: "/api/social/leaderboard",
+  });
+
+  const loadError = friendsError || leaderboardError || challengesError;
 
   // Picking a suggestion seeds the create form (remounted via key) and clears on send.
   const pickSuggestion = (s: Suggestion) => {
@@ -81,103 +114,6 @@ export default function SocialPage() {
     setPrefill(null);
     setPrefillKey((k) => k + 1);
   };
-
-  const fetchFriends = useCallback(async () => {
-    if (!accessToken) return;
-    setLoadingFriends(true);
-    try {
-      // Re-fetch the same number of items already loaded (via "Load more")
-      // instead of always resetting to the first page — otherwise an
-      // unrelated friend action (accept/decline/remove) would silently
-      // discard any extra pages the user had loaded. +1 covers a request
-      // just sent (AddFriendForm's onAdded also calls this): rows are
-      // ordered newest-first, so without the buffer the new row would push
-      // the previously-last-visible friend out of the re-fetched count.
-      const url =
-        friends.length > 0
-          ? `/api/social/friends?limit=${friends.length + 1}`
-          : "/api/social/friends";
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (res.ok) {
-        const data: { items: unknown[]; hasMore: boolean } = await res.json();
-        setFriends(data.items);
-        setFriendsHasMore(data.hasMore);
-        // Keep the header badge in sync immediately after any friend action.
-        setPendingFriendCount(countPendingReceived(data.items));
-        setFriendsError(false);
-      } else {
-        setFriendsError(true);
-      }
-    } catch {
-      setFriendsError(true);
-    } finally {
-      setLoadingFriends(false);
-    }
-  }, [accessToken, friends.length, setPendingFriendCount]);
-
-  const loadMoreFriends = useCallback(async () => {
-    if (!accessToken || loadingMoreFriends) return;
-    setLoadingMoreFriends(true);
-    try {
-      const res = await fetch(`/api/social/friends?offset=${friends.length}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (res.ok) {
-        const data: { items: unknown[]; hasMore: boolean } = await res.json();
-        setFriends((prev) => [...prev, ...data.items]);
-        setFriendsHasMore(data.hasMore);
-      }
-    } finally {
-      setLoadingMoreFriends(false);
-    }
-  }, [accessToken, friends.length, loadingMoreFriends]);
-
-  const fetchLeaderboard = useCallback(async () => {
-    if (!accessToken) return;
-    setLoadingLeaderboard(true);
-    try {
-      // Same reasoning as fetchFriends (including the +1 buffer — a new
-      // friend also adds a leaderboard entry).
-      const url =
-        leaderboard.length > 0
-          ? `/api/social/leaderboard?limit=${leaderboard.length + 1}`
-          : "/api/social/leaderboard";
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (res.ok) {
-        const data: { items: unknown[]; hasMore: boolean } = await res.json();
-        setLeaderboard(data.items);
-        setLeaderboardHasMore(data.hasMore);
-        setLeaderboardError(false);
-      } else {
-        setLeaderboardError(true);
-      }
-    } catch {
-      setLeaderboardError(true);
-    } finally {
-      setLoadingLeaderboard(false);
-    }
-  }, [accessToken, leaderboard.length]);
-
-  const loadMoreLeaderboard = useCallback(async () => {
-    if (!accessToken || loadingMoreLeaderboard) return;
-    setLoadingMoreLeaderboard(true);
-    try {
-      const res = await fetch(`/api/social/leaderboard?offset=${leaderboard.length}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (res.ok) {
-        const data: { items: unknown[]; hasMore: boolean } = await res.json();
-        setLeaderboard((prev) => [...prev, ...data.items]);
-        setLeaderboardHasMore(data.hasMore);
-      }
-    } finally {
-      setLoadingMoreLeaderboard(false);
-    }
-  }, [accessToken, leaderboard.length, loadingMoreLeaderboard]);
 
   const fetchChallenges = useCallback(async () => {
     if (!accessToken) return;
@@ -230,30 +166,6 @@ export default function SocialPage() {
     const { signal } = ctrl;
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoadingFriends(true);
-    fetch("/api/social/friends", { headers: { Authorization: `Bearer ${accessToken}` }, signal })
-      .then((r) => (r.ok ? r.json() : { items: [], hasMore: false }))
-      .then((data: { items: unknown[]; hasMore: boolean }) => {
-        setFriends(data.items);
-        setFriendsHasMore(data.hasMore);
-        setPendingFriendCount(countPendingReceived(data.items));
-      })
-      .catch((e) => console.error("social: friends fetch failed", e))
-      .finally(() => setLoadingFriends(false));
-
-    setLoadingLeaderboard(true);
-    fetch("/api/social/leaderboard", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      signal,
-    })
-      .then((r) => (r.ok ? r.json() : { items: [], hasMore: false }))
-      .then((data: { items: unknown[]; hasMore: boolean }) => {
-        setLeaderboard(data.items);
-        setLeaderboardHasMore(data.hasMore);
-      })
-      .catch((e) => console.error("social: leaderboard fetch failed", e))
-      .finally(() => setLoadingLeaderboard(false));
-
     setLoadingChallenges(true);
     fetch("/api/social/challenges", { headers: { Authorization: `Bearer ${accessToken}` }, signal })
       .then((r) => (r.ok ? r.json() : []))
@@ -273,7 +185,7 @@ export default function SocialPage() {
       .catch((e) => console.error("social: challenge-suggestions fetch failed", e));
 
     return () => ctrl.abort();
-  }, [accessToken, userId, setPendingFriendCount, setPendingChallengeCount]);
+  }, [accessToken, userId, setPendingChallengeCount]);
 
   return (
     <AuthShell>
@@ -361,7 +273,7 @@ export default function SocialPage() {
                 ) : (
                   <>
                     <FriendList
-                      friends={friends as Parameters<typeof FriendList>[0]["friends"]}
+                      friends={friends}
                       onUpdate={() => {
                         fetchFriends();
                         fetchLeaderboard();
@@ -388,9 +300,7 @@ export default function SocialPage() {
                 <ChallengeSuggestions suggestions={suggestions} onPick={pickSuggestion} />
                 <CreateChallengeForm
                   key={prefillKey}
-                  friends={(
-                    friends as { status: string; friend: { id: number; username: string } | null }[]
-                  )
+                  friends={friends
                     .filter((f) => f.status === "accepted" && f.friend)
                     .map((f) => f.friend!)}
                   loadingFriends={loadingFriends}
@@ -425,9 +335,7 @@ export default function SocialPage() {
                     <Loader2 className="h-4 w-4 animate-spin text-teal" />
                   </div>
                 ) : (
-                  <LeaderboardTable
-                    entries={leaderboard as Parameters<typeof LeaderboardTable>[0]["entries"]}
-                  />
+                  <LeaderboardTable entries={leaderboard} />
                 )}
                 {!loadingLeaderboard && leaderboardHasMore && (
                   <div className="flex justify-center pt-2">

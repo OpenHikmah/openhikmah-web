@@ -46,9 +46,17 @@ export async function PATCH(
     return NextResponse.json({ error: "Request already resolved" }, { status: 409 });
   }
 
+  if (action === "decline") {
+    // Declines are deleted outright rather than kept as a "declined" row —
+    // a re-request after a decline should look identical to a first-time
+    // request, and nothing reads declined history.
+    await db.delete(friendships).where(eq(friendships.id, friendshipId));
+    return NextResponse.json({ id: friendshipId, status: "declined" });
+  }
+
   const [updated] = await db
     .update(friendships)
-    .set({ status: action === "accept" ? "accepted" : "declined", updatedAt: new Date() })
+    .set({ status: "accepted", updatedAt: new Date() })
     .where(eq(friendships.id, friendshipId))
     .returning();
 

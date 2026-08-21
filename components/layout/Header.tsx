@@ -20,6 +20,8 @@ import { useCanvasStore, serializeCanvas } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { useAudioStore } from "@/store/audio";
+import { countPendingReceived } from "@/lib/social/friends";
+import { MAX_LIMIT } from "@/lib/infra/http";
 import type { AudioVerse } from "@/store/audio";
 import type { Verse } from "@/types/quran";
 import { buildShareUrl } from "@/hooks/useCanvasPersistence";
@@ -237,11 +239,11 @@ export function Header({ onSearchOpen }: HeaderProps) {
   // Poll for incoming friend requests every 60 s while signed in
   useEffect(() => {
     if (!accessToken || !userId) return;
-    // limit=200 (the pagination max) rather than the default page size: this
-    // poll only needs an accurate pending-request count, and defaulting to a
+    // Use the pagination max rather than the default page size: this poll
+    // only needs an accurate pending-request count, and defaulting to a
     // small page could undercount for a user with many friends.
     const load = () =>
-      fetch("/api/social/friends?limit=200", {
+      fetch(`/api/social/friends?limit=${MAX_LIMIT}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       })
         // A failed poll keeps the previously-displayed count rather than
@@ -250,10 +252,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
         .then((r) => (r.ok ? r.json() : null))
         .then((data: { items: { status: string; direction: string }[] } | null) => {
           if (!data) return;
-          const count = data.items.filter(
-            (f) => f.status === "pending" && f.direction === "received"
-          ).length;
-          setPendingFriendCount(count);
+          setPendingFriendCount(countPendingReceived(data.items));
         })
         .catch((e) => console.error("header: friend-request poll failed", e));
     load();
