@@ -6,7 +6,12 @@ on:
   pull_request:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # Scope by commit SHA for pushes to main so that back-to-back merges (e.g.
+  # several Dependabot auto-merges landing within one CI run's duration) don't
+  # cancel each other's run before it finishes — every merge to main should get
+  # a completed CI record. PR branches keep the ref-scoped group: a superseding
+  # push there really does make the prior run moot.
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: true
 
 # Least privilege by default. Jobs that need to report back to PRs override this explicitly.
