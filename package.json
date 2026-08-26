@@ -82,7 +82,7 @@
     "husky": "^9.1.7",
     "jsdom": "^30.0.1",
     "lint-staged": "^17.0.7",
-    "prettier": "^3.9.4",
+    "prettier": "^3.9.6",
     "size-limit": "^12.1.0",
     "tailwindcss": "^4",
     "typescript": "^5",
