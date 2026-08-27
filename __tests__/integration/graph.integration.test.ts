@@ -118,6 +118,34 @@ describe("connection graph (integration, real Postgres)", () => {
     expect(mockCallAI).toHaveBeenCalledTimes(2);
   });
 
+  it("persists a concrete model id even when no provider is passed (resolves the flag)", async () => {
+    await seed("2:255");
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "throne verse" }]));
+
+    await getConnections("1:1", "thematic", source);
+
+    const [row] = await db.select().from(connections);
+    // resolveProvider() → "claude" in this mock, so the row is attributed to the
+    // Claude default model, never left null / ANTHROPIC_MODEL-dependent.
+    expect(row.model).toBe("claude-opus-4-7");
+  });
+
+  it("single-flight does not coalesce concurrent generations for different providers", async () => {
+    await seed("2:255");
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "throne verse" }]));
+
+    const [a, b] = await Promise.all([
+      getConnections("1:1", "thematic", source, { provider: "claude" }),
+      getConnections("1:1", "thematic", source, { provider: "gemini" }),
+    ]);
+
+    expect(a).toHaveLength(1);
+    expect(b).toHaveLength(1);
+    // Distinct provider → distinct in-flight key → two real AI calls, not one
+    // coalesced call.
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
+  });
+
   it("the unique index dedupes duplicate edges", async () => {
     await db
       .insert(connections)
