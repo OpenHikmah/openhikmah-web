@@ -28,8 +28,6 @@ export interface CallAiOptions {
   provider?: Provider;
 }
 
-const ENV_PROVIDER = (process.env.AI_PROVIDER ?? "claude") as Provider;
-
 /** The model id a provider will use by default (respecting the model env vars). */
 export function defaultModelFor(provider: Provider): string {
   return provider === "gemini"
@@ -51,7 +49,7 @@ function asProvider(value: string | undefined): Provider | null {
  * Step 4 is the pre-existing global resolution, untouched — with no per-feature
  * flag or env set, the result is identical to before.
  */
-async function resolveProvider(feature?: AiFeature, override?: Provider): Promise<Provider> {
+export async function resolveProvider(feature?: AiFeature, override?: Provider): Promise<Provider> {
   const fromOverride = asProvider(override);
   if (fromOverride) return fromOverride;
 
@@ -62,7 +60,10 @@ async function resolveProvider(feature?: AiFeature, override?: Provider): Promis
     if (fromFeatureEnv) return fromFeatureEnv;
   }
 
-  const flagged = await getFlagString("ai_provider", ENV_PROVIDER);
+  // Read AI_PROVIDER at call time (not a module-load snapshot) so tests and
+  // runtime config changes take effect without a reload.
+  const envProvider = (process.env.AI_PROVIDER ?? "claude") as Provider;
+  const flagged = await getFlagString("ai_provider", envProvider);
   return flagged === "gemini" ? "gemini" : "claude";
 }
 

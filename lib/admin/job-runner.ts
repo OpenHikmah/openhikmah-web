@@ -82,8 +82,8 @@ function backfillParamEnv(raw: Record<string, unknown>): Record<string, string> 
   }
 
   const maxCalls = Number(raw.maxCalls);
-  if (!Number.isFinite(maxCalls) || maxCalls <= 0)
-    throw new Error("maxCalls must be a positive number");
+  if (!Number.isInteger(maxCalls) || maxCalls <= 0)
+    throw new Error("maxCalls must be a positive integer");
 
   const maxCostUsd = Number(raw.maxCostUsd);
   if (!Number.isFinite(maxCostUsd) || maxCostUsd <= 0) {
@@ -97,7 +97,7 @@ function backfillParamEnv(raw: Record<string, unknown>): Record<string, string> 
     BACKFILL_MODE: mode,
     BACKFILL_PROVIDER: provider,
     BACKFILL_LOCALES: localeList.join(","),
-    BACKFILL_MAX_CALLS: String(Math.floor(maxCalls)),
+    BACKFILL_MAX_CALLS: String(maxCalls),
     BACKFILL_MAX_COST_USD: String(maxCostUsd),
   };
 }

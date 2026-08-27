@@ -12,6 +12,8 @@ vi.mock("@/lib/ai/ai", () => ({
     provider: "claude" as const,
     model: "claude-opus-4-7",
   })),
+  resolveProvider: vi.fn(async () => "claude" as const),
+  defaultModelFor: (p: string) => (p === "gemini" ? "gemini-2.0-flash" : "claude-opus-4-7"),
 }));
 // Guard against accidental network in the resolver fallback — everything must
 // resolve from the seeded corpus.

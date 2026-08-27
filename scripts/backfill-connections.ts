@@ -41,22 +41,35 @@ if (provider !== "claude" && provider !== "gemini") {
   process.exit(1);
 }
 
-const locales = (process.env.BACKFILL_LOCALES ?? "")
+const TARGET_LOCALES = ["tr", "ru", "az"] as const;
+const localeInput = (process.env.BACKFILL_LOCALES ?? "")
   .split(",")
   .map((s) => s.trim())
-  .filter(Boolean)
-  .filter((l): l is Locale => (LOCALES as readonly string[]).includes(l) && l !== "en");
+  .filter(Boolean);
+// Reject an unknown locale rather than silently dropping it — a direct
+// invocation should never complete an expensive partial run while the operator
+// believes a locale they mistyped was included.
+const badLocale = localeInput.find((l) => !(TARGET_LOCALES as readonly string[]).includes(l));
+if (badLocale) {
+  console.error(
+    `backfill-connections: BACKFILL_LOCALES must be a subset of ${TARGET_LOCALES.join(",")}, got "${badLocale}"`
+  );
+  process.exit(1);
+}
+const locales = localeInput.filter(
+  (l): l is Locale => (LOCALES as readonly string[]).includes(l) && l !== "en"
+);
 
 const maxCalls = Number(requireEnv("BACKFILL_MAX_CALLS"));
 const maxCostUsd = Number(requireEnv("BACKFILL_MAX_COST_USD"));
 if (
-  !Number.isFinite(maxCalls) ||
+  !Number.isInteger(maxCalls) ||
   maxCalls <= 0 ||
   !Number.isFinite(maxCostUsd) ||
   maxCostUsd <= 0
 ) {
   console.error(
-    "backfill-connections: BACKFILL_MAX_CALLS / BACKFILL_MAX_COST_USD must be positive"
+    "backfill-connections: BACKFILL_MAX_CALLS must be a positive integer and BACKFILL_MAX_COST_USD a positive number"
   );
   process.exit(1);
 }

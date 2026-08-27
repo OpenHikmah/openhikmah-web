@@ -13,38 +13,15 @@ import {
 } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
+import type { CoverageReport as CoverageResponse, CoverageCell } from "@/lib/admin/coverage-report";
+import type { Locale } from "@/lib/i18n/config";
+import type { EdgeKind } from "@/types/quran";
 
-type Kind = "thematic" | "root" | "contrast";
-type Locale = "en" | "tr" | "ru" | "az";
+type Kind = EdgeKind;
 
 const KINDS: Kind[] = ["thematic", "root", "contrast"];
 const LOCALES: Locale[] = ["en", "tr", "ru", "az"];
 const TARGET_LOCALES: Exclude<Locale, "en">[] = ["tr", "ru", "az"];
-
-interface CoverageCell {
-  kind: Kind;
-  locale: Locale;
-  covered: number;
-  missing: number;
-  exhausted: number;
-}
-interface SurahRow {
-  surah: number;
-  name: string;
-  ayahCount: number;
-  thematic: number;
-  root: number;
-  contrast: number;
-}
-interface CoverageResponse {
-  totalVerses: number;
-  matrix: CoverageCell[];
-  focusLocale: Locale;
-  surahs: SurahRow[];
-  focusKind: Kind;
-  missingSample: string[];
-  missingSampleTotal: number;
-}
 
 const cell = (m: CoverageCell[], kind: Kind, locale: Locale) =>
   m.find((c) => c.kind === kind && c.locale === locale);
@@ -132,7 +109,6 @@ export function CoverageReport() {
             />
           </div>
 
-          {/* Missing matrix: kind × locale */}
           <section>
             <h3 className="mb-2 text-sm font-semibold text-text-primary">
               Verses missing a connection (kind × language)
@@ -182,7 +158,6 @@ export function CoverageReport() {
             </p>
           </section>
 
-          {/* Missing sample */}
           <section>
             <h3 className="mb-2 text-sm font-semibold text-text-primary">Missing verses</h3>
             <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
@@ -222,7 +197,6 @@ export function CoverageReport() {
             )}
           </section>
 
-          {/* Surah rollup */}
           <section>
             <h3 className="mb-2 text-sm font-semibold text-text-primary">
               Per-surah coverage ({focusLocale.toUpperCase()}) — verses with a connection, per kind
@@ -269,7 +243,6 @@ export function CoverageReport() {
             </div>
           </section>
 
-          {/* Run panel */}
           <section className="rounded-lg border border-border bg-surface p-4">
             <h3 className="text-sm font-semibold text-text-primary">Run the backfill job</h3>
             <p className="mt-1 text-xs text-text-muted">

@@ -1,23 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Verse, VerseRef } from "@/types/quran";
 
-const { mockCallAI, mockInsert, mockGetVerses } = vi.hoisted(() => ({
-  mockCallAI: vi.fn(),
-  mockInsert: vi.fn(() => ({ values: vi.fn().mockResolvedValue(undefined) })),
-  mockGetVerses: vi.fn(),
-}));
+const { mockCallAI, mockCallAIDetailed, mockInsert, mockGetVerses, insertedRows } = vi.hoisted(
+  () => {
+    const insertedRows: Array<Record<string, unknown>> = [];
+    return {
+      mockCallAI: vi.fn(),
+      mockCallAIDetailed: vi.fn(),
+      mockGetVerses: vi.fn(),
+      insertedRows,
+      mockInsert: vi.fn(() => ({
+        values: vi.fn((row: Record<string, unknown>) => {
+          insertedRows.push(row);
+          return Promise.resolve(undefined);
+        }),
+      })),
+    };
+  }
+);
 
-// The generator calls callAIDetailed and reads .text/.usage/.model. Keep the
-// existing mockCallAI (text-only) as the source of the response body so every
-// test below continues to drive it the same way.
-vi.mock("@/lib/ai/ai", () => ({
-  callAIDetailed: vi.fn(async (prompt: string) => ({
-    text: await mockCallAI(prompt),
-    usage: { inputTokens: 100, outputTokens: 20 },
-    provider: "claude" as const,
-    model: "claude-opus-4-7",
-  })),
-}));
+// The generator calls callAIDetailed and reads .text/.usage/.model. By default it
+// delegates to mockCallAI (text-only) for the response body and reports a Claude
+// result, so every existing test drives it the same way; provider-specific tests
+// override mockCallAIDetailed directly.
+vi.mock("@/lib/ai/ai", () => ({ callAIDetailed: mockCallAIDetailed }));
 vi.mock("@/lib/infra/db", () => ({ db: { insert: mockInsert } }));
 vi.mock("@/lib/quran/quran-corpus", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/quran/quran-corpus")>();
@@ -52,9 +58,18 @@ function verse(ref: string): Verse {
   };
 }
 
+const defaultDetailed = async (prompt: string) => ({
+  text: await mockCallAI(prompt),
+  usage: { inputTokens: 100, outputTokens: 20 },
+  provider: "claude" as const,
+  model: "claude-opus-4-7",
+});
+
 describe("generateConnections", () => {
   beforeEach(() => {
     mockCallAI.mockReset();
+    mockCallAIDetailed.mockReset().mockImplementation(defaultDetailed);
+    insertedRows.length = 0;
     mockInsert.mockClear();
     mockGetVerses.mockReset();
     // Default: every requested ref hydrates from the local corpus.
@@ -193,11 +208,31 @@ Return ONLY a valid JSON array of { "ref": "surah:ayah", "reason": "..." }.`,
     expect(prompt).not.toMatch(/you are a classical islamic scholar/i);
     expect(prompt).toMatch(/strict tanzih/i);
   });
+
+  it("forwards the provider override and logs the returned model + combined tokens", async () => {
+    mockCallAIDetailed.mockResolvedValue({
+      text: JSON.stringify([{ ref: "2:255", reason: "x" }]),
+      usage: { inputTokens: 1234, outputTokens: 56 },
+      provider: "gemini" as const,
+      model: "gemini-2.0-flash",
+    });
+    await generateConnections("1:1", "ar", "tr", "thematic", "en", { provider: "gemini" });
+
+    expect(mockCallAIDetailed).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ feature: "connections", provider: "gemini" })
+    );
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({ model: "gemini-2.0-flash", tokens: 1290 })
+    );
+  });
 });
 
 describe("generateGroundedConnections", () => {
   beforeEach(() => {
     mockCallAI.mockReset();
+    mockCallAIDetailed.mockReset().mockImplementation(defaultDetailed);
+    insertedRows.length = 0;
     mockInsert.mockClear();
     mockGetVerses.mockReset();
     // Default: every requested candidate ref resolves to a verse.
@@ -271,5 +306,25 @@ describe("generateGroundedConnections", () => {
     const prompt = mockCallAI.mock.calls[0][0] as string;
     expect(prompt).toMatch(/write each "reason" in russian/i);
     expect(prompt).toMatch(/strict tanzih/i);
+  });
+
+  it("forwards the provider override and logs the returned model + combined tokens", async () => {
+    mockCallAIDetailed.mockResolvedValue({
+      text: JSON.stringify([{ ref: "2:255", reason: "x" }]),
+      usage: { inputTokens: 900, outputTokens: 100 },
+      provider: "gemini" as const,
+      model: "gemini-2.0-flash",
+    });
+    await generateGroundedConnections("1:1", "ar", "tr", "root", ["2:255"], "en", {
+      provider: "gemini",
+    });
+
+    expect(mockCallAIDetailed).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ feature: "connections", provider: "gemini" })
+    );
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({ model: "gemini-2.0-flash", tokens: 1000 })
+    );
   });
 });

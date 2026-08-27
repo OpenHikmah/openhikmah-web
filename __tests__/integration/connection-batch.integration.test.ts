@@ -39,7 +39,9 @@ async function seed(ref: string) {
     ref,
     surah: Number(s),
     ayah: Number(a),
-    arabicText: `arabic-${ref}`,
+    // Sacred-data rule: plausible Arabic even in fixtures (AGENTS.md §Theological
+    // standards). "In the name of God, the Most Gracious, the Most Merciful."
+    arabicText: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
     translation: `translation-${ref}`,
   });
 }
@@ -169,6 +171,38 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     expect((await db.select().from(connections)).length).toBeGreaterThan(0);
     expect((await db.select().from(connectionCoverage)).length).toBeGreaterThanOrEqual(1);
     expect((await db.select().from(aiGenerations)).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("spend guard: translations cannot push a cell past maxCalls", async () => {
+    await seed("1:1");
+    await seed("2:255");
+    await seed("3:18");
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.startsWith("Translate the following sentence")) return "localized reason";
+      return JSON.stringify([
+        { ref: "2:255", reason: "throne verse" },
+        { ref: "3:18", reason: "witness of oneness" },
+      ]);
+    });
+
+    const summary = await runConnectionBatch(
+      { mode: "baseline", provider: "claude", locales: ["tr", "ru"], maxCalls: 1, maxCostUsd: 100 },
+      hooks
+    );
+
+    // One generation call, then the budget is spent — no translation calls.
+    expect(summary.callsUsed).toBe(1);
+    expect(summary.stoppedReason).toBe("call-budget");
+    expect(summary.translated).toBe(0);
+    const translateCalls = mockCallAI.mock.calls.filter(([p]) =>
+      String(p).startsWith("Translate the following sentence")
+    );
+    expect(translateCalls).toHaveLength(0);
+    const nonEnRows = await db
+      .select()
+      .from(connections)
+      .where(sql`${connections.locale} <> 'en'`);
+    expect(nonEnRows).toHaveLength(0);
   });
 
   it("resumability: a second run picks up cells the budget-stopped run did not reach", async () => {

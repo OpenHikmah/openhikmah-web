@@ -172,6 +172,9 @@ describe("startJob — backfill-connections params", () => {
       startJob("backfill-connections", "qf-admin", { ...validParams, maxCalls: 0 })
     ).rejects.toThrow(/maxCalls/);
     await expect(
+      startJob("backfill-connections", "qf-admin", { ...validParams, maxCalls: 0.5 })
+    ).rejects.toThrow(/maxCalls/);
+    await expect(
       startJob("backfill-connections", "qf-admin", { ...validParams, maxCostUsd: -1 })
     ).rejects.toThrow(/maxCostUsd/);
     await expect(

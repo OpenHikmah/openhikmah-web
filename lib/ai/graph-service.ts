@@ -2,7 +2,7 @@ import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { connections, type Connection } from "@/lib/infra/db/schema";
 import { generateConnections, generateGroundedConnections } from "@/lib/ai/connection-generator";
-import { defaultModelFor, type Provider } from "@/lib/ai/ai";
+import { defaultModelFor, resolveProvider, type Provider } from "@/lib/ai/ai";
 import { discoverCandidates } from "@/lib/ai/connection-discovery";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
@@ -206,7 +206,10 @@ export async function generateConnectionsForCell(
           );
 
   if (generated.length > 0) {
-    const model = provider ? defaultModelFor(provider) : (process.env.ANTHROPIC_MODEL ?? null);
+    // Attribute the row to the model that actually generated it. With no
+    // explicit provider, the generator resolves the connections feature/global
+    // provider flag — which can be Gemini — so ANTHROPIC_MODEL would be wrong.
+    const model = defaultModelFor(provider ?? (await resolveProvider("connections")));
     try {
       const inserted = await db
         .insert(connections)
