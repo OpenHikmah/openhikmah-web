@@ -29,7 +29,9 @@ export interface GenerateOpts {
   provider?: Provider;
 }
 
-function tokensFromUsage(usage: { inputTokens: number; outputTokens: number } | null): number | null {
+function tokensFromUsage(
+  usage: { inputTokens: number; outputTokens: number } | null
+): number | null {
   return usage ? usage.inputTokens + usage.outputTokens : null;
 }
 

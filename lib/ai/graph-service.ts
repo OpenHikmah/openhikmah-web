@@ -24,7 +24,16 @@ import type { ConnectionResult, EdgeKind } from "@/types/quran";
  * `${fromRef}:${kind}:${locale}:${excludeRefs}`; entries are removed as soon as
  * the generation settles.
  */
-const inFlight = new Map<string, Promise<ConnectionResult[]>>();
+const inFlight = new Map<string, Promise<CellGenerationResult>>();
+
+/** Result of one miss-path generation. `calledAI` is false only when the
+ *  grounded candidate pool was already exhausted for a "get more" request, so
+ *  no LLM call was made — the admin backfill job uses this to mark a cell
+ *  exhausted and never re-pay for it. */
+export interface CellGenerationResult {
+  results: ConnectionResult[];
+  calledAI: boolean;
+}
 
 interface SourceVerse {
   arabicText: string;
@@ -126,14 +135,21 @@ export async function getConnections(
   const pending = inFlight.get(key);
   if (pending) {
     incr("gen_coalesced");
-    return pending;
+    return (await pending).results;
   }
 
   incr("gen_started");
-  const work = generateConnectionsForCell(fromRef, kind, source, excludeRefs, locale, options.provider);
+  const work = generateConnectionsForCell(
+    fromRef,
+    kind,
+    source,
+    excludeRefs,
+    locale,
+    options.provider
+  );
   inFlight.set(key, work);
   try {
-    return await work;
+    return (await work).results;
   } finally {
     inFlight.delete(key);
   }
@@ -158,9 +174,10 @@ export async function generateConnectionsForCell(
   excludeRefs: string[] = [],
   locale: Locale = "en",
   provider?: Provider
-): Promise<ConnectionResult[]> {
+): Promise<CellGenerationResult> {
   const genOpts = provider ? ([{ provider }] as const) : ([] as const);
   const candidates = await discoverCandidates(fromRef, kind, undefined, excludeRefs);
+  const calledAI = candidates.length > 0 || excludeRefs.length === 0;
   // The legacy ungrounded path has no notion of excludeRefs — it would just
   // regenerate a similar set from memory, defeating the point of "get more."
   // Only fall back to it on a true first-time miss (no grounding data seeded
@@ -189,7 +206,7 @@ export async function generateConnectionsForCell(
           );
 
   if (generated.length > 0) {
-    const model = provider ? defaultModelFor(provider) : process.env.ANTHROPIC_MODEL ?? null;
+    const model = provider ? defaultModelFor(provider) : (process.env.ANTHROPIC_MODEL ?? null);
     try {
       const inserted = await db
         .insert(connections)
@@ -229,10 +246,13 @@ export async function generateConnectionsForCell(
             )
           );
         const reasonByRef = new Map(persisted.map((r) => [r.toRef, r.reason]));
-        return generated.map((g) => {
-          const persistedReason = reasonByRef.get(g.ref);
-          return persistedReason !== undefined ? { ...g, reason: persistedReason } : g;
-        });
+        return {
+          calledAI,
+          results: generated.map((g) => {
+            const persistedReason = reasonByRef.get(g.ref);
+            return persistedReason !== undefined ? { ...g, reason: persistedReason } : g;
+          }),
+        };
       }
     } catch (err) {
       // A swallowed persist failure would be invisible: the caller still gets
@@ -245,5 +265,5 @@ export async function generateConnectionsForCell(
     }
   }
 
-  return generated;
+  return { results: generated, calledAI };
 }

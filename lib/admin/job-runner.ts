@@ -14,11 +14,17 @@ import { jobRuns, verses, verseEmbeddings } from "@/lib/infra/db/schema";
  * for history/last-run status, so it survives a server restart).
  */
 
+export type JobId =
+  "seed-quran" | "seed-morphology" | "embed-corpus" | "seed-translations" | "backfill-connections";
+
 export interface JobDefinition {
-  id: "seed-quran" | "seed-morphology" | "embed-corpus" | "seed-translations";
+  id: JobId;
   label: string;
   script: string;
   requiresEnv?: string[];
+  /** When set, the job accepts a params object (validated in startJob) that is
+   *  passed to the spawned script as env vars. */
+  acceptsParams?: boolean;
 }
 
 export const JOBS: readonly JobDefinition[] = [
@@ -39,7 +45,62 @@ export const JOBS: readonly JobDefinition[] = [
     label: "Seed verse translations (TR/RU/AZ)",
     script: "scripts/seed-translations.mjs",
   },
+  {
+    id: "backfill-connections",
+    label: "Backfill verse connections",
+    script: "scripts/backfill-connections.ts",
+    acceptsParams: true,
+  },
 ] as const;
+
+export interface BackfillParams {
+  mode: "baseline" | "topup";
+  provider: "claude" | "gemini";
+  /** csv subset of tr,ru,az (may be empty) */
+  locales: string;
+  maxCalls: number;
+  maxCostUsd: number;
+}
+
+/** Validates raw admin input for the backfill job and returns the env vars the
+ *  spawned script reads. Throws on bad input (routes map to 400). */
+function backfillParamEnv(raw: Record<string, unknown>): Record<string, string> {
+  const mode = raw.mode;
+  if (mode !== "baseline" && mode !== "topup") throw new Error("mode must be baseline or topup");
+
+  const provider = raw.provider;
+  if (provider !== "claude" && provider !== "gemini") {
+    throw new Error("provider must be claude or gemini");
+  }
+
+  const localeList = String(raw.locales ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (localeList.some((l) => !["tr", "ru", "az"].includes(l))) {
+    throw new Error("locales must be a subset of tr,ru,az");
+  }
+
+  const maxCalls = Number(raw.maxCalls);
+  if (!Number.isFinite(maxCalls) || maxCalls <= 0)
+    throw new Error("maxCalls must be a positive number");
+
+  const maxCostUsd = Number(raw.maxCostUsd);
+  if (!Number.isFinite(maxCostUsd) || maxCostUsd <= 0) {
+    throw new Error("maxCostUsd must be a positive number");
+  }
+
+  const requiredKey = provider === "gemini" ? "GEMINI_API_KEY" : "ANTHROPIC_API_KEY";
+  if (!process.env[requiredKey]) throw new Error(`Missing required env var: ${requiredKey}`);
+
+  return {
+    BACKFILL_MODE: mode,
+    BACKFILL_PROVIDER: provider,
+    BACKFILL_LOCALES: localeList.join(","),
+    BACKFILL_MAX_CALLS: String(Math.floor(maxCalls)),
+    BACKFILL_MAX_COST_USD: String(maxCostUsd),
+  };
+}
 
 const LOG_TAIL_LINES = 50;
 
@@ -63,8 +124,13 @@ function pushLogLine(job: RunningJob, line: string) {
 }
 
 /** Starts a job if none is currently running. Throws on bad input or an
- *  already-running job — routes should catch and translate to a 400/409. */
-export async function startJob(jobId: string, adminQfId: string): Promise<{ runId: number }> {
+ *  already-running job — routes should catch and translate to a 400/409.
+ *  `params` is required for jobs with `acceptsParams` and rejected for others. */
+export async function startJob(
+  jobId: string,
+  adminQfId: string,
+  params?: Record<string, unknown>
+): Promise<{ runId: number }> {
   const job = JOBS.find((j) => j.id === jobId);
   if (!job) throw new Error("Unknown job");
   if (running) throw new Error(`Job "${running.jobId}" is already running`);
@@ -72,6 +138,14 @@ export async function startJob(jobId: string, adminQfId: string): Promise<{ runI
   const missingEnv = (job.requiresEnv ?? []).filter((name) => !process.env[name]);
   if (missingEnv.length > 0) {
     throw new Error(`Missing required env var(s): ${missingEnv.join(", ")}`);
+  }
+
+  let paramEnv: Record<string, string> = {};
+  if (job.acceptsParams) {
+    if (!params) throw new Error(`Job "${job.id}" requires params`);
+    if (job.id === "backfill-connections") paramEnv = backfillParamEnv(params);
+  } else if (params) {
+    throw new Error(`Job "${job.id}" does not accept params`);
   }
 
   // Claim the slot synchronously (no await between the `if (running)` check
@@ -93,7 +167,10 @@ export async function startJob(jobId: string, adminQfId: string): Promise<{ runI
   }
   state.runId = row.id;
 
-  const child = spawn("bun", [job.script], { cwd: process.cwd(), env: process.env });
+  const child = spawn("bun", [job.script], {
+    cwd: process.cwd(),
+    env: { ...process.env, ...paramEnv },
+  });
 
   const onData = (chunk: Buffer) => {
     for (const line of chunk.toString("utf8").split("\n")) {

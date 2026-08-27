@@ -103,10 +103,32 @@ describe("POST /api/admin/jobs", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.runId).toBe(1);
-    expect(mockStartJob).toHaveBeenCalledWith("seed-morphology", "qf-admin");
+    expect(mockStartJob).toHaveBeenCalledWith("seed-morphology", "qf-admin", undefined);
     expect(logAdminAction).toHaveBeenCalledWith(
       expect.objectContaining({ action: "job.start", targetId: "seed-morphology" })
     );
+  });
+
+  it("passes params through to startJob and into the audit meta", async () => {
+    const params = {
+      mode: "baseline",
+      provider: "gemini",
+      locales: "tr",
+      maxCalls: 5,
+      maxCostUsd: 1,
+    };
+    const res = await POST(post({ jobId: "backfill-connections", params }));
+    expect(res.status).toBe(200);
+    expect(mockStartJob).toHaveBeenCalledWith("backfill-connections", "qf-admin", params);
+    expect(logAdminAction).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "job.start", meta: expect.objectContaining({ params }) })
+    );
+  });
+
+  it("returns 400 when startJob rejects bad params", async () => {
+    mockStartJob.mockRejectedValue(new Error("mode must be baseline or topup"));
+    const res = await POST(post({ jobId: "backfill-connections", params: { mode: "x" } }));
+    expect(res.status).toBe(400);
   });
 
   it("returns 400 (not 500) when startJob rejects, e.g. a job already running", async () => {

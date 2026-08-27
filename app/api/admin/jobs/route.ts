@@ -17,14 +17,14 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** Trigger a backfill job: body `{ jobId }`. */
+/** Trigger a backfill job: body `{ jobId, params? }`. */
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
   const limited = await rateLimitAdminMutation(auth);
   if (limited) return limited;
 
-  let body: { jobId?: string };
+  let body: { jobId?: string; params?: Record<string, unknown> };
   try {
     body = await req.json();
   } catch {
@@ -37,13 +37,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { runId } = await startJob(jobId, auth.user.qfId);
+    const { runId } = await startJob(jobId, auth.user.qfId, body.params);
     await logAdminAction({
       adminQfId: auth.user.qfId,
       action: "job.start",
       targetType: "job",
       targetId: jobId,
-      meta: { runId },
+      meta: { runId, params: body.params ?? null },
     });
     return NextResponse.json({ runId });
   } catch (err) {

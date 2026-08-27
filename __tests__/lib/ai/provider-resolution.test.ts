@@ -114,7 +114,9 @@ describe("provider resolution", () => {
   });
 
   it("parses Gemini token usage and tolerates a missing usageMetadata", async () => {
-    mockGeminiGenerate.mockResolvedValue(geminiReply("x", { promptTokenCount: 40, candidatesTokenCount: 8 }));
+    mockGeminiGenerate.mockResolvedValue(
+      geminiReply("x", { promptTokenCount: 40, candidatesTokenCount: 8 })
+    );
     const withMeta = await callAIDetailed("hi", { provider: "gemini" });
     expect(withMeta.usage).toEqual({ inputTokens: 40, outputTokens: 8 });
 

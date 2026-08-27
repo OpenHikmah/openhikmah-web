@@ -131,13 +131,83 @@ describe("startJob", () => {
 });
 
 describe("JOBS", () => {
-  it("registers the backfill scripts from issue #114 plus seed-translations (#331)", () => {
+  it("registers the backfill scripts plus seed-translations and backfill-connections", () => {
     expect(JOBS.map((j) => j.id)).toEqual([
       "seed-quran",
       "seed-morphology",
       "embed-corpus",
       "seed-translations",
+      "backfill-connections",
     ]);
+  });
+});
+
+describe("startJob — backfill-connections params", () => {
+  const validParams = {
+    mode: "baseline",
+    provider: "claude",
+    locales: "tr,ru",
+    maxCalls: 10,
+    maxCostUsd: 2,
+  };
+
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+  });
+
+  it("rejects the job with no params", async () => {
+    await expect(startJob("backfill-connections", "qf-admin")).rejects.toThrow(/requires params/);
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it("rejects a bad mode / provider / budget / locale", async () => {
+    await expect(
+      startJob("backfill-connections", "qf-admin", { ...validParams, mode: "sideways" })
+    ).rejects.toThrow(/mode/);
+    await expect(
+      startJob("backfill-connections", "qf-admin", { ...validParams, provider: "openai" })
+    ).rejects.toThrow(/provider/);
+    await expect(
+      startJob("backfill-connections", "qf-admin", { ...validParams, maxCalls: 0 })
+    ).rejects.toThrow(/maxCalls/);
+    await expect(
+      startJob("backfill-connections", "qf-admin", { ...validParams, maxCostUsd: -1 })
+    ).rejects.toThrow(/maxCostUsd/);
+    await expect(
+      startJob("backfill-connections", "qf-admin", { ...validParams, locales: "tr,de" })
+    ).rejects.toThrow(/locales/);
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it("requires the provider's API key", async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    await expect(
+      startJob("backfill-connections", "qf-admin", { ...validParams, provider: "claude" })
+    ).rejects.toThrow(/ANTHROPIC_API_KEY/);
+  });
+
+  it("threads validated params into the spawned child's env", async () => {
+    await startJob("backfill-connections", "qf-admin", validParams);
+    expect(mockSpawn).toHaveBeenCalledWith(
+      "bun",
+      ["scripts/backfill-connections.ts"],
+      expect.objectContaining({
+        env: expect.objectContaining({
+          BACKFILL_MODE: "baseline",
+          BACKFILL_PROVIDER: "claude",
+          BACKFILL_LOCALES: "tr,ru",
+          BACKFILL_MAX_CALLS: "10",
+          BACKFILL_MAX_COST_USD: "2",
+        }),
+      })
+    );
+  });
+
+  it("rejects params on a job that does not accept them", async () => {
+    await expect(startJob("seed-quran", "qf-admin", { mode: "baseline" })).rejects.toThrow(
+      /does not accept params/
+    );
   });
 });
 
