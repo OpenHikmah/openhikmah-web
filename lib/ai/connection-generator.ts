@@ -1,4 +1,4 @@
-import { callAI } from "@/lib/ai/ai";
+import { callAIDetailed, type Provider } from "@/lib/ai/ai";
 import { getPrompt, renderTemplate } from "@/lib/ai/prompt-registry";
 import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
 import { db } from "@/lib/infra/db";
@@ -21,6 +21,17 @@ import type { ConnectionResult, EdgeKind, Verse } from "@/types/quran";
  *
  * Both log the generation to `ai_generations`.
  */
+
+/** Optional generation controls. `provider` forces a specific LLM for this
+ *  call (the admin batch job's per-run pick), bypassing the feature/global
+ *  provider flags. */
+export interface GenerateOpts {
+  provider?: Provider;
+}
+
+function tokensFromUsage(usage: { inputTokens: number; outputTokens: number } | null): number | null {
+  return usage ? usage.inputTokens + usage.outputTokens : null;
+}
 
 const KIND_INSTRUCTIONS: Record<EdgeKind, string> = {
   thematic:
@@ -135,9 +146,9 @@ export async function generateConnections(
   arabicText: string,
   translation: string,
   kind: EdgeKind,
-  locale: Locale = "en"
+  locale: Locale = "en",
+  opts: GenerateOpts = {}
 ): Promise<ConnectionResult[]> {
-  const model = process.env.ANTHROPIC_MODEL ?? null;
   const { text: prompt, promptVersion } = await buildPrompt(
     fromRef,
     arabicText,
@@ -145,11 +156,18 @@ export async function generateConnections(
     kind,
     locale
   );
-  const text = await callAI(prompt);
+  const res = await callAIDetailed(prompt, { feature: "connections", provider: opts.provider });
+  const text = res.text;
 
   // Best-effort audit log — never fail generation because logging failed.
   try {
-    await db.insert(aiGenerations).values({ fromRef, kind, model, promptVersion });
+    await db.insert(aiGenerations).values({
+      fromRef,
+      kind,
+      model: res.model,
+      tokens: tokensFromUsage(res.usage),
+      promptVersion,
+    });
   } catch (err) {
     console.error("ai_generations log failed:", err);
   }
@@ -259,7 +277,8 @@ export async function generateGroundedConnections(
   translation: string,
   kind: EdgeKind,
   candidateRefs: string[],
-  locale: Locale = "en"
+  locale: Locale = "en",
+  opts: GenerateOpts = {}
 ): Promise<ConnectionResult[]> {
   const verseMap = await getVerses(candidateRefs);
   const candidates = candidateRefs
@@ -267,7 +286,6 @@ export async function generateGroundedConnections(
     .filter((v): v is Verse => v !== undefined && v.ref !== fromRef);
   if (candidates.length === 0) return [];
 
-  const model = process.env.ANTHROPIC_MODEL ?? null;
   const { text: prompt, promptVersion } = await buildSelectionPrompt(
     fromRef,
     arabicText,
@@ -276,10 +294,17 @@ export async function generateGroundedConnections(
     candidates,
     locale
   );
-  const text = await callAI(prompt);
+  const res = await callAIDetailed(prompt, { feature: "connections", provider: opts.provider });
+  const text = res.text;
 
   try {
-    await db.insert(aiGenerations).values({ fromRef, kind, model, promptVersion });
+    await db.insert(aiGenerations).values({
+      fromRef,
+      kind,
+      model: res.model,
+      tokens: tokensFromUsage(res.usage),
+      promptVersion,
+    });
   } catch (err) {
     console.error("ai_generations log failed:", err);
   }

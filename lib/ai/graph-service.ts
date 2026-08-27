@@ -2,6 +2,7 @@ import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { connections, type Connection } from "@/lib/infra/db/schema";
 import { generateConnections, generateGroundedConnections } from "@/lib/ai/connection-generator";
+import { defaultModelFor, type Provider } from "@/lib/ai/ai";
 import { discoverCandidates } from "@/lib/ai/connection-discovery";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
@@ -43,6 +44,10 @@ interface GetConnectionsOptions {
    *  both keyed on this, so each locale gets its own cached reason instead of
    *  sharing whichever locale first triggered generation. Defaults to "en". */
   locale?: Locale;
+  /** Forces a specific LLM provider for the miss-path generation (the admin
+   *  batch job's per-run pick). Unset for live traffic, which uses the
+   *  feature/global provider flags. */
+  provider?: Provider;
 }
 
 /** Hydrate stored edges (which carry only refs + reason) into full results. */
@@ -125,7 +130,7 @@ export async function getConnections(
   }
 
   incr("gen_started");
-  const work = generateAndPersist(fromRef, kind, source, excludeRefs, locale);
+  const work = generateConnectionsForCell(fromRef, kind, source, excludeRefs, locale, options.provider);
   inFlight.set(key, work);
   try {
     return await work;
@@ -138,16 +143,23 @@ export async function getConnections(
  * The cache-miss body: discover candidates, generate connections, persist them.
  * Prefers grounded discovery (data discovers, AI articulates); falls back to
  * legacy memory-based generation only when no grounding data is available for
- * this verse (e.g. corpus not yet seeded). Extracted so `getConnections` can run
- * exactly one instance of it per verse+kind under the single-flight lock.
+ * this verse (e.g. corpus not yet seeded).
+ *
+ * Exported so the admin backfill job (lib/ai/connection-batch.ts) can drive it
+ * directly — WITHOUT the per-client rate limiter and single-flight map that
+ * `getConnections` wraps it in for live traffic. The job is sequential and
+ * single-process (one job at a time via lib/admin/job-runner.ts), so neither
+ * guard applies.
  */
-async function generateAndPersist(
+export async function generateConnectionsForCell(
   fromRef: string,
   kind: EdgeKind,
   source: SourceVerse,
   excludeRefs: string[] = [],
-  locale: Locale = "en"
+  locale: Locale = "en",
+  provider?: Provider
 ): Promise<ConnectionResult[]> {
+  const genOpts = provider ? ([{ provider }] as const) : ([] as const);
   const candidates = await discoverCandidates(fromRef, kind, undefined, excludeRefs);
   // The legacy ungrounded path has no notion of excludeRefs — it would just
   // regenerate a similar set from memory, defeating the point of "get more."
@@ -162,14 +174,22 @@ async function generateAndPersist(
           source.translation,
           kind,
           candidates,
-          locale
+          locale,
+          ...genOpts
         )
       : excludeRefs.length > 0
         ? []
-        : await generateConnections(fromRef, source.arabicText, source.translation, kind, locale);
+        : await generateConnections(
+            fromRef,
+            source.arabicText,
+            source.translation,
+            kind,
+            locale,
+            ...genOpts
+          );
 
   if (generated.length > 0) {
-    const model = process.env.ANTHROPIC_MODEL ?? null;
+    const model = provider ? defaultModelFor(provider) : process.env.ANTHROPIC_MODEL ?? null;
     try {
       const inserted = await db
         .insert(connections)
