@@ -225,8 +225,7 @@ export function CoverageReport() {
           {/* Surah rollup */}
           <section>
             <h3 className="mb-2 text-sm font-semibold text-text-primary">
-              Per-surah coverage ({focusLocale.toUpperCase()}) — covered /{" "}
-              {data.totalVerses ? "ayahs" : ""}
+              Per-surah coverage ({focusLocale.toUpperCase()}) — verses with a connection, per kind
             </h3>
             <div className="max-h-96 overflow-y-auto">
               <Table>
