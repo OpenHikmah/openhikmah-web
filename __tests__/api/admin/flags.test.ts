@@ -165,6 +165,11 @@ describe("PUT /api/admin/flags", () => {
     const res = await PUT(put({ key: "ai_gen_limit", value: 30 }));
     expect(res.status).toBe(200);
   });
+
+  it("validates the per-feature provider keys as strings", async () => {
+    expect((await PUT(put({ key: "ai_provider_connections", value: 3 }))).status).toBe(400);
+    expect((await PUT(put({ key: "ai_provider_names", value: "gemini" }))).status).toBe(200);
+  });
 });
 
 describe("DELETE /api/admin/flags", () => {

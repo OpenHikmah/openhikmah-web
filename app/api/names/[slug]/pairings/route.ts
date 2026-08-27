@@ -64,7 +64,9 @@ async function getPairings(
     async () => {
       let text: string;
       try {
-        text = await callAI(buildPrompt(name.transliteration, name.arabic, name.meaning, locale));
+        text = await callAI(buildPrompt(name.transliteration, name.arabic, name.meaning, locale), {
+          feature: "names",
+        });
       } catch (err) {
         // Not cached (empty result), so the next request retries — mirrors how
         // buildReasons/fallbackAIVerses in verses/route.ts tolerate a provider
