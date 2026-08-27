@@ -132,17 +132,32 @@ describe("connection graph (integration, real Postgres)", () => {
 
   it("single-flight does not coalesce concurrent generations for different providers", async () => {
     await seed("2:255");
-    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "throne verse" }]));
+    const response = JSON.stringify([{ ref: "2:255", reason: "throne verse" }]);
 
-    const [a, b] = await Promise.all([
-      getConnections("1:1", "thematic", source, { provider: "claude" }),
-      getConnections("1:1", "thematic", source, { provider: "gemini" }),
-    ]);
+    // Deterministic overlap: pin the first call at the AI boundary (after its
+    // DB read + inFlight.set) until the second call has run to completion, so
+    // the two are genuinely in flight together. If the key were provider-blind,
+    // the second would coalesce onto the first and mockCallAI would fire once.
+    let firstAtBoundary!: () => void;
+    const reachedBoundary = new Promise<void>((r) => (firstAtBoundary = r));
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((r) => (releaseFirst = r));
+    mockCallAI
+      .mockImplementationOnce(async () => {
+        firstAtBoundary();
+        await firstGate;
+        return response;
+      })
+      .mockImplementation(async () => response);
+
+    const p1 = getConnections("1:1", "thematic", source, { provider: "claude" });
+    await reachedBoundary;
+    const b = await getConnections("1:1", "thematic", source, { provider: "gemini" });
+    releaseFirst();
+    const a = await p1;
 
     expect(a).toHaveLength(1);
     expect(b).toHaveLength(1);
-    // Distinct provider → distinct in-flight key → two real AI calls, not one
-    // coalesced call.
     expect(mockCallAI).toHaveBeenCalledTimes(2);
   });
 
