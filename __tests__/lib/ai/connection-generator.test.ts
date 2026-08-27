@@ -7,7 +7,17 @@ const { mockCallAI, mockInsert, mockGetVerses } = vi.hoisted(() => ({
   mockGetVerses: vi.fn(),
 }));
 
-vi.mock("@/lib/ai/ai", () => ({ callAI: mockCallAI }));
+// The generator calls callAIDetailed and reads .text/.usage/.model. Keep the
+// existing mockCallAI (text-only) as the source of the response body so every
+// test below continues to drive it the same way.
+vi.mock("@/lib/ai/ai", () => ({
+  callAIDetailed: vi.fn(async (prompt: string) => ({
+    text: await mockCallAI(prompt),
+    usage: { inputTokens: 100, outputTokens: 20 },
+    provider: "claude" as const,
+    model: "claude-opus-4-7",
+  })),
+}));
 vi.mock("@/lib/infra/db", () => ({ db: { insert: mockInsert } }));
 vi.mock("@/lib/quran/quran-corpus", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/quran/quran-corpus")>();
