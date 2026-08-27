@@ -63,7 +63,6 @@ export async function getCoverageReport(params?: {
     ? (params!.kind as EdgeKind)
     : "thematic";
 
-  // Covered distinct from_ref count per (kind, locale).
   const coveredRows = await db
     .select({
       kind: connections.kind,
@@ -76,7 +75,6 @@ export async function getCoverageReport(params?: {
   const coveredByCell = new Map<string, number>();
   for (const r of coveredRows) coveredByCell.set(`${r.kind}:${r.locale}`, r.covered);
 
-  // Exhausted cell count per (kind, locale).
   const exhaustedRows = await db
     .select({
       kind: connectionCoverage.kind,
@@ -103,7 +101,6 @@ export async function getCoverageReport(params?: {
     }
   }
 
-  // Per-surah rollup for the focus locale: covered verses per kind.
   const surahRows = await db
     .select({
       surah: sql<number>`split_part(${connections.fromRef}, ':', 1)::int`,
@@ -128,7 +125,6 @@ export async function getCoverageReport(params?: {
     };
   });
 
-  // Sample of verse refs missing a connection for focus kind × locale.
   const missingRows = await db
     .select({ ref: verses.ref })
     .from(verses)

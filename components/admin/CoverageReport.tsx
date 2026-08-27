@@ -36,7 +36,6 @@ export function CoverageReport() {
     `admin-coverage-${focusKind}-${focusLocale}`
   );
 
-  // Run panel state
   const [mode, setMode] = useState<"baseline" | "topup">("baseline");
   const [provider, setProvider] = useState<"claude" | "gemini">("gemini");
   const [runLocales, setRunLocales] = useState<Record<string, boolean>>({

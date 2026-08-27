@@ -41,6 +41,14 @@ if (provider !== "claude" && provider !== "gemini") {
   process.exit(1);
 }
 
+// Same provider→key rule as lib/admin/job-runner.ts's backfillParamEnv: a direct
+// run must not start (and bill nothing) if the selected provider's key is unset.
+const requiredKey = provider === "gemini" ? "GEMINI_API_KEY" : "ANTHROPIC_API_KEY";
+if (!process.env[requiredKey]) {
+  console.error(`backfill-connections: ${requiredKey} is required for provider "${provider}"`);
+  process.exit(1);
+}
+
 const TARGET_LOCALES = ["tr", "ru", "az"] as const;
 const localeInput = (process.env.BACKFILL_LOCALES ?? "")
   .split(",")

@@ -18,6 +18,7 @@ interface Rate {
 
 const RATES: Record<string, Rate> = {
   // Anthropic
+  "claude-fable-5": { inputUsdPerMTok: 10, outputUsdPerMTok: 50 },
   "claude-opus-4-7": { inputUsdPerMTok: 5, outputUsdPerMTok: 25 },
   "claude-opus-4-8": { inputUsdPerMTok: 5, outputUsdPerMTok: 25 },
   "claude-opus-5": { inputUsdPerMTok: 5, outputUsdPerMTok: 25 },
@@ -29,8 +30,10 @@ const RATES: Record<string, Rate> = {
   "gemini-2.5-pro": { inputUsdPerMTok: 1.25, outputUsdPerMTok: 10 },
 };
 
+// Highest current per-provider list rate (Claude: Fable 5; Gemini: 2.5 Pro) so
+// an unknown model id never makes the spend guard under-estimate.
 const FALLBACK_BY_PROVIDER: Record<Provider, Rate> = {
-  claude: { inputUsdPerMTok: 5, outputUsdPerMTok: 25 },
+  claude: { inputUsdPerMTok: 10, outputUsdPerMTok: 50 },
   gemini: { inputUsdPerMTok: 1.25, outputUsdPerMTok: 10 },
 };
 

@@ -129,9 +129,10 @@ export async function getConnections(
   // Single-flight: if an identical generation is already running, join it rather
   // than starting a second AI call. The get→set below MUST stay synchronous (no
   // await between them) or two concurrent callers could both become the leader.
-  // The exclude set and locale are folded into the key so a "get more" request
-  // or a different-locale request never coalesces with an unrelated one.
-  const key = `${fromRef}:${kind}:${locale}:${[...excludeRefs].sort().join(",")}`;
+  // The exclude set, locale, and provider are folded into the key so a "get
+  // more" request, a different-locale request, or a request pinned to a
+  // different provider never coalesces with an unrelated one.
+  const key = `${fromRef}:${kind}:${locale}:${options.provider ?? "default"}:${[...excludeRefs].sort().join(",")}`;
   const pending = inFlight.get(key);
   if (pending) {
     incr("gen_coalesced");

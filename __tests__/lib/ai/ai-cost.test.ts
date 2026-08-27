@@ -20,16 +20,20 @@ describe("estimateCostUsd", () => {
     expect(cost).toBeCloseTo(0.5, 6);
   });
 
-  it("falls back to the provider rate for an unknown model", () => {
-    const known = estimateCostUsd("claude-opus-4-7", "claude", {
-      inputTokens: 2000,
-      outputTokens: 500,
-    });
+  it("falls back to the provider's highest rate for an unknown model", () => {
+    // Claude fallback = Fable 5 list price ($10/M in, $50/M out) so the spend
+    // guard never under-estimates an unrecognised model id.
     const unknown = estimateCostUsd("some-future-claude", "claude", {
-      inputTokens: 2000,
-      outputTokens: 500,
+      inputTokens: 1_000_000,
+      outputTokens: 1_000_000,
     });
-    expect(unknown).toBeCloseTo(known, 10);
+    expect(unknown).toBeCloseTo(60, 6);
+    // ...which is strictly above a known cheaper model's cost for the same usage.
+    const opus = estimateCostUsd("claude-opus-4-7", "claude", {
+      inputTokens: 1_000_000,
+      outputTokens: 1_000_000,
+    });
+    expect(unknown).toBeGreaterThan(opus);
   });
 
   it("uses DEFAULT_TOKENS when usage is null", () => {
