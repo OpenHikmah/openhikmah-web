@@ -6,6 +6,11 @@ type FlagType = "string" | "number" | "boolean";
 // it's intentionally left unvalidated here.
 const KNOWN_FLAG_TYPES: Record<string, FlagType> = {
   ai_provider: "string",
+  // Per-feature provider overrides ("claude" | "gemini"). When unset, the
+  // feature falls back to `ai_provider` then the AI_PROVIDER env. See
+  // lib/ai/ai.ts resolveProvider().
+  ai_provider_connections: "string",
+  ai_provider_names: "string",
   maintenance_mode: "boolean",
   ai_gen_limit: "number",
   ai_gen_window_seconds: "number",

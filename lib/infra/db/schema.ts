@@ -308,6 +308,36 @@ export const connections = pgTable(
   ]
 );
 
+// ─── Connection Coverage (batch-generation bookkeeping) ───────────────────────
+// One row per (from_ref, kind, locale) cell the admin backfill job has touched.
+// "Is this cell covered?" is always answered live from `connections` — this
+// table is authoritative ONLY for `exhaustedAt` (the grounded candidate pool
+// for this cell is genuinely empty, so a top-up run must skip it instead of
+// re-paying the LLM every time) and the last-attempt diagnostics. `activeCount`
+// is a denormalised convenience refreshed by the job; the coverage report never
+// trusts it for gap detection.
+
+export const connectionCoverage = pgTable(
+  "connection_coverage",
+  {
+    fromRef: text("from_ref").notNull(),
+    kind: text("kind").notNull(),
+    locale: text("locale").notNull().default("en"),
+    activeCount: integer("active_count").notNull().default(0),
+    exhaustedAt: timestamp("exhausted_at", { withTimezone: true }),
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.fromRef, t.kind, t.locale] }),
+    index("connection_coverage_kind_locale_idx").on(t.kind, t.locale),
+    index("connection_coverage_exhausted_idx")
+      .on(t.kind, t.locale)
+      .where(sql`${t.exhaustedAt} is not null`),
+  ]
+);
+
 // ─── Story Flags ───────────────────────────────────────────────────────────────
 // Stories (lib/stories/data/*.ts) are static, hardcoded content, not DB-backed.
 // A row here hides a story slug from production immediately (checked at request
@@ -595,6 +625,8 @@ export type VerseTranslation = typeof verseTranslations.$inferSelect;
 export type NewVerseTranslation = typeof verseTranslations.$inferInsert;
 export type Connection = typeof connections.$inferSelect;
 export type NewConnection = typeof connections.$inferInsert;
+export type ConnectionCoverage = typeof connectionCoverage.$inferSelect;
+export type NewConnectionCoverage = typeof connectionCoverage.$inferInsert;
 export type AiGeneration = typeof aiGenerations.$inferSelect;
 export type NewAiGeneration = typeof aiGenerations.$inferInsert;
 export type RateLimit = typeof rateLimits.$inferSelect;

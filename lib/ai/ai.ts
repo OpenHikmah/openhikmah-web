@@ -33,8 +33,8 @@ const ENV_PROVIDER = (process.env.AI_PROVIDER ?? "claude") as Provider;
 /** The model id a provider will use by default (respecting the model env vars). */
 export function defaultModelFor(provider: Provider): string {
   return provider === "gemini"
-    ? process.env.GEMINI_MODEL ?? "gemini-2.0-flash"
-    : process.env.ANTHROPIC_MODEL ?? "claude-opus-4-7";
+    ? (process.env.GEMINI_MODEL ?? "gemini-2.0-flash")
+    : (process.env.ANTHROPIC_MODEL ?? "claude-opus-4-7");
 }
 
 function asProvider(value: string | undefined): Provider | null {
@@ -71,10 +71,7 @@ async function resolveProvider(feature?: AiFeature, override?: Provider): Promis
  * token usage, resolved provider, and model id. Prefer this over `callAI` when
  * you need to log spend or thread a provider override.
  */
-export async function callAIDetailed(
-  prompt: string,
-  opts: CallAiOptions = {}
-): Promise<AiResult> {
+export async function callAIDetailed(prompt: string, opts: CallAiOptions = {}): Promise<AiResult> {
   const provider = await resolveProvider(opts.feature, opts.provider);
   return provider === "gemini" ? callGemini(prompt) : callClaude(prompt);
 }
@@ -101,10 +98,12 @@ async function callClaude(prompt: string): Promise<AiResult> {
   if (!block || block.type !== "text") throw new Error("No text block in Claude response");
   return {
     text: block.text,
-    usage: {
-      inputTokens: message.usage.input_tokens,
-      outputTokens: message.usage.output_tokens,
-    },
+    usage: message.usage
+      ? {
+          inputTokens: message.usage.input_tokens,
+          outputTokens: message.usage.output_tokens,
+        }
+      : null,
     provider: "claude",
     model,
   };
