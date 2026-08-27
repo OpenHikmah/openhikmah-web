@@ -1,9 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { sql } from "drizzle-orm";
 
-// Real Postgres (Testcontainers) — only the AI call is mocked.
+// Real Postgres (Testcontainers) — only the AI call is mocked. The generator
+// uses callAIDetailed; mockCallAI stays the text source so assertions on call
+// count / response body are unchanged.
 const { mockCallAI } = vi.hoisted(() => ({ mockCallAI: vi.fn() }));
-vi.mock("@/lib/ai/ai", () => ({ callAI: mockCallAI }));
+vi.mock("@/lib/ai/ai", () => ({
+  callAIDetailed: vi.fn(async (prompt: string) => ({
+    text: await mockCallAI(prompt),
+    usage: { inputTokens: 100, outputTokens: 20 },
+    provider: "claude" as const,
+    model: "claude-opus-4-7",
+  })),
+}));
 // Guard against accidental network in the resolver fallback — everything must
 // resolve from the seeded corpus.
 vi.stubGlobal(
