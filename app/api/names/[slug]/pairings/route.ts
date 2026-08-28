@@ -61,12 +61,12 @@ async function getPairings(
     "pairings",
     locale,
     PAIRINGS_VERSION,
-    async (model) => {
+    async (resolved) => {
       let text: string;
       try {
         text = await callAI(buildPrompt(name.transliteration, name.arabic, name.meaning, locale), {
           feature: "names",
-          model,
+          ...resolved,
         });
       } catch (err) {
         // Not cached (empty result), so the next request retries — mirrors how

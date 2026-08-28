@@ -111,6 +111,13 @@ function OperationalSettings({
           {AI_ROUTES.map((route) => {
             const resolved = routeFor(route.key);
             const modelKey = `ai_model${route.key}`;
+            // A stored model left over from a previous provider isn't in this
+            // provider's option list — show it as "Default" so the control
+            // reflects what resolveModel() actually uses at call time.
+            const storedModel = strFlag(modelKey);
+            const modelValue = SELECTABLE_MODELS[resolved.provider].includes(storedModel)
+              ? storedModel
+              : "";
             return (
               <div key={route.key} className="grid items-center gap-2 sm:grid-cols-[8rem_1fr_1fr]">
                 <span className="text-xs text-text-secondary">{route.label}</span>
@@ -131,7 +138,7 @@ function OperationalSettings({
                 </select>
                 <select
                   aria-label={`${route.label} model`}
-                  value={strFlag(modelKey)}
+                  value={modelValue}
                   onChange={(e) => setFlag(modelKey, e.target.value)}
                   disabled={busy}
                   className={SELECT_CLASS}

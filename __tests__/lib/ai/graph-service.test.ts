@@ -94,6 +94,10 @@ function result(ref: string): ConnectionResult {
 const SOURCE_ARABIC = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ";
 const source = { arabicText: SOURCE_ARABIC, translation: "tr" };
 
+// getConnections resolves the connections provider+model once and threads the
+// pair through to the generator. With no flag/env set it's the Claude default.
+const RESOLVED = { provider: "claude", model: "claude-opus-4-7" };
+
 describe("getConnections", () => {
   beforeEach(() => {
     mockSelect.mockReset();
@@ -142,7 +146,14 @@ describe("getConnections", () => {
     const out = await getConnections("1:1", "thematic", source);
 
     expect(mockGenerate).toHaveBeenCalledTimes(1);
-    expect(mockGenerate).toHaveBeenCalledWith("1:1", SOURCE_ARABIC, "tr", "thematic", "en");
+    expect(mockGenerate).toHaveBeenCalledWith(
+      "1:1",
+      SOURCE_ARABIC,
+      "tr",
+      "thematic",
+      "en",
+      RESOLVED
+    );
     expect(mockInsert).toHaveBeenCalledTimes(1);
     expect(mockValues).toHaveBeenCalledTimes(1);
     const persisted = mockValues.mock.calls[0][0] as Array<Record<string, unknown>>;
@@ -236,7 +247,8 @@ describe("getConnections", () => {
       "tr",
       "thematic",
       ["2:255", "3:18"],
-      "en"
+      "en",
+      RESOLVED
     );
     expect(mockGenerate).not.toHaveBeenCalled(); // legacy path skipped
     expect(out).toHaveLength(1);
@@ -251,7 +263,7 @@ describe("getConnections", () => {
     const out = await getConnections("1:1", "root", source);
 
     expect(mockGenerateGrounded).not.toHaveBeenCalled();
-    expect(mockGenerate).toHaveBeenCalledWith("1:1", SOURCE_ARABIC, "tr", "root", "en");
+    expect(mockGenerate).toHaveBeenCalledWith("1:1", SOURCE_ARABIC, "tr", "root", "en", RESOLVED);
     expect(out).toHaveLength(1);
   });
 
@@ -335,7 +347,14 @@ describe("getConnections — per-locale caching", () => {
 
     await getConnections("1:1", "thematic", source, { locale: "tr" });
 
-    expect(mockGenerate).toHaveBeenCalledWith("1:1", SOURCE_ARABIC, "tr", "thematic", "tr");
+    expect(mockGenerate).toHaveBeenCalledWith(
+      "1:1",
+      SOURCE_ARABIC,
+      "tr",
+      "thematic",
+      "tr",
+      RESOLVED
+    );
     const persisted = mockValues.mock.calls[0][0] as Array<Record<string, unknown>>;
     expect(persisted[0]).toMatchObject({ locale: "tr" });
   });
@@ -350,8 +369,22 @@ describe("getConnections — per-locale caching", () => {
     ]);
 
     expect(mockGenerate).toHaveBeenCalledTimes(2);
-    expect(mockGenerate).toHaveBeenCalledWith("1:1", SOURCE_ARABIC, "tr", "thematic", "en");
-    expect(mockGenerate).toHaveBeenCalledWith("1:1", SOURCE_ARABIC, "tr", "thematic", "tr");
+    expect(mockGenerate).toHaveBeenCalledWith(
+      "1:1",
+      SOURCE_ARABIC,
+      "tr",
+      "thematic",
+      "en",
+      RESOLVED
+    );
+    expect(mockGenerate).toHaveBeenCalledWith(
+      "1:1",
+      SOURCE_ARABIC,
+      "tr",
+      "thematic",
+      "tr",
+      RESOLVED
+    );
   });
 });
 

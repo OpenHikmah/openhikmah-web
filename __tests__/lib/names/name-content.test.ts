@@ -87,11 +87,37 @@ describe("getOrGenerateNameContent", () => {
     const values = mockValues.mock.calls[0][0] as Record<string, unknown>;
     expect(values).toMatchObject({ slug: "al-malik", kind: "verses", locale: "en", version: 2 });
     expect(JSON.parse(values.data as string)).toEqual(["a", "b"]);
-    // The model handed to generate() is the one that gets persisted — resolved
-    // once, so a config change mid-flight can't split them.
-    const modelPassedToGenerate = generate.mock.calls[0][0] as string;
-    expect(typeof modelPassedToGenerate).toBe("string");
-    expect(values.model).toBe(modelPassedToGenerate);
+    // The provider+model pair handed to generate() is the one that gets
+    // persisted — resolved once, so a config change mid-flight can't split them.
+    const passedToGenerate = generate.mock.calls[0][0] as { provider: string; model: string };
+    expect(passedToGenerate).toEqual({ provider: expect.any(String), model: expect.any(String) });
+    expect(values.model).toBe(passedToGenerate.model);
+  });
+
+  it("pins the provider+model resolved once, even if config flips during generation", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    const ai = await import("@/lib/ai/ai");
+    const providerSpy = vi.spyOn(ai, "resolveProvider").mockResolvedValue("gemini");
+    const modelSpy = vi.spyOn(ai, "resolveModel").mockResolvedValue("gemini-3.7-flash");
+
+    const generate = vi.fn(async (resolved: { provider: string; model: string }) => {
+      // Admin flips the route back to Claude mid-generation.
+      providerSpy.mockResolvedValue("claude");
+      modelSpy.mockResolvedValue("claude-opus-5");
+      return [resolved.provider, resolved.model];
+    });
+
+    const out = await getOrGenerateNameContent("al-malik", "verses", "en", 9, generate, isEmptyArr);
+
+    expect(out).toEqual(["gemini", "gemini-3.7-flash"]);
+    const values = mockValues.mock.calls[0][0] as Record<string, unknown>;
+    expect(values.model).toBe("gemini-3.7-flash");
+    expect(generate.mock.calls[0][0]).toEqual({
+      provider: "gemini",
+      model: "gemini-3.7-flash",
+    });
+    providerSpy.mockRestore();
+    modelSpy.mockRestore();
   });
 
   it("keys the cache by locale — a Turkish miss doesn't reuse or clobber the English row", async () => {

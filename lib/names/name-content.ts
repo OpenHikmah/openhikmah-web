@@ -1,16 +1,24 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { nameContent, nameVerseReasons, type NameContentKind } from "@/lib/infra/db/schema";
-import { resolveModel, resolveProvider } from "@/lib/ai/ai";
+import { resolveModel, resolveProvider, type Provider } from "@/lib/ai/ai";
 import type { Locale } from "@/lib/i18n/config";
 
-// The model to use for (and attribute) one names generation. Resolved ONCE per
-// generation and passed into both the `callAI` request and the persisted `model`
+/** The provider+model to use for (and attribute) one names generation. */
+export interface ResolvedNamesModel {
+  provider: Provider;
+  model: string;
+}
+
+// Resolved ONCE per generation and passed as a pinned pair into both the
+// `callAI` request (as provider + model overrides) and the persisted `model`
 // column, so a config change (`ai_provider_names` / `ai_model_names`) mid-flight
-// can't make the recorded model disagree with the one that actually ran.
-const resolveNamesModel = async () => {
+// can't make the request use one provider while the recorded model belongs to
+// another — or make the stored attribution disagree with what actually ran.
+const resolveNamesModel = async (): Promise<ResolvedNamesModel> => {
   const provider = await resolveProvider("names");
-  return resolveModel("names", provider);
+  const model = await resolveModel("names", provider);
+  return { provider, model };
 };
 
 /**
@@ -53,7 +61,7 @@ export async function getOrGenerateNameContent<T>(
   kind: NameContentKind,
   locale: Locale,
   version: number,
-  generate: (model: string) => Promise<T>,
+  generate: (resolved: ResolvedNamesModel) => Promise<T>,
   isEmpty: (value: T) => boolean,
   onBeforeGenerate?: () => Promise<void>
 ): Promise<T> {
@@ -139,13 +147,14 @@ async function generateAndPersist<T>(
   kind: NameContentKind,
   locale: Locale,
   version: number,
-  generate: (model: string) => Promise<T>,
+  generate: (resolved: ResolvedNamesModel) => Promise<T>,
   isEmpty: (value: T) => boolean
 ): Promise<T> {
-  // Resolve the model before generation and use the same value for the request
-  // and the persisted attribution.
-  const model = await resolveNamesModel();
-  const result = await generate(model);
+  // Resolve the provider+model before generation and use the same pair for the
+  // request and the persisted attribution.
+  const resolved = await resolveNamesModel();
+  const result = await generate(resolved);
+  const model = resolved.model;
 
   if (!isEmpty(result)) {
     const data = JSON.stringify(result);
@@ -182,7 +191,7 @@ export async function getOrGenerateVerseReason(
   slug: string,
   ref: string,
   locale: Locale,
-  generate: (model: string) => Promise<string>,
+  generate: (resolved: ResolvedNamesModel) => Promise<string>,
   onBeforeGenerate?: () => Promise<void>
 ): Promise<string> {
   const [row] = await db
@@ -206,8 +215,9 @@ export async function getOrGenerateVerseReason(
   if (pending) return pending;
 
   const work = (async () => {
-    const model = await resolveNamesModel();
-    const reason = await generate(model);
+    const resolved = await resolveNamesModel();
+    const reason = await generate(resolved);
+    const model = resolved.model;
     if (reason.trim() === "") return reason;
 
     try {

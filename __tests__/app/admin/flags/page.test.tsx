@@ -68,6 +68,26 @@ describe("FlagsPage — AI routing grid", () => {
     );
   });
 
+  it("shows the resolved default when a stored model belongs to a now-unselected provider", async () => {
+    // Route was switched Claude -> Gemini; the stale ai_model_names (a Claude
+    // model) is still stored but resolveModel() ignores it.
+    mockApi.mockResolvedValue(
+      response(
+        { ai_provider_names: "gemini", ai_model_names: "claude-opus-4-7" },
+        { names: { provider: "gemini", model: "gemini-3.5-flash-lite" } }
+      )
+    );
+    render(<FlagsPage />);
+
+    const namesModel = (await screen.findByLabelText(
+      "Names (Asma-ul-Husna) model"
+    )) as HTMLSelectElement;
+    expect(namesModel.value).toBe("");
+    expect(within(namesModel).getByRole("option", { selected: true }).textContent).toContain(
+      "gemini-3.5-flash-lite"
+    );
+  });
+
   it("offers the resolved provider's models even when only an env var (no flag) selects it", async () => {
     // No provider flag set, but the server resolves Default to Gemini via AI_PROVIDER.
     mockApi.mockResolvedValue(

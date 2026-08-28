@@ -129,13 +129,22 @@ export async function getConnections(
     if (!allowed) throw new RateLimitError();
   }
 
+  // Resolve the effective provider+model ONCE for this miss (honouring any
+  // batch-job override), then thread the same concrete pair through the
+  // single-flight key, the generation call, and the persisted attribution — so
+  // an admin flipping `ai_provider_connections` / `ai_model_connections`
+  // between those steps can't make the request use one provider while the row
+  // records a model from another.
+  const provider = await resolveProvider("connections", options.provider);
+  const model = await resolveModel("connections", provider, options.model);
+
   // Single-flight: if an identical generation is already running, join it rather
   // than starting a second AI call. The get→set below MUST stay synchronous (no
   // await between them) or two concurrent callers could both become the leader.
   // The exclude set, locale, provider, and model are folded into the key so a
   // "get more" request, a different-locale request, or a request pinned to a
   // different provider/model never coalesces with an unrelated one.
-  const key = `${fromRef}:${kind}:${locale}:${options.provider ?? "default"}:${options.model ?? "default"}:${[...excludeRefs].sort().join(",")}`;
+  const key = `${fromRef}:${kind}:${locale}:${provider}:${model}:${[...excludeRefs].sort().join(",")}`;
   const pending = inFlight.get(key);
   if (pending) {
     incr("gen_coalesced");
@@ -149,8 +158,8 @@ export async function getConnections(
     source,
     excludeRefs,
     locale,
-    options.provider,
-    options.model
+    provider,
+    model
   );
   inFlight.set(key, work);
   try {
@@ -178,10 +187,10 @@ export async function generateConnectionsForCell(
   source: SourceVerse,
   excludeRefs: string[] = [],
   locale: Locale = "en",
-  provider?: Provider,
-  model?: string
+  provider: Provider,
+  model: string
 ): Promise<CellGenerationResult> {
-  const genOpts = provider || model ? ([{ provider, model }] as const) : ([] as const);
+  const genOpts = [{ provider, model }] as const;
   const candidates = await discoverCandidates(fromRef, kind, undefined, excludeRefs);
   const calledAI = candidates.length > 0 || excludeRefs.length === 0;
   // The legacy ungrounded path has no notion of excludeRefs — it would just
@@ -212,11 +221,9 @@ export async function generateConnectionsForCell(
           );
 
   if (generated.length > 0) {
-    // Attribute the row to the model that generated it — resolve the same
-    // provider + model the generator used (batch job's per-run override, or the
-    // connections feature/global flags), not the ANTHROPIC_MODEL default.
-    const resolvedProvider = provider ?? (await resolveProvider("connections"));
-    const attributedModel = await resolveModel("connections", resolvedProvider, model);
+    // Attribute the row to the exact model that generated it — the caller
+    // resolved the provider+model pair once and passed it straight through, so
+    // there's nothing to re-resolve here.
     try {
       const inserted = await db
         .insert(connections)
@@ -226,7 +233,7 @@ export async function generateConnectionsForCell(
             toRef: g.ref,
             kind,
             reason: g.reason,
-            model: attributedModel,
+            model,
             locale,
           }))
         )
