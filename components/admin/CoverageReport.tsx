@@ -16,6 +16,7 @@ import { useAsync } from "@/components/admin/useAsync";
 import type { CoverageReport as CoverageResponse, CoverageCell } from "@/lib/admin/coverage-report";
 import type { Locale } from "@/lib/i18n/config";
 import type { EdgeKind } from "@/types/quran";
+import { SELECTABLE_MODELS } from "@/lib/ai/models";
 
 type Kind = EdgeKind;
 
@@ -38,6 +39,7 @@ export function CoverageReport() {
 
   const [mode, setMode] = useState<"baseline" | "topup">("baseline");
   const [provider, setProvider] = useState<"claude" | "gemini">("gemini");
+  const [model, setModel] = useState("");
   const [runLocales, setRunLocales] = useState<Record<string, boolean>>({
     tr: true,
     ru: true,
@@ -61,6 +63,7 @@ export function CoverageReport() {
           params: {
             mode,
             provider,
+            ...(model ? { model } : {}),
             locales: TARGET_LOCALES.filter((l) => runLocales[l]).join(","),
             maxCalls,
             maxCostUsd,
@@ -267,11 +270,30 @@ export function CoverageReport() {
                 <span className="mb-1 block text-text-muted">Provider</span>
                 <select
                   value={provider}
-                  onChange={(e) => setProvider(e.target.value as "claude" | "gemini")}
+                  onChange={(e) => {
+                    setProvider(e.target.value as "claude" | "gemini");
+                    setModel("");
+                  }}
                   className="w-full rounded border border-border bg-bg px-2 py-1.5"
                 >
                   <option value="gemini">gemini — cheapest</option>
                   <option value="claude">claude — highest fidelity</option>
+                </select>
+              </label>
+
+              <label className="text-xs">
+                <span className="mb-1 block text-text-muted">Model</span>
+                <select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  className="w-full rounded border border-border bg-bg px-2 py-1.5"
+                >
+                  <option value="">default</option>
+                  {SELECTABLE_MODELS[provider].map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
                 </select>
               </label>
 

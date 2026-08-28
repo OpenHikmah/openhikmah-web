@@ -44,6 +44,9 @@ export interface BatchOptions {
   mode: BatchMode;
   /** Which LLM to use for this run — the admin's per-run pick. */
   provider: Provider;
+  /** Which model to use — the admin's per-run pick. Empty/undefined = the
+   *  resolved default for `provider`. Applied only when it belongs to `provider`. */
+  model?: string;
   /** Target locales to translate the English reason into (subset of tr/ru/az). */
   locales: Locale[];
   /** Hard ceiling on LLM calls this run. Always exact. */
@@ -83,8 +86,8 @@ const cellKey = (ref: string, kind: string) => `${ref}|${kind}`;
 
 /** Cost of one generation call, estimated (the generation path doesn't return
  *  token usage). Deliberately the DEFAULT_TOKENS path so the guard errs early. */
-function perCallCost(provider: Provider): number {
-  return estimateCostUsd(defaultModelFor(provider), provider, null);
+function perCallCost(provider: Provider, model?: string): number {
+  return estimateCostUsd(model || defaultModelFor(provider), provider, null);
 }
 
 /** Builds the ordered work list from current DB state. */
@@ -182,6 +185,7 @@ async function translateCellReasons(
   kind: EdgeKind,
   locales: Locale[],
   provider: Provider,
+  model: string | undefined,
   budget: { spend: () => boolean; stoppedReason: StoppedReason | null }
 ): Promise<{ inserted: number; stoppedReason: StoppedReason | null }> {
   if (locales.length === 0) return { inserted: 0, stoppedReason: null };
@@ -199,7 +203,7 @@ async function translateCellReasons(
     );
   if (enRows.length === 0) return { inserted: 0, stoppedReason: null };
 
-  const model = defaultModelFor(provider);
+  const attributedModel = model || defaultModelFor(provider);
   let inserted = 0;
 
   for (const locale of locales) {
@@ -213,6 +217,7 @@ async function translateCellReasons(
         translated = await translateReason(en.reason, LOCALE_LANGUAGE_NAME[locale], {
           feature: "connections",
           provider,
+          model,
         });
       } catch (err) {
         console.error(`connection-batch: translation failed ${fromRef} ${kind} ${locale}:`, err);
@@ -230,14 +235,23 @@ async function translateCellReasons(
 
       const rows = await db
         .insert(connections)
-        .values({ fromRef, toRef: en.toRef, kind, reason: translated, locale, model })
+        .values({
+          fromRef,
+          toRef: en.toRef,
+          kind,
+          reason: translated,
+          locale,
+          model: attributedModel,
+        })
         .onConflictDoNothing()
         .returning({ toRef: connections.toRef });
       if (rows.length > 0) inserted++;
 
       // Cost/audit visibility for translation spend (tokens not tracked here).
       try {
-        await db.insert(aiGenerations).values({ fromRef, kind, model, promptVersion: null });
+        await db
+          .insert(aiGenerations)
+          .values({ fromRef, kind, model: attributedModel, promptVersion: null });
       } catch (err) {
         console.error("connection-batch: ai_generations log failed:", err);
       }
@@ -302,11 +316,12 @@ export async function runConnectionBatch(
 
   hooks.onProgress(
     `[${opts.mode}] ${cells.length} cells to consider | provider=${opts.provider} | ` +
+      `model=${opts.model || "default"} | ` +
       `locales=${opts.locales.join(",") || "none"} | maxCalls=${opts.maxCalls} | ` +
       `maxCost=$${opts.maxCostUsd}`
   );
 
-  const callCost = perCallCost(opts.provider);
+  const callCost = perCallCost(opts.provider, opts.model);
 
   // Shared spend guard. `spend()` is called before EVERY LLM request (one
   // generation + one per locale translation per cell); it debits the counters
@@ -358,7 +373,8 @@ export async function runConnectionBatch(
         { arabicText: cell.arabicText, translation: cell.translation },
         excludeRefs,
         "en",
-        opts.provider
+        opts.provider,
+        opts.model
       );
       if (!calledAI) {
         // No grounding data / drained pool — no request was actually made, so
@@ -383,6 +399,7 @@ export async function runConnectionBatch(
           cell.kind,
           opts.locales,
           opts.provider,
+          opts.model,
           budget
         );
         summary.translated += xlt.inserted;

@@ -7,6 +7,16 @@ import { Table, Th, Td, StateNote, ConfirmButton } from "@/components/admin/prim
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { KNOWN_OPERATIONAL_FLAG_KEYS } from "@/lib/admin/feature-flag-keys";
+import { SELECTABLE_MODELS, DEFAULT_MODEL } from "@/lib/ai/models";
+
+const SELECT_CLASS =
+  "h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary hover:border-border-subtle focus:border-gold-muted";
+
+const AI_ROUTES = [
+  { key: "", label: "Default" },
+  { key: "_connections", label: "Connections" },
+  { key: "_names", label: "Names (Asma-ul-Husna)" },
+] as const;
 
 interface Flag {
   key: string;
@@ -25,9 +35,20 @@ function OperationalSettings({ flags, reload }: { flags: Flag[]; reload: () => v
   const [busy, setBusy] = useState(false);
 
   const byKey = new Map(flags.map((f) => [f.key, f.value]));
-  const aiProviderRaw = byKey.get("ai_provider");
-  const aiProvider = typeof aiProviderRaw === "string" ? aiProviderRaw : "";
+  const strFlag = (key: string): string => {
+    const v = byKey.get(key);
+    return typeof v === "string" ? v : "";
+  };
   const maintenanceOn = byKey.get("maintenance_mode") === true;
+
+  // Provider for a route's model dropdown: the route's own provider flag, else
+  // the Default route's, else "claude" (the built-in default provider).
+  const providerFor = (routeKey: string): "claude" | "gemini" => {
+    const own = strFlag(`ai_provider${routeKey}`);
+    const dflt = strFlag("ai_provider");
+    const p = own || dflt;
+    return p === "gemini" ? "gemini" : "claude";
+  };
 
   // Uncontrolled: each number field reads its live DOM value on save and is
   // reset (via `key`) whenever the flag list is reloaded from the server.
@@ -63,21 +84,55 @@ function OperationalSettings({ flags, reload }: { flags: Flag[]; reload: () => v
     <div className="space-y-4 rounded-lg border border-border bg-surface p-5">
       <h2 className="text-sm font-medium text-text-primary">Operational settings</h2>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="space-y-1.5">
-          <span className="text-xs text-text-secondary">AI provider</span>
-          <select
-            value={aiProvider}
-            onChange={(e) => setFlag("ai_provider", e.target.value)}
-            disabled={busy}
-            className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary hover:border-border-subtle focus:border-gold-muted"
-          >
-            <option value="">Default (env: AI_PROVIDER)</option>
-            <option value="claude">Claude</option>
-            <option value="gemini">Gemini</option>
-          </select>
-        </label>
+      <div className="space-y-2">
+        <span className="text-xs text-text-secondary">
+          AI routing (provider &amp; model per feature)
+        </span>
+        <div className="space-y-2 rounded-md border border-border p-3">
+          {AI_ROUTES.map((route) => {
+            const provider = providerFor(route.key);
+            const modelKey = `ai_model${route.key}`;
+            return (
+              <div key={route.key} className="grid items-center gap-2 sm:grid-cols-[8rem_1fr_1fr]">
+                <span className="text-xs text-text-secondary">{route.label}</span>
+                <select
+                  aria-label={`${route.label} provider`}
+                  value={strFlag(`ai_provider${route.key}`)}
+                  onChange={(e) => setFlag(`ai_provider${route.key}`, e.target.value)}
+                  disabled={busy}
+                  className={SELECT_CLASS}
+                >
+                  <option value="">{route.key === "" ? "Default (env)" : "Inherit"}</option>
+                  <option value="claude">Claude</option>
+                  <option value="gemini">Gemini</option>
+                </select>
+                <select
+                  aria-label={`${route.label} model`}
+                  value={strFlag(modelKey)}
+                  onChange={(e) => setFlag(modelKey, e.target.value)}
+                  disabled={busy}
+                  className={SELECT_CLASS}
+                >
+                  <option value="">
+                    {route.key === "" ? `Default (${DEFAULT_MODEL[provider]})` : "Inherit"}
+                  </option>
+                  {SELECTABLE_MODELS[provider].map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-text-muted">
+          A model that doesn&apos;t belong to the selected provider is ignored at call time and the
+          provider default is used instead.
+        </p>
+      </div>
 
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <span className="block text-xs text-text-secondary">Maintenance mode</span>
           <Button

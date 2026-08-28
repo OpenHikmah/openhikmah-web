@@ -141,7 +141,7 @@ jobs:
       ANTHROPIC_API_KEY: sk-ant-placeholder
       AI_PROVIDER: claude
       GEMINI_API_KEY: placeholder-gemini-key
-      GEMINI_MODEL: gemini-2.0-flash
+      GEMINI_MODEL: gemini-3.5-flash-lite
       NEXT_PUBLIC_QF_CLIENT_ID: placeholder-client-id
       QF_API_BASE: https://placeholder.example.com
       QF_AUTH_BASE: https://placeholder.example.com
@@ -290,7 +290,7 @@ jobs:
       ANTHROPIC_API_KEY: sk-ant-placeholder
       AI_PROVIDER: claude
       GEMINI_API_KEY: placeholder-gemini-key
-      GEMINI_MODEL: gemini-2.0-flash
+      GEMINI_MODEL: gemini-3.5-flash-lite
       NEXT_PUBLIC_QF_CLIENT_ID: placeholder-client-id
       QF_API_BASE: https://placeholder.example.com
       QF_AUTH_BASE: https://placeholder.example.com

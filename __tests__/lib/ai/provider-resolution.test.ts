@@ -125,3 +125,74 @@ describe("provider resolution", () => {
     expect(noMeta.usage).toBeNull();
   });
 });
+
+describe("model resolution", () => {
+  const savedEnv = { ...process.env };
+
+  beforeEach(() => {
+    mockClaudeCreate.mockReset().mockResolvedValue(claudeReply("claude-said"));
+    mockGeminiGenerate.mockReset().mockResolvedValue(geminiReply("gemini-said", null));
+    mockGetFlagString.mockReset().mockImplementation((_key: string, fallback: string) => fallback);
+    process.env = { ...savedEnv };
+    delete process.env.AI_PROVIDER;
+    delete process.env.ANTHROPIC_MODEL;
+    delete process.env.AI_MODEL;
+    delete process.env.AI_MODEL_CONNECTIONS;
+    delete process.env.AI_MODEL_NAMES;
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+  });
+
+  afterEach(() => {
+    process.env = { ...savedEnv };
+  });
+
+  it("defaults to the provider's built-in model and forwards it to the SDK", async () => {
+    const res = await callAIDetailed("hi");
+    expect(res.model).toBe("claude-opus-4-7");
+    expect(mockClaudeCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "claude-opus-4-7" })
+    );
+  });
+
+  it("uses the ai_model_<feature> flag over the global default", async () => {
+    mockGetFlagString.mockImplementation((key: string, fallback: string) =>
+      key === "ai_model_names" ? "claude-haiku-4-5" : fallback
+    );
+    const res = await callAIDetailed("hi", { feature: "names" });
+    expect(res.model).toBe("claude-haiku-4-5");
+  });
+
+  it("falls back to the AI_MODEL_<FEATURE> env var", async () => {
+    process.env.AI_MODEL_CONNECTIONS = "claude-sonnet-5";
+    const res = await callAIDetailed("hi", { feature: "connections" });
+    expect(res.model).toBe("claude-sonnet-5");
+  });
+
+  it("falls back to the global ai_model flag for an untagged call", async () => {
+    mockGetFlagString.mockImplementation((key: string, fallback: string) =>
+      key === "ai_model" ? "claude-sonnet-5" : fallback
+    );
+    const res = await callAIDetailed("hi");
+    expect(res.model).toBe("claude-sonnet-5");
+  });
+
+  it("honours an explicit model override above every flag/env", async () => {
+    process.env.AI_MODEL_CONNECTIONS = "claude-sonnet-5";
+    const res = await callAIDetailed("hi", { feature: "connections", model: "claude-haiku-4-5" });
+    expect(res.model).toBe("claude-haiku-4-5");
+  });
+
+  it("ignores a model that doesn't belong to the resolved provider", async () => {
+    // provider resolves to claude (nothing configured), but a Gemini model is set.
+    mockGetFlagString.mockImplementation((key: string, fallback: string) =>
+      key === "ai_model_names" ? "gemini-3.7-flash" : fallback
+    );
+    const res = await callAIDetailed("hi", { feature: "names" });
+    expect(res.model).toBe("claude-opus-4-7");
+  });
+
+  it("resolves a model for the Gemini provider and forwards it", async () => {
+    const res = await callAIDetailed("hi", { provider: "gemini", model: "gemini-3.7-flash" });
+    expect(res.model).toBe("gemini-3.7-flash");
+  });
+});

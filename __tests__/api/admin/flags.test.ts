@@ -170,6 +170,12 @@ describe("PUT /api/admin/flags", () => {
     expect((await PUT(put({ key: "ai_provider_connections", value: 3 }))).status).toBe(400);
     expect((await PUT(put({ key: "ai_provider_names", value: "gemini" }))).status).toBe(200);
   });
+
+  it("validates the per-feature model keys as strings (no enum check, matching ai_provider_*)", async () => {
+    expect((await PUT(put({ key: "ai_model_connections", value: 5 }))).status).toBe(400);
+    expect((await PUT(put({ key: "ai_model_names", value: "gemini-3.7-flash" }))).status).toBe(200);
+    expect((await PUT(put({ key: "ai_model", value: "" }))).status).toBe(200);
+  });
 });
 
 describe("DELETE /api/admin/flags", () => {

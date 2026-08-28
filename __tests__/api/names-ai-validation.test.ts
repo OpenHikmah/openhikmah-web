@@ -56,6 +56,7 @@ vi.mock("@/lib/infra/rate-limit", async (importOriginal) => {
 vi.mock("@/lib/ai/ai", () => ({
   callAI: mockCallAI,
   resolveProvider: vi.fn(async () => "claude" as const),
+  resolveModel: vi.fn(async () => "claude-opus-4-7"),
   defaultModelFor: () => "claude-opus-4-7",
 }));
 

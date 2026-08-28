@@ -7,7 +7,9 @@ import type { AiUsage, Provider } from "@/lib/ai/ai";
  * Rates are USD per 1M tokens, current as of 2026-08 (Anthropic first-party API
  * and Google Gemini list pricing). They are deliberately a small hand-maintained
  * table — update when pricing changes or a new model id starts appearing in
- * `ai_generations.model`. An unknown model falls back to its provider's
+ * `ai_generations.model`. Every id an admin can pick in `lib/ai/models.ts`
+ * (`SELECTABLE_MODELS`) must have an entry here, or the spend guard falls back to
+ * the conservative over-estimate. An unknown model falls back to its provider's
  * most-expensive plausible rate so an estimate never silently under-reports.
  */
 
