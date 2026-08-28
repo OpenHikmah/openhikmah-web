@@ -19,7 +19,7 @@ services:
       - AI_PROVIDER=${AI_PROVIDER:-claude}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-opus-4-7}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash-lite}
       - QF_CLIENT_SECRET=${QF_CLIENT_SECRET}
       - QF_API_BASE=${QF_API_BASE}
       - QF_AUTH_BASE=${QF_AUTH_BASE}

@@ -19,6 +19,7 @@
     "size": "size-limit",
     "embed": "bun scripts/embed-corpus.mjs",
     "prewarm": "bun scripts/prewarm-graph.mjs",
+    "backfill:connections": "bun scripts/backfill-connections.ts",
     "db:migrate": "bun scripts/migrate.mjs",
     "db:migrate:concurrent-indexes": "bun scripts/migrate-concurrent-indexes.mjs",
     "prepare": "husky"

@@ -2,28 +2,91 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getFlagString } from "@/lib/admin/feature-flags";
 
-type Provider = "claude" | "gemini";
+export type Provider = "claude" | "gemini";
 
-const ENV_PROVIDER = (process.env.AI_PROVIDER ?? "claude") as Provider;
+/** The distinct LLM-backed features that can be pointed at different providers. */
+export type AiFeature = "connections" | "names";
 
-/** Resolves the active provider: the `ai_provider` flag if set, else AI_PROVIDER env. */
-async function resolveProvider(): Promise<Provider> {
-  const flagged = await getFlagString("ai_provider", ENV_PROVIDER);
+export interface AiUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface AiResult {
+  text: string;
+  /** Token usage reported by the provider, or null when it wasn't returned. */
+  usage: AiUsage | null;
+  provider: Provider;
+  model: string;
+}
+
+export interface CallAiOptions {
+  /** Which feature is calling — selects a per-feature provider flag/env when set. */
+  feature?: AiFeature;
+  /** Hard provider override (e.g. the admin batch job's per-run pick). Wins over
+   *  every flag and env var. */
+  provider?: Provider;
+}
+
+/** The model id a provider will use by default (respecting the model env vars). */
+export function defaultModelFor(provider: Provider): string {
+  return provider === "gemini"
+    ? (process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite")
+    : (process.env.ANTHROPIC_MODEL ?? "claude-opus-4-7");
+}
+
+function asProvider(value: string | undefined): Provider | null {
+  return value === "claude" || value === "gemini" ? value : null;
+}
+
+/**
+ * Resolves the active provider. Precedence (first hit wins):
+ *   1. `override` argument
+ *   2. `ai_provider_<feature>` admin flag
+ *   3. `AI_PROVIDER_<FEATURE>` env var
+ *   4. `ai_provider` admin flag, else `AI_PROVIDER` env, else "claude"
+ *
+ * Step 4 is the pre-existing global resolution, untouched — with no per-feature
+ * flag or env set, the result is identical to before.
+ */
+export async function resolveProvider(feature?: AiFeature, override?: Provider): Promise<Provider> {
+  const fromOverride = asProvider(override);
+  if (fromOverride) return fromOverride;
+
+  if (feature) {
+    const fromFeatureFlag = asProvider(await getFlagString(`ai_provider_${feature}`, ""));
+    if (fromFeatureFlag) return fromFeatureFlag;
+    const fromFeatureEnv = asProvider(process.env[`AI_PROVIDER_${feature.toUpperCase()}`]);
+    if (fromFeatureEnv) return fromFeatureEnv;
+  }
+
+  // Read AI_PROVIDER at call time (not a module-load snapshot) so tests and
+  // runtime config changes take effect without a reload.
+  const envProvider = (process.env.AI_PROVIDER ?? "claude") as Provider;
+  const flagged = await getFlagString("ai_provider", envProvider);
   return flagged === "gemini" ? "gemini" : "claude";
 }
 
 /**
- * Calls the configured LLM provider and returns the raw text response.
- * Provider is selected by the `ai_provider` admin flag, falling back to the
- * AI_PROVIDER env var ("claude" | "gemini", default: "claude") when unset.
+ * Calls the configured LLM provider and returns the response text plus the
+ * token usage, resolved provider, and model id. Prefer this over `callAI` when
+ * you need to log spend or thread a provider override.
  */
-export async function callAI(prompt: string): Promise<string> {
-  const provider = await resolveProvider();
-  if (provider === "gemini") return callGemini(prompt);
-  return callClaude(prompt);
+export async function callAIDetailed(prompt: string, opts: CallAiOptions = {}): Promise<AiResult> {
+  const provider = await resolveProvider(opts.feature, opts.provider);
+  return provider === "gemini" ? callGemini(prompt) : callClaude(prompt);
 }
 
-async function callClaude(prompt: string): Promise<string> {
+/**
+ * Calls the configured LLM provider and returns the raw text response.
+ * Provider is selected per {@link resolveProvider}. Backwards-compatible thin
+ * wrapper over {@link callAIDetailed}.
+ */
+export async function callAI(prompt: string, opts: CallAiOptions = {}): Promise<string> {
+  return (await callAIDetailed(prompt, opts)).text;
+}
+
+async function callClaude(prompt: string): Promise<AiResult> {
   const client = new Anthropic();
   const model = process.env.ANTHROPIC_MODEL ?? "claude-opus-4-7";
   const message = await client.messages.create({
@@ -34,17 +97,38 @@ async function callClaude(prompt: string): Promise<string> {
   });
   const block = message.content.find((b) => b.type === "text");
   if (!block || block.type !== "text") throw new Error("No text block in Claude response");
-  return block.text;
+  return {
+    text: block.text,
+    usage: message.usage
+      ? {
+          inputTokens: message.usage.input_tokens,
+          outputTokens: message.usage.output_tokens,
+        }
+      : null,
+    provider: "claude",
+    model,
+  };
 }
 
-async function callGemini(prompt: string): Promise<string> {
+async function callGemini(prompt: string): Promise<AiResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
-  const model = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
+  const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite";
   const ai = new GoogleGenerativeAI(apiKey);
   const genModel = ai.getGenerativeModel({ model });
   const result = await genModel.generateContent(prompt);
-  return result.response.text();
+  const meta = result.response.usageMetadata;
+  return {
+    text: result.response.text(),
+    usage: meta
+      ? {
+          inputTokens: meta.promptTokenCount ?? 0,
+          outputTokens: meta.candidatesTokenCount ?? 0,
+        }
+      : null,
+    provider: "gemini",
+    model,
+  };
 }
 
 // ─── Embeddings ───────────────────────────────────────────────────────────────

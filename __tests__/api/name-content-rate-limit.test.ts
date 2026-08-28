@@ -53,7 +53,11 @@ vi.mock("@/lib/infra/rate-limit", async (importOriginal) => {
   return { ...actual, consume: mockConsume };
 });
 
-vi.mock("@/lib/ai/ai", () => ({ callAI: mockCallAI }));
+vi.mock("@/lib/ai/ai", () => ({
+  callAI: mockCallAI,
+  resolveProvider: vi.fn(async () => "claude" as const),
+  defaultModelFor: () => "claude-opus-4-7",
+}));
 
 import { GET as getReflection } from "@/app/api/names/[slug]/reflection/route";
 import { GET as getPairings } from "@/app/api/names/[slug]/pairings/route";

@@ -6,7 +6,7 @@ import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 
 interface JobStatus {
-  id: "seed-quran" | "seed-morphology" | "embed-corpus";
+  id: string;
   label: string;
   status: "never-run" | "running" | "success" | "failed";
   startedAt: string | null;
@@ -98,14 +98,23 @@ export function JobRunner() {
                 </Td>
                 <Td>
                   <div className="flex justify-end">
-                    <ConfirmButton
-                      variant="secondary"
-                      disabled={busyId === job.id || job.status === "running"}
-                      onConfirm={() => run(job.id)}
-                      confirmLabel="Run now?"
-                    >
-                      Run
-                    </ConfirmButton>
+                    {job.id === "backfill-connections" ? (
+                      <a
+                        href="/admin/coverage"
+                        className="text-xs text-text-muted underline hover:text-text-secondary"
+                      >
+                        Run from Coverage →
+                      </a>
+                    ) : (
+                      <ConfirmButton
+                        variant="secondary"
+                        disabled={busyId === job.id || job.status === "running"}
+                        onConfirm={() => run(job.id)}
+                        confirmLabel="Run now?"
+                      >
+                        Run
+                      </ConfirmButton>
+                    )}
                   </div>
                 </Td>
               </tr>

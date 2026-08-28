@@ -1,7 +1,14 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { nameContent, nameVerseReasons, type NameContentKind } from "@/lib/infra/db/schema";
+import { defaultModelFor, resolveProvider } from "@/lib/ai/ai";
 import type { Locale } from "@/lib/i18n/config";
+
+// The `model` column records which provider produced the row for later cost
+// attribution. The names feature can be pointed at Gemini (see `resolveProvider`
+// / `ai_provider_names`), so read the resolved provider rather than assuming the
+// Anthropic env var.
+const generatedModel = async () => defaultModelFor(await resolveProvider("names"));
 
 /**
  * Durable, write-once/read-many cache for the AI-generated 99-Names content
@@ -136,7 +143,7 @@ async function generateAndPersist<T>(
 
   if (!isEmpty(result)) {
     const data = JSON.stringify(result);
-    const model = process.env.ANTHROPIC_MODEL ?? null;
+    const model = await generatedModel();
     try {
       await db
         .insert(nameContent)
@@ -197,7 +204,7 @@ export async function getOrGenerateVerseReason(
     const reason = await generate();
     if (reason.trim() === "") return reason;
 
-    const model = process.env.ANTHROPIC_MODEL ?? null;
+    const model = await generatedModel();
     try {
       // `reasonInFlight` only coalesces callers within this process — a
       // concurrent request on another instance can win the same (slug, ref,

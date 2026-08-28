@@ -2,6 +2,7 @@ import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { connections, type Connection } from "@/lib/infra/db/schema";
 import { generateConnections, generateGroundedConnections } from "@/lib/ai/connection-generator";
+import { defaultModelFor, resolveProvider, type Provider } from "@/lib/ai/ai";
 import { discoverCandidates } from "@/lib/ai/connection-discovery";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
@@ -23,7 +24,16 @@ import type { ConnectionResult, EdgeKind } from "@/types/quran";
  * `${fromRef}:${kind}:${locale}:${excludeRefs}`; entries are removed as soon as
  * the generation settles.
  */
-const inFlight = new Map<string, Promise<ConnectionResult[]>>();
+const inFlight = new Map<string, Promise<CellGenerationResult>>();
+
+/** Result of one miss-path generation. `calledAI` is false only when the
+ *  grounded candidate pool was already exhausted for a "get more" request, so
+ *  no LLM call was made — the admin backfill job uses this to mark a cell
+ *  exhausted and never re-pay for it. */
+export interface CellGenerationResult {
+  results: ConnectionResult[];
+  calledAI: boolean;
+}
 
 interface SourceVerse {
   arabicText: string;
@@ -43,6 +53,10 @@ interface GetConnectionsOptions {
    *  both keyed on this, so each locale gets its own cached reason instead of
    *  sharing whichever locale first triggered generation. Defaults to "en". */
   locale?: Locale;
+  /** Forces a specific LLM provider for the miss-path generation (the admin
+   *  batch job's per-run pick). Unset for live traffic, which uses the
+   *  feature/global provider flags. */
+  provider?: Provider;
 }
 
 /** Hydrate stored edges (which carry only refs + reason) into full results. */
@@ -115,20 +129,28 @@ export async function getConnections(
   // Single-flight: if an identical generation is already running, join it rather
   // than starting a second AI call. The get→set below MUST stay synchronous (no
   // await between them) or two concurrent callers could both become the leader.
-  // The exclude set and locale are folded into the key so a "get more" request
-  // or a different-locale request never coalesces with an unrelated one.
-  const key = `${fromRef}:${kind}:${locale}:${[...excludeRefs].sort().join(",")}`;
+  // The exclude set, locale, and provider are folded into the key so a "get
+  // more" request, a different-locale request, or a request pinned to a
+  // different provider never coalesces with an unrelated one.
+  const key = `${fromRef}:${kind}:${locale}:${options.provider ?? "default"}:${[...excludeRefs].sort().join(",")}`;
   const pending = inFlight.get(key);
   if (pending) {
     incr("gen_coalesced");
-    return pending;
+    return (await pending).results;
   }
 
   incr("gen_started");
-  const work = generateAndPersist(fromRef, kind, source, excludeRefs, locale);
+  const work = generateConnectionsForCell(
+    fromRef,
+    kind,
+    source,
+    excludeRefs,
+    locale,
+    options.provider
+  );
   inFlight.set(key, work);
   try {
-    return await work;
+    return (await work).results;
   } finally {
     inFlight.delete(key);
   }
@@ -138,17 +160,25 @@ export async function getConnections(
  * The cache-miss body: discover candidates, generate connections, persist them.
  * Prefers grounded discovery (data discovers, AI articulates); falls back to
  * legacy memory-based generation only when no grounding data is available for
- * this verse (e.g. corpus not yet seeded). Extracted so `getConnections` can run
- * exactly one instance of it per verse+kind under the single-flight lock.
+ * this verse (e.g. corpus not yet seeded).
+ *
+ * Exported so the admin backfill job (lib/ai/connection-batch.ts) can drive it
+ * directly — WITHOUT the per-client rate limiter and single-flight map that
+ * `getConnections` wraps it in for live traffic. The job is sequential and
+ * single-process (one job at a time via lib/admin/job-runner.ts), so neither
+ * guard applies.
  */
-async function generateAndPersist(
+export async function generateConnectionsForCell(
   fromRef: string,
   kind: EdgeKind,
   source: SourceVerse,
   excludeRefs: string[] = [],
-  locale: Locale = "en"
-): Promise<ConnectionResult[]> {
+  locale: Locale = "en",
+  provider?: Provider
+): Promise<CellGenerationResult> {
+  const genOpts = provider ? ([{ provider }] as const) : ([] as const);
   const candidates = await discoverCandidates(fromRef, kind, undefined, excludeRefs);
+  const calledAI = candidates.length > 0 || excludeRefs.length === 0;
   // The legacy ungrounded path has no notion of excludeRefs — it would just
   // regenerate a similar set from memory, defeating the point of "get more."
   // Only fall back to it on a true first-time miss (no grounding data seeded
@@ -162,14 +192,25 @@ async function generateAndPersist(
           source.translation,
           kind,
           candidates,
-          locale
+          locale,
+          ...genOpts
         )
       : excludeRefs.length > 0
         ? []
-        : await generateConnections(fromRef, source.arabicText, source.translation, kind, locale);
+        : await generateConnections(
+            fromRef,
+            source.arabicText,
+            source.translation,
+            kind,
+            locale,
+            ...genOpts
+          );
 
   if (generated.length > 0) {
-    const model = process.env.ANTHROPIC_MODEL ?? null;
+    // Attribute the row to the model that actually generated it. With no
+    // explicit provider, the generator resolves the connections feature/global
+    // provider flag — which can be Gemini — so ANTHROPIC_MODEL would be wrong.
+    const model = defaultModelFor(provider ?? (await resolveProvider("connections")));
     try {
       const inserted = await db
         .insert(connections)
@@ -209,10 +250,13 @@ async function generateAndPersist(
             )
           );
         const reasonByRef = new Map(persisted.map((r) => [r.toRef, r.reason]));
-        return generated.map((g) => {
-          const persistedReason = reasonByRef.get(g.ref);
-          return persistedReason !== undefined ? { ...g, reason: persistedReason } : g;
-        });
+        return {
+          calledAI,
+          results: generated.map((g) => {
+            const persistedReason = reasonByRef.get(g.ref);
+            return persistedReason !== undefined ? { ...g, reason: persistedReason } : g;
+          }),
+        };
       }
     } catch (err) {
       // A swallowed persist failure would be invisible: the caller still gets
@@ -225,5 +269,5 @@ async function generateAndPersist(
     }
   }
 
-  return generated;
+  return { results: generated, calledAI };
 }

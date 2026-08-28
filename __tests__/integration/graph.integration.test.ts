@@ -1,9 +1,20 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { sql } from "drizzle-orm";
 
-// Real Postgres (Testcontainers) — only the AI call is mocked.
+// Real Postgres (Testcontainers) — only the AI call is mocked. The generator
+// uses callAIDetailed; mockCallAI stays the text source so assertions on call
+// count / response body are unchanged.
 const { mockCallAI } = vi.hoisted(() => ({ mockCallAI: vi.fn() }));
-vi.mock("@/lib/ai/ai", () => ({ callAI: mockCallAI }));
+vi.mock("@/lib/ai/ai", () => ({
+  callAIDetailed: vi.fn(async (prompt: string) => ({
+    text: await mockCallAI(prompt),
+    usage: { inputTokens: 100, outputTokens: 20 },
+    provider: "claude" as const,
+    model: "claude-opus-4-7",
+  })),
+  resolveProvider: vi.fn(async () => "claude" as const),
+  defaultModelFor: (p: string) => (p === "gemini" ? "gemini-3.5-flash-lite" : "claude-opus-4-7"),
+}));
 // Guard against accidental network in the resolver fallback — everything must
 // resolve from the seeded corpus.
 vi.stubGlobal(
@@ -104,6 +115,65 @@ describe("connection graph (integration, real Postgres)", () => {
     // Re-requesting English now serves from cache, not a third AI call.
     const enAgain = await getConnections("1:1", "thematic", source, { locale: "en" });
     expect(enAgain[0]).toMatchObject({ reason: "throne verse" });
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
+  });
+
+  it("persists a concrete model id even when no provider is passed (resolves the flag)", async () => {
+    await seed("2:255");
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "throne verse" }]));
+
+    await getConnections("1:1", "thematic", source);
+
+    const [row] = await db.select().from(connections);
+    // resolveProvider() → "claude" in this mock, so the row is attributed to the
+    // Claude default model, never left null / ANTHROPIC_MODEL-dependent.
+    expect(row.model).toBe("claude-opus-4-7");
+  });
+
+  it("single-flight does not coalesce concurrent generations for different providers", async () => {
+    await seed("2:255");
+    const response = JSON.stringify([{ ref: "2:255", reason: "throne verse" }]);
+
+    // Deterministic overlap: pin the first call at the AI boundary (after its
+    // DB read + inFlight.set) until the second call has run to completion, so
+    // the two are genuinely in flight together. If the key were provider-blind,
+    // the second would coalesce onto the first and mockCallAI would fire once.
+    let firstAtBoundary!: () => void;
+    const reachedBoundary = new Promise<void>((r) => (firstAtBoundary = r));
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((r) => (releaseFirst = r));
+    mockCallAI
+      .mockImplementationOnce(async () => {
+        firstAtBoundary();
+        await firstGate;
+        return response;
+      })
+      .mockImplementation(async () => response);
+
+    const p1 = getConnections("1:1", "thematic", source, { provider: "claude" });
+    await reachedBoundary;
+    // The second request must run to completion while p1 is still gated, so the
+    // two are genuinely in flight together. If the key were provider-blind, p2
+    // would coalesce onto the gated p1 and this await would hang — bound it with
+    // a race so a regression fails fast instead of hitting the suite timeout.
+    let b: Awaited<typeof p1>;
+    try {
+      b = await Promise.race([
+        getConnections("1:1", "thematic", source, { provider: "gemini" }),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("p2 coalesced onto the gated p1 (provider-blind key)")),
+            2000
+          )
+        ),
+      ]);
+    } finally {
+      releaseFirst();
+    }
+    const a = await p1;
+
+    expect(a).toHaveLength(1);
+    expect(b).toHaveLength(1);
     expect(mockCallAI).toHaveBeenCalledTimes(2);
   });
 

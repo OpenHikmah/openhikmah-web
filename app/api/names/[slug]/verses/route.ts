@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callAI } from "@/lib/ai/ai";
+import { translateReason } from "@/lib/ai/translate";
 import { getNameBySlug } from "@/lib/names/divine-names";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
@@ -85,7 +86,7 @@ Output format:
 { "surah:ayah": "one sentence", ... }`;
 
   try {
-    const text = await callAI(prompt);
+    const text = await callAI(prompt, { feature: "names" });
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return new Map();
     const obj: unknown = JSON.parse(match[0]);
@@ -119,7 +120,7 @@ Return ONLY a JSON array:
 [{ "ref": "surah:ayah", "reason": "one sentence" }, ...]`;
 
   try {
-    const text = await callAI(prompt);
+    const text = await callAI(prompt, { feature: "names" });
     const match = text.match(/\[[\s\S]*\]/);
     if (!match) return [];
     const raw: unknown = JSON.parse(match[0]);
@@ -143,17 +144,6 @@ Return ONLY a JSON array:
 
 function stripHtml(text: string): string {
   return sanitizeHtml(text, { allowedTags: [], allowedAttributes: {} });
-}
-
-// Translates (not re-derives) a verse's canonical English `reason` into the
-// target language, so the underlying theological justification stays exactly
-// what was already generated and validated in English.
-async function translateReason(reason: string, language: string): Promise<string> {
-  const prompt = `Translate the following sentence into ${language}. Preserve its meaning exactly — do not add, remove, or alter any theological claim, and maintain ${TANZIH_CONSTRAINT}. Return ONLY the translated sentence, with no quotation marks, labels, or explanation.
-
-Sentence: "${reason}"`;
-  const translated = await callAI(prompt);
-  return translated.trim();
 }
 
 async function getVersesBySlug(
@@ -282,7 +272,7 @@ async function getVersesBySlug(
         slug,
         v.ref,
         locale,
-        () => translateReason(v.reason, language),
+        () => translateReason(v.reason, language, { feature: "names" }),
         onBeforeGenerateOnce
       );
       // A blank/failed translation must never silently replace an
