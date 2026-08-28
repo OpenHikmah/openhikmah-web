@@ -17,7 +17,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** Trigger a backfill job: body `{ jobId, params? }`. */
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;

@@ -12,12 +12,21 @@ describe("estimateCostUsd", () => {
   });
 
   it("uses the cheap Gemini rate for a known Gemini model", () => {
-    // gemini-2.0-flash: $0.10/M in, $0.40/M out
-    const cost = estimateCostUsd("gemini-2.0-flash", "gemini", {
+    // gemini-3.5-flash-lite: $0.30/M in, $2.50/M out
+    const cost = estimateCostUsd("gemini-3.5-flash-lite", "gemini", {
       inputTokens: 1_000_000,
       outputTokens: 1_000_000,
     });
-    expect(cost).toBeCloseTo(0.5, 6);
+    expect(cost).toBeCloseTo(2.8, 6);
+  });
+
+  it("uses the exact Fable 5 rate for its model id", () => {
+    // claude-fable-5: $10/M in, $50/M out — the exact entry, not the fallback.
+    const cost = estimateCostUsd("claude-fable-5", "claude", {
+      inputTokens: 1_000_000,
+      outputTokens: 1_000_000,
+    });
+    expect(cost).toBeCloseTo(60, 6);
   });
 
   it("falls back to the provider's highest rate for an unknown model", () => {
@@ -45,7 +54,7 @@ describe("estimateCostUsd", () => {
 
   it("handles a null model by using the provider fallback rate", () => {
     const cost = estimateCostUsd(null, "gemini", { inputTokens: 1_000_000, outputTokens: 0 });
-    // gemini fallback: $1.25/M in
-    expect(cost).toBeCloseTo(1.25, 6);
+    // gemini fallback: $1.50/M in
+    expect(cost).toBeCloseTo(1.5, 6);
   });
 });

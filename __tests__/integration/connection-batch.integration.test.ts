@@ -173,6 +173,24 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     expect((await db.select().from(aiGenerations)).length).toBeGreaterThanOrEqual(1);
   });
 
+  it("spend guard: refuses the call that would cross maxCostUsd (no overspend)", async () => {
+    for (const r of ["1:1", "2:255"]) await seed(r);
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
+
+    // One generation call costs ~$0.019 (DEFAULT_TOKENS at the claude-opus-4-7
+    // rate). A ceiling below that must stop the run before any request.
+    const summary = await runConnectionBatch(
+      { mode: "baseline", provider: "claude", locales: [], maxCalls: 500, maxCostUsd: 0.001 },
+      hooks
+    );
+
+    expect(summary.stoppedReason).toBe("cost-budget");
+    expect(summary.callsUsed).toBe(0);
+    expect(summary.costUsd).toBe(0);
+    expect(mockCallAI).not.toHaveBeenCalled();
+    expect(await db.select().from(connections)).toHaveLength(0);
+  });
+
   it("spend guard: translations cannot push a cell past maxCalls", async () => {
     await seed("1:1");
     await seed("2:255");

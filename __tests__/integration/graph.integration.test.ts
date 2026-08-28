@@ -13,7 +13,7 @@ vi.mock("@/lib/ai/ai", () => ({
     model: "claude-opus-4-7",
   })),
   resolveProvider: vi.fn(async () => "claude" as const),
-  defaultModelFor: (p: string) => (p === "gemini" ? "gemini-2.0-flash" : "claude-opus-4-7"),
+  defaultModelFor: (p: string) => (p === "gemini" ? "gemini-3.5-flash-lite" : "claude-opus-4-7"),
 }));
 // Guard against accidental network in the resolver fallback — everything must
 // resolve from the seeded corpus.
@@ -152,8 +152,24 @@ describe("connection graph (integration, real Postgres)", () => {
 
     const p1 = getConnections("1:1", "thematic", source, { provider: "claude" });
     await reachedBoundary;
-    const b = await getConnections("1:1", "thematic", source, { provider: "gemini" });
-    releaseFirst();
+    // The second request must run to completion while p1 is still gated, so the
+    // two are genuinely in flight together. If the key were provider-blind, p2
+    // would coalesce onto the gated p1 and this await would hang — bound it with
+    // a race so a regression fails fast instead of hitting the suite timeout.
+    let b: Awaited<typeof p1>;
+    try {
+      b = await Promise.race([
+        getConnections("1:1", "thematic", source, { provider: "gemini" }),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("p2 coalesced onto the gated p1 (provider-blind key)")),
+            2000
+          )
+        ),
+      ]);
+    } finally {
+      releaseFirst();
+    }
     const a = await p1;
 
     expect(a).toHaveLength(1);

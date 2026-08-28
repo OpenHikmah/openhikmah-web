@@ -31,7 +31,7 @@ export interface CallAiOptions {
 /** The model id a provider will use by default (respecting the model env vars). */
 export function defaultModelFor(provider: Provider): string {
   return provider === "gemini"
-    ? (process.env.GEMINI_MODEL ?? "gemini-2.0-flash")
+    ? (process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite")
     : (process.env.ANTHROPIC_MODEL ?? "claude-opus-4-7");
 }
 
@@ -113,7 +113,7 @@ async function callClaude(prompt: string): Promise<AiResult> {
 async function callGemini(prompt: string): Promise<AiResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
-  const model = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
+  const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite";
   const ai = new GoogleGenerativeAI(apiKey);
   const genModel = ai.getGenerativeModel({ model });
   const result = await genModel.generateContent(prompt);

@@ -214,7 +214,7 @@ Return ONLY a valid JSON array of { "ref": "surah:ayah", "reason": "..." }.`,
       text: JSON.stringify([{ ref: "2:255", reason: "x" }]),
       usage: { inputTokens: 1234, outputTokens: 56 },
       provider: "gemini" as const,
-      model: "gemini-2.0-flash",
+      model: "gemini-3.5-flash-lite",
     });
     await generateConnections("1:1", "ar", "tr", "thematic", "en", { provider: "gemini" });
 
@@ -223,7 +223,7 @@ Return ONLY a valid JSON array of { "ref": "surah:ayah", "reason": "..." }.`,
       expect.objectContaining({ feature: "connections", provider: "gemini" })
     );
     expect(insertedRows).toContainEqual(
-      expect.objectContaining({ model: "gemini-2.0-flash", tokens: 1290 })
+      expect.objectContaining({ model: "gemini-3.5-flash-lite", tokens: 1290 })
     );
   });
 });
@@ -313,7 +313,7 @@ describe("generateGroundedConnections", () => {
       text: JSON.stringify([{ ref: "2:255", reason: "x" }]),
       usage: { inputTokens: 900, outputTokens: 100 },
       provider: "gemini" as const,
-      model: "gemini-2.0-flash",
+      model: "gemini-3.5-flash-lite",
     });
     await generateGroundedConnections("1:1", "ar", "tr", "root", ["2:255"], "en", {
       provider: "gemini",
@@ -324,7 +324,7 @@ describe("generateGroundedConnections", () => {
       expect.objectContaining({ feature: "connections", provider: "gemini" })
     );
     expect(insertedRows).toContainEqual(
-      expect.objectContaining({ model: "gemini-2.0-flash", tokens: 1000 })
+      expect.objectContaining({ model: "gemini-3.5-flash-lite", tokens: 1000 })
     );
   });
 });

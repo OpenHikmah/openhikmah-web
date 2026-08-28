@@ -24,17 +24,23 @@ const RATES: Record<string, Rate> = {
   "claude-opus-5": { inputUsdPerMTok: 5, outputUsdPerMTok: 25 },
   "claude-sonnet-5": { inputUsdPerMTok: 2, outputUsdPerMTok: 10 },
   "claude-haiku-4-5": { inputUsdPerMTok: 1, outputUsdPerMTok: 5 },
-  // Google Gemini
-  "gemini-2.0-flash": { inputUsdPerMTok: 0.1, outputUsdPerMTok: 0.4 },
-  "gemini-2.5-flash": { inputUsdPerMTok: 0.3, outputUsdPerMTok: 2.5 },
+  // Google Gemini — current 3.x tier
+  "gemini-3.7-flash": { inputUsdPerMTok: 0.75, outputUsdPerMTok: 3.75 },
+  "gemini-3.6-flash": { inputUsdPerMTok: 0.75, outputUsdPerMTok: 3.75 },
+  "gemini-3.5-flash": { inputUsdPerMTok: 1.5, outputUsdPerMTok: 9 },
+  "gemini-3.5-flash-lite": { inputUsdPerMTok: 0.3, outputUsdPerMTok: 2.5 },
+  "gemini-3.1-flash-lite": { inputUsdPerMTok: 0.25, outputUsdPerMTok: 1.5 },
+  // Retired, but still referenced by older `ai_generations` rows.
   "gemini-2.5-pro": { inputUsdPerMTok: 1.25, outputUsdPerMTok: 10 },
+  "gemini-2.5-flash": { inputUsdPerMTok: 0.3, outputUsdPerMTok: 2.5 },
+  "gemini-2.0-flash": { inputUsdPerMTok: 0.1, outputUsdPerMTok: 0.4 },
 };
 
-// Highest current per-provider list rate (Claude: Fable 5; Gemini: 2.5 Pro) so
-// an unknown model id never makes the spend guard under-estimate.
+// Highest plausible per-provider list rate (Claude: Fable 5; Gemini: 3.5 Flash)
+// so an unknown model id never makes the spend guard under-estimate.
 const FALLBACK_BY_PROVIDER: Record<Provider, Rate> = {
   claude: { inputUsdPerMTok: 10, outputUsdPerMTok: 50 },
-  gemini: { inputUsdPerMTok: 1.25, outputUsdPerMTok: 10 },
+  gemini: { inputUsdPerMTok: 1.5, outputUsdPerMTok: 10 },
 };
 
 /**

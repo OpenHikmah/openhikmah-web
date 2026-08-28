@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/admin-auth";
 import { getCoverageReport } from "@/lib/admin/coverage-report";
 
-/** Connection-graph coverage report for /admin/coverage.
- *  Optional `?locale=` and `?kind=` steer the surah rollup + missing sample. */
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
