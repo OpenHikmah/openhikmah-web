@@ -2,16 +2,27 @@ import { spawn } from "node:child_process";
 import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { jobRuns, verses, verseEmbeddings } from "@/lib/infra/db/schema";
+import { runConnectionBatch, type BatchOptions } from "@/lib/ai/connection-batch";
+import type { Provider } from "@/lib/ai/ai";
+import { LOCALES, type Locale } from "@/lib/i18n/config";
 
 /**
- * Triggers and tracks the project's one-time/resumable backfill scripts
- * (scripts/seed-quran.mjs, scripts/seed-morphology.mjs, scripts/embed-corpus.mjs,
- * scripts/seed-translations.mjs)
- * from the admin panel instead of a container shell. Deliberately simple for a
- * single-box deployment: one job runs at a time, tracked by an in-memory child
- * process reference in this module (the source of truth for "is a job running
- * right now") backed by a `job_runs` DB row per invocation (the source of truth
- * for history/last-run status, so it survives a server restart).
+ * Triggers and tracks the project's one-time/resumable backfill jobs from the
+ * admin panel instead of a container shell. Deliberately simple for a single-box
+ * deployment: one job runs at a time, tracked by in-memory state in this module
+ * (the source of truth for "is a job running right now") backed by a `job_runs`
+ * DB row per invocation (the source of truth for history/last-run status, so it
+ * survives a server restart).
+ *
+ * Two execution shapes:
+ *   - `script` jobs spawn `bun scripts/<name>.mjs` as a child process. Those
+ *     scripts are deliberately dependency-light and hand-shipped in the prod
+ *     image (see .dockerignore / Dockerfile).
+ *   - `inProcess` jobs call an app function directly. `backfill-connections`
+ *     needs a large slice of `@/lib/*` that `output: "standalone"` compiles into
+ *     `.next` chunks rather than shipping as source, so a spawned
+ *     `bun scripts/backfill-connections.ts` cannot resolve its imports in prod —
+ *     it runs here instead.
  */
 
 export type JobId =
@@ -20,10 +31,12 @@ export type JobId =
 export interface JobDefinition {
   id: JobId;
   label: string;
-  script: string;
+  /** Spawned as `bun <script>`. Mutually exclusive with `inProcess`. */
+  script?: string;
+  /** Run in-process by `startJob` instead of spawning a child. */
+  inProcess?: boolean;
   requiresEnv?: string[];
-  /** When set, the job accepts a params object (validated in startJob) that is
-   *  passed to the spawned script as env vars. */
+  /** When set, the job accepts a params object, validated in startJob. */
   acceptsParams?: boolean;
 }
 
@@ -48,23 +61,14 @@ export const JOBS: readonly JobDefinition[] = [
   {
     id: "backfill-connections",
     label: "Backfill verse connections",
-    script: "scripts/backfill-connections.ts",
+    inProcess: true,
     acceptsParams: true,
   },
 ] as const;
 
-export interface BackfillParams {
-  mode: "baseline" | "topup";
-  provider: "claude" | "gemini";
-  /** csv subset of tr,ru,az (may be empty) */
-  locales: string;
-  maxCalls: number;
-  maxCostUsd: number;
-}
-
-/** Validates raw admin input for the backfill job and returns the env vars the
- *  spawned script reads. Throws on bad input (routes map to 400). */
-function backfillParamEnv(raw: Record<string, unknown>): Record<string, string> {
+/** Validates raw admin input for the backfill job into the typed options
+ *  `runConnectionBatch` takes. Throws on bad input (routes map to 400). */
+function parseBackfillParams(raw: Record<string, unknown>): BatchOptions {
   const mode = raw.mode;
   if (mode !== "baseline" && mode !== "topup") throw new Error("mode must be baseline or topup");
 
@@ -94,11 +98,11 @@ function backfillParamEnv(raw: Record<string, unknown>): Record<string, string> 
   if (!process.env[requiredKey]) throw new Error(`Missing required env var: ${requiredKey}`);
 
   return {
-    BACKFILL_MODE: mode,
-    BACKFILL_PROVIDER: provider,
-    BACKFILL_LOCALES: localeList.join(","),
-    BACKFILL_MAX_CALLS: String(maxCalls),
-    BACKFILL_MAX_COST_USD: String(maxCostUsd),
+    mode,
+    provider: provider as Provider,
+    locales: localeList.filter((l): l is Locale => (LOCALES as readonly string[]).includes(l)),
+    maxCalls,
+    maxCostUsd,
   };
 }
 
@@ -123,6 +127,17 @@ function pushLogLine(job: RunningJob, line: string) {
   if (job.logTail.length > LOG_TAIL_LINES) job.logTail.shift();
 }
 
+/** Records the terminal `job_runs` row and releases the in-memory slot. Shared
+ *  by the spawn path (child close/error) and the in-process path. */
+function finishRun(state: RunningJob, status: "success" | "failed", error: string | null) {
+  void db
+    .update(jobRuns)
+    .set({ status, completedAt: new Date(), error, logTail: state.logTail.join("\n") })
+    .where(eq(jobRuns.id, state.runId))
+    .catch((err) => console.error("job-runner: failed to record job completion", err));
+  if (running?.runId === state.runId) running = null;
+}
+
 /** Starts a job if none is currently running. Throws on bad input or an
  *  already-running job — routes should catch and translate to a 400/409.
  *  `params` is required for jobs with `acceptsParams` and rejected for others. */
@@ -140,10 +155,10 @@ export async function startJob(
     throw new Error(`Missing required env var(s): ${missingEnv.join(", ")}`);
   }
 
-  let paramEnv: Record<string, string> = {};
+  let backfillOpts: BatchOptions | null = null;
   if (job.acceptsParams) {
     if (!params) throw new Error(`Job "${job.id}" requires params`);
-    if (job.id === "backfill-connections") paramEnv = backfillParamEnv(params);
+    if (job.id === "backfill-connections") backfillOpts = parseBackfillParams(params);
   } else if (params) {
     throw new Error(`Job "${job.id}" does not accept params`);
   }
@@ -167,10 +182,31 @@ export async function startJob(
   }
   state.runId = row.id;
 
-  const child = spawn("bun", [job.script], {
-    cwd: process.cwd(),
-    env: { ...process.env, ...paramEnv },
-  });
+  if (job.inProcess) {
+    // Fire-and-forget: startJob returns as soon as the run is recorded, and the
+    // batch reports progress via `onProgress` into the same logTail the status
+    // endpoint reads. `runConnectionBatch` is budget-capped and single-flight,
+    // and a redeploy kills it exactly like it killed the spawned child — the
+    // `job_runs` row + resumable work list cover restart recovery.
+    void (async () => {
+      try {
+        const summary = await runConnectionBatch(backfillOpts as BatchOptions, {
+          onProgress: (line) => pushLogLine(state, line),
+        });
+        finishRun(
+          state,
+          summary.stoppedReason === "error" ? "failed" : "success",
+          summary.error ?? null
+        );
+      } catch (err) {
+        pushLogLine(state, `job failed: ${err instanceof Error ? err.message : String(err)}`);
+        finishRun(state, "failed", err instanceof Error ? err.message : String(err));
+      }
+    })();
+    return { runId: row.id };
+  }
+
+  const child = spawn("bun", [job.script as string], { cwd: process.cwd() });
 
   const onData = (chunk: Buffer) => {
     for (const line of chunk.toString("utf8").split("\n")) {
@@ -181,32 +217,14 @@ export async function startJob(
   child.stderr.on("data", onData);
 
   child.on("close", (code) => {
-    void db
-      .update(jobRuns)
-      .set({
-        status: code === 0 ? "success" : "failed",
-        completedAt: new Date(),
-        error: code === 0 ? null : `Exited with code ${code}`,
-        logTail: state.logTail.join("\n"),
-      })
-      .where(eq(jobRuns.id, state.runId))
-      .catch((err) => console.error("job-runner: failed to record job completion", err));
-    if (running?.runId === state.runId) running = null;
+    finishRun(
+      state,
+      code === 0 ? "success" : "failed",
+      code === 0 ? null : `Exited with code ${code}`
+    );
   });
 
-  child.on("error", (err) => {
-    void db
-      .update(jobRuns)
-      .set({
-        status: "failed",
-        completedAt: new Date(),
-        error: err.message,
-        logTail: state.logTail.join("\n"),
-      })
-      .where(eq(jobRuns.id, state.runId))
-      .catch((e) => console.error("job-runner: failed to record job spawn error", e));
-    if (running?.runId === state.runId) running = null;
-  });
+  child.on("error", (err) => finishRun(state, "failed", err.message));
 
   return { runId: row.id };
 }

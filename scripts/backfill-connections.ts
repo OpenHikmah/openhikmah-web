@@ -1,20 +1,22 @@
 /**
- * Admin backfill job: fill the connection graph so the public "+" expander
- * never shows "Could not find connections".
+ * Local-dev / smoke-test entry point for the connection backfill.
  *
- * Triggered from /admin/coverage via lib/admin/job-runner.ts, which spawns
- * `bun scripts/backfill-connections.ts` with these env vars:
+ * The admin panel does NOT run this script — `/admin/coverage` → job-runner
+ * calls `runConnectionBatch` in-process (this file's `@/lib/*` import graph is a
+ * large slice of the app that `output: "standalone"` compiles into `.next`
+ * chunks, so a spawned `bun scripts/backfill-connections.ts` can't resolve its
+ * imports in the prod image). This wrapper stays for `bun run backfill:connections`
+ * against a local checkout:
+ *
+ *   BACKFILL_MODE=baseline BACKFILL_PROVIDER=claude BACKFILL_LOCALES= \
+ *   BACKFILL_MAX_CALLS=3 BACKFILL_MAX_COST_USD=1 DATABASE_URL=... \
+ *   bun scripts/backfill-connections.ts
  *
  *   BACKFILL_MODE         baseline | topup
  *   BACKFILL_PROVIDER     claude | gemini
  *   BACKFILL_LOCALES      csv subset of tr,ru,az (may be empty)
  *   BACKFILL_MAX_CALLS    hard ceiling on LLM calls (exact)
  *   BACKFILL_MAX_COST_USD best-effort USD ceiling
- *
- * Can also be run directly for a smoke test:
- *   BACKFILL_MODE=baseline BACKFILL_PROVIDER=claude BACKFILL_LOCALES= \
- *   BACKFILL_MAX_CALLS=3 BACKFILL_MAX_COST_USD=1 DATABASE_URL=... \
- *   bun scripts/backfill-connections.ts
  */
 import { runConnectionBatch, type BatchMode } from "@/lib/ai/connection-batch";
 import type { Provider } from "@/lib/ai/ai";
@@ -41,7 +43,7 @@ if (provider !== "claude" && provider !== "gemini") {
   process.exit(1);
 }
 
-// Same provider→key rule as lib/admin/job-runner.ts's backfillParamEnv: a direct
+// Same provider→key rule as lib/admin/job-runner.ts's parseBackfillParams: a direct
 // run must not start (and bill nothing) if the selected provider's key is unset.
 const requiredKey = provider === "gemini" ? "GEMINI_API_KEY" : "ANTHROPIC_API_KEY";
 if (!process.env[requiredKey]) {
@@ -90,8 +92,10 @@ const summary = await runConnectionBatch(
     maxCalls,
     maxCostUsd,
   },
-  { onProgress: (line) => console.log(line) }
+  // console.error keeps progress on stderr — the repo's precommit guard forbids
+  // console.log in .ts files, and a dev smoke-test doesn't need stdout.
+  { onProgress: (line) => console.error(line) }
 );
 
-console.log(`backfill-connections: ${JSON.stringify(summary)}`);
+console.error(`backfill-connections: ${JSON.stringify(summary)}`);
 process.exit(summary.stoppedReason === "error" ? 1 : 0);
