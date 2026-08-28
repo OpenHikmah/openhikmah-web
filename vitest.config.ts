@@ -7,6 +7,14 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    // The forks pool evaluates many first-time module transforms in parallel
+    // (jsdom + the App Router page modules are heavy). On a loaded machine that
+    // first import can alone approach Vitest's 5s default, timing out tests
+    // whose own logic is fast — a whole-suite flake that shifts files run to
+    // run. Give that headroom globally instead of patching one test at a time
+    // (see the now-removed `, 15000` on stories-pages.test.tsx).
+    testTimeout: 20000,
+    hookTimeout: 20000,
     // Forks pool is more compatible with Bun's runtime on Windows.
     // The prior threads preference was Node.js-specific.
     pool: "forks",

@@ -48,6 +48,8 @@ describe("Surah reading page", () => {
   beforeEach(() => {
     mockGetSurahVerses.mockReset();
     mockGetSurahVerses.mockResolvedValue([verse("1:1"), verse("1:2")]);
+    mockGetQuranEdition.mockReset();
+    mockGetQuranEdition.mockResolvedValue("en.sahih");
   });
 
   it("renders the surah name and ayah count", async () => {
@@ -58,7 +60,7 @@ describe("Surah reading page", () => {
   });
 
   it("fetches every ayah for the requested surah with the caller's edition", async () => {
-    mockGetQuranEdition.mockResolvedValueOnce("tr.diyanet");
+    mockGetQuranEdition.mockResolvedValue("tr.diyanet");
     const { default: SurahReaderPage } = await import("@/app/surah/[number]/page");
     await SurahReaderPage({ params: Promise.resolve({ number: "18" }) });
     expect(mockGetSurahVerses).toHaveBeenCalledWith(18, "tr.diyanet");

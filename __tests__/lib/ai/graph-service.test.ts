@@ -167,6 +167,21 @@ describe("getConnections", () => {
     expect(out).toHaveLength(2);
   });
 
+  it("threads an explicit provider+model override through to generation", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    mockGenerate.mockResolvedValue([result("2:255")]);
+
+    await getConnections("1:1", "thematic", source, {
+      provider: "gemini",
+      model: "gemini-3.5-flash-lite",
+    });
+
+    expect(mockGenerate).toHaveBeenCalledWith("1:1", SOURCE_ARABIC, "tr", "thematic", "en", {
+      provider: "gemini",
+      model: "gemini-3.5-flash-lite",
+    });
+  });
+
   it("on a persist failure, still returns the generated results but counts it — not silent", async () => {
     mockSelect.mockReturnValue(makeSelectChain([])); // miss
     mockGenerate.mockResolvedValue([result("2:255")]);
@@ -448,6 +463,29 @@ describe("getConnections — single-flight de-duplication", () => {
     ]);
     expect(mockGenerate).toHaveBeenCalledTimes(1);
     expect(mockGenerateGrounded).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT coalesce misses resolved to different models (same verse+kind)", async () => {
+    mockGenerate.mockImplementation(async () => [result("2:255")]);
+    await Promise.all([
+      getConnections("1:1", "thematic", source, {
+        provider: "gemini",
+        model: "gemini-3.5-flash",
+      }),
+      getConnections("1:1", "thematic", source, {
+        provider: "gemini",
+        model: "gemini-3.5-flash-lite",
+      }),
+    ]);
+    expect(mockGenerate).toHaveBeenCalledTimes(2);
+    expect(mockGenerate).toHaveBeenCalledWith("1:1", SOURCE_ARABIC, "tr", "thematic", "en", {
+      provider: "gemini",
+      model: "gemini-3.5-flash",
+    });
+    expect(mockGenerate).toHaveBeenCalledWith("1:1", SOURCE_ARABIC, "tr", "thematic", "en", {
+      provider: "gemini",
+      model: "gemini-3.5-flash-lite",
+    });
   });
 
   it("does NOT coalesce different verse+kind keys", async () => {
