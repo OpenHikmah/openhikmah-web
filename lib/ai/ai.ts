@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getFlagString } from "@/lib/admin/feature-flags";
+import { DEFAULT_MODEL, isModelForProvider } from "@/lib/ai/models";
 
 export type Provider = "claude" | "gemini";
 
@@ -21,22 +22,64 @@ export interface AiResult {
 }
 
 export interface CallAiOptions {
-  /** Which feature is calling — selects a per-feature provider flag/env when set. */
+  /** Which feature is calling — selects a per-feature provider/model flag/env when set. */
   feature?: AiFeature;
   /** Hard provider override (e.g. the admin batch job's per-run pick). Wins over
    *  every flag and env var. */
   provider?: Provider;
+  /** Hard model override (the admin batch job's per-run pick). Applied only when
+   *  it belongs to the resolved provider; otherwise ignored. */
+  model?: string;
 }
 
-/** The model id a provider will use by default (respecting the model env vars). */
+/** The model id a provider will use by default: the `<PROVIDER>_MODEL` env var
+ *  if set (operator escape hatch), else the built-in default. */
 export function defaultModelFor(provider: Provider): string {
   return provider === "gemini"
-    ? (process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite")
-    : (process.env.ANTHROPIC_MODEL ?? "claude-opus-4-7");
+    ? (process.env.GEMINI_MODEL ?? DEFAULT_MODEL.gemini)
+    : (process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL.claude);
 }
 
 function asProvider(value: string | undefined): Provider | null {
   return value === "claude" || value === "gemini" ? value : null;
+}
+
+/**
+ * Resolves the model for a call, given its already-resolved provider. Precedence
+ * (first hit that is a valid model for `provider` wins):
+ *   1. `override` argument (the batch job's per-run pick)
+ *   2. `ai_model_<feature>` admin flag
+ *   3. `AI_MODEL_<FEATURE>` env var
+ *   4. `ai_model` admin flag
+ *   5. `defaultModelFor(provider)` — `<PROVIDER>_MODEL` env, else built-in default
+ *
+ * Admin-set candidates (flags/env) are checked against the provider's selectable
+ * set so a leftover Claude model never gets sent to the Gemini API (or vice
+ * versa) when the provider is switched. Step 5 is the operator escape hatch and
+ * is trusted as-is.
+ */
+export async function resolveModel(
+  feature: AiFeature | undefined,
+  provider: Provider,
+  override?: string
+): Promise<string> {
+  const validFor = (m: string | undefined | null): string | null =>
+    m && isModelForProvider(m, provider) ? m : null;
+
+  const fromOverride = validFor(override);
+  if (fromOverride) return fromOverride;
+
+  if (feature) {
+    const fromFeatureFlag = validFor(await getFlagString(`ai_model_${feature}`, ""));
+    if (fromFeatureFlag) return fromFeatureFlag;
+    const fromFeatureEnv = validFor(process.env[`AI_MODEL_${feature.toUpperCase()}`]);
+    if (fromFeatureEnv) return fromFeatureEnv;
+  }
+
+  const fromGlobalFlag = validFor(await getFlagString("ai_model", ""));
+  if (fromGlobalFlag) return fromGlobalFlag;
+
+  return defaultModelFor(provider);
 }
 
 /**
@@ -74,7 +117,8 @@ export async function resolveProvider(feature?: AiFeature, override?: Provider):
  */
 export async function callAIDetailed(prompt: string, opts: CallAiOptions = {}): Promise<AiResult> {
   const provider = await resolveProvider(opts.feature, opts.provider);
-  return provider === "gemini" ? callGemini(prompt) : callClaude(prompt);
+  const model = await resolveModel(opts.feature, provider, opts.model);
+  return provider === "gemini" ? callGemini(prompt, model) : callClaude(prompt, model);
 }
 
 /**
@@ -86,9 +130,8 @@ export async function callAI(prompt: string, opts: CallAiOptions = {}): Promise<
   return (await callAIDetailed(prompt, opts)).text;
 }
 
-async function callClaude(prompt: string): Promise<AiResult> {
+async function callClaude(prompt: string, model: string): Promise<AiResult> {
   const client = new Anthropic();
-  const model = process.env.ANTHROPIC_MODEL ?? "claude-opus-4-7";
   const message = await client.messages.create({
     model,
     max_tokens: 4096,
@@ -110,10 +153,9 @@ async function callClaude(prompt: string): Promise<AiResult> {
   };
 }
 
-async function callGemini(prompt: string): Promise<AiResult> {
+async function callGemini(prompt: string, model: string): Promise<AiResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
-  const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite";
   const ai = new GoogleGenerativeAI(apiKey);
   const genModel = ai.getGenerativeModel({ model });
   const result = await genModel.generateContent(prompt);

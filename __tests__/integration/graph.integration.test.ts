@@ -12,7 +12,13 @@ vi.mock("@/lib/ai/ai", () => ({
     provider: "claude" as const,
     model: "claude-opus-4-7",
   })),
-  resolveProvider: vi.fn(async () => "claude" as const),
+  resolveProvider: vi.fn(
+    async (_feature: string, override?: string) => (override ?? "claude") as "claude" | "gemini"
+  ),
+  resolveModel: vi.fn(
+    async (_feature: string, provider: string, override?: string) =>
+      override ?? (provider === "gemini" ? "gemini-3.5-flash-lite" : "claude-opus-4-7")
+  ),
   defaultModelFor: (p: string) => (p === "gemini" ? "gemini-3.5-flash-lite" : "claude-opus-4-7"),
 }));
 // Guard against accidental network in the resolver fallback — everything must

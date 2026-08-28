@@ -4,7 +4,11 @@ import { translateReason } from "@/lib/ai/translate";
 import { getNameBySlug } from "@/lib/names/divine-names";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
-import { getOrGenerateNameContent, getOrGenerateVerseReason } from "@/lib/names/name-content";
+import {
+  getOrGenerateNameContent,
+  getOrGenerateVerseReason,
+  type ResolvedNamesModel,
+} from "@/lib/names/name-content";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import { incr } from "@/lib/infra/metrics";
@@ -70,7 +74,8 @@ async function searchVerseRefs(arabic: string): Promise<string[]> {
 async function buildReasons(
   refs: string[],
   transliteration: string,
-  meaning: string
+  meaning: string,
+  resolved: ResolvedNamesModel
 ): Promise<Map<string, string>> {
   if (refs.length === 0) return new Map();
   const prompt = `You are a classical Islamic scholar (Maturidi/Hanafi tradition).
@@ -86,7 +91,7 @@ Output format:
 { "surah:ayah": "one sentence", ... }`;
 
   try {
-    const text = await callAI(prompt, { feature: "names" });
+    const text = await callAI(prompt, { feature: "names", ...resolved });
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return new Map();
     const obj: unknown = JSON.parse(match[0]);
@@ -107,7 +112,8 @@ async function fallbackAIVerses(
   arabic: string,
   transliteration: string,
   meaning: string,
-  description: string
+  description: string,
+  resolved: ResolvedNamesModel
 ): Promise<Array<{ ref: string; reason: string }>> {
   const prompt = `You are a classical Islamic scholar (Maturidi/Hanafi tradition).
 
@@ -120,7 +126,7 @@ Return ONLY a JSON array:
 [{ "ref": "surah:ayah", "reason": "one sentence" }, ...]`;
 
   try {
-    const text = await callAI(prompt, { feature: "names" });
+    const text = await callAI(prompt, { feature: "names", ...resolved });
     const match = text.match(/\[[\s\S]*\]/);
     if (!match) return [];
     const raw: unknown = JSON.parse(match[0]);
@@ -162,7 +168,7 @@ async function getVersesBySlug(
     // requester's locale — see name_verse_reasons below for why.
     "en",
     VERSES_VERSION,
-    async (): Promise<NameVerse[]> => {
+    async (resolved): Promise<NameVerse[]> => {
       // Try actual quran.com search first
       const refs = await searchVerseRefs(name.arabic);
 
@@ -170,7 +176,7 @@ async function getVersesBySlug(
       if (refs.length > 0) {
         const [verseDataResults, reasonMap] = await Promise.all([
           Promise.all(refs.map((ref) => fetchVerseData(ref))),
-          buildReasons(refs, name.transliteration, name.meaning),
+          buildReasons(refs, name.transliteration, name.meaning, resolved),
         ]);
 
         const verses: NameVerse[] = refs
@@ -193,7 +199,8 @@ async function getVersesBySlug(
         name.arabic,
         name.transliteration,
         name.meaning,
-        name.description
+        name.description,
+        resolved
       );
       if (aiItems.length === 0) return [];
 
@@ -272,7 +279,7 @@ async function getVersesBySlug(
         slug,
         v.ref,
         locale,
-        () => translateReason(v.reason, language, { feature: "names" }),
+        (resolved) => translateReason(v.reason, language, { feature: "names", ...resolved }),
         onBeforeGenerateOnce
       );
       // A blank/failed translation must never silently replace an

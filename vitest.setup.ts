@@ -37,4 +37,4 @@ process.env.NEXT_PUBLIC_QF_AUTH_BASE = "https://auth.test.qf.com";
 process.env.ANTHROPIC_API_KEY ??= "test-anthropic-key";
 process.env.AI_PROVIDER ??= "claude";
 process.env.GEMINI_API_KEY ??= "test-gemini-key-placeholder";
-process.env.GEMINI_MODEL ??= "gemini-2.0-flash";
+process.env.GEMINI_MODEL ??= "gemini-3.5-flash-lite";

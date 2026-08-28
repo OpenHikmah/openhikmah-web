@@ -165,6 +165,30 @@ describe("startJob — backfill-connections params", () => {
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
+  it("rejects a model that isn't valid for the chosen provider, accepts a valid one", async () => {
+    await expect(
+      startJob("backfill-connections", "qf-admin", {
+        ...validParams,
+        provider: "claude",
+        model: "gemini-3.7-flash",
+      })
+    ).rejects.toThrow(/model/);
+    await expect(
+      startJob("backfill-connections", "qf-admin", { ...validParams, model: "not-a-model" })
+    ).rejects.toThrow(/model/);
+
+    mockRunConnectionBatch.mockReturnValueOnce(new Promise(() => {}));
+    await startJob("backfill-connections", "qf-admin", {
+      ...validParams,
+      provider: "gemini",
+      model: "gemini-3.7-flash",
+    });
+    expect(mockRunConnectionBatch).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: "gemini", model: "gemini-3.7-flash" }),
+      expect.anything()
+    );
+  });
+
   it("rejects a bad mode / provider / budget / locale", async () => {
     await expect(
       startJob("backfill-connections", "qf-admin", { ...validParams, mode: "sideways" })
@@ -205,6 +229,7 @@ describe("startJob — backfill-connections params", () => {
       {
         mode: "baseline",
         provider: "claude",
+        model: undefined,
         locales: ["tr", "ru"],
         maxCalls: 10,
         maxCostUsd: 2,

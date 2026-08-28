@@ -1,14 +1,25 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { nameContent, nameVerseReasons, type NameContentKind } from "@/lib/infra/db/schema";
-import { defaultModelFor, resolveProvider } from "@/lib/ai/ai";
+import { resolveModel, resolveProvider, type Provider } from "@/lib/ai/ai";
 import type { Locale } from "@/lib/i18n/config";
 
-// The `model` column records which provider produced the row for later cost
-// attribution. The names feature can be pointed at Gemini (see `resolveProvider`
-// / `ai_provider_names`), so read the resolved provider rather than assuming the
-// Anthropic env var.
-const generatedModel = async () => defaultModelFor(await resolveProvider("names"));
+/** The provider+model to use for (and attribute) one names generation. */
+export interface ResolvedNamesModel {
+  provider: Provider;
+  model: string;
+}
+
+// Resolved ONCE per generation and passed as a pinned pair into both the
+// `callAI` request (as provider + model overrides) and the persisted `model`
+// column, so a config change (`ai_provider_names` / `ai_model_names`) mid-flight
+// can't make the request use one provider while the recorded model belongs to
+// another — or make the stored attribution disagree with what actually ran.
+const resolveNamesModel = async (): Promise<ResolvedNamesModel> => {
+  const provider = await resolveProvider("names");
+  const model = await resolveModel("names", provider);
+  return { provider, model };
+};
 
 /**
  * Durable, write-once/read-many cache for the AI-generated 99-Names content
@@ -50,7 +61,7 @@ export async function getOrGenerateNameContent<T>(
   kind: NameContentKind,
   locale: Locale,
   version: number,
-  generate: () => Promise<T>,
+  generate: (resolved: ResolvedNamesModel) => Promise<T>,
   isEmpty: (value: T) => boolean,
   onBeforeGenerate?: () => Promise<void>
 ): Promise<T> {
@@ -136,14 +147,17 @@ async function generateAndPersist<T>(
   kind: NameContentKind,
   locale: Locale,
   version: number,
-  generate: () => Promise<T>,
+  generate: (resolved: ResolvedNamesModel) => Promise<T>,
   isEmpty: (value: T) => boolean
 ): Promise<T> {
-  const result = await generate();
+  // Resolve the provider+model before generation and use the same pair for the
+  // request and the persisted attribution.
+  const resolved = await resolveNamesModel();
+  const result = await generate(resolved);
+  const model = resolved.model;
 
   if (!isEmpty(result)) {
     const data = JSON.stringify(result);
-    const model = await generatedModel();
     try {
       await db
         .insert(nameContent)
@@ -177,7 +191,7 @@ export async function getOrGenerateVerseReason(
   slug: string,
   ref: string,
   locale: Locale,
-  generate: () => Promise<string>,
+  generate: (resolved: ResolvedNamesModel) => Promise<string>,
   onBeforeGenerate?: () => Promise<void>
 ): Promise<string> {
   const [row] = await db
@@ -201,10 +215,11 @@ export async function getOrGenerateVerseReason(
   if (pending) return pending;
 
   const work = (async () => {
-    const reason = await generate();
+    const resolved = await resolveNamesModel();
+    const reason = await generate(resolved);
+    const model = resolved.model;
     if (reason.trim() === "") return reason;
 
-    const model = await generatedModel();
     try {
       // `reasonInFlight` only coalesces callers within this process — a
       // concurrent request on another instance can win the same (slug, ref,

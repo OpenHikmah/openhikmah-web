@@ -22,11 +22,12 @@ import type { ConnectionResult, EdgeKind, Verse } from "@/types/quran";
  * Both log the generation to `ai_generations`.
  */
 
-/** Optional generation controls. `provider` forces a specific LLM for this
- *  call (the admin batch job's per-run pick), bypassing the feature/global
- *  provider flags. */
+/** Optional generation controls. `provider` / `model` force a specific LLM for
+ *  this call (the admin batch job's per-run pick), bypassing the feature/global
+ *  flags. `model` is applied only when it belongs to the resolved provider. */
 export interface GenerateOpts {
   provider?: Provider;
+  model?: string;
 }
 
 function tokensFromUsage(
@@ -158,7 +159,11 @@ export async function generateConnections(
     kind,
     locale
   );
-  const res = await callAIDetailed(prompt, { feature: "connections", provider: opts.provider });
+  const res = await callAIDetailed(prompt, {
+    feature: "connections",
+    provider: opts.provider,
+    model: opts.model,
+  });
   const text = res.text;
 
   // Best-effort audit log — never fail generation because logging failed.
@@ -296,7 +301,11 @@ export async function generateGroundedConnections(
     candidates,
     locale
   );
-  const res = await callAIDetailed(prompt, { feature: "connections", provider: opts.provider });
+  const res = await callAIDetailed(prompt, {
+    feature: "connections",
+    provider: opts.provider,
+    model: opts.model,
+  });
   const text = res.text;
 
   try {
