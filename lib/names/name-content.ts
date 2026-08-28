@@ -4,11 +4,11 @@ import { nameContent, nameVerseReasons, type NameContentKind } from "@/lib/infra
 import { resolveModel, resolveProvider } from "@/lib/ai/ai";
 import type { Locale } from "@/lib/i18n/config";
 
-// The `model` column records which model produced the row for later cost
-// attribution. The names feature can be pointed at a different provider/model
-// (see `ai_provider_names` / `ai_model_names`), so resolve the same way the
-// actual `callAI` will rather than assuming the Anthropic env var.
-const generatedModel = async () => {
+// The model to use for (and attribute) one names generation. Resolved ONCE per
+// generation and passed into both the `callAI` request and the persisted `model`
+// column, so a config change (`ai_provider_names` / `ai_model_names`) mid-flight
+// can't make the recorded model disagree with the one that actually ran.
+const resolveNamesModel = async () => {
   const provider = await resolveProvider("names");
   return resolveModel("names", provider);
 };
@@ -53,7 +53,7 @@ export async function getOrGenerateNameContent<T>(
   kind: NameContentKind,
   locale: Locale,
   version: number,
-  generate: () => Promise<T>,
+  generate: (model: string) => Promise<T>,
   isEmpty: (value: T) => boolean,
   onBeforeGenerate?: () => Promise<void>
 ): Promise<T> {
@@ -139,14 +139,16 @@ async function generateAndPersist<T>(
   kind: NameContentKind,
   locale: Locale,
   version: number,
-  generate: () => Promise<T>,
+  generate: (model: string) => Promise<T>,
   isEmpty: (value: T) => boolean
 ): Promise<T> {
-  const result = await generate();
+  // Resolve the model before generation and use the same value for the request
+  // and the persisted attribution.
+  const model = await resolveNamesModel();
+  const result = await generate(model);
 
   if (!isEmpty(result)) {
     const data = JSON.stringify(result);
-    const model = await generatedModel();
     try {
       await db
         .insert(nameContent)
@@ -180,7 +182,7 @@ export async function getOrGenerateVerseReason(
   slug: string,
   ref: string,
   locale: Locale,
-  generate: () => Promise<string>,
+  generate: (model: string) => Promise<string>,
   onBeforeGenerate?: () => Promise<void>
 ): Promise<string> {
   const [row] = await db
@@ -204,10 +206,10 @@ export async function getOrGenerateVerseReason(
   if (pending) return pending;
 
   const work = (async () => {
-    const reason = await generate();
+    const model = await resolveNamesModel();
+    const reason = await generate(model);
     if (reason.trim() === "") return reason;
 
-    const model = await generatedModel();
     try {
       // `reasonInFlight` only coalesces callers within this process — a
       // concurrent request on another instance can win the same (slug, ref,

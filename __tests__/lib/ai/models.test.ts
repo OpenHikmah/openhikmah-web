@@ -4,16 +4,15 @@ import { SELECTABLE_MODELS, DEFAULT_MODEL, isModelForProvider } from "@/lib/ai/m
 
 describe("SELECTABLE_MODELS", () => {
   it("every selectable model has a real (non-fallback) rate in ai-cost", () => {
+    const usage = { inputTokens: 1_000_000, outputTokens: 1_000_000 };
     for (const provider of ["claude", "gemini"] as const) {
+      const fallback = estimateCostUsd("definitely-not-a-model", provider, usage);
       for (const model of SELECTABLE_MODELS[provider]) {
-        const known = estimateCostUsd(model, provider, { inputTokens: 1_000_000, outputTokens: 0 });
-        const unknown = estimateCostUsd("definitely-not-a-model", provider, {
-          inputTokens: 1_000_000,
-          outputTokens: 0,
-        });
-        // A model with its own RATES entry costs less than the conservative
-        // provider fallback (or the guard would over-estimate for it).
-        expect(known).toBeLessThanOrEqual(unknown);
+        const known = estimateCostUsd(model, provider, usage);
+        // A model with its own RATES entry is strictly cheaper than the
+        // conservative provider fallback — if it were missing from RATES it
+        // would resolve to the same (fallback) estimate and this would fail.
+        expect(known).toBeLessThan(fallback);
         expect(known).toBeGreaterThan(0);
       }
     }

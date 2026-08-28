@@ -4,7 +4,7 @@ import { verses, connections, connectionCoverage, aiGenerations } from "@/lib/in
 import { generateConnectionsForCell } from "@/lib/ai/graph-service";
 import { translateReason } from "@/lib/ai/translate";
 import { estimateCostUsd } from "@/lib/ai/ai-cost";
-import { defaultModelFor, type Provider } from "@/lib/ai/ai";
+import { resolveModel, type Provider } from "@/lib/ai/ai";
 import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
 import { incr } from "@/lib/infra/metrics";
 import type { EdgeKind } from "@/types/quran";
@@ -86,8 +86,8 @@ const cellKey = (ref: string, kind: string) => `${ref}|${kind}`;
 
 /** Cost of one generation call, estimated (the generation path doesn't return
  *  token usage). Deliberately the DEFAULT_TOKENS path so the guard errs early. */
-function perCallCost(provider: Provider, model?: string): number {
-  return estimateCostUsd(model || defaultModelFor(provider), provider, null);
+function perCallCost(provider: Provider, model: string): number {
+  return estimateCostUsd(model, provider, null);
 }
 
 /** Builds the ordered work list from current DB state. */
@@ -185,7 +185,7 @@ async function translateCellReasons(
   kind: EdgeKind,
   locales: Locale[],
   provider: Provider,
-  model: string | undefined,
+  model: string,
   budget: { spend: () => boolean; stoppedReason: StoppedReason | null }
 ): Promise<{ inserted: number; stoppedReason: StoppedReason | null }> {
   if (locales.length === 0) return { inserted: 0, stoppedReason: null };
@@ -203,7 +203,6 @@ async function translateCellReasons(
     );
   if (enRows.length === 0) return { inserted: 0, stoppedReason: null };
 
-  const attributedModel = model || defaultModelFor(provider);
   let inserted = 0;
 
   for (const locale of locales) {
@@ -241,7 +240,7 @@ async function translateCellReasons(
           kind,
           reason: translated,
           locale,
-          model: attributedModel,
+          model,
         })
         .onConflictDoNothing()
         .returning({ toRef: connections.toRef });
@@ -249,9 +248,7 @@ async function translateCellReasons(
 
       // Cost/audit visibility for translation spend (tokens not tracked here).
       try {
-        await db
-          .insert(aiGenerations)
-          .values({ fromRef, kind, model: attributedModel, promptVersion: null });
+        await db.insert(aiGenerations).values({ fromRef, kind, model, promptVersion: null });
       } catch (err) {
         console.error("connection-batch: ai_generations log failed:", err);
       }
@@ -304,6 +301,13 @@ export async function runConnectionBatch(
     exhausted: 0,
   };
 
+  // Resolve the effective model once, up front: with no per-run pick,
+  // `callAIDetailed` inside generation still applies the connections
+  // flag/env/global-model precedence, so the budget estimate, progress line,
+  // and persisted `model` must resolve the same way or they'd disagree with
+  // what actually ran. Passed as an explicit override everywhere below.
+  const model = await resolveModel("connections", opts.provider, opts.model);
+
   let cells: Cell[];
   try {
     cells = await buildWorkList(opts.mode);
@@ -316,12 +320,12 @@ export async function runConnectionBatch(
 
   hooks.onProgress(
     `[${opts.mode}] ${cells.length} cells to consider | provider=${opts.provider} | ` +
-      `model=${opts.model || "default"} | ` +
+      `model=${model} | ` +
       `locales=${opts.locales.join(",") || "none"} | maxCalls=${opts.maxCalls} | ` +
       `maxCost=$${opts.maxCostUsd}`
   );
 
-  const callCost = perCallCost(opts.provider, opts.model);
+  const callCost = perCallCost(opts.provider, model);
 
   // Shared spend guard. `spend()` is called before EVERY LLM request (one
   // generation + one per locale translation per cell); it debits the counters
@@ -374,7 +378,7 @@ export async function runConnectionBatch(
         excludeRefs,
         "en",
         opts.provider,
-        opts.model
+        model
       );
       if (!calledAI) {
         // No grounding data / drained pool — no request was actually made, so
@@ -399,7 +403,7 @@ export async function runConnectionBatch(
           cell.kind,
           opts.locales,
           opts.provider,
-          opts.model,
+          model,
           budget
         );
         summary.translated += xlt.inserted;

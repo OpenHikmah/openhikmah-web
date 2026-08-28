@@ -54,11 +54,11 @@ async function getReflection(
     "reflection",
     locale,
     REFLECTION_VERSION,
-    async () => {
+    async (model) => {
       try {
         return await callAI(
           buildPrompt(name.arabic, name.transliteration, name.meaning, name.description, locale),
-          { feature: "names" }
+          { feature: "names", model }
         );
       } catch (err) {
         // Not cached (empty result), so the next request retries — mirrors how

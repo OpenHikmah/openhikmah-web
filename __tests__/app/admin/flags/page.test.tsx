@@ -9,7 +9,13 @@ vi.mock("@/components/admin/AdminContext", async () => {
 
 import FlagsPage from "@/app/admin/flags/page";
 
-function flags(rows: Record<string, unknown>) {
+type Route = { provider: "claude" | "gemini"; model: string };
+
+function response(
+  rows: Record<string, unknown>,
+  resolvedAi?: Partial<Record<"default" | "connections" | "names", Route>>
+) {
+  const claude: Route = { provider: "claude", model: "claude-opus-4-7" };
   return {
     flags: Object.entries(rows).map(([key, value]) => ({
       key,
@@ -17,6 +23,11 @@ function flags(rows: Record<string, unknown>) {
       updatedBy: "qf-admin",
       updatedAt: "2026-08-01T00:00:00Z",
     })),
+    resolvedAi: {
+      default: resolvedAi?.default ?? claude,
+      connections: resolvedAi?.connections ?? claude,
+      names: resolvedAi?.names ?? claude,
+    },
   };
 }
 
@@ -25,18 +36,23 @@ describe("FlagsPage — AI routing grid", () => {
     mockApi.mockReset();
   });
 
-  it("scopes a route's model options to its selected provider and writes the right flag key", async () => {
-    // Names route pinned to Gemini; everything else default.
-    mockApi.mockImplementation((path: string, opts?: { method?: string }) => {
+  it("scopes model options to the route's server-resolved provider and writes the right key", async () => {
+    // Names route resolves to Gemini server-side (flag or env — the client only
+    // sees the resolved result).
+    mockApi.mockImplementation((_path: string, opts?: { method?: string }) => {
       if (!opts || opts.method !== "PUT")
-        return Promise.resolve(flags({ ai_provider_names: "gemini" }));
+        return Promise.resolve(
+          response(
+            { ai_provider_names: "gemini" },
+            { names: { provider: "gemini", model: "gemini-3.5-flash-lite" } }
+          )
+        );
       return Promise.resolve({});
     });
 
     render(<FlagsPage />);
 
     const namesModel = await screen.findByLabelText("Names (Asma-ul-Husna) model");
-    // Gemini models are offered, not Claude ones.
     expect(within(namesModel).queryByText("gemini-3.7-flash")).toBeTruthy();
     expect(within(namesModel).queryByText("claude-opus-4-7")).toBeNull();
 
@@ -52,12 +68,15 @@ describe("FlagsPage — AI routing grid", () => {
     );
   });
 
-  it("offers Claude models for the default route when nothing is configured", async () => {
-    mockApi.mockResolvedValue(flags({}));
+  it("offers the resolved provider's models even when only an env var (no flag) selects it", async () => {
+    // No provider flag set, but the server resolves Default to Gemini via AI_PROVIDER.
+    mockApi.mockResolvedValue(
+      response({}, { default: { provider: "gemini", model: "gemini-3.5-flash-lite" } })
+    );
     render(<FlagsPage />);
 
     const defaultModel = await screen.findByLabelText("Default model");
-    expect(within(defaultModel).queryByText("claude-opus-4-7")).toBeTruthy();
-    expect(within(defaultModel).queryByText("gemini-3.7-flash")).toBeNull();
+    expect(within(defaultModel).queryByText("gemini-3.7-flash")).toBeTruthy();
+    expect(within(defaultModel).queryByText("claude-opus-4-7")).toBeNull();
   });
 });

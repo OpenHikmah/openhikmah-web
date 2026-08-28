@@ -212,9 +212,9 @@ export async function generateConnectionsForCell(
           );
 
   if (generated.length > 0) {
-    // Attribute the row to the model that actually generated it — resolve the
-    // same provider + model the generator used (feature/global flags, or the
-    // batch job's per-run override), not the ANTHROPIC_MODEL default.
+    // Attribute the row to the model that generated it — resolve the same
+    // provider + model the generator used (batch job's per-run override, or the
+    // connections feature/global flags), not the ANTHROPIC_MODEL default.
     const resolvedProvider = provider ?? (await resolveProvider("connections"));
     const attributedModel = await resolveModel("connections", resolvedProvider, model);
     try {

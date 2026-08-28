@@ -5,17 +5,31 @@ import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { featureFlags } from "@/lib/infra/db/schema";
 import { invalidateFlagCache, validateFlagType } from "@/lib/admin/feature-flags";
+import { resolveProvider, resolveModel, type AiFeature } from "@/lib/ai/ai";
 import { safeParse } from "@/lib/infra/http";
+
+async function resolveRoute(feature: AiFeature | undefined) {
+  const provider = await resolveProvider(feature);
+  return { provider, model: await resolveModel(feature, provider) };
+}
 
 const KEY_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
 
-/** All feature flags, alphabetical. Values are JSON (parsed for the client). */
+/** All feature flags, alphabetical. Values are JSON (parsed for the client).
+ *  `resolvedAi` is the provider+model each AI route actually resolves to right
+ *  now (flags + env, per `resolveProvider`/`resolveModel`) — the flags UI needs
+ *  it to offer a valid model list, since it can't read server-side env itself. */
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
 
   try {
     const rows = await db.select().from(featureFlags).orderBy(asc(featureFlags.key));
+    const [defaultRoute, connections, names] = await Promise.all([
+      resolveRoute(undefined),
+      resolveRoute("connections"),
+      resolveRoute("names"),
+    ]);
     return NextResponse.json({
       flags: rows.map((r) => ({
         key: r.key,
@@ -23,6 +37,7 @@ export async function GET(req: NextRequest) {
         updatedBy: r.updatedBy,
         updatedAt: r.updatedAt,
       })),
+      resolvedAi: { default: defaultRoute, connections, names },
     });
   } catch (err) {
     console.error("admin flags GET db error:", err);

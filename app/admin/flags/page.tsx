@@ -7,7 +7,7 @@ import { Table, Th, Td, StateNote, ConfirmButton } from "@/components/admin/prim
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { KNOWN_OPERATIONAL_FLAG_KEYS } from "@/lib/admin/feature-flag-keys";
-import { SELECTABLE_MODELS, DEFAULT_MODEL } from "@/lib/ai/models";
+import { SELECTABLE_MODELS } from "@/lib/ai/models";
 
 const SELECT_CLASS =
   "h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary hover:border-border-subtle focus:border-gold-muted";
@@ -25,11 +25,29 @@ interface Flag {
   updatedAt: string;
 }
 
+type Provider = "claude" | "gemini";
+interface ResolvedRoute {
+  provider: Provider;
+  model: string;
+}
+interface FlagsResponse {
+  flags: Flag[];
+  resolvedAi: { default: ResolvedRoute; connections: ResolvedRoute; names: ResolvedRoute };
+}
+
 /** Purpose-built controls for the settings that runtime code actually reads —
  *  everything else stays in the generic key/value editor below. Each control
  *  writes through the same `PUT /flags` route as the generic editor, so
  *  logAdminAction coverage and cache invalidation are free. */
-function OperationalSettings({ flags, reload }: { flags: Flag[]; reload: () => void }) {
+function OperationalSettings({
+  flags,
+  resolvedAi,
+  reload,
+}: {
+  flags: Flag[];
+  resolvedAi: FlagsResponse["resolvedAi"];
+  reload: () => void;
+}) {
   const api = useAdminFetch();
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -41,14 +59,15 @@ function OperationalSettings({ flags, reload }: { flags: Flag[]; reload: () => v
   };
   const maintenanceOn = byKey.get("maintenance_mode") === true;
 
-  // Provider for a route's model dropdown: the route's own provider flag, else
-  // the Default route's, else "claude" (the built-in default provider).
-  const providerFor = (routeKey: string): "claude" | "gemini" => {
-    const own = strFlag(`ai_provider${routeKey}`);
-    const dflt = strFlag("ai_provider");
-    const p = own || dflt;
-    return p === "gemini" ? "gemini" : "claude";
-  };
+  // What each route actually resolves to server-side (flags AND env, via
+  // resolveProvider/resolveModel), reported by GET /flags — the client can't
+  // read env itself. Drives which model list to offer + the "default" hint.
+  const routeFor = (routeKey: string): ResolvedRoute =>
+    routeKey === "_connections"
+      ? resolvedAi.connections
+      : routeKey === "_names"
+        ? resolvedAi.names
+        : resolvedAi.default;
 
   // Uncontrolled: each number field reads its live DOM value on save and is
   // reset (via `key`) whenever the flag list is reloaded from the server.
@@ -90,7 +109,7 @@ function OperationalSettings({ flags, reload }: { flags: Flag[]; reload: () => v
         </span>
         <div className="space-y-2 rounded-md border border-border p-3">
           {AI_ROUTES.map((route) => {
-            const provider = providerFor(route.key);
+            const resolved = routeFor(route.key);
             const modelKey = `ai_model${route.key}`;
             return (
               <div key={route.key} className="grid items-center gap-2 sm:grid-cols-[8rem_1fr_1fr]">
@@ -102,7 +121,11 @@ function OperationalSettings({ flags, reload }: { flags: Flag[]; reload: () => v
                   disabled={busy}
                   className={SELECT_CLASS}
                 >
-                  <option value="">{route.key === "" ? "Default (env)" : "Inherit"}</option>
+                  <option value="">
+                    {route.key === ""
+                      ? `Default — ${resolved.provider}`
+                      : `Inherit — ${resolved.provider}`}
+                  </option>
                   <option value="claude">Claude</option>
                   <option value="gemini">Gemini</option>
                 </select>
@@ -113,10 +136,8 @@ function OperationalSettings({ flags, reload }: { flags: Flag[]; reload: () => v
                   disabled={busy}
                   className={SELECT_CLASS}
                 >
-                  <option value="">
-                    {route.key === "" ? `Default (${DEFAULT_MODEL[provider]})` : "Inherit"}
-                  </option>
-                  {SELECTABLE_MODELS[provider].map((m) => (
+                  <option value="">Default — {resolved.model}</option>
+                  {SELECTABLE_MODELS[resolved.provider].map((m) => (
                     <option key={m} value={m}>
                       {m}
                     </option>
@@ -232,10 +253,7 @@ function numOrEmpty(v: unknown): string {
 
 export default function FlagsPage() {
   const api = useAdminFetch();
-  const { data, error, loading, reload } = useAsync<{ flags: Flag[] }>(
-    () => api("/flags"),
-    "flags"
-  );
+  const { data, error, loading, reload } = useAsync<FlagsResponse>(() => api("/flags"), "flags");
 
   const [key, setKey] = useState("");
   const [value, setValue] = useState("");
@@ -291,7 +309,9 @@ export default function FlagsPage() {
         subtitle="Runtime config read by subsystems. A missing key falls back to its code default."
       />
       <div className="space-y-6 p-7">
-        {data && <OperationalSettings flags={data.flags} reload={reload} />}
+        {data && (
+          <OperationalSettings flags={data.flags} resolvedAi={data.resolvedAi} reload={reload} />
+        )}
 
         <div className="space-y-3 rounded-lg border border-border bg-surface p-5">
           <div className="grid gap-3 sm:grid-cols-[200px_1fr]">

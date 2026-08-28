@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const { mockClaudeCreate, mockGeminiGenerate, mockGetFlagString } = vi.hoisted(() => ({
-  mockClaudeCreate: vi.fn(),
-  mockGeminiGenerate: vi.fn(),
-  mockGetFlagString: vi.fn(),
-}));
+const { mockClaudeCreate, mockGeminiGenerate, mockGetGenerativeModel, mockGetFlagString } =
+  vi.hoisted(() => ({
+    mockClaudeCreate: vi.fn(),
+    mockGeminiGenerate: vi.fn(),
+    mockGetGenerativeModel: vi.fn(),
+    mockGetFlagString: vi.fn(),
+  }));
 
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class {
@@ -14,7 +16,8 @@ vi.mock("@anthropic-ai/sdk", () => ({
 
 vi.mock("@google/generative-ai", () => ({
   GoogleGenerativeAI: class {
-    getGenerativeModel() {
+    getGenerativeModel(...args: unknown[]) {
+      mockGetGenerativeModel(...args);
       return { generateContent: mockGeminiGenerate };
     }
   },
@@ -191,8 +194,10 @@ describe("model resolution", () => {
     expect(res.model).toBe("claude-opus-4-7");
   });
 
-  it("resolves a model for the Gemini provider and forwards it", async () => {
+  it("resolves a model for the Gemini provider and forwards it to the SDK", async () => {
+    mockGetGenerativeModel.mockClear();
     const res = await callAIDetailed("hi", { provider: "gemini", model: "gemini-3.7-flash" });
     expect(res.model).toBe("gemini-3.7-flash");
+    expect(mockGetGenerativeModel).toHaveBeenCalledWith({ model: "gemini-3.7-flash" });
   });
 });

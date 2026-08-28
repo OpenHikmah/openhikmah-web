@@ -11,7 +11,11 @@ vi.mock("@/lib/admin/feature-flags", async () => {
   const actual = await vi.importActual<typeof import("@/lib/admin/feature-flags")>(
     "@/lib/admin/feature-flags"
   );
-  return { invalidateFlagCache: vi.fn(), validateFlagType: actual.validateFlagType };
+  return {
+    invalidateFlagCache: vi.fn(),
+    validateFlagType: actual.validateFlagType,
+    getFlagString: vi.fn(async (_key: string, fallback: string) => fallback),
+  };
 });
 
 function makeDbChain(resolveWith: unknown = []) {
