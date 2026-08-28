@@ -3,6 +3,7 @@ import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { db } from "@/lib/infra/db";
 import { challenges, users } from "@/lib/infra/db/schema";
+import { parsePagination } from "@/lib/infra/http";
 import {
   scoreChallenge,
   resolveEndedChallenges,
@@ -28,8 +29,7 @@ export async function GET(req: NextRequest) {
   if (status && !(STATUSES as readonly string[]).includes(status)) {
     return NextResponse.json({ error: "Invalid status filter" }, { status: 400 });
   }
-  const limitParam = Number(sp.get("limit"));
-  const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 200) : 50;
+  const { limit, offset } = parsePagination(req);
 
   try {
     // Finalize any ended/expired challenges before the stats aggregation and the
@@ -78,12 +78,16 @@ export async function GET(req: NextRequest) {
     }
 
     // List (filtered, newest first), finalize any ended ones, then enrich.
-    const rows = await db
+    // One extra row to detect a further page; sliced off before any processing.
+    const pageRows = await db
       .select()
       .from(challenges)
       .where(status ? eq(challenges.status, status) : undefined)
-      .orderBy(desc(challenges.createdAt))
-      .limit(limit);
+      .orderBy(desc(challenges.createdAt), desc(challenges.id))
+      .limit(limit + 1)
+      .offset(offset);
+    const hasMore = pageRows.length > limit;
+    const rows = pageRows.slice(0, limit);
 
     // A challenge can flip from active to overdue in the gap between the
     // `ended` select above and this one, so it slips past the earlier gate.
@@ -140,7 +144,7 @@ export async function GET(req: NextRequest) {
       }
     );
 
-    return NextResponse.json({ stats, challenges: list });
+    return NextResponse.json({ stats, challenges: list, hasMore });
   } catch (err) {
     console.error("admin challenges GET db error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

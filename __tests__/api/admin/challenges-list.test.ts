@@ -132,4 +132,18 @@ describe("GET /api/admin/challenges", () => {
     expect(res.status).toBe(200);
     expect(mockRateLimitAdminMutation).toHaveBeenCalledTimes(1);
   });
+
+  it("caps the list page and reports hasMore when an extra row is returned", async () => {
+    const many = Array.from({ length: 51 }, (_, i) => ({
+      id: i + 1,
+      status: "pending",
+      challengerId: 1,
+      challengedId: 2,
+      endsAt: new Date(Date.now() + 1000),
+    }));
+    queueSelects([], [], many);
+    const body = await (await GET(req())).json();
+    expect(body.challenges).toHaveLength(50);
+    expect(body.hasMore).toBe(true);
+  });
 });

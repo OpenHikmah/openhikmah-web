@@ -105,6 +105,22 @@ describe("GET /api/admin/names", () => {
     const body = await res.json();
     expect(body.rows[0].data).toEqual({ text: "hi" });
     expect(body.rows[1].data).toBe("not-json");
+    expect(body.hasMore).toBe(false);
+  });
+
+  it("caps the page and sets hasMore when an extra row is returned", async () => {
+    const many = Array.from({ length: 51 }, (_, i) => ({
+      slug: `n${i}`,
+      kind: "reflection",
+      data: "x",
+      model: null,
+      version: 1,
+      updatedAt: new Date("2026-01-01"),
+    }));
+    mockSelect.mockReturnValue(makeDbChain(many));
+    const body = await (await GET(get())).json();
+    expect(body.rows).toHaveLength(50);
+    expect(body.hasMore).toBe(true);
   });
 });
 

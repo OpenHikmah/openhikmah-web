@@ -98,6 +98,15 @@ describe("GET /api/admin/users", () => {
     expect(body.users).toHaveLength(1);
     expect(body.users[0].isAdmin).toBe(true);
     expect(body.users[0].username).toBe("someone");
+    expect(body.hasMore).toBe(false);
+  });
+
+  it("caps the page and sets hasMore when an extra row is returned", async () => {
+    const many = Array.from({ length: 51 }, (_, i) => ({ ...targetUser, id: i + 1 }));
+    mockSelect.mockReturnValue(makeDbChain(many));
+    const body = await (await GET(get())).json();
+    expect(body.users).toHaveLength(50);
+    expect(body.hasMore).toBe(true);
   });
 });
 

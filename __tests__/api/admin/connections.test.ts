@@ -110,6 +110,20 @@ describe("GET /api/admin/connections", () => {
     expect((await GET(get("reviewed=pending"))).status).toBe(200);
     expect((await GET(get("reviewed=reviewed"))).status).toBe(200);
   });
+
+  it("reports hasMore and caps the page when an extra row comes back", async () => {
+    const many = Array.from({ length: 51 }, (_, i) => ({ ...connectionRow, id: i + 1 }));
+    mockSelect.mockReturnValue(makeDbChain(many));
+    const body = await (await GET(get())).json();
+    expect(body.connections).toHaveLength(50);
+    expect(body.hasMore).toBe(true);
+  });
+
+  it("reports hasMore=false when the page isn't full", async () => {
+    mockSelect.mockReturnValue(makeDbChain([connectionRow]));
+    const body = await (await GET(get())).json();
+    expect(body.hasMore).toBe(false);
+  });
 });
 
 describe("PATCH /api/admin/connections", () => {

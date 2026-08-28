@@ -4,7 +4,7 @@ import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { nameContent } from "@/lib/infra/db/schema";
-import { safeParse } from "@/lib/infra/http";
+import { safeParse, parsePagination } from "@/lib/infra/http";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 
 const KINDS = ["verses", "reflection", "pairings"] as const;
@@ -78,14 +78,20 @@ export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
 
+  const { limit, offset } = parsePagination(req);
+
   try {
     const rows = await db
       .select()
       .from(nameContent)
-      .orderBy(asc(nameContent.slug), asc(nameContent.kind));
+      .orderBy(asc(nameContent.slug), asc(nameContent.kind))
+      .limit(limit + 1)
+      .offset(offset);
 
+    const hasMore = rows.length > limit;
     return NextResponse.json({
-      rows: rows.map((r) => ({
+      hasMore,
+      rows: rows.slice(0, limit).map((r) => ({
         slug: r.slug,
         kind: r.kind,
         data: safeParse(r.data),

@@ -5,6 +5,7 @@ import { logAdminAction } from "@/lib/admin/admin-audit";
 import { broadcastUserCacheInvalidation } from "@/lib/auth/social-auth";
 import { db } from "@/lib/infra/db";
 import { users } from "@/lib/infra/db/schema";
+import { parsePagination } from "@/lib/infra/http";
 
 /** List users (newest-active first) with optional `?q=` username search. */
 export async function GET(req: NextRequest) {
@@ -12,19 +13,21 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const q = req.nextUrl.searchParams.get("q")?.trim();
-  const limitParam = Number(req.nextUrl.searchParams.get("limit"));
-  const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 200) : 100;
+  const { limit, offset } = parsePagination(req);
 
   try {
     const rows = await db
       .select()
       .from(users)
       .where(q ? ilike(users.username, `%${q}%`) : undefined)
-      .orderBy(desc(users.lastActiveAt))
-      .limit(limit);
+      .orderBy(desc(users.lastActiveAt), desc(users.id))
+      .limit(limit + 1)
+      .offset(offset);
 
+    const hasMore = rows.length > limit;
     return NextResponse.json({
-      users: rows.map((u) => ({
+      hasMore,
+      users: rows.slice(0, limit).map((u) => ({
         id: u.id,
         qfId: u.qfId,
         username: u.username,

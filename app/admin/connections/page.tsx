@@ -5,7 +5,7 @@ import { Button } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
-import { useAsync } from "@/components/admin/useAsync";
+import { usePaginated } from "@/components/admin/usePaginated";
 import { cn } from "@/lib/utils";
 
 interface Connection {
@@ -32,15 +32,23 @@ export default function ConnectionsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  const qs = new URLSearchParams();
-  if (status !== "all") qs.set("status", status);
-  if (kind !== "all") qs.set("kind", kind);
-  if (reviewed !== "all") qs.set("reviewed", reviewed);
+  const baseParams = () => {
+    const p = new URLSearchParams();
+    if (status !== "all") p.set("status", status);
+    if (kind !== "all") p.set("kind", kind);
+    if (reviewed !== "all") p.set("reviewed", reviewed);
+    return p;
+  };
 
-  const { data, error, loading, reload } = useAsync<{ connections: Connection[] }>(
-    () => api(`/connections?${qs.toString()}`),
-    `connections:${status}:${kind}:${reviewed}`
-  );
+  const { rows, hasMore, error, loading, loadingMore, loadMoreError, reload, loadMore } =
+    usePaginated<Connection>(async ({ offset }) => {
+      const p = baseParams();
+      if (offset) p.set("offset", String(offset));
+      const d = await api<{ connections: Connection[]; hasMore: boolean }>(
+        `/connections?${p.toString()}`
+      );
+      return { rows: d.connections, hasMore: d.hasMore };
+    }, `connections:${status}:${kind}:${reviewed}`);
 
   const setStatusOf = async (id: number, next: Connection["status"]) => {
     setActionError(null);
@@ -89,9 +97,9 @@ export default function ConnectionsPage() {
         {error && <StateNote tone="error">{error}</StateNote>}
         {actionError && <StateNote tone="error">{actionError}</StateNote>}
         {loading && <StateNote>Loading…</StateNote>}
-        {data && data.connections.length === 0 && <StateNote>No connections match.</StateNote>}
+        {!loading && !error && rows.length === 0 && <StateNote>No connections match.</StateNote>}
 
-        {data && data.connections.length > 0 && (
+        {rows.length > 0 && (
           <Table>
             <thead>
               <tr>
@@ -105,7 +113,7 @@ export default function ConnectionsPage() {
               </tr>
             </thead>
             <tbody>
-              {data.connections.map((c) => (
+              {rows.map((c) => (
                 <tr key={c.id}>
                   <Td className="whitespace-nowrap font-mono text-xs text-text-secondary">
                     {c.fromRef} → {c.toRef}
@@ -182,6 +190,17 @@ export default function ConnectionsPage() {
               ))}
             </tbody>
           </Table>
+        )}
+
+        {hasMore && (
+          <div className="flex flex-col items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? "Loading…" : "Load more"}
+            </Button>
+            {loadMoreError && (
+              <StateNote tone="error">Couldn&apos;t load more connections.</StateNote>
+            )}
+          </div>
         )}
       </div>
     </>

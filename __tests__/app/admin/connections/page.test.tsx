@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mockApi = vi.fn();
@@ -59,5 +59,27 @@ describe("ConnectionsPage — confidence column", () => {
     const confidence = await screen.findByText("42%");
     expect(confidence.className).toContain("text-gold");
     expect(confidence.className).not.toContain("text-error");
+  });
+
+  it("shows Load more only when hasMore, and appends the next page with an offset", async () => {
+    mockApi
+      .mockResolvedValueOnce({
+        connections: [{ ...baseConnection, id: 1, fromRef: "1:1", confidence: 80 }],
+        hasMore: true,
+      })
+      .mockResolvedValueOnce({
+        connections: [{ ...baseConnection, id: 2, fromRef: "2:2", confidence: 70 }],
+        hasMore: false,
+      });
+
+    render(<ConnectionsPage />);
+
+    const loadMore = await screen.findByRole("button", { name: "Load more" });
+    fireEvent.click(loadMore);
+
+    await waitFor(() => expect(screen.getByText("2:2 → 24:35")).toBeInTheDocument());
+    expect(screen.getByText("1:1 → 24:35")).toBeInTheDocument();
+    expect(mockApi.mock.calls[1][0]).toContain("offset=1");
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
   });
 });
