@@ -6,6 +6,7 @@ import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { usePaginated } from "@/components/admin/usePaginated";
+import { SkeletonRows } from "@/components/admin/Skeleton";
 
 interface AdminUser {
   id: number;
@@ -72,7 +73,7 @@ export default function UsersPage() {
 
         {error && <StateNote tone="error">{error}</StateNote>}
         {actionError && <StateNote tone="error">{actionError}</StateNote>}
-        {loading && <StateNote>Loading…</StateNote>}
+        {loading && <SkeletonRows />}
         {!loading && !error && rows.length === 0 && <StateNote>No users found.</StateNote>}
 
         {rows.length > 0 && (

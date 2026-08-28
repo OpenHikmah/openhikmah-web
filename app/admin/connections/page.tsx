@@ -6,6 +6,8 @@ import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { usePaginated } from "@/components/admin/usePaginated";
+import { ExpandableText } from "@/components/admin/ExpandableText";
+import { SkeletonRows } from "@/components/admin/Skeleton";
 import { cn } from "@/lib/utils";
 
 interface Connection {
@@ -96,7 +98,7 @@ export default function ConnectionsPage() {
 
         {error && <StateNote tone="error">{error}</StateNote>}
         {actionError && <StateNote tone="error">{actionError}</StateNote>}
-        {loading && <StateNote>Loading…</StateNote>}
+        {loading && <SkeletonRows />}
         {!loading && !error && rows.length === 0 && <StateNote>No connections match.</StateNote>}
 
         {rows.length > 0 && (
@@ -122,7 +124,7 @@ export default function ConnectionsPage() {
                     <span className="text-xs text-text-secondary">{c.kind}</span>
                   </Td>
                   <Td className="max-w-md text-xs text-text-secondary">
-                    <span className="line-clamp-2">{c.reason}</span>
+                    <ExpandableText>{c.reason}</ExpandableText>
                   </Td>
                   <Td className="whitespace-nowrap text-xs">
                     {c.confidence === null ? (

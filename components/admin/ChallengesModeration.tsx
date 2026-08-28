@@ -13,6 +13,7 @@ import {
 } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { usePaginated } from "@/components/admin/usePaginated";
+import { SkeletonRows } from "@/components/admin/Skeleton";
 import { cn } from "@/lib/utils";
 
 interface AdminChallenge {
@@ -167,7 +168,7 @@ export function ChallengesModeration() {
       {finalizeMsg && <StateNote>{finalizeMsg}</StateNote>}
       {error && <StateNote tone="error">{error}</StateNote>}
       {actionError && <StateNote tone="error">{actionError}</StateNote>}
-      {loading && <StateNote>Loading…</StateNote>}
+      {loading && <SkeletonRows />}
       {!loading && !error && rows.length === 0 && <StateNote>No challenges match.</StateNote>}
 
       {rows.length > 0 && (

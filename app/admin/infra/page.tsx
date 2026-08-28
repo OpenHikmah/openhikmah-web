@@ -14,6 +14,9 @@ import {
 import { InfoHint } from "@/components/admin/InfoHint";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
+import { RefreshButton } from "@/components/admin/RefreshButton";
+import { SkeletonRows } from "@/components/admin/Skeleton";
+import { formatInfraResult } from "@/lib/admin/format";
 
 interface Infra {
   redis: "disabled" | "up" | "down";
@@ -40,11 +43,11 @@ export default function InfraPage() {
     setMsg(null);
     setBusy(true);
     try {
-      const res = await api<Record<string, unknown>>("/infra", {
+      const res = await api<Parameters<typeof formatInfraResult>[0]>("/infra", {
         method: "POST",
         json: { action },
       });
-      setMsg(`Done: ${JSON.stringify(res)}`);
+      setMsg(formatInfraResult(res));
       reload();
     } catch (e) {
       setMsg(e instanceof AdminApiError ? e.message : "Action failed.");
@@ -55,10 +58,14 @@ export default function InfraPage() {
 
   return (
     <>
-      <AdminPageHeader title="Infra" subtitle="Process health, caches, and maintenance actions." />
+      <AdminPageHeader
+        title="Infra"
+        subtitle="Process health, caches, and maintenance actions."
+        actions={<RefreshButton onClick={reload} loading={loading} />}
+      />
       <div className="space-y-6 p-7">
         {error && <StateNote tone="error">{error}</StateNote>}
-        {loading && <StateNote>Loading…</StateNote>}
+        {loading && !data && <SkeletonRows n={4} />}
 
         {data && (
           <>

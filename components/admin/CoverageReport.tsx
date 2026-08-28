@@ -13,6 +13,7 @@ import {
 } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
+import { SkeletonRows } from "@/components/admin/Skeleton";
 import type { CoverageReport as CoverageResponse, CoverageCell } from "@/lib/admin/coverage-report";
 import type { Locale } from "@/lib/i18n/config";
 import type { EdgeKind } from "@/types/quran";
@@ -87,7 +88,7 @@ export function CoverageReport() {
   return (
     <div className="space-y-8">
       {error && <StateNote tone="error">{error}</StateNote>}
-      {loading && !data && <StateNote>Loading…</StateNote>}
+      {loading && !data && <SkeletonRows n={8} />}
 
       {data && (
         <>
@@ -133,19 +134,26 @@ export function CoverageReport() {
                     {LOCALES.map((l) => {
                       const c = cell(data.matrix, k, l);
                       const missing = c?.missing ?? 0;
+                      const covered = c?.covered ?? 0;
                       return (
                         <Td key={l} className="text-right tabular-nums">
                           {missing === 0 ? (
                             <Pill tone="active">complete</Pill>
                           ) : (
-                            <span className={l === "en" ? "text-gold" : "text-text-primary"}>
-                              {missing.toLocaleString()}
-                              {c && c.exhausted > 0 && (
-                                <span className="ml-1 text-[10px] text-text-muted">
-                                  ({c.exhausted} exh)
-                                </span>
-                              )}
-                            </span>
+                            <>
+                              <span className={l === "en" ? "text-gold" : "text-text-primary"}>
+                                {missing.toLocaleString()}
+                                {c && c.exhausted > 0 && (
+                                  <span className="ml-1 text-[10px] text-text-muted">
+                                    ({c.exhausted} exh)
+                                  </span>
+                                )}
+                              </span>
+                              <span className="block text-[10px] text-text-muted">
+                                {covered.toLocaleString()} / {data.totalVerses.toLocaleString()}{" "}
+                                done
+                              </span>
+                            </>
                           )}
                         </Td>
                       );
@@ -155,8 +163,11 @@ export function CoverageReport() {
               </tbody>
             </Table>
             <p className="mt-1.5 text-xs text-text-muted">
-              Non-English rows are translations of the English reason, so they can never exceed the
-              English count. Fill English first.
+              These are <em>missing</em>-verse counts. A verse can&apos;t get a translated
+              connection until its English one exists, and the translation pass lags English
+              generation — so non-English missing counts are always ≥ English. Fill English first;
+              the translation locales close the gap afterward. (Exhausted-cell tracking is
+              English-only.)
             </p>
           </section>
 
