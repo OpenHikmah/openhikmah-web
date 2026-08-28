@@ -7,6 +7,7 @@ import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admi
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { usePaginated } from "@/components/admin/usePaginated";
 import { SkeletonRows } from "@/components/admin/Skeleton";
+import { useAdminAnnounce } from "@/components/admin/AdminLiveRegion";
 
 interface AdminUser {
   id: number;
@@ -22,6 +23,7 @@ interface AdminUser {
 
 export default function UsersPage() {
   const api = useAdminFetch();
+  const announce = useAdminAnnounce();
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
@@ -42,9 +44,12 @@ export default function UsersPage() {
     setBusyId(id);
     try {
       await api("/users", { method: "PATCH", json: { id, disabled } });
+      announce(`User ${id} ${disabled ? "disabled" : "re-enabled"}.`);
       reload();
     } catch (e) {
-      setActionError(e instanceof AdminApiError ? e.message : "Failed to update user.");
+      const msg = e instanceof AdminApiError ? e.message : "Failed to update user.";
+      setActionError(msg);
+      announce(msg);
     } finally {
       setBusyId(null);
     }

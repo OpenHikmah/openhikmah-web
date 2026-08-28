@@ -43,7 +43,25 @@ function monthLabel(month: string): string {
   });
 }
 
+/** "12 March 2026" for a `YYYY-MM-DD` date. */
+function longDate(date: string): string {
+  const [dy, dm, dd] = date.split("-").map(Number);
+  return new Date(Date.UTC(dy, dm - 1, dd)).toLocaleString("en", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 const todayStr = () => new Date().toISOString().slice(0, 10);
+
+/** `YYYY-MM-DD` `delta` days away, wrapping across month/year boundaries. */
+function addDays(date: string, delta: number): string {
+  const [dy, dm, dd] = date.split("-").map(Number);
+  const d = new Date(Date.UTC(dy, dm - 1, dd + delta));
+  return d.toISOString().slice(0, 10);
+}
 
 export default function VotdPage() {
   const api = useAdminFetch();
@@ -67,6 +85,73 @@ export default function VotdPage() {
   const firstWeekday = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
   const today = todayStr();
+
+  const gridRef = useRef<HTMLDivElement>(null);
+  // After an arrow-key move changes the month, focus the target day once its
+  // button has rendered.
+  const pendingFocus = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pendingFocus.current) return;
+    const el = gridRef.current?.querySelector<HTMLButtonElement>(
+      `[data-date="${pendingFocus.current}"]`
+    );
+    el?.focus();
+    pendingFocus.current = null;
+  }, [month, data]);
+
+  // The one day in the grid that's tab-reachable (roving tabindex): the
+  // selection if it's in this month, else today if visible, else day 1.
+  const rovingDate =
+    selected && selected.startsWith(month)
+      ? selected
+      : today.startsWith(month)
+        ? today
+        : `${month}-01`;
+
+  const moveTo = (date: string) => {
+    setSelected(date);
+    if (date.slice(0, 7) !== month) {
+      pendingFocus.current = date;
+      setMonth(date.slice(0, 7));
+    } else {
+      gridRef.current?.querySelector<HTMLButtonElement>(`[data-date="${date}"]`)?.focus();
+    }
+  };
+
+  const onGridKeyDown = (e: React.KeyboardEvent) => {
+    const from = rovingDate;
+    let target: string | null = null;
+    switch (e.key) {
+      case "ArrowRight":
+        target = addDays(from, 1);
+        break;
+      case "ArrowLeft":
+        target = addDays(from, -1);
+        break;
+      case "ArrowDown":
+        target = addDays(from, 7);
+        break;
+      case "ArrowUp":
+        target = addDays(from, -7);
+        break;
+      case "Home":
+        target = `${month}-01`;
+        break;
+      case "End":
+        target = `${month}-${String(daysInMonth).padStart(2, "0")}`;
+        break;
+      case "PageUp":
+        target = addMonth(month, -1) + "-01";
+        break;
+      case "PageDown":
+        target = addMonth(month, 1) + "-01";
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+    moveTo(target);
+  };
 
   return (
     <>
@@ -100,7 +185,7 @@ export default function VotdPage() {
 
           {error && <StateNote tone="error">{error}</StateNote>}
 
-          <div className="grid grid-cols-7 gap-1.5">
+          <div className="grid grid-cols-7 gap-1.5" aria-hidden>
             {WEEKDAYS.map((d, i) => (
               <div
                 key={i}
@@ -109,8 +194,16 @@ export default function VotdPage() {
                 {d}
               </div>
             ))}
+          </div>
+          <div
+            ref={gridRef}
+            role="grid"
+            aria-label={`${monthLabel(month)} — set the verse of the day`}
+            onKeyDown={onGridKeyDown}
+            className="grid grid-cols-7 gap-1.5"
+          >
             {Array.from({ length: firstWeekday }).map((_, i) => (
-              <div key={`pad-${i}`} />
+              <div key={`pad-${i}`} role="presentation" />
             ))}
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
@@ -121,6 +214,14 @@ export default function VotdPage() {
               return (
                 <button
                   key={date}
+                  data-date={date}
+                  role="gridcell"
+                  tabIndex={date === rovingDate ? 0 : -1}
+                  aria-current={isToday ? "date" : undefined}
+                  aria-selected={isSelected}
+                  aria-label={`${longDate(date)}${
+                    entry ? `, verse ${entry.verseRef}` : ", no verse set"
+                  }${isToday ? ", today" : ""}`}
                   onClick={() => setSelected(date)}
                   className={cn(
                     "flex aspect-square flex-col items-center justify-center rounded-md border text-sm transition-colors",

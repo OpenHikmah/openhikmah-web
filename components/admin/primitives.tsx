@@ -79,9 +79,18 @@ export function Table({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
+export function Th({
+  children,
+  className,
+  scope = "col",
+}: {
+  children?: React.ReactNode;
+  className?: string;
+  scope?: React.ThHTMLAttributes<HTMLTableCellElement>["scope"];
+}) {
   return (
     <th
+      scope={scope}
       className={cn(
         "border-b border-border bg-surface px-3.5 py-2.5 text-left font-mono text-[10px] font-normal uppercase tracking-[0.14em] text-text-muted",
         className

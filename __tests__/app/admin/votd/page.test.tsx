@@ -192,6 +192,61 @@ describe("VotdPage — today's live pick on the calendar", () => {
   });
 });
 
+describe("VotdPage — calendar keyboard navigation", () => {
+  beforeEach(() => {
+    mockApi.mockReset();
+    mockApi.mockResolvedValue({ entries: [], today: null });
+  });
+
+  const cell = (day: number) =>
+    screen.getByText(String(day), { selector: "span.tabular-nums" }).closest("button")!;
+
+  // The grid opens on the current month; today's cell is the roving target.
+  const todayDay = new Date().getUTCDate();
+  const daysThisMonth = new Date(
+    Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 0)
+  ).getUTCDate();
+
+  it("labels each day and makes today's cell the tab-reachable one (roving tabindex)", async () => {
+    render(<VotdPage />);
+    await screen.findByText("1", { selector: "span.tabular-nums" });
+
+    expect(cell(todayDay)).toHaveAttribute("tabindex", "0");
+    expect(cell(todayDay === 1 ? 2 : 1)).toHaveAttribute("tabindex", "-1");
+    expect(cell(1).getAttribute("aria-label")).toMatch(/no verse set/);
+  });
+
+  it("ArrowRight moves the selection one day and ArrowDown moves a week", async () => {
+    if (todayDay + 8 > daysThisMonth) return; // avoid month-boundary wrap in this test
+    render(<VotdPage />);
+    await screen.findByText("1", { selector: "span.tabular-nums" });
+
+    const grid = screen.getByRole("grid");
+    fireEvent.keyDown(grid, { key: "ArrowRight" });
+    expect(cell(todayDay + 1)).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(grid, { key: "ArrowDown" });
+    expect(cell(todayDay + 8)).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("PageDown moves to the next month", async () => {
+    render(<VotdPage />);
+    await screen.findByText("1", { selector: "span.tabular-nums" });
+
+    const monthNow = new Date().toLocaleString("en", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+    const grid = screen.getByRole("grid");
+    fireEvent.keyDown(grid, { key: "PageDown" });
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 2 }).textContent).not.toBe(monthNow)
+    );
+  });
+});
+
 describe("VotdPage — Preview button guards against overlapping requests", () => {
   const mockFetch = vi.fn();
 

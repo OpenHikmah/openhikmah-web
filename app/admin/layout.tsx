@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AdminGate } from "@/components/admin/AdminGate";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { AdminLiveRegion } from "@/components/admin/AdminLiveRegion";
 
 export const metadata: Metadata = {
   title: "Admin — Open Hikmah",
@@ -15,7 +16,9 @@ export const dynamic = "force-dynamic";
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <AdminGate>
-      <AdminShell>{children}</AdminShell>
+      <AdminLiveRegion>
+        <AdminShell>{children}</AdminShell>
+      </AdminLiveRegion>
     </AdminGate>
   );
 }
