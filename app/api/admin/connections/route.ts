@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq, isNotNull, isNull, type SQL } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql, type SQL } from "drizzle-orm";
 import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
-import { connections } from "@/lib/infra/db/schema";
+import { connections, connectionCoverage } from "@/lib/infra/db/schema";
 
 const STATUSES = ["active", "flagged", "retired"] as const;
 const KINDS = ["thematic", "root", "contrast"] as const;
@@ -97,6 +97,28 @@ export async function PATCH(req: NextRequest) {
 
       if (!updated) {
         return NextResponse.json({ error: "Connection not found" }, { status: 404 });
+      }
+
+      // Retiring/flagging a connection must not strand its coverage cell as
+      // permanently exhausted — otherwise the backfill job skips that verse
+      // forever even though it now has fewer (or zero) usable connections.
+      // No-op when there's no coverage row or it isn't marked exhausted.
+      if (status === "retired" || status === "flagged") {
+        await db
+          .update(connectionCoverage)
+          .set({
+            exhaustedAt: null,
+            activeCount: sql`GREATEST(${connectionCoverage.activeCount} - 1, 0)`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(connectionCoverage.fromRef, updated.fromRef),
+              eq(connectionCoverage.kind, updated.kind),
+              eq(connectionCoverage.locale, "en"),
+              isNotNull(connectionCoverage.exhaustedAt)
+            )
+          );
       }
 
       await logAdminAction({

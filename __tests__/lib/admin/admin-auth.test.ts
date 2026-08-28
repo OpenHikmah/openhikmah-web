@@ -4,8 +4,31 @@ import type { User } from "@/lib/infra/db/schema";
 
 vi.mock("@/lib/auth/social-auth", () => ({ requireUser: vi.fn() }));
 
-import { isAdminQfId, requireAdmin } from "@/lib/admin/admin-auth";
-import { requireUser } from "@/lib/auth/social-auth";
+const { mockRateLimitOrNull } = vi.hoisted(() => ({
+  mockRateLimitOrNull: vi.fn(
+    async (
+      _key: string,
+      _message: string,
+      _limit?: number,
+      _windowSeconds?: number
+    ): Promise<null> => null
+  ),
+}));
+vi.mock("@/lib/infra/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/infra/rate-limit")>();
+  return { ...actual, rateLimitOrNull: mockRateLimitOrNull };
+});
+vi.mock("@/lib/admin/feature-flags", () => ({
+  getFlagNumber: vi.fn(async (_key: string, fallback: number) => fallback),
+}));
+
+import {
+  isAdminQfId,
+  requireAdmin,
+  rateLimitAdminMutation,
+  rateLimitAdminSelfHeal,
+} from "@/lib/admin/admin-auth";
+import { requireUser, type AuthedUser } from "@/lib/auth/social-auth";
 
 function makeUser(qfId: string): User {
   return {
@@ -83,5 +106,25 @@ describe("requireAdmin", () => {
     vi.mocked(requireUser).mockResolvedValue(authed);
     const res = await requireAdmin(req());
     expect(res).toBe(authed);
+  });
+});
+
+describe("admin mutation rate limiting", () => {
+  const auth = { userId: 42, user: makeUser("qf-admin") } as AuthedUser;
+
+  beforeEach(() => mockRateLimitOrNull.mockClear());
+
+  it("uses a dedicated admin budget, not the flagless end-user default", async () => {
+    await rateLimitAdminMutation(auth);
+    const [key, , limit, windowSeconds] = mockRateLimitOrNull.mock.calls[0];
+    expect(key).toBe("admin-mutation:42");
+    expect(typeof limit).toBe("number");
+    expect(limit).toBeGreaterThanOrEqual(240);
+    expect(typeof windowSeconds).toBe("number");
+  });
+
+  it("self-heal writes are metered on a separate key from interactive mutations", async () => {
+    await rateLimitAdminSelfHeal(auth);
+    expect(mockRateLimitOrNull.mock.calls[0][0]).toBe("admin-selfheal:42");
   });
 });

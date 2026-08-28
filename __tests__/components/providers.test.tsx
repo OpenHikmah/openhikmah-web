@@ -87,6 +87,34 @@ describe("SessionRestorer", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it("defers session-loaded until a saved dev token is applied (no 'denied' flash)", async () => {
+    try {
+      sessionStorage.setItem("__devToken", "dev-tok");
+    } catch {
+      /* jsdom */
+    }
+    mockFetch.mockImplementation((url: string) => {
+      if (String(url).includes("/api/social/me")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ id: 1, username: "u" }),
+        });
+      }
+      return Promise.resolve({ ok: false });
+    });
+
+    render(<SessionRestorer />);
+
+    await waitFor(() => expect(useAuthStore.getState().accessToken).toBe("dev-tok"));
+    await waitFor(() => expect(useAuthStore.getState().isSessionLoading).toBe(false));
+
+    try {
+      sessionStorage.removeItem("__devToken");
+    } catch {
+      /* jsdom */
+    }
+  });
+
   it("skips the refresh call entirely when there's no qf_has_session marker cookie", async () => {
     // document.cookie is empty by default in jsdom — this is the common
     // anonymous-visitor case that previously fired a doomed refresh request

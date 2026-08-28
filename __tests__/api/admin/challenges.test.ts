@@ -152,6 +152,24 @@ describe("admin challenges [id]", () => {
     mockDelete.mockReturnValue(makeDbChain([]));
     expect((await DELETE(req("DELETE"), params)).status).toBe(404);
   });
+
+  it("returns 500 (not a raw stack) when the PATCH update throws", async () => {
+    mockUpdate.mockImplementation(() => {
+      throw new Error("db down");
+    });
+    const res = await PATCH(req("PATCH", { action: "end" }), params);
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Internal server error" });
+  });
+
+  it("returns 500 (not a raw stack) when the DELETE throws", async () => {
+    mockDelete.mockImplementation(() => {
+      throw new Error("db down");
+    });
+    const res = await DELETE(req("DELETE"), params);
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Internal server error" });
+  });
 });
 
 describe("admin challenges finalize", () => {

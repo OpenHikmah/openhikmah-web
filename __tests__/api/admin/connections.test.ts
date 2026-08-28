@@ -66,6 +66,8 @@ function patch(body: unknown) {
 
 beforeEach(() => {
   vi.mocked(requireAdmin).mockResolvedValue(admin);
+  mockSelect.mockReset();
+  mockUpdate.mockReset();
   mockSelect.mockReturnValue(makeDbChain([]));
   mockUpdate.mockReturnValue(makeDbChain([]));
   vi.mocked(logAdminAction).mockClear();
@@ -158,6 +160,44 @@ describe("PATCH /api/admin/connections", () => {
     mockUpdate.mockReturnValue(makeDbChain([]));
     const res = await PATCH(patch({ id: 7, reviewed: true }));
     expect(res.status).toBe(404);
+  });
+
+  it("clears the exhausted coverage cell when a connection is retired", async () => {
+    const setCalls: Array<Record<string, unknown>> = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function recordingChain(resolveWith: unknown): any {
+      return new Proxy(function () {}, {
+        get(_t, prop) {
+          if (prop === "then")
+            return (res: (v: unknown) => unknown) => Promise.resolve(resolveWith).then(res);
+          if (prop === "set")
+            return (payload: Record<string, unknown>) => {
+              setCalls.push(payload);
+              return recordingChain(resolveWith);
+            };
+          return () => recordingChain(resolveWith);
+        },
+        apply() {
+          return recordingChain(resolveWith);
+        },
+      });
+    }
+
+    mockUpdate
+      .mockReturnValueOnce(recordingChain([{ ...connectionRow, status: "retired" }]))
+      .mockReturnValueOnce(recordingChain([]));
+
+    const res = await PATCH(patch({ id: 7, status: "retired" }));
+    expect(res.status).toBe(200);
+    expect(mockUpdate).toHaveBeenCalledTimes(2);
+    expect(setCalls[1]).toMatchObject({ exhaustedAt: null });
+  });
+
+  it("does not touch coverage when a connection is set back to active", async () => {
+    mockUpdate.mockReturnValue(makeDbChain([{ ...connectionRow, status: "active" }]));
+    const res = await PATCH(patch({ id: 7, status: "active" }));
+    expect(res.status).toBe(200);
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
   });
 
   it("marks a connection reviewed without changing status and logs connection.reviewed", async () => {
