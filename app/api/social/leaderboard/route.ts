@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
       currentStreak: users.currentStreak,
       longestStreak: users.longestStreak,
       lastActivityDate: users.lastActivityDate,
+      timezoneOffsetMinutes: users.timezoneOffsetMinutes,
     })
     .from(users)
     .where(or(...allIds.map((id) => eq(users.id, id))));
@@ -55,7 +56,10 @@ export async function GET(req: NextRequest) {
   // Ranking requires the full set (rank depends on every row's position), so
   // pagination is applied to the already-ranked list, not the DB query.
   const ranked = rows
-    .map((u) => ({ ...u, streak: effectiveStreak(u.currentStreak, u.lastActivityDate) }))
+    .map((u) => ({
+      ...u,
+      streak: effectiveStreak(u.currentStreak, u.lastActivityDate, u.timezoneOffsetMinutes),
+    }))
     .sort(
       (a, b) =>
         b.streak - a.streak ||

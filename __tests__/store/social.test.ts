@@ -6,6 +6,7 @@ const INITIAL = {
   username: null,
   streak: 0,
   longestStreak: 0,
+  streakAsOf: null,
   pendingFriendCount: 0,
   pendingChallengeCount: 0,
   pendingMentionCount: 0,
@@ -73,6 +74,70 @@ describe("social store", () => {
     expect(useSocialStore.getState()).toMatchObject({ streak: 5, longestStreak: 99 });
   });
 
+  it("bumpStreak ignores a hydration read older than the value already applied", () => {
+    useSocialStore.getState().applyActivityResult({
+      streak: 5,
+      longestStreak: 5,
+      activityDate: "2026-08-28",
+    });
+    // A slow GET from an earlier day resolves late.
+    useSocialStore.getState().bumpStreak(3, 3, "2026-08-27");
+    expect(useSocialStore.getState().streak).toBe(5);
+  });
+
+  it("bumpStreak ignores a same-day hydration read that regresses the streak", () => {
+    useSocialStore.getState().applyActivityResult({
+      streak: 5,
+      longestStreak: 5,
+      activityDate: "2026-08-28",
+    });
+    // A stale in-flight GET (pre-increment) lands after the POST result.
+    useSocialStore.getState().bumpStreak(4, 5, "2026-08-28");
+    expect(useSocialStore.getState().streak).toBe(5);
+  });
+
+  it("bumpStreak applies a newer hydration read, including a legitimate decay to 0", () => {
+    useSocialStore.getState().applyActivityResult({
+      streak: 5,
+      longestStreak: 5,
+      activityDate: "2026-08-28",
+    });
+    useSocialStore.getState().bumpStreak(0, 5, "2026-08-30");
+    expect(useSocialStore.getState().streak).toBe(0);
+    expect(useSocialStore.getState().longestStreak).toBe(5);
+  });
+
+  it("applyActivityResult always wins and records the day it was computed for", () => {
+    useSocialStore.getState().bumpStreak(9, 9, "2026-08-28");
+    useSocialStore.getState().applyActivityResult({
+      streak: 3,
+      longestStreak: 9,
+      activityDate: "2026-08-28",
+    });
+    expect(useSocialStore.getState().streak).toBe(3);
+  });
+
+  it("longestStreak never decreases", () => {
+    useSocialStore.getState().applyActivityResult({
+      streak: 10,
+      longestStreak: 10,
+      activityDate: "2026-08-28",
+    });
+    useSocialStore.getState().bumpStreak(1, 1, "2026-08-29");
+    expect(useSocialStore.getState().longestStreak).toBe(10);
+  });
+
+  it("clearSocial resets streakAsOf so a stale guard can't block the next user", () => {
+    useSocialStore.getState().applyActivityResult({
+      streak: 7,
+      longestStreak: 7,
+      activityDate: "2026-08-28",
+    });
+    useSocialStore.getState().clearSocial();
+    useSocialStore.getState().bumpStreak(2, 2, "2026-01-01");
+    expect(useSocialStore.getState().streak).toBe(2);
+  });
+
   it("setPendingFriendCount/setPendingChallengeCount/setPendingMentionCount each set their own field independently", () => {
     useSocialStore.getState().setPendingFriendCount(3);
     useSocialStore.getState().setPendingChallengeCount(2);
@@ -96,12 +161,19 @@ describe("social store", () => {
       pendingMentionCount: 1,
     });
 
+    useSocialStore.getState().applyActivityResult({
+      streak: 5,
+      longestStreak: 10,
+      activityDate: "2026-08-28",
+    });
+
     const stored = JSON.parse(localStorage.getItem("open-hikmah-social")!);
     expect(stored.state).toMatchObject({
       userId: 42,
       username: "hikmah_seeker",
       streak: 5,
       longestStreak: 10,
+      streakAsOf: "2026-08-28",
     });
     expect(stored.state.pendingFriendCount).toBeUndefined();
     expect(stored.state.pendingChallengeCount).toBeUndefined();

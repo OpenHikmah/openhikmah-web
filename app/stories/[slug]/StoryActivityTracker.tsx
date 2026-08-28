@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
+import { postActivity } from "@/lib/social/post-activity";
 
 /**
  * Credits a Story read toward the daily streak. Canvas verse/connection
@@ -12,27 +13,14 @@ import { useSocialStore } from "@/store/social";
  */
 export function StoryActivityTracker({ slug }: { slug: string }) {
   const accessToken = useAuthStore((s) => s.accessToken);
-  const bumpStreak = useSocialStore((s) => s.bumpStreak);
+  const applyActivityResult = useSocialStore((s) => s.applyActivityResult);
 
   useEffect(() => {
     if (!accessToken) return;
-
-    fetch("/api/social/activity", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ type: "hadith_read" }),
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.streak !== undefined) bumpStreak(data.streak, data.longestStreak);
-      })
-      .catch(() => {
-        // Non-blocking — ignore errors, same as useActivityTracker.
-      });
-  }, [accessToken, slug, bumpStreak]);
+    void postActivity(accessToken, { type: "hadith_read" }).then((result) => {
+      if (result) applyActivityResult(result);
+    });
+  }, [accessToken, slug, applyActivityResult]);
 
   return null;
 }

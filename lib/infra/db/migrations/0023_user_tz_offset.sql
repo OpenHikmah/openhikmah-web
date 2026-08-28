@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "timezone_offset_minutes" integer;

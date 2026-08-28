@@ -15,7 +15,11 @@ export async function GET(req: NextRequest) {
     id: user.id,
     username: user.username,
     displayName: user.displayName,
-    currentStreak: effectiveStreak(user.currentStreak, user.lastActivityDate),
+    currentStreak: effectiveStreak(
+      user.currentStreak,
+      user.lastActivityDate,
+      user.timezoneOffsetMinutes
+    ),
     longestStreak: user.longestStreak,
     lastActivityDate: user.lastActivityDate,
     createdAt: user.createdAt,

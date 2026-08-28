@@ -49,6 +49,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     currentStreak: 0,
     longestStreak: 0,
     lastActivityDate: null,
+    timezoneOffsetMinutes: null,
     disabledAt: null,
     ...overrides,
   };
