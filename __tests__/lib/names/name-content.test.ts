@@ -87,6 +87,11 @@ describe("getOrGenerateNameContent", () => {
     const values = mockValues.mock.calls[0][0] as Record<string, unknown>;
     expect(values).toMatchObject({ slug: "al-malik", kind: "verses", locale: "en", version: 2 });
     expect(JSON.parse(values.data as string)).toEqual(["a", "b"]);
+    // The model handed to generate() is the one that gets persisted — resolved
+    // once, so a config change mid-flight can't split them.
+    const modelPassedToGenerate = generate.mock.calls[0][0] as string;
+    expect(typeof modelPassedToGenerate).toBe("string");
+    expect(values.model).toBe(modelPassedToGenerate);
   });
 
   it("keys the cache by locale — a Turkish miss doesn't reuse or clobber the English row", async () => {

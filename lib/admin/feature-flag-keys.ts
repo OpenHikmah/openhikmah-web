@@ -11,6 +11,13 @@ const KNOWN_FLAG_TYPES: Record<string, FlagType> = {
   // lib/ai/ai.ts resolveProvider().
   ai_provider_connections: "string",
   ai_provider_names: "string",
+  // Model overrides (a model id from lib/ai/models.ts SELECTABLE_MODELS).
+  // `ai_model_<feature>` beats `ai_model` beats the <PROVIDER>_MODEL env / built-in
+  // default. A value that doesn't match the resolved provider is ignored. See
+  // lib/ai/ai.ts resolveModel(). Not enum-validated here (same as ai_provider_*).
+  ai_model: "string",
+  ai_model_connections: "string",
+  ai_model_names: "string",
   maintenance_mode: "boolean",
   ai_gen_limit: "number",
   ai_gen_window_seconds: "number",

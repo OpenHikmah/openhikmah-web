@@ -216,11 +216,18 @@ Return ONLY a valid JSON array of { "ref": "surah:ayah", "reason": "..." }.`,
       provider: "gemini" as const,
       model: "gemini-3.5-flash-lite",
     });
-    await generateConnections("1:1", "ar", "tr", "thematic", "en", { provider: "gemini" });
+    await generateConnections("1:1", "ar", "tr", "thematic", "en", {
+      provider: "gemini",
+      model: "gemini-3.7-flash",
+    });
 
     expect(mockCallAIDetailed).toHaveBeenCalledWith(
       expect.any(String),
-      expect.objectContaining({ feature: "connections", provider: "gemini" })
+      expect.objectContaining({
+        feature: "connections",
+        provider: "gemini",
+        model: "gemini-3.7-flash",
+      })
     );
     expect(insertedRows).toContainEqual(
       expect.objectContaining({ model: "gemini-3.5-flash-lite", tokens: 1290 })
@@ -317,11 +324,16 @@ describe("generateGroundedConnections", () => {
     });
     await generateGroundedConnections("1:1", "ar", "tr", "root", ["2:255"], "en", {
       provider: "gemini",
+      model: "gemini-3.7-flash",
     });
 
     expect(mockCallAIDetailed).toHaveBeenCalledWith(
       expect.any(String),
-      expect.objectContaining({ feature: "connections", provider: "gemini" })
+      expect.objectContaining({
+        feature: "connections",
+        provider: "gemini",
+        model: "gemini-3.7-flash",
+      })
     );
     expect(insertedRows).toContainEqual(
       expect.objectContaining({ model: "gemini-3.5-flash-lite", tokens: 1000 })

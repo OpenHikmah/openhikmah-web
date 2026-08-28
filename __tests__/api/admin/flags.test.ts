@@ -11,7 +11,11 @@ vi.mock("@/lib/admin/feature-flags", async () => {
   const actual = await vi.importActual<typeof import("@/lib/admin/feature-flags")>(
     "@/lib/admin/feature-flags"
   );
-  return { invalidateFlagCache: vi.fn(), validateFlagType: actual.validateFlagType };
+  return {
+    invalidateFlagCache: vi.fn(),
+    validateFlagType: actual.validateFlagType,
+    getFlagString: vi.fn(async (_key: string, fallback: string) => fallback),
+  };
 });
 
 function makeDbChain(resolveWith: unknown = []) {
@@ -169,6 +173,12 @@ describe("PUT /api/admin/flags", () => {
   it("validates the per-feature provider keys as strings", async () => {
     expect((await PUT(put({ key: "ai_provider_connections", value: 3 }))).status).toBe(400);
     expect((await PUT(put({ key: "ai_provider_names", value: "gemini" }))).status).toBe(200);
+  });
+
+  it("validates the per-feature model keys as strings (no enum check, matching ai_provider_*)", async () => {
+    expect((await PUT(put({ key: "ai_model_connections", value: 5 }))).status).toBe(400);
+    expect((await PUT(put({ key: "ai_model_names", value: "gemini-3.7-flash" }))).status).toBe(200);
+    expect((await PUT(put({ key: "ai_model", value: "" }))).status).toBe(200);
   });
 });
 

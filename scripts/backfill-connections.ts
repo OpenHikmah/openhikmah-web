@@ -17,9 +17,11 @@
  *   BACKFILL_LOCALES      csv subset of tr,ru,az (may be empty)
  *   BACKFILL_MAX_CALLS    hard ceiling on LLM calls (exact)
  *   BACKFILL_MAX_COST_USD best-effort USD ceiling
+ *   BACKFILL_MODEL        optional model id (must match BACKFILL_PROVIDER)
  */
 import { runConnectionBatch, type BatchMode } from "@/lib/ai/connection-batch";
 import type { Provider } from "@/lib/ai/ai";
+import { SELECTABLE_MODELS, isModelForProvider } from "@/lib/ai/models";
 import { LOCALES, type Locale } from "@/lib/i18n/config";
 
 function requireEnv(name: string): string {
@@ -70,6 +72,14 @@ const locales = localeInput.filter(
   (l): l is Locale => (LOCALES as readonly string[]).includes(l) && l !== "en"
 );
 
+const model = process.env.BACKFILL_MODEL || undefined;
+if (model !== undefined && !isModelForProvider(model, provider)) {
+  console.error(
+    `backfill-connections: BACKFILL_MODEL "${model}" is not valid for ${provider} — one of: ${SELECTABLE_MODELS[provider].join(", ")}`
+  );
+  process.exit(1);
+}
+
 const maxCalls = Number(requireEnv("BACKFILL_MAX_CALLS"));
 const maxCostUsd = Number(requireEnv("BACKFILL_MAX_COST_USD"));
 if (
@@ -88,6 +98,7 @@ const summary = await runConnectionBatch(
   {
     mode: mode as BatchMode,
     provider: provider as Provider,
+    model,
     locales,
     maxCalls,
     maxCostUsd,

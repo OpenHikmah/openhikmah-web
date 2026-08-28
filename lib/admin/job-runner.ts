@@ -4,6 +4,7 @@ import { db } from "@/lib/infra/db";
 import { jobRuns, verses, verseEmbeddings } from "@/lib/infra/db/schema";
 import { runConnectionBatch, type BatchOptions } from "@/lib/ai/connection-batch";
 import type { Provider } from "@/lib/ai/ai";
+import { SELECTABLE_MODELS, isModelForProvider } from "@/lib/ai/models";
 import { LOCALES, type Locale } from "@/lib/i18n/config";
 
 /**
@@ -77,6 +78,11 @@ function parseBackfillParams(raw: Record<string, unknown>): BatchOptions {
     throw new Error("provider must be claude or gemini");
   }
 
+  const model = raw.model === undefined || raw.model === "" ? undefined : raw.model;
+  if (model !== undefined && (typeof model !== "string" || !isModelForProvider(model, provider))) {
+    throw new Error(`model must be one of: ${SELECTABLE_MODELS[provider].join(", ")}`);
+  }
+
   const localeList = String(raw.locales ?? "")
     .split(",")
     .map((s) => s.trim())
@@ -100,6 +106,7 @@ function parseBackfillParams(raw: Record<string, unknown>): BatchOptions {
   return {
     mode,
     provider: provider as Provider,
+    model: model as string | undefined,
     locales: localeList.filter((l): l is Locale => (LOCALES as readonly string[]).includes(l)),
     maxCalls,
     maxCostUsd,
