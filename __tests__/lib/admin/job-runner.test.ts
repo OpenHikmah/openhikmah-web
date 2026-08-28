@@ -45,6 +45,9 @@ vi.mock("node:child_process", () => ({
   default: { spawn: mockSpawn },
 }));
 
+const { mockRunConnectionBatch } = vi.hoisted(() => ({ mockRunConnectionBatch: vi.fn() }));
+vi.mock("@/lib/ai/connection-batch", () => ({ runConnectionBatch: mockRunConnectionBatch }));
+
 import { startJob, embedCoverage, JOBS } from "@/lib/admin/job-runner";
 
 beforeEach(() => {
@@ -56,6 +59,7 @@ beforeEach(() => {
     lastChild.current = child;
     return child;
   });
+  mockRunConnectionBatch.mockReset().mockResolvedValue({ stoppedReason: "completed" });
 });
 
 // `running` is module-level state in job-runner.ts (by design — it's the
@@ -190,21 +194,54 @@ describe("startJob — backfill-connections params", () => {
     ).rejects.toThrow(/ANTHROPIC_API_KEY/);
   });
 
-  it("threads validated params into the spawned child's env", async () => {
-    await startJob("backfill-connections", "qf-admin", validParams);
-    expect(mockSpawn).toHaveBeenCalledWith(
-      "bun",
-      ["scripts/backfill-connections.ts"],
-      expect.objectContaining({
-        env: expect.objectContaining({
-          BACKFILL_MODE: "baseline",
-          BACKFILL_PROVIDER: "claude",
-          BACKFILL_LOCALES: "tr,ru",
-          BACKFILL_MAX_CALLS: "10",
-          BACKFILL_MAX_COST_USD: "2",
-        }),
-      })
+  it("runs in-process (no spawn) and passes parsed options to runConnectionBatch", async () => {
+    let resolveBatch!: (v: unknown) => void;
+    mockRunConnectionBatch.mockReturnValueOnce(new Promise((r) => (resolveBatch = r)));
+
+    const { runId } = await startJob("backfill-connections", "qf-admin", validParams);
+    expect(runId).toBe(42);
+    expect(mockSpawn).not.toHaveBeenCalled();
+    expect(mockRunConnectionBatch).toHaveBeenCalledWith(
+      {
+        mode: "baseline",
+        provider: "claude",
+        locales: ["tr", "ru"],
+        maxCalls: 10,
+        maxCostUsd: 2,
+      },
+      expect.objectContaining({ onProgress: expect.any(Function) })
     );
+
+    resolveBatch({ stoppedReason: "completed" });
+    await Promise.resolve();
+    await Promise.resolve();
+    // Guard released → a new job can start.
+    const next = await startJob("seed-quran", "qf-admin");
+    expect(next.runId).toBe(42);
+  });
+
+  it("records a failed run and releases the guard when runConnectionBatch throws", async () => {
+    mockRunConnectionBatch.mockRejectedValueOnce(new Error("Anthropic 402"));
+    await startJob("backfill-connections", "qf-admin", validParams);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const failed = mockUpdate.mock.calls.length > 0;
+    expect(failed).toBe(true);
+    const next = await startJob("seed-quran", "qf-admin");
+    expect(next.runId).toBe(42);
+  });
+
+  it("records a failed run when the batch stops with reason 'error'", async () => {
+    mockRunConnectionBatch.mockResolvedValueOnce({
+      stoppedReason: "error",
+      error: "bad work list",
+    });
+    await startJob("backfill-connections", "qf-admin", validParams);
+    await Promise.resolve();
+    await Promise.resolve();
+    const next = await startJob("seed-quran", "qf-admin");
+    expect(next.runId).toBe(42);
   });
 
   it("rejects params on a job that does not accept them", async () => {
