@@ -69,13 +69,13 @@ describe("useActivityTracker restore vs. genuine activity", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("fires an activity POST when a node is genuinely added while mounted", () => {
+  it("fires an activity POST when a node is genuinely added while mounted", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
     vi.stubGlobal("fetch", fetchMock);
 
     renderHook(() => useActivityTracker());
 
-    act(() => {
+    await act(async () => {
       useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
     });
 
@@ -127,7 +127,7 @@ describe("useActivityTracker restore vs. genuine activity", () => {
     );
   });
 
-  it("resumes firing for genuine additions after a restore", () => {
+  it("resumes firing for genuine additions after a restore", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -138,7 +138,7 @@ describe("useActivityTracker restore vs. genuine activity", () => {
     });
     expect(fetchMock).not.toHaveBeenCalled();
 
-    act(() => {
+    await act(async () => {
       useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
     });
     expect(fetchMock).toHaveBeenCalledWith(

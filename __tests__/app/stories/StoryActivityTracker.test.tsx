@@ -3,7 +3,7 @@ import { render, waitFor } from "@testing-library/react";
 import { StoryActivityTracker } from "@/app/stories/[slug]/StoryActivityTracker";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
-import { __resetActivityQueue } from "@/lib/social/post-activity";
+import { resetActivityQueue } from "@/lib/social/post-activity";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -15,7 +15,7 @@ function jsonResponse(body: unknown) {
 describe("StoryActivityTracker", () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    __resetActivityQueue();
+    resetActivityQueue();
     useAuthStore.setState({ accessToken: null });
     useSocialStore.setState({ streak: 0, longestStreak: 0, streakAsOf: null });
   });

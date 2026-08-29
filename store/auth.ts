@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useSocialStore } from "@/store/social";
+import { resetActivityQueue } from "@/lib/social/post-activity";
 
 interface AuthStore {
   // Access token kept in memory — restored on page load via /api/auth/refresh (HttpOnly cookie)
@@ -89,6 +90,7 @@ export const useAuthStore = create<AuthStore>()(
           bookmarkGeneration: s.bookmarkGeneration + 1,
         }));
         useSocialStore.getState().clearSocial();
+        resetActivityQueue();
       },
 
       isBookmarked: (ref) => get().bookmarks.includes(ref),

@@ -107,14 +107,45 @@ describe("social store", () => {
     expect(useSocialStore.getState().longestStreak).toBe(5);
   });
 
-  it("applyActivityResult always wins and records the day it was computed for", () => {
-    useSocialStore.getState().bumpStreak(9, 9, "2026-08-28");
+  it("applyActivityResult wins over a hydration read and records the day it was computed for", () => {
+    useSocialStore.getState().bumpStreak(2, 2, "2026-08-28");
     useSocialStore.getState().applyActivityResult({
       streak: 3,
       longestStreak: 9,
       activityDate: "2026-08-28",
     });
     expect(useSocialStore.getState().streak).toBe(3);
+    expect(useSocialStore.getState().streakAsOf).toBe("2026-08-28");
+  });
+
+  it("applyActivityResult ignores an out-of-order response that regresses the same day", () => {
+    useSocialStore.getState().applyActivityResult({
+      streak: 6,
+      longestStreak: 6,
+      activityDate: "2026-08-28",
+    });
+    // An earlier POST resolving late with a lower same-day streak.
+    useSocialStore.getState().applyActivityResult({
+      streak: 5,
+      longestStreak: 6,
+      activityDate: "2026-08-28",
+    });
+    expect(useSocialStore.getState().streak).toBe(6);
+  });
+
+  it("applyActivityResult ignores a response older than the day already applied", () => {
+    useSocialStore.getState().applyActivityResult({
+      streak: 4,
+      longestStreak: 4,
+      activityDate: "2026-08-29",
+    });
+    useSocialStore.getState().applyActivityResult({
+      streak: 3,
+      longestStreak: 4,
+      activityDate: "2026-08-28",
+    });
+    expect(useSocialStore.getState().streak).toBe(4);
+    expect(useSocialStore.getState().streakAsOf).toBe("2026-08-29");
   });
 
   it("longestStreak never decreases", () => {

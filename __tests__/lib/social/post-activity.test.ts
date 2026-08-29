@@ -3,7 +3,7 @@ import {
   postActivity,
   flushQueue,
   pendingActivityCount,
-  __resetActivityQueue,
+  resetActivityQueue,
 } from "@/lib/social/post-activity";
 
 function okJson(body: unknown) {
@@ -15,7 +15,7 @@ function errStatus(status: number) {
 
 describe("postActivity", () => {
   beforeEach(() => {
-    __resetActivityQueue();
+    resetActivityQueue();
     vi.useFakeTimers();
   });
   afterEach(() => {
@@ -123,5 +123,45 @@ describe("postActivity", () => {
     await vi.runAllTimersAsync();
 
     expect(pendingActivityCount()).toBe(0);
+  });
+
+  it("sends a queued older event before a newly submitted one", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(errStatus(500));
+    vi.stubGlobal("fetch", fetchMock);
+    const p1 = postActivity("tok", { type: "verse_added", verseRef: "1:1" });
+    await vi.runAllTimersAsync();
+    await p1;
+    expect(pendingActivityCount()).toBe(1);
+
+    const sent: string[] = [];
+    fetchMock.mockImplementation((_url: string, init: { body: string }) => {
+      sent.push(JSON.parse(init.body).verse_ref);
+      return Promise.resolve(okJson({ streak: 1, longestStreak: 1, activityDate: "2026-08-28" }));
+    });
+
+    const p2 = postActivity("tok", { type: "verse_added", verseRef: "2:2" });
+    await vi.runAllTimersAsync();
+    await p2;
+
+    expect(sent).toEqual(["1:1", "2:2"]);
+    expect(pendingActivityCount()).toBe(0);
+  });
+
+  it("resetActivityQueue drops deferred events so they can't flush under a new token", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(errStatus(503)));
+    const p = postActivity("tok-a", { type: "verse_added", verseRef: "1:1" });
+    await vi.runAllTimersAsync();
+    await p;
+    expect(pendingActivityCount()).toBe(1);
+
+    resetActivityQueue();
+    expect(pendingActivityCount()).toBe(0);
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(okJson({ streak: 1, longestStreak: 1, activityDate: "2026-08-28" }));
+    vi.stubGlobal("fetch", fetchMock);
+    await flushQueue("tok-b");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

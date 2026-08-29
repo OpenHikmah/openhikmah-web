@@ -30,6 +30,28 @@ const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const queue: QueuedActivity[] = [];
 let lastToken: string | null = null;
 
+// Every send — a fresh event or a queue flush — runs through this one chain, so
+// there is never a concurrent drain (which could submit the same queue head
+// twice) and a new event never overtakes an older queued one (which would let
+// the server overwrite lastActivityDate with the earlier day and break the
+// streak).
+let dispatch: Promise<void> = Promise.resolve();
+
+function enqueueDispatch(task: () => Promise<void>): Promise<void> {
+  const run = dispatch.then(task, task);
+  dispatch = run.catch(() => {});
+  return run;
+}
+
+/** Deliver queued activities in FIFO order, stopping at the first failure. */
+async function drainQueue(accessToken: string): Promise<void> {
+  while (queue.length > 0) {
+    const { result } = await sendWithRetry(accessToken, queue[0]);
+    if (!result) return;
+    queue.shift();
+  }
+}
+
 /** The client's current local calendar day, "YYYY-MM-DD". */
 export function clientLocalDate(now: Date = new Date()): string {
   const y = now.getFullYear();
@@ -70,7 +92,10 @@ async function sendOnce(
       return { result: data, retryable: false };
     }
     return { result: null, retryable: RETRYABLE_STATUS.has(res.status) };
-  } catch {
+  } catch (err) {
+    // A network-level failure is retryable, but it must not vanish: a fully
+    // exhausted event only lives in the in-memory queue and is lost on reload.
+    console.error("postActivity: request failed", err);
     return { result: null, retryable: true };
   }
 }
@@ -99,37 +124,54 @@ export async function postActivity(
   accessToken: string,
   input: ActivityInput
 ): Promise<ActivityResult | null> {
-  lastToken = accessToken;
   const queued: QueuedActivity = { ...input, localDate: clientLocalDate() };
+  let outcome: ActivityResult | null = null;
 
-  const { result, exhausted } = await sendWithRetry(accessToken, queued);
-  if (result) {
-    void flushQueue(accessToken);
-    return result;
-  }
+  await enqueueDispatch(async () => {
+    lastToken = accessToken;
+    // Older queued events go first. If the backlog can't clear, this event joins
+    // the tail rather than jumping ahead of it.
+    await drainQueue(accessToken);
+    if (queue.length > 0) {
+      queue.push(queued);
+      return;
+    }
 
-  if (exhausted) queue.push(queued);
-  return null;
+    const { result, exhausted } = await sendWithRetry(accessToken, queued);
+    if (result) {
+      outcome = result;
+      return;
+    }
+    if (exhausted) {
+      console.error("postActivity: retries exhausted, queued for later flush", queued.type);
+      queue.push(queued);
+    }
+  });
+
+  return outcome;
 }
 
 /** Attempt to deliver every queued activity, FIFO, stopping at the first failure. */
 export async function flushQueue(accessToken: string): Promise<void> {
-  lastToken = accessToken;
-  while (queue.length > 0) {
-    const next = queue[0];
-    const { result } = await sendWithRetry(accessToken, next);
-    if (!result) return;
-    queue.shift();
-  }
+  await enqueueDispatch(async () => {
+    lastToken = accessToken;
+    await drainQueue(accessToken);
+  });
 }
 
 export function pendingActivityCount(): number {
   return queue.length;
 }
 
-export function __resetActivityQueue(): void {
+/**
+ * Drop every deferred activity and forget the last token. Called on sign-out
+ * (see `store/auth.ts` `clearAuth`) so a queued event from one account can never
+ * be flushed later with a different account's bearer token.
+ */
+export function resetActivityQueue(): void {
   queue.length = 0;
   lastToken = null;
+  dispatch = Promise.resolve();
 }
 
 if (typeof document !== "undefined") {

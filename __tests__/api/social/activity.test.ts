@@ -303,6 +303,31 @@ describe("POST /api/social/activity", () => {
     expect(body.streak).toBe(3);
   });
 
+  it("falls back to UTC for a well-formed but non-existent local_date", async () => {
+    authedAs(makeUser({ currentStreak: 2, lastActivityDate: yesterdayStr() }));
+    const res = await POST(makeReq({ type: "verse_added", local_date: "2026-02-30" }));
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.activityDate).toBe(todayStr());
+  });
+
+  it("falls back when local_date disagrees with the supplied tz offset", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T12:00:00Z"));
+    try {
+      authedAs(makeUser({ currentStreak: 2, lastActivityDate: "2026-08-27" }));
+      // UTC+0 offset => local day is the 28th; a client claiming the 30th is
+      // trying to pre-credit two days ahead.
+      const res = await POST(
+        makeReq({ type: "verse_added", local_date: "2026-08-30", tz_offset_minutes: 0 })
+      );
+      const body = await res.json();
+      expect(body.activityDate).toBe("2026-08-28");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("persists the client's timezone offset on the user row", async () => {
     authedAs(makeUser({ currentStreak: 1, lastActivityDate: yesterdayStr() }));
     let captured: Record<string, unknown> | undefined;

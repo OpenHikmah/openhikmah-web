@@ -59,8 +59,18 @@ export function useActivityTracker() {
           }
         : { type: "connection_made" };
 
-      if (accessToken) deliver(input);
-      else pending.current.push(input);
+      if (accessToken) {
+        // Token and a new add can land in the same render batch — drain whatever
+        // was buffered while the token was missing (in order) before this one,
+        // so the first add of the session isn't stranded in `pending.current`.
+        const buffered = pending.current;
+        pending.current = [];
+        buffered.forEach(deliver);
+        deliver(input);
+        void flushQueue(accessToken);
+      } else {
+        pending.current.push(input);
+      }
       return;
     }
 

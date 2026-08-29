@@ -3,7 +3,13 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { activityLog, users } from "@/lib/infra/db/schema";
 import { requireUser, invalidateTokenCache } from "@/lib/auth/social-auth";
-import { todayUTC, yesterdayUTC, previousDay, effectiveStreak } from "@/lib/social/streak";
+import {
+  todayUTC,
+  yesterdayUTC,
+  previousDay,
+  effectiveStreak,
+  localDateFromOffset,
+} from "@/lib/social/streak";
 import { rateLimitOrNull, MUTATION_WINDOW_SECONDS } from "@/lib/infra/rate-limit";
 
 // Activity pings fire on ordinary reading (each verse/connection), so a genuinely
@@ -24,13 +30,24 @@ const MAX_TZ_OFFSET_MIN = 840;
  * date if the client's date is more than ~26h away (a broken clock), so it can't
  * jump the streak forward or drop a day.
  */
-function resolveActivityDate(localDate: string | undefined): string {
+function resolveActivityDate(localDate: string | undefined, offsetMinutes: number | null): string {
   const utc = todayUTC();
   if (!localDate || !DATE_RE.test(localDate)) return utc;
-  const diffDays = Math.abs(
-    (Date.parse(`${localDate}T00:00:00Z`) - Date.parse(`${utc}T00:00:00Z`)) / 86_400_000
-  );
-  return diffDays > 1 ? utc : localDate;
+
+  // Reject a well-formed but non-existent calendar date ("2026-99-99",
+  // "2026-02-30"): Date.parse gives NaN or silently rolls over, and the raw
+  // string would otherwise hit the Postgres `date` column as a 500.
+  const parsedMs = Date.parse(`${localDate}T00:00:00Z`);
+  if (!Number.isFinite(parsedMs) || new Date(parsedMs).toISOString().slice(0, 10) !== localDate) {
+    return utc;
+  }
+
+  // When the client sent its offset too, trust the offset: the reported local
+  // day has to be the one that offset actually yields now (± a day of clock
+  // slack), so a signed-in client can't pre-credit an arbitrary tomorrow.
+  const reference = offsetMinutes !== null ? localDateFromOffset(offsetMinutes) : utc;
+  const diffDays = Math.abs((parsedMs - Date.parse(`${reference}T00:00:00Z`)) / 86_400_000);
+  return diffDays > 1 ? reference : localDate;
 }
 
 export async function POST(req: NextRequest) {
@@ -79,7 +96,7 @@ export async function POST(req: NextRequest) {
   const verseRef = body.verse_ref ?? null;
 
   const { userId } = authed;
-  const today = resolveActivityDate(body.local_date);
+  const today = resolveActivityDate(body.local_date, tzOffsetMinutes);
   const yesterday = today === todayUTC() ? yesterdayUTC() : previousDay(today);
 
   try {

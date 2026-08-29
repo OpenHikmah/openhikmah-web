@@ -81,11 +81,19 @@ export const useSocialStore = create<SocialStore>()(
         }),
 
       applyActivityResult: ({ streak, longestStreak, activityDate }) =>
-        set((s) => ({
-          streak,
-          longestStreak: Math.max(s.longestStreak, longestStreak),
-          streakAsOf: activityDate,
-        })),
+        set((s) => {
+          const nextLongest = Math.max(s.longestStreak, longestStreak);
+          // Multiple POSTs can be in flight; an earlier local-date response
+          // landing after a later one must not roll the streak back. Same
+          // date + same-day guard as bumpStreak.
+          if (s.streakAsOf != null) {
+            if (activityDate < s.streakAsOf) return { longestStreak: nextLongest };
+            if (activityDate === s.streakAsOf && streak < s.streak) {
+              return { longestStreak: nextLongest };
+            }
+          }
+          return { streak, longestStreak: nextLongest, streakAsOf: activityDate };
+        }),
 
       setPendingFriendCount: (count) => set({ pendingFriendCount: count }),
 
