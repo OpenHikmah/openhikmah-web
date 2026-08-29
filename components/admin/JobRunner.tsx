@@ -8,7 +8,7 @@ import { useAsync } from "@/components/admin/useAsync";
 interface JobStatus {
   id: string;
   label: string;
-  status: "never-run" | "running" | "success" | "failed";
+  status: "never-run" | "running" | "success" | "failed" | "cancelled";
   startedAt: string | null;
   completedAt: string | null;
   error: string | null;
@@ -22,6 +22,8 @@ interface JobsResponse {
 
 const statusTone = (s: JobStatus["status"]) =>
   s === "running" ? "flagged" : s === "success" ? "active" : s === "failed" ? "retired" : "neutral";
+
+const STOPPABLE = new Set(["backfill-connections"]);
 
 export function JobRunner() {
   const api = useAdminFetch();
@@ -51,6 +53,19 @@ export function JobRunner() {
       reload();
     } catch (e) {
       setActionError(e instanceof AdminApiError ? e.message : "Failed to start job.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const stop = async (jobId: JobStatus["id"]) => {
+    setActionError(null);
+    setBusyId(jobId);
+    try {
+      await api("/jobs", { method: "POST", json: { jobId, action: "stop" } });
+      reload();
+    } catch (e) {
+      setActionError(e instanceof AdminApiError ? e.message : "Failed to stop job.");
     } finally {
       setBusyId(null);
     }
@@ -97,14 +112,26 @@ export function JobRunner() {
                   )}
                 </Td>
                 <Td>
-                  <div className="flex justify-end">
-                    {job.id === "backfill-connections" ? (
-                      <a
-                        href="/admin/coverage"
-                        className="text-xs text-text-muted underline hover:text-text-secondary"
+                  <div className="flex justify-end gap-2">
+                    {job.status === "running" && STOPPABLE.has(job.id) && (
+                      <ConfirmButton
+                        variant="danger"
+                        disabled={busyId === job.id}
+                        onConfirm={() => stop(job.id)}
+                        confirmLabel="Stop the running job?"
                       >
-                        Run from Coverage →
-                      </a>
+                        Stop
+                      </ConfirmButton>
+                    )}
+                    {job.id === "backfill-connections" ? (
+                      job.status !== "running" && (
+                        <a
+                          href="/admin/coverage"
+                          className="text-xs text-text-muted underline hover:text-text-secondary"
+                        >
+                          Run from Coverage →
+                        </a>
+                      )
                     ) : (
                       <ConfirmButton
                         variant="secondary"

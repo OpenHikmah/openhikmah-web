@@ -117,6 +117,22 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     expect(rerun.generated).toBe(0);
   });
 
+  it("stops immediately with reason 'cancelled' when the signal is already aborted", async () => {
+    await seed("1:1");
+    await seed("2:255");
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
+
+    const summary = await runConnectionBatch(
+      { mode: "baseline", provider: "claude", locales: [], maxCalls: 500, maxCostUsd: 100 },
+      hooks,
+      AbortSignal.abort()
+    );
+
+    expect(summary.stoppedReason).toBe("cancelled");
+    expect(summary.cellsProcessed).toBe(0);
+    expect(mockCallAI).not.toHaveBeenCalled();
+  });
+
   it("topup: marks a cell exhausted when generation returns nothing new, then skips it", async () => {
     await seed("1:1");
     await seed("2:255");

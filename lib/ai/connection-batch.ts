@@ -38,7 +38,7 @@ const POPULAR_SURAHS = [1, 36, 67, 18, 2, 112, 55, 56];
 const PROGRESS_EVERY = 25;
 
 export type BatchMode = "baseline" | "topup";
-export type StoppedReason = "completed" | "call-budget" | "cost-budget" | "error";
+export type StoppedReason = "completed" | "call-budget" | "cost-budget" | "error" | "cancelled";
 
 export interface BatchOptions {
   mode: BatchMode;
@@ -289,7 +289,8 @@ async function upsertCoverage(
 
 export async function runConnectionBatch(
   opts: BatchOptions,
-  hooks: BatchHooks
+  hooks: BatchHooks,
+  signal?: AbortSignal
 ): Promise<BatchSummary> {
   const summary: BatchSummary = {
     stoppedReason: "completed",
@@ -355,6 +356,13 @@ export async function runConnectionBatch(
   };
 
   for (const cell of cells) {
+    // Cooperative cancel from the admin panel (job-runner aborts this signal).
+    // Between-cell granularity matches the budget stop — at most one more cell's
+    // worth of calls after the click.
+    if (signal?.aborted) {
+      summary.stoppedReason = "cancelled";
+      break;
+    }
     if (wouldExceedBudget()) {
       summary.stoppedReason = summary.callsUsed + 1 > opts.maxCalls ? "call-budget" : "cost-budget";
       break;

@@ -8,10 +8,11 @@ vi.mock("@/lib/admin/admin-auth", () => ({
 }));
 vi.mock("@/lib/admin/admin-audit", () => ({ logAdminAction: vi.fn() }));
 
-const { mockGetJobsStatus, mockEmbedCoverage, mockStartJob } = vi.hoisted(() => ({
+const { mockGetJobsStatus, mockEmbedCoverage, mockStartJob, mockStopJob } = vi.hoisted(() => ({
   mockGetJobsStatus: vi.fn<() => Promise<unknown[]>>(() => Promise.resolve([])),
   mockEmbedCoverage: vi.fn(() => Promise.resolve({ embedded: 0, total: 0 })),
   mockStartJob: vi.fn(() => Promise.resolve({ runId: 1 })),
+  mockStopJob: vi.fn(() => ({ jobId: "backfill-connections" as const })),
 }));
 vi.mock("@/lib/admin/job-runner", async () => {
   const actual =
@@ -21,6 +22,7 @@ vi.mock("@/lib/admin/job-runner", async () => {
     getJobsStatus: mockGetJobsStatus,
     embedCoverage: mockEmbedCoverage,
     startJob: mockStartJob,
+    stopJob: mockStopJob,
   };
 });
 
@@ -48,6 +50,7 @@ beforeEach(() => {
   mockGetJobsStatus.mockClear().mockResolvedValue([]);
   mockEmbedCoverage.mockClear().mockResolvedValue({ embedded: 0, total: 0 });
   mockStartJob.mockClear().mockResolvedValue({ runId: 1 });
+  mockStopJob.mockClear().mockReturnValue({ jobId: "backfill-connections" });
   vi.mocked(logAdminAction).mockClear();
 });
 
@@ -137,5 +140,26 @@ describe("POST /api/admin/jobs", () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toMatch(/already running/);
+  });
+
+  it("stops the running job and logs job.stop", async () => {
+    const res = await POST(post({ jobId: "backfill-connections", action: "stop" }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ stopped: "backfill-connections" });
+    expect(mockStopJob).toHaveBeenCalledWith("qf-admin");
+    expect(mockStartJob).not.toHaveBeenCalled();
+    expect(logAdminAction).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "job.stop", targetId: "backfill-connections" })
+    );
+  });
+
+  it("returns 400 when stopJob throws (nothing running / not stoppable)", async () => {
+    mockStopJob.mockImplementation(() => {
+      throw new Error("No job is running");
+    });
+    const res = await POST(post({ jobId: "backfill-connections", action: "stop" }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/No job is running/);
+    expect(logAdminAction).not.toHaveBeenCalled();
   });
 });
