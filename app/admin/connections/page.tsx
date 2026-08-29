@@ -3,7 +3,16 @@
 import { useState } from "react";
 import { Button } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
+import {
+  Table,
+  Th,
+  Td,
+  Pill,
+  StateNote,
+  ConfirmButton,
+  LoadMore,
+} from "@/components/admin/primitives";
+import { AdminToggle } from "@/components/admin/AdminToggle";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { usePaginated } from "@/components/admin/usePaginated";
 import { ExpandableText } from "@/components/admin/ExpandableText";
@@ -26,6 +35,11 @@ interface Connection {
 const STATUS_FILTERS = ["all", "active", "flagged", "retired"] as const;
 const KIND_FILTERS = ["all", "thematic", "root", "contrast"] as const;
 const REVIEWED_FILTERS = ["pending", "reviewed", "all"] as const;
+
+/** `["all", "active"]` → `[{ value: "all", label: "All" }, …]` for `AdminToggle`. */
+function toOptions<T extends string>(values: readonly T[]): { value: T; label: string }[] {
+  return values.map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }));
+}
 
 export default function ConnectionsPage() {
   const api = useAdminFetch();
@@ -94,14 +108,24 @@ export default function ConnectionsPage() {
       />
       <div className="space-y-4 p-7">
         <div className="flex flex-wrap items-center gap-4">
-          <FilterRow
+          <AdminToggle
             label="Review"
-            options={REVIEWED_FILTERS}
+            options={toOptions(REVIEWED_FILTERS)}
             value={reviewed}
             onChange={setReviewed}
           />
-          <FilterRow label="Status" options={STATUS_FILTERS} value={status} onChange={setStatus} />
-          <FilterRow label="Kind" options={KIND_FILTERS} value={kind} onChange={setKind} />
+          <AdminToggle
+            label="Status"
+            options={toOptions(STATUS_FILTERS)}
+            value={status}
+            onChange={setStatus}
+          />
+          <AdminToggle
+            label="Kind"
+            options={toOptions(KIND_FILTERS)}
+            value={kind}
+            onChange={setKind}
+          />
         </div>
 
         {error && <StateNote tone="error">{error}</StateNote>}
@@ -202,55 +226,13 @@ export default function ConnectionsPage() {
           </Table>
         )}
 
-        {hasMore && (
-          <div className="flex flex-col items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={loadMore} disabled={loadingMore}>
-              {loadingMore ? "Loading…" : "Load more"}
-            </Button>
-            {loadMoreError && (
-              <StateNote tone="error">Couldn&apos;t load more connections.</StateNote>
-            )}
-          </div>
-        )}
+        <LoadMore
+          hasMore={hasMore}
+          loading={loadingMore}
+          error={loadMoreError}
+          onClick={loadMore}
+        />
       </div>
     </>
-  );
-}
-
-function FilterRow<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: readonly T[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">
-        {label}
-      </span>
-      <div className="flex gap-1">
-        {options.map((o) => (
-          <button
-            key={o}
-            type="button"
-            aria-pressed={value === o}
-            onClick={() => onChange(o)}
-            className={cn(
-              "rounded border px-2 py-1 text-xs capitalize transition-colors",
-              value === o
-                ? "border-gold-muted bg-gold/10 text-gold"
-                : "border-border text-text-secondary hover:border-gold-muted"
-            )}
-          >
-            {o}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }

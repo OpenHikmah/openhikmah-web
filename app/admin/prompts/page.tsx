@@ -4,10 +4,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
+import { AdminToggle } from "@/components/admin/AdminToggle";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
-import { cn } from "@/lib/utils";
 
 interface PromptVersionRow {
   id: number;
@@ -76,31 +76,18 @@ export default function PromptsPage() {
         subtitle="Versioned templates for the AI connection generator. No active version means the hardcoded fallback is used."
       />
       <div className="space-y-4 p-7">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">
-            Slot
-          </span>
-          <div className="flex gap-1">
-            {PROMPT_KEYS.map((k) => (
-              <button
-                key={k}
-                onClick={() => setKey(k)}
-                // Locked with the draft/textarea during the armed window — otherwise
-                // a confirmed create could activate the draft in a slot the user
-                // never actually confirmed for.
-                disabled={createArmed || saving}
-                className={cn(
-                  "rounded border px-2 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                  key === k
-                    ? "border-gold-muted bg-gold/10 text-gold"
-                    : "border-border text-text-secondary hover:border-gold-muted"
-                )}
-              >
-                {k}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Locked during the armed window — otherwise a confirmed create could
+            activate the draft in a slot the user never confirmed for. */}
+        <AdminToggle
+          label="Slot"
+          options={PROMPT_KEYS.map((k) => ({
+            value: k,
+            label: k,
+            disabled: createArmed || saving,
+          }))}
+          value={key}
+          onChange={setKey}
+        />
 
         {error && <StateNote tone="error">{error}</StateNote>}
         {actionError && <StateNote tone="error">{actionError}</StateNote>}
