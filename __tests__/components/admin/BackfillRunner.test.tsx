@@ -34,13 +34,39 @@ describe("BackfillRunner", () => {
     mockApi.mockResolvedValue({ runId: "run_1" });
   });
 
-  it("blocks the run and posts nothing when the budget fields are blank", async () => {
+  it("disables Run and posts nothing while the budget fields are blank", async () => {
     render(<BackfillRunner />);
+
+    expect(screen.getByRole("button", { name: "Run backfill" })).toBeDisabled();
+    expect(screen.getByText(/Enter Max LLM calls and Max cost to enable/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Run backfill" }));
+
+    // Never even arms the two-click confirm.
+    expect(
+      screen.queryByRole("button", { name: "Run baseline on gemini?" })
+    ).not.toBeInTheDocument();
+    expect(mockApi).not.toHaveBeenCalled();
+  });
+
+  it("enables Run once the budgets are filled and then starts the job", async () => {
+    render(<BackfillRunner />);
+
+    expect(screen.getByRole("button", { name: "Run backfill" })).toBeDisabled();
+
+    fillBudgets("10", "2");
+
+    expect(screen.getByRole("button", { name: "Run backfill" })).not.toBeDisabled();
+    expect(
+      screen.queryByText(/Enter Max LLM calls and Max cost to enable/)
+    ).not.toBeInTheDocument();
 
     await clickRun("Run baseline on gemini?");
 
-    expect(await screen.findByText(/Set Max LLM calls and Max cost/)).toBeInTheDocument();
-    expect(mockApi).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByText(/Watch progress on the Jobs page/)).toBeInTheDocument()
+    );
+    expect(mockApi).toHaveBeenCalledWith("/jobs", expect.objectContaining({ method: "POST" }));
   });
 
   it("keeps the admin's typed inputs after an 'already running' error", async () => {
