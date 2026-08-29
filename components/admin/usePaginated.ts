@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminApiError } from "./AdminContext";
 
-/** One page of results plus whether more exist, and any non-row payload. */
 export interface Page<Row, Extra = undefined> {
   rows: Row[];
   hasMore: boolean;
@@ -14,13 +13,10 @@ interface PaginatedState<Row, Extra> {
   rows: Row[];
   extra: Extra | null;
   hasMore: boolean;
-  /** Initial load (page 0) in flight. */
   loading: boolean;
-  /** A `loadMore()` append in flight. */
   loadingMore: boolean;
-  /** Initial load failed. */
   error: string | null;
-  /** A `loadMore()` append failed (rows already on screen are kept). */
+  /** A `loadMore()` append failed — rows already on screen are kept. */
   loadMoreError: boolean;
   reload: () => void;
   loadMore: () => void;
@@ -67,6 +63,9 @@ export function usePaginated<Row, Extra = undefined>(
     setLoading(true);
     setError(null);
     setLoadMoreError(false);
+    // A page-0 reload supersedes any in-flight append: its stale `finally` is
+    // guarded out, so clear the flag here or the Load-more button stays disabled.
+    setLoadingMore(false);
 
     fetchRef
       .current({ offset: 0 })

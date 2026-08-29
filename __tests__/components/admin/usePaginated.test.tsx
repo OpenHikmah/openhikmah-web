@@ -64,6 +64,32 @@ describe("usePaginated", () => {
     expect(result.current.rows).toEqual([]);
   });
 
+  it("clears loadingMore when a reload supersedes an in-flight append", async () => {
+    let releaseAppend!: () => void;
+    const fetchPage = vi.fn(async ({ offset }: { offset: number }): Promise<Page<number>> => {
+      if (offset === 0) return { rows: [1], hasMore: true };
+      await new Promise<void>((r) => {
+        releaseAppend = r;
+      });
+      return { rows: [2], hasMore: true };
+    });
+    const { result } = renderHook(() => usePaginated(fetchPage, "k"));
+    await waitFor(() => expect(result.current.rows).toEqual([1]));
+
+    act(() => result.current.loadMore());
+    await waitFor(() => expect(result.current.loadingMore).toBe(true));
+
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current.rows).toEqual([1]));
+
+    // The stale append resolves after the reload — its finally is guarded out,
+    // so loadingMore must already be false and loadMore() must work again.
+    act(() => releaseAppend());
+    await waitFor(() => expect(result.current.loadingMore).toBe(false));
+    act(() => result.current.loadMore());
+    expect(fetchPage).toHaveBeenLastCalledWith({ offset: 1 });
+  });
+
   it("keeps rows on a failed loadMore and flags loadMoreError", async () => {
     const fetchPage = vi.fn(async ({ offset }: { offset: number }): Promise<Page<number>> => {
       if (offset === 0) return { rows: [1, 2], hasMore: true };
