@@ -99,10 +99,14 @@ export function ChallengesModeration() {
     setActionError(null);
     try {
       const res = await api<{ resolved: number }>("/challenges/finalize", { method: "POST" });
-      setFinalizeMsg(`Finalized ${res.resolved} ended challenge${res.resolved === 1 ? "" : "s"}.`);
+      const msg = `Finalized ${res.resolved} ended challenge${res.resolved === 1 ? "" : "s"}.`;
+      setFinalizeMsg(msg);
+      announce(msg);
       reload();
     } catch (e) {
-      setActionError(e instanceof AdminApiError ? e.message : "Finalize failed.");
+      const msg = e instanceof AdminApiError ? e.message : "Finalize failed.";
+      setActionError(msg);
+      announce(msg);
     }
   };
 
