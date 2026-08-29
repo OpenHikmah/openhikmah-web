@@ -2,7 +2,7 @@
 
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { StatTile, StateNote, Pill } from "@/components/admin/primitives";
-import { InfoHint } from "@/components/admin/InfoHint";
+import { SkeletonTiles } from "@/components/admin/Skeleton";
 import { useAdminFetch } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 
@@ -22,7 +22,7 @@ export default function OverviewPage() {
     <>
       <AdminPageHeader title="Overview" subtitle="A snapshot of the project right now." />
       <div className="p-7">
-        {loading && <StateNote>Loading…</StateNote>}
+        {loading && !data && <SkeletonTiles n={5} />}
         {error && <StateNote tone="error">{error}</StateNote>}
         {data && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -33,7 +33,7 @@ export default function OverviewPage() {
               info="Total registered accounts. 'disabled' counts accounts an admin has soft-disabled (they can't sign in)."
             />
             <StatTile
-              label="Flagged edges"
+              label="Flagged connections"
               value={data.connections.flagged}
               hint={`of ${data.connections.total} total`}
               tone={data.connections.flagged > 0 ? "gold" : "plain"}
@@ -52,14 +52,10 @@ export default function OverviewPage() {
               hint={`${data.aiMonthToDate.tokens.toLocaleString()} tokens`}
               info="AI generations (and tokens) this calendar month so far — one per cache miss. The bill flattens as the graph fills."
             />
-            <div className="rounded-lg border border-border bg-surface px-4 py-3.5">
-              <div className="flex items-start justify-between gap-2">
-                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
-                  Redis
-                </div>
-                <InfoHint text="Optional cache/accelerator. 'up' = connected, 'down' = configured but unreachable, 'disabled' = not configured (the app falls back to in-process/Postgres)." />
-              </div>
-              <div className="mt-2">
+            <StatTile
+              label="Redis"
+              info="Optional cache/accelerator. 'up' = connected, 'down' = configured but unreachable, 'disabled' = not configured (the app falls back to in-process/Postgres)."
+              value={
                 <Pill
                   tone={
                     data.redis === "up" ? "active" : data.redis === "down" ? "flagged" : "neutral"
@@ -67,8 +63,8 @@ export default function OverviewPage() {
                 >
                   {data.redis}
                 </Pill>
-              </div>
-            </div>
+              }
+            />
           </div>
         )}
 

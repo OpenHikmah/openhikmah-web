@@ -69,6 +69,15 @@ export function Pill({
   );
 }
 
+/** The one card surface for admin settings/editor blocks — single padding scale. */
+export function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <section className={cn("rounded-lg border border-border bg-surface p-5", className)}>
+      {children}
+    </section>
+  );
+}
+
 // ─── Table primitives ─────────────────────────────────────────────────────────
 
 export function Table({ children }: { children: React.ReactNode }) {
@@ -126,12 +135,40 @@ export function ConfirmButton({
   children: React.ReactNode;
   confirmLabel?: string;
 } & Omit<ButtonProps, "onClick">) {
+  // `variant` is the resting look; the button always turns `danger` once armed,
+  // so a non-destructive default (e.g. a "Create & activate" primary) works too.
   const { armed, trigger } = useArmedConfirm(onConfirm);
 
   return (
     <Button variant={armed ? "danger" : variant} size={size} onClick={trigger} {...props}>
       {armed ? confirmLabel : children}
     </Button>
+  );
+}
+
+/**
+ * The standard "Load more" control for a `usePaginated` list: one button, one
+ * error copy. Renders nothing when there's no next page.
+ */
+export function LoadMore({
+  hasMore,
+  loading,
+  error,
+  onClick,
+}: {
+  hasMore: boolean;
+  loading: boolean;
+  error: boolean;
+  onClick: () => void;
+}) {
+  if (!hasMore) return null;
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <Button variant="secondary" size="sm" onClick={onClick} disabled={loading}>
+        {loading ? "Loading…" : "Load more"}
+      </Button>
+      {error && <StateNote tone="error">Couldn&apos;t load more.</StateNote>}
+    </div>
   );
 }
 

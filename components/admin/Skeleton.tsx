@@ -19,3 +19,25 @@ export function SkeletonRows({ n = 6, className }: { n?: number; className?: str
     </>
   );
 }
+
+/** Placeholder grid matching the `StatTile` dashboard rows (Overview, AI, Analytics). */
+export function SkeletonTiles({ n = 4, className }: { n?: number; className?: string }) {
+  return (
+    <>
+      <span role="status" className="sr-only">
+        Loading…
+      </span>
+      <div
+        className={cn("grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4", className)}
+        aria-hidden
+      >
+        {Array.from({ length: n }, (_, i) => (
+          <div
+            key={i}
+            className="h-[86px] animate-pulse rounded-lg border border-border bg-white/5"
+          />
+        ))}
+      </div>
+    </>
+  );
+}
