@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
-import { JOBS, getJobsStatus, embedCoverage, startJob } from "@/lib/admin/job-runner";
+import { JOBS, getJobsStatus, embedCoverage, startJob, stopJob } from "@/lib/admin/job-runner";
 
 /** Job list + latest run status, plus the embedding-coverage check. */
 export async function GET(req: NextRequest) {
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   const limited = await rateLimitAdminMutation(auth);
   if (limited) return limited;
 
-  let body: { jobId?: string; params?: Record<string, unknown> };
+  let body: { jobId?: string; params?: Record<string, unknown>; action?: "start" | "stop" };
   try {
     body = await req.json();
   } catch {
@@ -33,6 +33,23 @@ export async function POST(req: NextRequest) {
   const jobId = body.jobId;
   if (!jobId || !JOBS.some((j) => j.id === jobId)) {
     return NextResponse.json({ error: "Unknown job" }, { status: 400 });
+  }
+
+  if (body.action === "stop") {
+    try {
+      const { jobId: stopped } = stopJob(auth.user.qfId);
+      await logAdminAction({
+        adminQfId: auth.user.qfId,
+        action: "job.stop",
+        targetType: "job",
+        targetId: stopped,
+      });
+      return NextResponse.json({ stopped });
+    } catch (err) {
+      // Nothing running / not stoppable are expected client errors.
+      const message = err instanceof Error ? err.message : "Failed to stop job";
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
   }
 
   try {

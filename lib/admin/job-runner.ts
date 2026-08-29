@@ -119,6 +119,8 @@ interface RunningJob {
   jobId: JobDefinition["id"];
   runId: number;
   logTail: string[];
+  /** Aborted by `stopJob`. Only the in-process backfill job watches it. */
+  controller: AbortController;
 }
 
 // Module-level, so it survives across requests within this `next start`
@@ -129,6 +131,20 @@ export function currentlyRunningJobId(): JobDefinition["id"] | null {
   return running?.jobId ?? null;
 }
 
+/** Cooperatively stops the running job. Only `inProcess` jobs (currently just
+ *  `backfill-connections`) watch the abort signal; the batch loop checks it
+ *  between cells and records a `cancelled` run via `finishRun`. Throws when
+ *  nothing is running or the running job can't be stopped — routes map to 400. */
+export function stopJob(adminQfId: string): { jobId: JobDefinition["id"] } {
+  const job = running;
+  if (!job) throw new Error("No job is running");
+  const def = JOBS.find((j) => j.id === job.jobId);
+  if (!def?.inProcess) throw new Error(`Job "${job.jobId}" can't be stopped`);
+  job.controller.abort();
+  pushLogLine(job, `stop requested by admin ${adminQfId}`);
+  return { jobId: job.jobId };
+}
+
 function pushLogLine(job: RunningJob, line: string) {
   job.logTail.push(line);
   if (job.logTail.length > LOG_TAIL_LINES) job.logTail.shift();
@@ -136,7 +152,11 @@ function pushLogLine(job: RunningJob, line: string) {
 
 /** Records the terminal `job_runs` row and releases the in-memory slot. Shared
  *  by the spawn path (child close/error) and the in-process path. */
-function finishRun(state: RunningJob, status: "success" | "failed", error: string | null) {
+function finishRun(
+  state: RunningJob,
+  status: "success" | "failed" | "cancelled",
+  error: string | null
+) {
   void db
     .update(jobRuns)
     .set({ status, completedAt: new Date(), error, logTail: state.logTail.join("\n") })
@@ -174,7 +194,12 @@ export async function startJob(
   // above and this assignment) so two near-simultaneous calls can't both pass
   // the guard — matches lib/names/name-content.ts's inFlight/reasonInFlight
   // pattern. `runId` is filled in once the insert below resolves.
-  const state: RunningJob = { jobId: job.id, runId: -1, logTail: [] };
+  const state: RunningJob = {
+    jobId: job.id,
+    runId: -1,
+    logTail: [],
+    controller: new AbortController(),
+  };
   running = state;
 
   let row: { id: number };
@@ -197,14 +222,18 @@ export async function startJob(
     // `job_runs` row + resumable work list cover restart recovery.
     void (async () => {
       try {
-        const summary = await runConnectionBatch(backfillOpts as BatchOptions, {
-          onProgress: (line) => pushLogLine(state, line),
-        });
-        finishRun(
-          state,
-          summary.stoppedReason === "error" ? "failed" : "success",
-          summary.error ?? null
+        const summary = await runConnectionBatch(
+          backfillOpts as BatchOptions,
+          { onProgress: (line) => pushLogLine(state, line) },
+          state.controller.signal
         );
+        const status =
+          summary.stoppedReason === "error"
+            ? "failed"
+            : summary.stoppedReason === "cancelled"
+              ? "cancelled"
+              : "success";
+        finishRun(state, status, summary.error ?? null);
       } catch (err) {
         pushLogLine(state, `job failed: ${err instanceof Error ? err.message : String(err)}`);
         finishRun(state, "failed", err instanceof Error ? err.message : String(err));
@@ -239,7 +268,7 @@ export async function startJob(
 export interface JobStatus {
   id: JobDefinition["id"];
   label: string;
-  status: "never-run" | "running" | "success" | "failed";
+  status: "never-run" | "running" | "success" | "failed" | "cancelled";
   startedAt: string | null;
   completedAt: string | null;
   error: string | null;

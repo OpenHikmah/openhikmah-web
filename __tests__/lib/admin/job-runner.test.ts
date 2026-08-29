@@ -48,7 +48,7 @@ vi.mock("node:child_process", () => ({
 const { mockRunConnectionBatch } = vi.hoisted(() => ({ mockRunConnectionBatch: vi.fn() }));
 vi.mock("@/lib/ai/connection-batch", () => ({ runConnectionBatch: mockRunConnectionBatch }));
 
-import { startJob, embedCoverage, JOBS } from "@/lib/admin/job-runner";
+import { startJob, stopJob, embedCoverage, JOBS } from "@/lib/admin/job-runner";
 
 beforeEach(() => {
   mockInsert.mockReset().mockReturnValue(makeDbChain([{ id: 42 }]));
@@ -185,7 +185,8 @@ describe("startJob — backfill-connections params", () => {
     });
     expect(mockRunConnectionBatch).toHaveBeenCalledWith(
       expect.objectContaining({ provider: "gemini", model: "gemini-3.7-flash" }),
-      expect.anything()
+      expect.anything(),
+      expect.any(AbortSignal)
     );
   });
 
@@ -234,7 +235,8 @@ describe("startJob — backfill-connections params", () => {
         maxCalls: 10,
         maxCostUsd: 2,
       },
-      expect.objectContaining({ onProgress: expect.any(Function) })
+      expect.objectContaining({ onProgress: expect.any(Function) }),
+      expect.any(AbortSignal)
     );
 
     resolveBatch({ stoppedReason: "completed" });
@@ -273,6 +275,59 @@ describe("startJob — backfill-connections params", () => {
     await expect(startJob("seed-quran", "qf-admin", { mode: "baseline" })).rejects.toThrow(
       /does not accept params/
     );
+  });
+
+  it("records a cancelled run when the batch stops with reason 'cancelled'", async () => {
+    mockRunConnectionBatch.mockResolvedValueOnce({ stoppedReason: "cancelled" });
+    await startJob("backfill-connections", "qf-admin", validParams);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(mockUpdate).toHaveBeenCalled();
+    const next = await startJob("seed-quran", "qf-admin");
+    expect(next.runId).toBe(42);
+  });
+});
+
+describe("stopJob", () => {
+  const validParams = {
+    mode: "baseline",
+    provider: "claude",
+    locales: "tr,ru",
+    maxCalls: 10,
+    maxCostUsd: 2,
+  };
+
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+  });
+
+  it("throws when no job is running", () => {
+    expect(() => stopJob("qf-admin")).toThrow(/No job is running/);
+  });
+
+  it("aborts the in-process backfill run's signal and releases the guard", async () => {
+    let resolveBatch!: (v: unknown) => void;
+    mockRunConnectionBatch.mockReturnValueOnce(new Promise((r) => (resolveBatch = r)));
+    await startJob("backfill-connections", "qf-admin", validParams);
+
+    const signal = mockRunConnectionBatch.mock.calls[0][2] as AbortSignal;
+    expect(signal.aborted).toBe(false);
+
+    expect(stopJob("qf-admin")).toEqual({ jobId: "backfill-connections" });
+    expect(signal.aborted).toBe(true);
+
+    resolveBatch({ stoppedReason: "cancelled" });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(mockUpdate).toHaveBeenCalled();
+    const next = await startJob("seed-quran", "qf-admin");
+    expect(next.runId).toBe(42);
+  });
+
+  it("refuses to stop a spawned (script) job", async () => {
+    await startJob("seed-morphology", "qf-admin");
+    expect(() => stopJob("qf-admin")).toThrow(/can't be stopped/);
   });
 });
 
