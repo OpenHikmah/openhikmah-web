@@ -65,7 +65,7 @@ export default function AdminStoriesPage() {
         title="Stories"
         subtitle="Hardcoded prophetic narratives. Flag one to pull it from /stories immediately if something in it is wrong — it stays hidden until you restore it, no redeploy needed."
       />
-      <div className="space-y-4 p-7">
+      <div className="space-y-6 p-7">
         {error && <StateNote tone="error">{error}</StateNote>}
         {actionError && <StateNote tone="error">{actionError}</StateNote>}
         {loading && <SkeletonRows />}

@@ -5,6 +5,7 @@ import { Table, Th, Td, StateNote, LoadMore } from "@/components/admin/primitive
 import { SkeletonRows } from "@/components/admin/Skeleton";
 import { useAdminFetch } from "@/components/admin/AdminContext";
 import { usePaginated } from "@/components/admin/usePaginated";
+import { formatTimestamp } from "@/lib/admin/format";
 
 interface Entry {
   id: number;
@@ -29,7 +30,7 @@ export default function AuditPage() {
   return (
     <>
       <AdminPageHeader title="Audit Log" subtitle="Every mutating admin action, newest first." />
-      <div className="space-y-4 p-7">
+      <div className="space-y-6 p-7">
         {error && <StateNote tone="error">{error}</StateNote>}
         {loading && <SkeletonRows />}
         {!loading && !error && rows.length === 0 && (
@@ -50,7 +51,7 @@ export default function AuditPage() {
               {rows.map((e) => (
                 <tr key={e.id}>
                   <Td className="whitespace-nowrap text-xs text-text-muted">
-                    {new Date(e.createdAt).toLocaleString()}
+                    {formatTimestamp(e.createdAt)}
                   </Td>
                   <Td className="whitespace-nowrap font-mono text-xs text-gold">{e.action}</Td>
                   <Td className="whitespace-nowrap text-xs text-text-secondary">

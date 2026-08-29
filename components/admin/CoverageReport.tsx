@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { NativeSelect } from "@/components/ui";
 import { Table, Th, Td, Pill, StatTile, StateNote } from "@/components/admin/primitives";
+import { SectionHeading } from "@/components/admin/SectionHeading";
 import { useAdminFetch } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { SkeletonRows } from "@/components/admin/Skeleton";
@@ -35,7 +36,7 @@ export function CoverageReport() {
   const totalExhausted = data ? data.matrix.reduce((sum, c) => sum + c.exhausted, 0) : 0;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {error && <StateNote tone="error">{error}</StateNote>}
       {loading && !data && <SkeletonRows n={8} />}
 
@@ -62,9 +63,7 @@ export function CoverageReport() {
           </div>
 
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-text-primary">
-              Verses missing a connection (kind × language)
-            </h3>
+            <SectionHeading title="Verses missing a connection (kind × language)" />
             <Table>
               <thead>
                 <tr>
@@ -121,7 +120,7 @@ export function CoverageReport() {
           </section>
 
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-text-primary">Missing verses</h3>
+            <SectionHeading title="Missing verses" />
             <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
               <NativeSelect
                 aria-label="Connection kind"
@@ -162,9 +161,9 @@ export function CoverageReport() {
           </section>
 
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-text-primary">
-              Per-surah coverage ({focusLocale.toUpperCase()}) — verses with a connection, per kind
-            </h3>
+            <SectionHeading
+              title={`Per-surah coverage (${focusLocale.toUpperCase()}) — verses with a connection, per kind`}
+            />
             <div className="max-h-96 overflow-y-auto">
               <Table>
                 <thead>

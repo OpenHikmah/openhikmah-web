@@ -13,6 +13,7 @@ import {
   LoadMore,
 } from "@/components/admin/primitives";
 import { AdminToggle } from "@/components/admin/AdminToggle";
+import { formatTimestamp } from "@/lib/admin/format";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { usePaginated } from "@/components/admin/usePaginated";
 import { ExpandableText } from "@/components/admin/ExpandableText";
@@ -106,7 +107,7 @@ export default function ConnectionsPage() {
         title="Connections"
         subtitle="Moderate AI-generated edges. Flag suspect links or retire them from the graph."
       />
-      <div className="space-y-4 p-7">
+      <div className="space-y-6 p-7">
         <div className="flex flex-wrap items-center gap-4">
           <AdminToggle
             label="Review"
@@ -172,7 +173,7 @@ export default function ConnectionsPage() {
                   </Td>
                   <Td className="whitespace-nowrap text-xs text-text-secondary">
                     {c.reviewedAt ? (
-                      new Date(c.reviewedAt).toLocaleString()
+                      formatTimestamp(c.reviewedAt)
                     ) : (
                       <Pill tone="flagged">pending</Pill>
                     )}

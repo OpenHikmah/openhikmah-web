@@ -14,6 +14,7 @@ import {
 } from "@/components/admin/primitives";
 import { AdminToggle } from "@/components/admin/AdminToggle";
 import { SkeletonRows } from "@/components/admin/Skeleton";
+import { formatTimestamp } from "@/lib/admin/format";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
@@ -84,7 +85,7 @@ export default function PromptsPage() {
         title="Prompts"
         subtitle="Versioned templates for the AI connection generator. No active version means the hardcoded fallback is used."
       />
-      <div className="space-y-4 p-7">
+      <div className="space-y-6 p-7">
         {/* Locked during the armed window — otherwise a confirmed create could
             activate the draft in a slot the user never confirmed for. */}
         <AdminToggle
@@ -165,7 +166,7 @@ export default function PromptsPage() {
                     {v.createdBy ?? "—"}
                   </Td>
                   <Td className="whitespace-nowrap text-xs text-text-secondary">
-                    {new Date(v.createdAt).toLocaleString()}
+                    {formatTimestamp(v.createdAt)}
                   </Td>
                   <Td>
                     <div className="flex justify-end">

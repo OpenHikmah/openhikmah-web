@@ -3,7 +3,16 @@
 import { useState } from "react";
 import { Button, Input } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
+import {
+  Table,
+  Th,
+  Td,
+  Pill,
+  StateNote,
+  ConfirmButton,
+  LoadMore,
+} from "@/components/admin/primitives";
+import { formatTimestamp } from "@/lib/admin/format";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { usePaginated } from "@/components/admin/usePaginated";
 import { SkeletonRows } from "@/components/admin/Skeleton";
@@ -58,7 +67,7 @@ export default function UsersPage() {
   return (
     <>
       <AdminPageHeader title="Users" subtitle="View activity and moderate accounts." />
-      <div className="space-y-4 p-7">
+      <div className="space-y-6 p-7">
         <form
           className="flex max-w-sm gap-2"
           onSubmit={(e) => {
@@ -109,7 +118,7 @@ export default function UsersPage() {
                     <span className="text-text-muted">/ {u.longestStreak} best</span>
                   </Td>
                   <Td className="whitespace-nowrap text-xs text-text-muted">
-                    {new Date(u.lastActiveAt).toLocaleDateString()}
+                    {formatTimestamp(u.lastActiveAt)}
                   </Td>
                   <Td>
                     {u.disabledAt ? (
@@ -148,14 +157,12 @@ export default function UsersPage() {
           </Table>
         )}
 
-        {hasMore && (
-          <div className="flex flex-col items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={loadMore} disabled={loadingMore}>
-              {loadingMore ? "Loading…" : "Load more"}
-            </Button>
-            {loadMoreError && <StateNote tone="error">Couldn&apos;t load more users.</StateNote>}
-          </div>
-        )}
+        <LoadMore
+          hasMore={hasMore}
+          loading={loadingMore}
+          error={loadMoreError}
+          onClick={loadMore}
+        />
       </div>
     </>
   );
