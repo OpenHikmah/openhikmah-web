@@ -13,6 +13,8 @@ import {
 } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { usePaginated } from "@/components/admin/usePaginated";
+import { SkeletonRows } from "@/components/admin/Skeleton";
+import { useAdminAnnounce } from "@/components/admin/AdminLiveRegion";
 import { cn } from "@/lib/utils";
 
 interface AdminChallenge {
@@ -49,6 +51,7 @@ const statusTone = (s: AdminChallenge["status"]) =>
 
 export function ChallengesModeration() {
   const api = useAdminFetch();
+  const announce = useAdminAnnounce();
   const [status, setStatus] = useState<(typeof FILTERS)[number]>("all");
   const [actionError, setActionError] = useState<string | null>(null);
   const [finalizeMsg, setFinalizeMsg] = useState<string | null>(null);
@@ -80,9 +83,12 @@ export function ChallengesModeration() {
     setBusyId(id);
     try {
       await fn();
+      announce(`Challenge ${id} updated.`);
       reload();
     } catch (e) {
-      setActionError(e instanceof AdminApiError ? e.message : "Action failed.");
+      const msg = e instanceof AdminApiError ? e.message : "Action failed.";
+      setActionError(msg);
+      announce(msg);
     } finally {
       setBusyId(null);
     }
@@ -93,10 +99,14 @@ export function ChallengesModeration() {
     setActionError(null);
     try {
       const res = await api<{ resolved: number }>("/challenges/finalize", { method: "POST" });
-      setFinalizeMsg(`Finalized ${res.resolved} ended challenge${res.resolved === 1 ? "" : "s"}.`);
+      const msg = `Finalized ${res.resolved} ended challenge${res.resolved === 1 ? "" : "s"}.`;
+      setFinalizeMsg(msg);
+      announce(msg);
       reload();
     } catch (e) {
-      setActionError(e instanceof AdminApiError ? e.message : "Finalize failed.");
+      const msg = e instanceof AdminApiError ? e.message : "Finalize failed.";
+      setActionError(msg);
+      announce(msg);
     }
   };
 
@@ -147,6 +157,8 @@ export function ChallengesModeration() {
           {FILTERS.map((f) => (
             <button
               key={f}
+              type="button"
+              aria-pressed={status === f}
               onClick={() => setStatus(f)}
               className={cn(
                 "rounded border px-2 py-1 text-xs capitalize transition-colors",
@@ -167,7 +179,7 @@ export function ChallengesModeration() {
       {finalizeMsg && <StateNote>{finalizeMsg}</StateNote>}
       {error && <StateNote tone="error">{error}</StateNote>}
       {actionError && <StateNote tone="error">{actionError}</StateNote>}
-      {loading && <StateNote>Loading…</StateNote>}
+      {loading && <SkeletonRows />}
       {!loading && !error && rows.length === 0 && <StateNote>No challenges match.</StateNote>}
 
       {rows.length > 0 && (

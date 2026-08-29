@@ -6,6 +6,9 @@ import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { usePaginated } from "@/components/admin/usePaginated";
+import { ExpandableText } from "@/components/admin/ExpandableText";
+import { SkeletonRows } from "@/components/admin/Skeleton";
+import { useAdminAnnounce } from "@/components/admin/AdminLiveRegion";
 import { cn } from "@/lib/utils";
 
 interface Connection {
@@ -26,6 +29,7 @@ const REVIEWED_FILTERS = ["pending", "reviewed", "all"] as const;
 
 export default function ConnectionsPage() {
   const api = useAdminFetch();
+  const announce = useAdminAnnounce();
   const [status, setStatus] = useState<(typeof STATUS_FILTERS)[number]>("all");
   const [kind, setKind] = useState<(typeof KIND_FILTERS)[number]>("all");
   const [reviewed, setReviewed] = useState<(typeof REVIEWED_FILTERS)[number]>("pending");
@@ -55,9 +59,12 @@ export default function ConnectionsPage() {
     setBusyId(id);
     try {
       await api("/connections", { method: "PATCH", json: { id, status: next } });
+      announce(`Connection ${id} set to ${next}.`);
       reload();
     } catch (e) {
-      setActionError(e instanceof AdminApiError ? e.message : "Failed to update connection.");
+      const msg = e instanceof AdminApiError ? e.message : "Failed to update connection.";
+      setActionError(msg);
+      announce(msg);
     } finally {
       setBusyId(null);
     }
@@ -68,9 +75,12 @@ export default function ConnectionsPage() {
     setBusyId(id);
     try {
       await api("/connections", { method: "PATCH", json: { id, reviewed: true } });
+      announce(`Connection ${id} marked reviewed.`);
       reload();
     } catch (e) {
-      setActionError(e instanceof AdminApiError ? e.message : "Failed to update connection.");
+      const msg = e instanceof AdminApiError ? e.message : "Failed to update connection.";
+      setActionError(msg);
+      announce(msg);
     } finally {
       setBusyId(null);
     }
@@ -96,7 +106,7 @@ export default function ConnectionsPage() {
 
         {error && <StateNote tone="error">{error}</StateNote>}
         {actionError && <StateNote tone="error">{actionError}</StateNote>}
-        {loading && <StateNote>Loading…</StateNote>}
+        {loading && <SkeletonRows />}
         {!loading && !error && rows.length === 0 && <StateNote>No connections match.</StateNote>}
 
         {rows.length > 0 && (
@@ -122,7 +132,7 @@ export default function ConnectionsPage() {
                     <span className="text-xs text-text-secondary">{c.kind}</span>
                   </Td>
                   <Td className="max-w-md text-xs text-text-secondary">
-                    <span className="line-clamp-2">{c.reason}</span>
+                    <ExpandableText>{c.reason}</ExpandableText>
                   </Td>
                   <Td className="whitespace-nowrap text-xs">
                     {c.confidence === null ? (
@@ -227,6 +237,8 @@ function FilterRow<T extends string>({
         {options.map((o) => (
           <button
             key={o}
+            type="button"
+            aria-pressed={value === o}
             onClick={() => onChange(o)}
             className={cn(
               "rounded border px-2 py-1 text-xs capitalize transition-colors",
