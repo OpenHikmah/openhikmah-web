@@ -8,7 +8,7 @@ vi.mock("@/lib/admin/admin-auth", () => ({
 }));
 vi.mock("@/lib/admin/admin-audit", () => ({ logAdminAction: vi.fn() }));
 
-function makeDbChain(resolveWith: unknown = []) {
+function makeDbChain(resolveWith: unknown = [], calls?: Array<[string, unknown[]]>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
     function () {
@@ -19,7 +19,10 @@ function makeDbChain(resolveWith: unknown = []) {
         if (prop === "then")
           return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
             Promise.resolve(resolveWith).then(res, rej);
-        return () => chain;
+        return (...args: unknown[]) => {
+          calls?.push([String(prop), args]);
+          return chain;
+        };
       },
       apply() {
         return chain;
@@ -112,6 +115,27 @@ describe("GET /api/admin/connections", () => {
     mockSelect.mockReturnValue(makeDbChain([connectionRow]));
     expect((await GET(get("reviewed=pending"))).status).toBe(200);
     expect((await GET(get("reviewed=reviewed"))).status).toBe(200);
+  });
+
+  it("reports hasMore and caps the page when an extra row comes back", async () => {
+    const many = Array.from({ length: 51 }, (_, i) => ({ ...connectionRow, id: i + 1 }));
+    mockSelect.mockReturnValue(makeDbChain(many));
+    const body = await (await GET(get())).json();
+    expect(body.connections).toHaveLength(50);
+    expect(body.hasMore).toBe(true);
+  });
+
+  it("passes the requested offset through to the query", async () => {
+    const calls: Array<[string, unknown[]]> = [];
+    mockSelect.mockReturnValue(makeDbChain([], calls));
+    await GET(get("offset=50"));
+    expect(calls).toContainEqual(["offset", [50]]);
+  });
+
+  it("reports hasMore=false when the page isn't full", async () => {
+    mockSelect.mockReturnValue(makeDbChain([connectionRow]));
+    const body = await (await GET(get())).json();
+    expect(body.hasMore).toBe(false);
   });
 });
 

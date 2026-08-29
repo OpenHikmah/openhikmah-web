@@ -5,7 +5,9 @@ import { Button, Input } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
-import { useAsync } from "@/components/admin/useAsync";
+import { usePaginated } from "@/components/admin/usePaginated";
+import { SkeletonRows } from "@/components/admin/Skeleton";
+import { useAdminAnnounce } from "@/components/admin/AdminLiveRegion";
 
 interface AdminUser {
   id: number;
@@ -21,24 +23,33 @@ interface AdminUser {
 
 export default function UsersPage() {
   const api = useAdminFetch();
+  const announce = useAdminAnnounce();
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  const { data, error, loading, reload } = useAsync<{ users: AdminUser[] }>(
-    () => api(`/users${submitted ? `?q=${encodeURIComponent(submitted)}` : ""}`),
-    `users:${submitted}`
-  );
+  const { rows, hasMore, error, loading, loadingMore, loadMoreError, reload, loadMore } =
+    usePaginated<AdminUser>(async ({ offset }) => {
+      const p = new URLSearchParams();
+      if (submitted) p.set("q", submitted);
+      if (offset) p.set("offset", String(offset));
+      const qs = p.toString();
+      const d = await api<{ users: AdminUser[]; hasMore: boolean }>(`/users${qs ? `?${qs}` : ""}`);
+      return { rows: d.users, hasMore: d.hasMore };
+    }, `users:${submitted}`);
 
   const setDisabled = async (id: number, disabled: boolean) => {
     setActionError(null);
     setBusyId(id);
     try {
       await api("/users", { method: "PATCH", json: { id, disabled } });
+      announce(`User ${id} ${disabled ? "disabled" : "re-enabled"}.`);
       reload();
     } catch (e) {
-      setActionError(e instanceof AdminApiError ? e.message : "Failed to update user.");
+      const msg = e instanceof AdminApiError ? e.message : "Failed to update user.";
+      setActionError(msg);
+      announce(msg);
     } finally {
       setBusyId(null);
     }
@@ -67,10 +78,10 @@ export default function UsersPage() {
 
         {error && <StateNote tone="error">{error}</StateNote>}
         {actionError && <StateNote tone="error">{actionError}</StateNote>}
-        {loading && <StateNote>Loading…</StateNote>}
-        {data && data.users.length === 0 && <StateNote>No users found.</StateNote>}
+        {loading && <SkeletonRows />}
+        {!loading && !error && rows.length === 0 && <StateNote>No users found.</StateNote>}
 
-        {data && data.users.length > 0 && (
+        {rows.length > 0 && (
           <Table>
             <thead>
               <tr>
@@ -82,7 +93,7 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody>
-              {data.users.map((u) => (
+              {rows.map((u) => (
                 <tr key={u.id}>
                   <Td>
                     <div className="flex items-center gap-2">
@@ -135,6 +146,15 @@ export default function UsersPage() {
               ))}
             </tbody>
           </Table>
+        )}
+
+        {hasMore && (
+          <div className="flex flex-col items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? "Loading…" : "Load more"}
+            </Button>
+            {loadMoreError && <StateNote tone="error">Couldn&apos;t load more users.</StateNote>}
+          </div>
         )}
       </div>
     </>

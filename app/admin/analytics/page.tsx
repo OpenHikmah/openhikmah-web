@@ -4,6 +4,8 @@ import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { StatTile, Table, Th, Td, StateNote } from "@/components/admin/primitives";
 import { useAdminFetch } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
+import { RefreshButton } from "@/components/admin/RefreshButton";
+import { SkeletonRows } from "@/components/admin/Skeleton";
 
 type AnalyticsSectionKey =
   "topVerses" | "connectionsByKind" | "dau" | "popularSearches" | "zeroResultSearches";
@@ -22,7 +24,7 @@ interface AnalyticsResponse {
 
 export default function AnalyticsPage() {
   const api = useAdminFetch();
-  const { data, error, loading } = useAsync<AnalyticsResponse>(
+  const { data, error, loading, reload } = useAsync<AnalyticsResponse>(
     () => api("/analytics"),
     "analytics"
   );
@@ -32,10 +34,13 @@ export default function AnalyticsPage() {
       <AdminPageHeader
         title="Analytics"
         subtitle="Product usage: what people explore, search, and where search comes up empty."
+        actions={
+          <RefreshButton onClick={() => reload({ keepDataOnError: true })} loading={loading} />
+        }
       />
       <div className="space-y-6 p-7">
         {error && <StateNote tone="error">{error}</StateNote>}
-        {loading && <StateNote>Loading…</StateNote>}
+        {loading && !data && <SkeletonRows n={5} />}
 
         {data && (
           <>
@@ -48,15 +53,25 @@ export default function AnalyticsPage() {
               </StateNote>
             )}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatTile label="DAU" value={data.dau} hint="Active in the last 24h" />
-              {data.connectionsByKind.map((k) => (
-                <StatTile
-                  key={k.kind}
-                  label={`${k.kind} connections`}
-                  value={k.count}
-                  tone="teal"
-                />
-              ))}
+              <StatTile
+                label="DAU"
+                value={data.errors?.dau ? "—" : data.dau}
+                hint={data.errors?.dau ? "failed to load" : "Active in the last 24h"}
+              />
+              {data.errors?.connectionsByKind ? (
+                <StatTile label="connections" value="—" hint="failed to load" tone="plain" />
+              ) : data.connectionsByKind.length === 0 ? (
+                <StatTile label="connections" value={0} hint="none generated yet" tone="plain" />
+              ) : (
+                data.connectionsByKind.map((k) => (
+                  <StatTile
+                    key={k.kind}
+                    label={`${k.kind} connections`}
+                    value={k.count}
+                    tone="teal"
+                  />
+                ))
+              )}
             </div>
 
             <Section title="Top verses explored" subtitle="By generated-connection volume">

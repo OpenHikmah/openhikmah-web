@@ -5,7 +5,7 @@ import { Button } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
-import { useAsync } from "@/components/admin/useAsync";
+import { usePaginated } from "@/components/admin/usePaginated";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
 
 interface Row {
@@ -19,7 +19,13 @@ interface Row {
 
 export default function NamesPage() {
   const api = useAdminFetch();
-  const { data, error, loading, reload } = useAsync<{ rows: Row[] }>(() => api("/names"), "names");
+  const { rows, hasMore, error, loading, loadingMore, loadMoreError, reload, loadMore } =
+    usePaginated<Row>(async ({ offset }) => {
+      const d = await api<{ rows: Row[]; hasMore: boolean }>(
+        `/names${offset ? `?offset=${offset}` : ""}`
+      );
+      return { rows: d.rows, hasMore: d.hasMore };
+    }, "names");
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
@@ -79,9 +85,11 @@ export default function NamesPage() {
         {error && <StateNote tone="error">{error}</StateNote>}
         {msg && <StateNote tone="error">{msg}</StateNote>}
         {loading && <StateNote>Loading…</StateNote>}
-        {data && data.rows.length === 0 && <StateNote>No cached name content yet.</StateNote>}
+        {!loading && !error && rows.length === 0 && (
+          <StateNote>No cached name content yet.</StateNote>
+        )}
 
-        {data && data.rows.length > 0 && (
+        {rows.length > 0 && (
           <Table>
             <thead>
               <tr>
@@ -93,7 +101,7 @@ export default function NamesPage() {
               </tr>
             </thead>
             <tbody>
-              {data.rows.map((r) => {
+              {rows.map((r) => {
                 const id = `${r.slug}/${r.kind}`;
                 const isEditing = editing === id;
                 return (
@@ -143,6 +151,15 @@ export default function NamesPage() {
               })}
             </tbody>
           </Table>
+        )}
+
+        {hasMore && (
+          <div className="flex flex-col items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? "Loading…" : "Load more"}
+            </Button>
+            {loadMoreError && <StateNote tone="error">Couldn&apos;t load more entries.</StateNote>}
+          </div>
         )}
       </div>
     </>

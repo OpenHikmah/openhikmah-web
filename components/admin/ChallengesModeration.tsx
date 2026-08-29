@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui";
 import {
   Table,
   Th,
@@ -11,7 +12,9 @@ import {
   StatTile,
 } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
-import { useAsync } from "@/components/admin/useAsync";
+import { usePaginated } from "@/components/admin/usePaginated";
+import { SkeletonRows } from "@/components/admin/Skeleton";
+import { useAdminAnnounce } from "@/components/admin/AdminLiveRegion";
 import { cn } from "@/lib/utils";
 
 interface AdminChallenge {
@@ -48,24 +51,44 @@ const statusTone = (s: AdminChallenge["status"]) =>
 
 export function ChallengesModeration() {
   const api = useAdminFetch();
+  const announce = useAdminAnnounce();
   const [status, setStatus] = useState<(typeof FILTERS)[number]>("all");
   const [actionError, setActionError] = useState<string | null>(null);
   const [finalizeMsg, setFinalizeMsg] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  const { data, error, loading, reload } = useAsync<{ stats: Stats; challenges: AdminChallenge[] }>(
-    () => api(`/challenges${status === "all" ? "" : `?status=${status}`}`),
-    `admin-challenges:${status}`
-  );
+  const {
+    rows,
+    extra: stats,
+    hasMore,
+    error,
+    loading,
+    loadingMore,
+    loadMoreError,
+    reload,
+    loadMore,
+  } = usePaginated<AdminChallenge, Stats>(async ({ offset }) => {
+    const p = new URLSearchParams();
+    if (status !== "all") p.set("status", status);
+    if (offset) p.set("offset", String(offset));
+    const qs = p.toString();
+    const d = await api<{ stats: Stats; challenges: AdminChallenge[]; hasMore: boolean }>(
+      `/challenges${qs ? `?${qs}` : ""}`
+    );
+    return { rows: d.challenges, hasMore: d.hasMore, extra: d.stats };
+  }, `admin-challenges:${status}`);
 
   const act = async (id: number, fn: () => Promise<unknown>) => {
     setActionError(null);
     setBusyId(id);
     try {
       await fn();
+      announce(`Challenge ${id} updated.`);
       reload();
     } catch (e) {
-      setActionError(e instanceof AdminApiError ? e.message : "Action failed.");
+      const msg = e instanceof AdminApiError ? e.message : "Action failed.";
+      setActionError(msg);
+      announce(msg);
     } finally {
       setBusyId(null);
     }
@@ -76,49 +99,53 @@ export function ChallengesModeration() {
     setActionError(null);
     try {
       const res = await api<{ resolved: number }>("/challenges/finalize", { method: "POST" });
-      setFinalizeMsg(`Finalized ${res.resolved} ended challenge${res.resolved === 1 ? "" : "s"}.`);
+      const msg = `Finalized ${res.resolved} ended challenge${res.resolved === 1 ? "" : "s"}.`;
+      setFinalizeMsg(msg);
+      announce(msg);
       reload();
     } catch (e) {
-      setActionError(e instanceof AdminApiError ? e.message : "Finalize failed.");
+      const msg = e instanceof AdminApiError ? e.message : "Finalize failed.";
+      setActionError(msg);
+      announce(msg);
     }
   };
 
   return (
     <div className="space-y-4">
-      {data && (
+      {stats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
           <StatTile
             label="Total"
-            value={data.stats.total}
+            value={stats.total}
             tone="plain"
             info="All 1v1 challenges ever created, across every status."
           />
           <StatTile
             label="Active"
-            value={data.stats.byStatus.active ?? 0}
+            value={stats.byStatus.active ?? 0}
             tone="teal"
             info="Challenges that have been accepted and are currently being competed (within their time window)."
           />
           <StatTile
             label="Pending"
-            value={data.stats.byStatus.pending ?? 0}
+            value={stats.byStatus.pending ?? 0}
             info="Challenges sent but not yet accepted or declined by the recipient."
           />
           <StatTile
             label="Completed"
-            value={data.stats.byStatus.completed ?? 0}
+            value={stats.byStatus.completed ?? 0}
             tone="plain"
             info="Challenges whose window has ended and a winner (or draw) has been resolved."
           />
           <StatTile
             label="Declined"
-            value={data.stats.byStatus.declined ?? 0}
+            value={stats.byStatus.declined ?? 0}
             tone="plain"
             info="Challenges the recipient declined. (Withdrawn ones show as 'cancelled'.)"
           />
           <StatTile
             label="From suggestions"
-            value={data.stats.fromSuggestions}
+            value={stats.fromSuggestions}
             tone="teal"
             info="How many challenges were started from an admin-curated suggestion, rather than created from scratch."
           />
@@ -130,6 +157,8 @@ export function ChallengesModeration() {
           {FILTERS.map((f) => (
             <button
               key={f}
+              type="button"
+              aria-pressed={status === f}
               onClick={() => setStatus(f)}
               className={cn(
                 "rounded border px-2 py-1 text-xs capitalize transition-colors",
@@ -150,10 +179,10 @@ export function ChallengesModeration() {
       {finalizeMsg && <StateNote>{finalizeMsg}</StateNote>}
       {error && <StateNote tone="error">{error}</StateNote>}
       {actionError && <StateNote tone="error">{actionError}</StateNote>}
-      {loading && <StateNote>Loading…</StateNote>}
-      {data && data.challenges.length === 0 && <StateNote>No challenges match.</StateNote>}
+      {loading && <SkeletonRows />}
+      {!loading && !error && rows.length === 0 && <StateNote>No challenges match.</StateNote>}
 
-      {data && data.challenges.length > 0 && (
+      {rows.length > 0 && (
         <Table>
           <thead>
             <tr>
@@ -164,7 +193,7 @@ export function ChallengesModeration() {
             </tr>
           </thead>
           <tbody>
-            {data.challenges.map((c) => {
+            {rows.map((c) => {
               const a = c.challengerUsername ?? `#${c.challengerId}`;
               const b = c.challengedUsername ?? `#${c.challengedId}`;
               const winLabel =
@@ -270,6 +299,15 @@ export function ChallengesModeration() {
             })}
           </tbody>
         </Table>
+      )}
+
+      {hasMore && (
+        <div className="flex flex-col items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={loadMore} disabled={loadingMore}>
+            {loadingMore ? "Loading…" : "Load more"}
+          </Button>
+          {loadMoreError && <StateNote tone="error">Couldn&apos;t load more challenges.</StateNote>}
+        </div>
       )}
     </div>
   );

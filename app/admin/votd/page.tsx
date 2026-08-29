@@ -27,6 +27,24 @@ interface TodayInfo {
 }
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
+const WEEKDAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+function daysInMonthOf(month: string): number {
+  const [y, m] = month.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+
+function weekdayOf(date: string): number {
+  return new Date(`${date}T00:00:00Z`).getUTCDay();
+}
 
 function addMonth(month: string, delta: number): string {
   const [y, m] = month.split("-").map(Number);
@@ -43,7 +61,23 @@ function monthLabel(month: string): string {
   });
 }
 
+function longDate(date: string): string {
+  const [dy, dm, dd] = date.split("-").map(Number);
+  return new Date(Date.UTC(dy, dm - 1, dd)).toLocaleString("en", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 const todayStr = () => new Date().toISOString().slice(0, 10);
+
+function addDays(date: string, delta: number): string {
+  const [dy, dm, dd] = date.split("-").map(Number);
+  const d = new Date(Date.UTC(dy, dm - 1, dd + delta));
+  return d.toISOString().slice(0, 10);
+}
 
 export default function VotdPage() {
   const api = useAdminFetch();
@@ -67,6 +101,85 @@ export default function VotdPage() {
   const firstWeekday = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
   const today = todayStr();
+
+  const gridRef = useRef<HTMLDivElement>(null);
+  // After an arrow-key move changes the month, focus the target day once its
+  // button has rendered.
+  const pendingFocus = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pendingFocus.current) return;
+    const el = gridRef.current?.querySelector<HTMLButtonElement>(
+      `[data-date="${pendingFocus.current}"]`
+    );
+    el?.focus();
+    pendingFocus.current = null;
+  }, [month, data]);
+
+  // The one day in the grid that's tab-reachable (roving tabindex): the
+  // selection if it's in this month, else today if visible, else day 1.
+  const rovingDate =
+    selected && selected.startsWith(month)
+      ? selected
+      : today.startsWith(month)
+        ? today
+        : `${month}-01`;
+
+  // Lay the month out as calendar weeks so the grid can carry `role="row"`
+  // containers — a bare grid of gridcells isn't a valid grid.
+  const cells: (number | null)[] = [
+    ...Array.from({ length: firstWeekday }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+  const weeks: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
+  const moveTo = (date: string) => {
+    setSelected(date);
+    if (date.slice(0, 7) !== month) {
+      pendingFocus.current = date;
+      setMonth(date.slice(0, 7));
+    } else {
+      gridRef.current?.querySelector<HTMLButtonElement>(`[data-date="${date}"]`)?.focus();
+    }
+  };
+
+  const onGridKeyDown = (e: React.KeyboardEvent) => {
+    const from = rovingDate;
+    let target: string | null = null;
+    switch (e.key) {
+      case "ArrowRight":
+        target = addDays(from, 1);
+        break;
+      case "ArrowLeft":
+        target = addDays(from, -1);
+        break;
+      case "ArrowDown":
+        target = addDays(from, 7);
+        break;
+      case "ArrowUp":
+        target = addDays(from, -7);
+        break;
+      case "Home":
+        // Start of the active week (may cross into the previous month).
+        target = addDays(from, -weekdayOf(from));
+        break;
+      case "End":
+        target = addDays(from, 6 - weekdayOf(from));
+        break;
+      case "PageUp":
+      case "PageDown": {
+        const dest = addMonth(month, e.key === "PageUp" ? -1 : 1);
+        const dom = Math.min(Number(from.slice(8, 10)), daysInMonthOf(dest));
+        target = `${dest}-${String(dom).padStart(2, "0")}`;
+        break;
+      }
+      default:
+        return;
+    }
+    e.preventDefault();
+    moveTo(target);
+  };
 
   return (
     <>
@@ -100,57 +213,82 @@ export default function VotdPage() {
 
           {error && <StateNote tone="error">{error}</StateNote>}
 
-          <div className="grid grid-cols-7 gap-1.5">
-            {WEEKDAYS.map((d, i) => (
-              <div
-                key={i}
-                className="pb-1 text-center font-mono text-[10px] uppercase text-text-muted"
-              >
-                {d}
+          <div
+            ref={gridRef}
+            role="grid"
+            aria-label={`${monthLabel(month)} — set the verse of the day`}
+            onKeyDown={onGridKeyDown}
+            className="flex flex-col gap-1.5"
+          >
+            <div role="row" className="grid grid-cols-7 gap-1.5">
+              {WEEKDAYS.map((d, i) => (
+                <div
+                  key={i}
+                  role="columnheader"
+                  aria-label={WEEKDAY_NAMES[i]}
+                  className="pb-1 text-center font-mono text-[10px] uppercase text-text-muted"
+                >
+                  {d}
+                </div>
+              ))}
+            </div>
+            {weeks.map((week, wi) => (
+              <div key={wi} role="row" className="grid grid-cols-7 gap-1.5">
+                {week.map((day, ci) => {
+                  if (day === null) return <div key={ci} role="gridcell" aria-hidden />;
+                  const date = `${month}-${String(day).padStart(2, "0")}`;
+                  const entry = byDate.get(date);
+                  const isSelected = selected === date;
+                  const isToday = date === today;
+                  return (
+                    <div
+                      key={date}
+                      role="gridcell"
+                      aria-selected={isSelected}
+                      className="aspect-square"
+                    >
+                      <button
+                        data-date={date}
+                        tabIndex={date === rovingDate ? 0 : -1}
+                        aria-current={isToday ? "date" : undefined}
+                        aria-label={`${longDate(date)}${
+                          entry ? `, verse ${entry.verseRef}` : ", no verse set"
+                        }${isToday ? ", today" : ""}`}
+                        onClick={() => setSelected(date)}
+                        className={cn(
+                          "flex h-full w-full flex-col items-center justify-center rounded-md border text-sm transition-colors",
+                          isSelected
+                            ? "border-gold bg-gold/10 text-gold"
+                            : entry
+                              ? "border-teal/40 bg-teal/5 text-text-primary hover:border-teal"
+                              : "border-border bg-surface text-text-secondary hover:border-gold-muted",
+                          // Marks the live day independent of curated/selected color, so
+                          // it's identifiable even on an uncurated (algorithmic-pick) day.
+                          isToday && !isSelected && "ring-1 ring-inset ring-gold/50"
+                        )}
+                      >
+                        <span className="tabular-nums">{day}</span>
+                        {entry ? (
+                          <span className="mt-0.5 font-mono text-[9px] text-teal">
+                            {entry.verseRef}
+                          </span>
+                        ) : (
+                          // No curated entry — for today, still surface the live
+                          // algorithmic pick so the admin can see it without leaving
+                          // the calendar, styled distinctly from a curated ref.
+                          isToday &&
+                          data?.today?.ref && (
+                            <span className="mt-0.5 font-mono text-[9px] text-gold">
+                              {data.today.ref}
+                            </span>
+                          )
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             ))}
-            {Array.from({ length: firstWeekday }).map((_, i) => (
-              <div key={`pad-${i}`} />
-            ))}
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const day = i + 1;
-              const date = `${month}-${String(day).padStart(2, "0")}`;
-              const entry = byDate.get(date);
-              const isSelected = selected === date;
-              const isToday = date === today;
-              return (
-                <button
-                  key={date}
-                  onClick={() => setSelected(date)}
-                  className={cn(
-                    "flex aspect-square flex-col items-center justify-center rounded-md border text-sm transition-colors",
-                    isSelected
-                      ? "border-gold bg-gold/10 text-gold"
-                      : entry
-                        ? "border-teal/40 bg-teal/5 text-text-primary hover:border-teal"
-                        : "border-border bg-surface text-text-secondary hover:border-gold-muted",
-                    // Marks the live day independent of curated/selected color, so
-                    // it's identifiable even on an uncurated (algorithmic-pick) day.
-                    isToday && !isSelected && "ring-1 ring-inset ring-gold/50"
-                  )}
-                >
-                  <span className="tabular-nums">{day}</span>
-                  {entry ? (
-                    <span className="mt-0.5 font-mono text-[9px] text-teal">{entry.verseRef}</span>
-                  ) : (
-                    // No curated entry — for today, still surface the live
-                    // algorithmic pick so the admin can see it without leaving
-                    // the calendar, styled distinctly from a curated ref.
-                    isToday &&
-                    data?.today?.ref && (
-                      <span className="mt-0.5 font-mono text-[9px] text-gold">
-                        {data.today.ref}
-                      </span>
-                    )
-                  )}
-                </button>
-              );
-            })}
           </div>
           {loading && <StateNote>Loading…</StateNote>}
         </div>

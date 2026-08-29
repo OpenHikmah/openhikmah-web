@@ -4,6 +4,7 @@ import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { connections, connectionCoverage } from "@/lib/infra/db/schema";
+import { parsePagination } from "@/lib/infra/http";
 
 const STATUSES = ["active", "flagged", "retired"] as const;
 const KINDS = ["thematic", "root", "contrast"] as const;
@@ -19,8 +20,7 @@ export async function GET(req: NextRequest) {
   const status = sp.get("status");
   const kind = sp.get("kind");
   const reviewed = sp.get("reviewed");
-  const limitParam = Number(sp.get("limit"));
-  const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 200) : 100;
+  const { limit, offset } = parsePagination(req);
 
   // Reject unknown filter values rather than silently ignoring them, so a
   // typo'd query surfaces as a 400 instead of unfiltered results.
@@ -45,10 +45,12 @@ export async function GET(req: NextRequest) {
       .select()
       .from(connections)
       .where(filters.length ? and(...filters) : undefined)
-      .orderBy(desc(connections.createdAt))
-      .limit(limit);
+      .orderBy(desc(connections.createdAt), desc(connections.id))
+      .limit(limit + 1)
+      .offset(offset);
 
-    return NextResponse.json({ connections: rows });
+    const hasMore = rows.length > limit;
+    return NextResponse.json({ connections: rows.slice(0, limit), hasMore });
   } catch (err) {
     console.error("admin connections GET db error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

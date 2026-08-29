@@ -8,7 +8,7 @@ vi.mock("@/lib/admin/admin-auth", () => ({
 }));
 vi.mock("@/lib/admin/admin-audit", () => ({ logAdminAction: vi.fn() }));
 
-function makeDbChain(resolveWith: unknown = []) {
+function makeDbChain(resolveWith: unknown = [], calls?: Array<[string, unknown[]]>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
     function () {
@@ -19,7 +19,10 @@ function makeDbChain(resolveWith: unknown = []) {
         if (prop === "then")
           return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
             Promise.resolve(resolveWith).then(res, rej);
-        return () => chain;
+        return (...args: unknown[]) => {
+          calls?.push([String(prop), args]);
+          return chain;
+        };
       },
       apply() {
         return chain;
@@ -44,10 +47,11 @@ import { logAdminAction } from "@/lib/admin/admin-audit";
 
 const admin = { userId: 1, user: { qfId: "qf-admin" } as User };
 
-function get() {
-  return new NextRequest("http://localhost/api/admin/names", {
-    headers: { Authorization: "Bearer t" },
-  });
+function get(query?: string) {
+  const url = query
+    ? `http://localhost/api/admin/names?${query}`
+    : "http://localhost/api/admin/names";
+  return new NextRequest(url, { headers: { Authorization: "Bearer t" } });
 }
 function patch(body: unknown) {
   return new NextRequest("http://localhost/api/admin/names", {
@@ -105,6 +109,29 @@ describe("GET /api/admin/names", () => {
     const body = await res.json();
     expect(body.rows[0].data).toEqual({ text: "hi" });
     expect(body.rows[1].data).toBe("not-json");
+    expect(body.hasMore).toBe(false);
+  });
+
+  it("caps the page and sets hasMore when an extra row is returned", async () => {
+    const many = Array.from({ length: 51 }, (_, i) => ({
+      slug: `n${i}`,
+      kind: "reflection",
+      data: "x",
+      model: null,
+      version: 1,
+      updatedAt: new Date("2026-01-01"),
+    }));
+    mockSelect.mockReturnValue(makeDbChain(many));
+    const body = await (await GET(get())).json();
+    expect(body.rows).toHaveLength(50);
+    expect(body.hasMore).toBe(true);
+  });
+
+  it("passes the requested offset through to the query", async () => {
+    const calls: Array<[string, unknown[]]> = [];
+    mockSelect.mockReturnValue(makeDbChain([], calls));
+    await GET(get("offset=50"));
+    expect(calls).toContainEqual(["offset", [50]]);
   });
 });
 

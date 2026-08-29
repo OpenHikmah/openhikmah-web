@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, StateNote } from "@/components/admin/primitives";
 import { useAdminFetch } from "@/components/admin/AdminContext";
-import { useAsync } from "@/components/admin/useAsync";
+import { usePaginated } from "@/components/admin/usePaginated";
 import { Button } from "@/components/ui";
 
 interface Entry {
@@ -17,41 +16,15 @@ interface Entry {
   createdAt: string;
 }
 
-interface AuditPageData {
-  entries: Entry[];
-  hasMore: boolean;
-}
-
 export default function AuditPage() {
   const api = useAdminFetch();
-  const { data, error, loading } = useAsync<AuditPageData>(() => api("/audit"), "audit");
-
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [loadMoreError, setLoadMoreError] = useState(false);
-
-  useEffect(() => {
-    if (!data) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setEntries(data.entries);
-    setHasMore(data.hasMore);
-  }, [data]);
-
-  const loadMore = async () => {
-    if (loadingMore) return;
-    setLoadingMore(true);
-    setLoadMoreError(false);
-    try {
-      const page = await api<AuditPageData>(`/audit?offset=${entries.length}`);
-      setEntries((prev) => [...prev, ...page.entries]);
-      setHasMore(page.hasMore);
-    } catch {
-      setLoadMoreError(true);
-    } finally {
-      setLoadingMore(false);
-    }
-  };
+  const { rows, hasMore, error, loading, loadingMore, loadMoreError, loadMore } =
+    usePaginated<Entry>(async ({ offset }) => {
+      const d = await api<{ entries: Entry[]; hasMore: boolean }>(
+        `/audit${offset ? `?offset=${offset}` : ""}`
+      );
+      return { rows: d.entries, hasMore: d.hasMore };
+    }, "audit");
 
   return (
     <>
@@ -59,9 +32,11 @@ export default function AuditPage() {
       <div className="space-y-4 p-7">
         {error && <StateNote tone="error">{error}</StateNote>}
         {loading && <StateNote>Loading…</StateNote>}
-        {data && entries.length === 0 && <StateNote>No admin actions recorded yet.</StateNote>}
+        {!loading && !error && rows.length === 0 && (
+          <StateNote>No admin actions recorded yet.</StateNote>
+        )}
 
-        {data && entries.length > 0 && (
+        {rows.length > 0 && (
           <Table>
             <thead>
               <tr>
@@ -72,7 +47,7 @@ export default function AuditPage() {
               </tr>
             </thead>
             <tbody>
-              {entries.map((e) => (
+              {rows.map((e) => (
                 <tr key={e.id}>
                   <Td className="whitespace-nowrap text-xs text-text-muted">
                     {new Date(e.createdAt).toLocaleString()}
