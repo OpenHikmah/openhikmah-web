@@ -66,7 +66,10 @@ function patch(body: unknown) {
 
 beforeEach(() => {
   vi.mocked(requireAdmin).mockResolvedValue(admin);
-  mockSelect.mockReturnValue(makeDbChain([]));
+  mockSelect.mockReset();
+  mockUpdate.mockReset();
+  // Default: the PATCH status branch reads the prior row first — an active one.
+  mockSelect.mockReturnValue(makeDbChain([{ status: "active" }]));
   mockUpdate.mockReturnValue(makeDbChain([]));
   vi.mocked(logAdminAction).mockClear();
 });
@@ -133,7 +136,7 @@ describe("PATCH /api/admin/connections", () => {
   });
 
   it("returns 404 when the connection doesn't exist", async () => {
-    mockUpdate.mockReturnValue(makeDbChain([]));
+    mockSelect.mockReturnValue(makeDbChain([]));
     const res = await PATCH(patch({ id: 7, status: "flagged" }));
     expect(res.status).toBe(404);
   });
@@ -158,6 +161,79 @@ describe("PATCH /api/admin/connections", () => {
     mockUpdate.mockReturnValue(makeDbChain([]));
     const res = await PATCH(patch({ id: 7, reviewed: true }));
     expect(res.status).toBe(404);
+  });
+
+  it("clears the exhausted coverage cell when a connection is retired", async () => {
+    const setCalls: Array<Record<string, unknown>> = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function recordingChain(resolveWith: unknown): any {
+      return new Proxy(function () {}, {
+        get(_t, prop) {
+          if (prop === "then")
+            return (res: (v: unknown) => unknown) => Promise.resolve(resolveWith).then(res);
+          if (prop === "set")
+            return (payload: Record<string, unknown>) => {
+              setCalls.push(payload);
+              return recordingChain(resolveWith);
+            };
+          return () => recordingChain(resolveWith);
+        },
+        apply() {
+          return recordingChain(resolveWith);
+        },
+      });
+    }
+
+    mockSelect.mockReturnValue(makeDbChain([{ status: "active" }]));
+    mockUpdate
+      .mockReturnValueOnce(recordingChain([{ ...connectionRow, status: "retired" }]))
+      .mockReturnValueOnce(recordingChain([]));
+
+    const res = await PATCH(patch({ id: 7, status: "retired" }));
+    expect(res.status).toBe(200);
+    expect(mockUpdate).toHaveBeenCalledTimes(2);
+    expect(setCalls[1]).toMatchObject({ exhaustedAt: null });
+  });
+
+  it("does not move coverage when the status doesn't actually change active-ness", async () => {
+    mockSelect.mockReturnValue(makeDbChain([{ status: "flagged" }]));
+    mockUpdate.mockReturnValue(makeDbChain([{ ...connectionRow, status: "retired" }]));
+    const res = await PATCH(patch({ id: 7, status: "retired" }));
+    expect(res.status).toBe(200);
+    // Only the connections row update — flagged→retired is inactive→inactive.
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("increments coverage and un-strands the cell when a connection is reactivated", async () => {
+    const setCalls: Array<Record<string, unknown>> = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function recordingChain(resolveWith: unknown): any {
+      return new Proxy(function () {}, {
+        get(_t, prop) {
+          if (prop === "then")
+            return (res: (v: unknown) => unknown) => Promise.resolve(resolveWith).then(res);
+          if (prop === "set")
+            return (payload: Record<string, unknown>) => {
+              setCalls.push(payload);
+              return recordingChain(resolveWith);
+            };
+          return () => recordingChain(resolveWith);
+        },
+        apply() {
+          return recordingChain(resolveWith);
+        },
+      });
+    }
+
+    mockSelect.mockReturnValue(makeDbChain([{ status: "retired" }]));
+    mockUpdate
+      .mockReturnValueOnce(recordingChain([{ ...connectionRow, status: "active" }]))
+      .mockReturnValueOnce(recordingChain([]));
+
+    const res = await PATCH(patch({ id: 7, status: "active" }));
+    expect(res.status).toBe(200);
+    expect(mockUpdate).toHaveBeenCalledTimes(2);
+    expect(setCalls[1]).toMatchObject({ exhaustedAt: null });
   });
 
   it("marks a connection reviewed without changing status and logs connection.reviewed", async () => {

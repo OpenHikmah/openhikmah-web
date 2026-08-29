@@ -41,6 +41,10 @@ export function SessionRestorer() {
   const setProfile = useSocialStore((s) => s.setProfile);
   const bumpStreak = useSocialStore((s) => s.bumpStreak);
   const didRun = useRef(false);
+  // Set when a saved dev token is being restored, so the main restore effect
+  // below doesn't flip isSessionLoading to false (and briefly render the admin
+  // 404 "denied" screen) before __devLogin has applied the token.
+  const devRestorePending = useRef(false);
 
   // Dev-only console helper: `await window.__devLogin('<DEV_AUTH_TOKEN>')` sets the
   // access token and loads the profile, so the /admin UI works without completing
@@ -80,8 +84,11 @@ export function SessionRestorer() {
     } catch (e) {
       console.error("dev: failed to read __devToken", e);
     }
-    if (saved) void w.__devLogin(saved);
-  }, [setTokens, setProfile]);
+    if (saved) {
+      devRestorePending.current = true;
+      void w.__devLogin(saved).finally(() => setSessionLoaded());
+    }
+  }, [setTokens, setProfile, setSessionLoaded]);
 
   useEffect(() => {
     if (didRun.current) return;
@@ -106,7 +113,9 @@ export function SessionRestorer() {
       .split("; ")
       .some((c) => c.startsWith(`${HAS_SESSION_COOKIE_NAME}=`));
     if (!hasSession) {
-      setSessionLoaded();
+      // A dev-token restore is in flight (it owns the flag) — let it clear
+      // isSessionLoading once the token is applied.
+      if (!devRestorePending.current) setSessionLoaded();
       return;
     }
 

@@ -12,15 +12,20 @@ export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
 
-  const [redis, rateLimitRows] = await Promise.all([redisStatus(), db.$count(rateLimits)]);
+  try {
+    const [redis, rateLimitRows] = await Promise.all([redisStatus(), db.$count(rateLimits)]);
 
-  return NextResponse.json({
-    redis,
-    uptimeSeconds: uptimeSeconds(),
-    tokenCacheSize: tokenCache.size,
-    rateLimitRows,
-    metrics: counterSnapshot(),
-  });
+    return NextResponse.json({
+      redis,
+      uptimeSeconds: uptimeSeconds(),
+      tokenCacheSize: tokenCache.size,
+      rateLimitRows,
+      metrics: counterSnapshot(),
+    });
+  } catch (err) {
+    console.error("admin infra GET error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 const ACTIONS = ["flush-tokens", "flush-jwks", "reset-ratelimits"] as const;
@@ -45,30 +50,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   }
 
-  let result: Record<string, unknown> = {};
-  switch (action) {
-    case "flush-tokens": {
-      result = { cleared: broadcastFlushTokenCache() };
-      break;
+  try {
+    let result: Record<string, unknown> = {};
+    switch (action) {
+      case "flush-tokens": {
+        result = { cleared: broadcastFlushTokenCache() };
+        break;
+      }
+      case "flush-jwks": {
+        await clearJwksCache();
+        result = { ok: true };
+        break;
+      }
+      case "reset-ratelimits": {
+        const deleted = await db.delete(rateLimits).returning({ key: rateLimits.key });
+        result = { deleted: deleted.length };
+        break;
+      }
     }
-    case "flush-jwks": {
-      await clearJwksCache();
-      result = { ok: true };
-      break;
-    }
-    case "reset-ratelimits": {
-      const deleted = await db.delete(rateLimits).returning({ key: rateLimits.key });
-      result = { deleted: deleted.length };
-      break;
-    }
+
+    await logAdminAction({
+      adminQfId: auth.user.qfId,
+      action: `infra.${action}`,
+      targetType: "infra",
+      meta: result,
+    });
+
+    return NextResponse.json({ action, ...result });
+  } catch (err) {
+    console.error(`admin infra POST (${action}) error:`, err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  await logAdminAction({
-    adminQfId: auth.user.qfId,
-    action: `infra.${action}`,
-    targetType: "infra",
-    meta: result,
-  });
-
-  return NextResponse.json({ action, ...result });
 }

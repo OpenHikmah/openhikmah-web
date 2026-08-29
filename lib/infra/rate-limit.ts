@@ -51,6 +51,16 @@ export const MUTATION_LIMIT = positiveIntEnv("MUTATION_RATE_LIMIT", 60);
 export const MUTATION_WINDOW_SECONDS = positiveIntEnv("MUTATION_RATE_WINDOW", 600);
 
 /**
+ * Admin mutations get their own budget, separate from the end-user mutation
+ * pool above: an operator working through a moderation queue makes far more
+ * writes in a burst than any normal user, and sharing the 60/window pool with
+ * end-user traffic made a routine bulk session trip the limiter. Still bounded
+ * so a leaked admin token can't run unlimited high-privilege actions.
+ */
+export const ADMIN_MUTATION_LIMIT = positiveIntEnv("ADMIN_MUTATION_RATE_LIMIT", 240);
+export const ADMIN_MUTATION_WINDOW_SECONDS = positiveIntEnv("ADMIN_MUTATION_RATE_WINDOW", 600);
+
+/**
  * Default budget for search-log writes per client — the search endpoints
  * themselves are intentionally unauthenticated (see app/api/search/route.ts)
  * but are rate-limited (KEYWORD_SEARCH_LIMIT below, and the AI-generation
@@ -189,5 +199,12 @@ export async function rateLimitOrNull(
   const resolvedWindow =
     windowSeconds ?? (await getFlagNumber("mutation_window_seconds", MUTATION_WINDOW_SECONDS));
   const allowed = await consumeWith(key, resolvedLimit, resolvedWindow);
-  return allowed ? null : NextResponse.json({ error: message }, { status: 429 });
+  if (allowed) return null;
+  // Seconds left in the current fixed window — the soonest the caller's budget
+  // can free up. Lets clients show a real countdown instead of "try again later".
+  const retryAfter = resolvedWindow - (Math.floor(Date.now() / 1000) % resolvedWindow);
+  return NextResponse.json(
+    { error: message, retryAfter },
+    { status: 429, headers: { "Retry-After": String(retryAfter) } }
+  );
 }

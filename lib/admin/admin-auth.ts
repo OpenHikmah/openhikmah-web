@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, type AuthedUser } from "@/lib/auth/social-auth";
-import { rateLimitOrNull } from "@/lib/infra/rate-limit";
+import {
+  rateLimitOrNull,
+  ADMIN_MUTATION_LIMIT,
+  ADMIN_MUTATION_WINDOW_SECONDS,
+} from "@/lib/infra/rate-limit";
+import { getFlagNumber } from "@/lib/admin/feature-flags";
 
 /**
  * Single super-admin access control.
@@ -63,8 +68,11 @@ export async function requireAdmin(req: NextRequest): Promise<AuthedUser | NextR
  * PATCH/DELETE) against a single shared budget across every `/api/admin/*`
  * route — a leaked admin bearer token otherwise has no throttle on high-
  * privilege actions (disable a user, delete a challenge, change flags, ...).
- * Read-only GETs are deliberately not limited. Call right after `requireAdmin`
- * succeeds, before doing any work:
+ * Uses the admin-only budget (`ADMIN_MUTATION_*` / the `admin_mutation_limit` /
+ * `admin_mutation_window_seconds` flags), not the end-user mutation pool — an
+ * operator clearing a moderation queue bursts far more writes than any normal
+ * user. Read-only GETs are deliberately not limited. Call right after
+ * `requireAdmin` succeeds, before doing any work:
  *
  *   const auth = await requireAdmin(req);
  *   if (auth instanceof NextResponse) return auth;
@@ -72,8 +80,30 @@ export async function requireAdmin(req: NextRequest): Promise<AuthedUser | NextR
  *   if (limited) return limited;
  */
 export async function rateLimitAdminMutation(auth: AuthedUser): Promise<NextResponse | null> {
+  const [limit, windowSeconds] = await Promise.all([
+    getFlagNumber("admin_mutation_limit", ADMIN_MUTATION_LIMIT),
+    getFlagNumber("admin_mutation_window_seconds", ADMIN_MUTATION_WINDOW_SECONDS),
+  ]);
   return rateLimitOrNull(
     `admin-mutation:${auth.userId}`,
-    "Too many admin actions — try again later"
+    "Too many admin actions — try again in a moment",
+    limit,
+    windowSeconds
+  );
+}
+
+/**
+ * Budget for the writes an otherwise read-only admin GET performs as a
+ * self-heal side effect (finalizing challenges that ended since the last view).
+ * Kept on its own key so a burst of overdue challenges surfacing on a list
+ * refresh can't consume the interactive `rateLimitAdminMutation` budget and
+ * then block the operator's actual moderation clicks — or the list load itself.
+ */
+export async function rateLimitAdminSelfHeal(auth: AuthedUser): Promise<NextResponse | null> {
+  return rateLimitOrNull(
+    `admin-selfheal:${auth.userId}`,
+    "Too many challenge finalizations — try again in a moment",
+    ADMIN_MUTATION_LIMIT,
+    ADMIN_MUTATION_WINDOW_SECONDS
   );
 }

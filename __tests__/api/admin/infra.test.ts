@@ -145,6 +145,13 @@ describe("GET /api/admin/infra", () => {
     const body = await res.json();
     expect(body.redis).toBe("down");
   });
+
+  it("returns 500 (not a raw stack) when the rate-limit count query throws", async () => {
+    mockCount.mockImplementation(() => Promise.reject(new Error("db down")));
+    const res = await GET(get());
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Internal server error" });
+  });
 });
 
 describe("POST /api/admin/infra", () => {
@@ -190,5 +197,12 @@ describe("POST /api/admin/infra", () => {
     expect(logAdminAction).toHaveBeenCalledWith(
       expect.objectContaining({ action: "infra.reset-ratelimits" })
     );
+  });
+
+  it("returns 500 (not a raw stack) when a maintenance action throws", async () => {
+    mockClearJwksCache.mockRejectedValueOnce(new Error("boom"));
+    const res = await POST(post({ action: "flush-jwks" }));
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Internal server error" });
   });
 });
