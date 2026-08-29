@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button, Input, ReflectionNote } from "@/components/ui";
+import { Button, Input, Textarea, ReflectionNote } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { StateNote, ConfirmButton } from "@/components/admin/primitives";
+import { Field } from "@/components/admin/Field";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import type { Verse } from "@/types/quran";
@@ -409,8 +410,7 @@ function DayEditor({
         <div className="text-sm text-text-primary">{date}</div>
       </div>
 
-      <label className="block space-y-1.5">
-        <span className="text-xs text-text-secondary">Verse reference</span>
+      <Field label="Verse reference">
         <div className="flex gap-2">
           <Input
             value={verseRef}
@@ -424,7 +424,7 @@ function DayEditor({
             {previewBusy ? "Previewing…" : "Preview"}
           </Button>
         </div>
-      </label>
+      </Field>
 
       {preview && (
         <div className="space-y-2 rounded-md border border-border-subtle bg-bg p-3">
@@ -435,16 +435,14 @@ function DayEditor({
         </div>
       )}
 
-      <label className="block space-y-1.5">
-        <span className="text-xs text-text-secondary">Reflection (optional, editorial)</span>
-        <textarea
+      <Field label="Reflection (optional, editorial)">
+        <Textarea
           value={reflection}
           onChange={(e) => setReflection(e.target.value)}
           rows={4}
-          className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-gold-muted"
           placeholder="A short reflection shown beneath the verse…"
         />
-      </label>
+      </Field>
 
       {reflection.trim() && <ReflectionNote>{reflection}</ReflectionNote>}
 

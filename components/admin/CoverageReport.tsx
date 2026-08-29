@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { NativeSelect } from "@/components/ui";
 import { Table, Th, Td, Pill, StatTile, StateNote } from "@/components/admin/primitives";
 import { useAdminFetch } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
@@ -122,28 +123,30 @@ export function CoverageReport() {
           <section>
             <h3 className="mb-2 text-sm font-semibold text-text-primary">Missing verses</h3>
             <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-              <select
+              <NativeSelect
+                aria-label="Connection kind"
                 value={focusKind}
                 onChange={(e) => setFocusKind(e.target.value as Kind)}
-                className="rounded border border-border bg-surface px-2 py-1"
+                className="h-8 w-36 py-1 text-xs"
               >
                 {KINDS.map((k) => (
                   <option key={k} value={k}>
                     {k}
                   </option>
                 ))}
-              </select>
-              <select
+              </NativeSelect>
+              <NativeSelect
+                aria-label="Language"
                 value={focusLocale}
                 onChange={(e) => setFocusLocale(e.target.value as Locale)}
-                className="rounded border border-border bg-surface px-2 py-1"
+                className="h-8 w-28 py-1 text-xs"
               >
                 {LOCALES.map((l) => (
                   <option key={l} value={l}>
                     {l.toUpperCase()}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
               <span className="text-text-muted">
                 {data.missingSampleTotal.toLocaleString()} total missing — showing first{" "}
                 {data.missingSample.length}

@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { StateNote, ConfirmButton } from "@/components/admin/primitives";
+import { Input, NativeSelect } from "@/components/ui";
+import { StateNote, ConfirmButton, Panel } from "@/components/admin/primitives";
+import { Field } from "@/components/admin/Field";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import type { Locale } from "@/lib/i18n/config";
 import { SELECTABLE_MODELS } from "@/lib/ai/models";
@@ -70,7 +72,7 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
   };
 
   return (
-    <section className="rounded-lg border border-border bg-surface p-4">
+    <Panel>
       <h3 className="text-sm font-semibold text-text-primary">Run the backfill job</h3>
       <p className="mt-1 text-xs text-text-muted">
         Generates connections for verses that have none (baseline) or tops up the thinnest cells
@@ -79,51 +81,42 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="text-xs">
-          <span className="mb-1 block text-text-muted">Mode</span>
-          <select
+        <Field label="Mode">
+          <NativeSelect
             value={mode}
             onChange={(e) => setMode(e.target.value as "baseline" | "topup")}
-            className="w-full rounded border border-border bg-bg px-2 py-1.5"
           >
             <option value="baseline">baseline — fill cells with zero connections</option>
             <option value="topup">top-up — add more to the thinnest cells</option>
-          </select>
-        </label>
+          </NativeSelect>
+        </Field>
 
-        <label className="text-xs">
-          <span className="mb-1 block text-text-muted">Provider</span>
-          <select
+        <Field label="Provider">
+          <NativeSelect
             value={provider}
             onChange={(e) => {
               setProvider(e.target.value as "claude" | "gemini");
               setModel("");
             }}
-            className="w-full rounded border border-border bg-bg px-2 py-1.5"
           >
             <option value="gemini">gemini — cheapest</option>
             <option value="claude">claude — highest fidelity</option>
-          </select>
-        </label>
+          </NativeSelect>
+        </Field>
 
-        <label className="text-xs">
-          <span className="mb-1 block text-text-muted">Model</span>
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="w-full rounded border border-border bg-bg px-2 py-1.5"
-          >
+        <Field label="Model">
+          <NativeSelect value={model} onChange={(e) => setModel(e.target.value)}>
             <option value="">default</option>
             {SELECTABLE_MODELS[provider].map((m) => (
               <option key={m} value={m}>
                 {m}
               </option>
             ))}
-          </select>
-        </label>
+          </NativeSelect>
+        </Field>
 
         <div className="text-xs">
-          <span className="mb-1 block text-text-muted">Also translate reasons into</span>
+          <span className="mb-1 block text-text-secondary">Also translate reasons into</span>
           <div className="flex gap-3">
             {TARGET_LOCALES.map((l) => (
               <label key={l} className="flex items-center gap-1">
@@ -138,30 +131,28 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 text-xs">
-          <label>
-            <span className="mb-1 block text-text-muted">Max LLM calls</span>
-            <input
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Max LLM calls">
+            <Input
               type="number"
               min={1}
               value={maxCalls}
               placeholder="required"
               onChange={(e) => setMaxCalls(e.target.value === "" ? "" : Number(e.target.value))}
-              className="w-full rounded border border-border bg-bg px-2 py-1.5 tabular-nums"
+              className="tabular-nums"
             />
-          </label>
-          <label>
-            <span className="mb-1 block text-text-muted">Max cost (USD, est.)</span>
-            <input
+          </Field>
+          <Field label="Max cost (USD, est.)">
+            <Input
               type="number"
               min={0.1}
               step={0.1}
               value={maxCostUsd}
               placeholder="required"
               onChange={(e) => setMaxCostUsd(e.target.value === "" ? "" : Number(e.target.value))}
-              className="w-full rounded border border-border bg-bg px-2 py-1.5 tabular-nums"
+              className="tabular-nums"
             />
-          </label>
+          </Field>
         </div>
       </div>
 
@@ -202,6 +193,6 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
           {starting ? "Starting…" : "Run backfill"}
         </ConfirmButton>
       </div>
-    </section>
+    </Panel>
   );
 }

@@ -1,16 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Button, Input } from "@/components/ui";
+import { Button, Input, Textarea, NativeSelect } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { Table, Th, Td, StateNote, ConfirmButton } from "@/components/admin/primitives";
+import { Table, Th, Td, StateNote, ConfirmButton, Panel } from "@/components/admin/primitives";
+import { Field } from "@/components/admin/Field";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { KNOWN_OPERATIONAL_FLAG_KEYS } from "@/lib/admin/feature-flag-keys";
 import { SELECTABLE_MODELS } from "@/lib/ai/models";
-
-const SELECT_CLASS =
-  "h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary hover:border-border-subtle focus:border-gold-muted";
 
 const AI_ROUTES = [
   { key: "", label: "Default" },
@@ -100,7 +98,7 @@ function OperationalSettings({
   };
 
   return (
-    <div className="space-y-4 rounded-lg border border-border bg-surface p-5">
+    <Panel className="space-y-4">
       <h2 className="text-sm font-medium text-text-primary">Operational settings</h2>
 
       <div className="space-y-2">
@@ -121,12 +119,11 @@ function OperationalSettings({
             return (
               <div key={route.key} className="grid items-center gap-2 sm:grid-cols-[8rem_1fr_1fr]">
                 <span className="text-xs text-text-secondary">{route.label}</span>
-                <select
+                <NativeSelect
                   aria-label={`${route.label} provider`}
                   value={strFlag(`ai_provider${route.key}`)}
                   onChange={(e) => setFlag(`ai_provider${route.key}`, e.target.value)}
                   disabled={busy}
-                  className={SELECT_CLASS}
                 >
                   <option value="">
                     {route.key === ""
@@ -135,13 +132,12 @@ function OperationalSettings({
                   </option>
                   <option value="claude">Claude</option>
                   <option value="gemini">Gemini</option>
-                </select>
-                <select
+                </NativeSelect>
+                <NativeSelect
                   aria-label={`${route.label} model`}
                   value={modelValue}
                   onChange={(e) => setFlag(modelKey, e.target.value)}
                   disabled={busy}
-                  className={SELECT_CLASS}
                 >
                   <option value="">Default — {resolved.model}</option>
                   {SELECTABLE_MODELS[resolved.provider].map((m) => (
@@ -149,7 +145,7 @@ function OperationalSettings({
                       {m}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </div>
             );
           })}
@@ -172,8 +168,7 @@ function OperationalSettings({
           </Button>
         </div>
 
-        <label className="space-y-1.5">
-          <span className="text-xs text-text-secondary">AI generation limit (per window)</span>
+        <Field label="AI generation limit (per window)">
           <div className="flex gap-2">
             <Input
               key={`ai_gen_limit:${numOrEmpty(byKey.get("ai_gen_limit"))}`}
@@ -189,10 +184,9 @@ function OperationalSettings({
               Save
             </Button>
           </div>
-        </label>
+        </Field>
 
-        <label className="space-y-1.5">
-          <span className="text-xs text-text-secondary">AI generation window (seconds)</span>
+        <Field label="AI generation window (seconds)">
           <div className="flex gap-2">
             <Input
               key={`ai_gen_window_seconds:${numOrEmpty(byKey.get("ai_gen_window_seconds"))}`}
@@ -208,10 +202,9 @@ function OperationalSettings({
               Save
             </Button>
           </div>
-        </label>
+        </Field>
 
-        <label className="space-y-1.5">
-          <span className="text-xs text-text-secondary">Mutation limit (per window)</span>
+        <Field label="Mutation limit (per window)">
           <div className="flex gap-2">
             <Input
               key={`mutation_limit:${numOrEmpty(byKey.get("mutation_limit"))}`}
@@ -227,10 +220,9 @@ function OperationalSettings({
               Save
             </Button>
           </div>
-        </label>
+        </Field>
 
-        <label className="space-y-1.5">
-          <span className="text-xs text-text-secondary">Mutation window (seconds)</span>
+        <Field label="Mutation window (seconds)">
           <div className="flex gap-2">
             <Input
               key={`mutation_window_seconds:${numOrEmpty(byKey.get("mutation_window_seconds"))}`}
@@ -246,11 +238,11 @@ function OperationalSettings({
               Save
             </Button>
           </div>
-        </label>
+        </Field>
       </div>
 
       {msg && <span className="text-xs text-error">{msg}</span>}
-    </div>
+    </Panel>
   );
 }
 
@@ -320,26 +312,24 @@ export default function FlagsPage() {
           <OperationalSettings flags={data.flags} resolvedAi={data.resolvedAi} reload={reload} />
         )}
 
-        <div className="space-y-3 rounded-lg border border-border bg-surface p-5">
+        <Panel className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-[200px_1fr]">
-            <label className="space-y-1.5">
-              <span className="text-xs text-text-secondary">Key</span>
+            <Field label="Key">
               <Input
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
                 placeholder="rate_limit.window_s"
               />
-            </label>
-            <label className="space-y-1.5">
-              <span className="text-xs text-text-secondary">Value (JSON)</span>
-              <textarea
+            </Field>
+            <Field label="Value (JSON)">
+              <Textarea
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 placeholder='e.g. 60 or {"model":"x"}'
                 rows={4}
-                className="w-full rounded-md border border-border bg-bg px-3 py-2 font-mono text-xs text-text-primary focus:border-gold-muted"
+                className="font-mono text-xs"
               />
-            </label>
+            </Field>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -351,7 +341,7 @@ export default function FlagsPage() {
             </Button>
             {msg && <span className="text-xs text-error">{msg}</span>}
           </div>
-        </div>
+        </Panel>
 
         {error && <StateNote tone="error">{error}</StateNote>}
         {loading && <StateNote>Loading…</StateNote>}

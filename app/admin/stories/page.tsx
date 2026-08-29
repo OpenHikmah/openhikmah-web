@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui";
+import { Button, Input } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
@@ -97,7 +97,7 @@ export default function AdminStoriesPage() {
                     {s.hidden ? (
                       <span className="text-xs text-text-secondary">{s.reason ?? "—"}</span>
                     ) : (
-                      <input
+                      <Input
                         type="text"
                         placeholder="Reason (optional)"
                         aria-label={`Flag reason for ${s.name}`}
@@ -105,7 +105,7 @@ export default function AdminStoriesPage() {
                         onChange={(e) =>
                           setReasonDraft((prev) => ({ ...prev, [s.slug]: e.target.value }))
                         }
-                        className="w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary placeholder:text-text-muted focus:border-gold-muted focus:outline-none"
+                        className="h-8 px-2 text-xs"
                       />
                     )}
                   </Td>
