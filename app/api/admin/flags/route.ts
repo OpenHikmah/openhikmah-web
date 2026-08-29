@@ -74,8 +74,9 @@ export async function PUT(req: NextRequest) {
   const value = JSON.stringify(body.value);
   // Feature-flag values are small config (a provider name, a model id, a number,
   // a short list). Anything in the kilobytes is a mistake or an attempt to use
-  // the table as a blob store — reject before it hits the DB.
-  if (value.length > 8192) {
+  // the table as a blob store — reject before it hits the DB. Measured in UTF-8
+  // bytes: `.length` is UTF-16 code units, so a multibyte value could slip past.
+  if (new TextEncoder().encode(value).byteLength > 8192) {
     return NextResponse.json({ error: "Flag value too large (max 8KB)" }, { status: 400 });
   }
 

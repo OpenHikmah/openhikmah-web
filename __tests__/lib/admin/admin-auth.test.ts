@@ -29,6 +29,7 @@ import {
   rateLimitAdminSelfHeal,
 } from "@/lib/admin/admin-auth";
 import { requireUser, type AuthedUser } from "@/lib/auth/social-auth";
+import { ADMIN_MUTATION_LIMIT, ADMIN_MUTATION_WINDOW_SECONDS } from "@/lib/infra/rate-limit";
 
 function makeUser(qfId: string): User {
   return {
@@ -118,9 +119,8 @@ describe("admin mutation rate limiting", () => {
     await rateLimitAdminMutation(auth);
     const [key, , limit, windowSeconds] = mockRateLimitOrNull.mock.calls[0];
     expect(key).toBe("admin-mutation:42");
-    expect(typeof limit).toBe("number");
-    expect(limit).toBeGreaterThanOrEqual(240);
-    expect(typeof windowSeconds).toBe("number");
+    expect(limit).toBe(ADMIN_MUTATION_LIMIT);
+    expect(windowSeconds).toBe(ADMIN_MUTATION_WINDOW_SECONDS);
   });
 
   it("self-heal writes are metered on a separate key from interactive mutations", async () => {

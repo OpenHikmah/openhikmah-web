@@ -88,31 +88,32 @@ describe("SessionRestorer", () => {
   });
 
   it("defers session-loaded until a saved dev token is applied (no 'denied' flash)", async () => {
-    try {
-      sessionStorage.setItem("__devToken", "dev-tok");
-    } catch {
-      /* jsdom */
-    }
+    sessionStorage.setItem("__devToken", "dev-tok");
+
+    let resolveProfile!: (v: unknown) => void;
+    const profilePending = new Promise((r) => {
+      resolveProfile = r;
+    });
     mockFetch.mockImplementation((url: string) => {
-      if (String(url).includes("/api/social/me")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ id: 1, username: "u" }),
-        });
-      }
+      if (String(url).includes("/api/social/me")) return profilePending;
       return Promise.resolve({ ok: false });
     });
 
     render(<SessionRestorer />);
 
+    // The dev restore is in flight (validating the token via /api/social/me).
+    // isSessionLoading must NOT flip to false yet, or /admin briefly renders its
+    // denied screen before the token lands.
+    await Promise.resolve();
+    expect(useAuthStore.getState().isSessionLoading).toBe(true);
+    expect(useAuthStore.getState().accessToken).toBeNull();
+
+    resolveProfile({ ok: true, json: async () => ({ id: 1, username: "u" }) });
+
     await waitFor(() => expect(useAuthStore.getState().accessToken).toBe("dev-tok"));
     await waitFor(() => expect(useAuthStore.getState().isSessionLoading).toBe(false));
 
-    try {
-      sessionStorage.removeItem("__devToken");
-    } catch {
-      /* jsdom */
-    }
+    sessionStorage.removeItem("__devToken");
   });
 
   it("skips the refresh call entirely when there's no qf_has_session marker cookie", async () => {
