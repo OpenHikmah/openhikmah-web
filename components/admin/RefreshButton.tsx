@@ -4,8 +4,6 @@ import { RotateCw } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
-/** Re-runs a page's `useAsync`/`usePaginated` loader. Sits in the
- *  `AdminPageHeader` actions slot. */
 export function RefreshButton({ onClick, loading }: { onClick: () => void; loading?: boolean }) {
   return (
     <Button variant="secondary" size="sm" onClick={onClick} disabled={loading}>

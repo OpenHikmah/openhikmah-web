@@ -10,7 +10,7 @@ vi.mock("@/lib/admin/admin-auth", () => ({
 vi.mock("@/lib/admin/admin-audit", () => ({ logAdminAction: vi.fn() }));
 vi.mock("@/lib/auth/social-auth", () => ({ broadcastUserCacheInvalidation: vi.fn() }));
 
-function makeDbChain(resolveWith: unknown = []) {
+function makeDbChain(resolveWith: unknown = [], calls?: Array<[string, unknown[]]>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
     function () {
@@ -21,7 +21,10 @@ function makeDbChain(resolveWith: unknown = []) {
         if (prop === "then")
           return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
             Promise.resolve(resolveWith).then(res, rej);
-        return () => chain;
+        return (...args: unknown[]) => {
+          calls?.push([String(prop), args]);
+          return chain;
+        };
       },
       apply() {
         return chain;
@@ -107,6 +110,13 @@ describe("GET /api/admin/users", () => {
     const body = await (await GET(get())).json();
     expect(body.users).toHaveLength(50);
     expect(body.hasMore).toBe(true);
+  });
+
+  it("passes the requested offset through to the query", async () => {
+    const calls: Array<[string, unknown[]]> = [];
+    mockSelect.mockReturnValue(makeDbChain([], calls));
+    await GET(get("offset=50"));
+    expect(calls).toContainEqual(["offset", [50]]);
   });
 });
 
