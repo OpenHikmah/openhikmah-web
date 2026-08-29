@@ -5,6 +5,7 @@ import { Button, Input, Textarea, NativeSelect } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, StateNote, ConfirmButton, Panel } from "@/components/admin/primitives";
 import { Field } from "@/components/admin/Field";
+import { Feedback } from "@/components/admin/Feedback";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { KNOWN_OPERATIONAL_FLAG_KEYS } from "@/lib/admin/feature-flag-keys";
@@ -241,7 +242,7 @@ function OperationalSettings({
         </Field>
       </div>
 
-      {msg && <span className="text-xs text-error">{msg}</span>}
+      {msg && <Feedback tone="error">{msg}</Feedback>}
     </Panel>
   );
 }
@@ -339,7 +340,7 @@ export default function FlagsPage() {
             >
               Save flag
             </Button>
-            {msg && <span className="text-xs text-error">{msg}</span>}
+            {msg && <Feedback tone="error">{msg}</Feedback>}
           </div>
         </Panel>
 
