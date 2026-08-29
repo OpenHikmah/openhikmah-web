@@ -1,18 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
-import { useAsync } from "@/components/admin/useAsync";
 import type { Locale } from "@/lib/i18n/config";
 import { SELECTABLE_MODELS } from "@/lib/ai/models";
 
 const TARGET_LOCALES: Exclude<Locale, "en">[] = ["tr", "ru", "az"];
-
-interface JobsResponse {
-  jobs: { id: string; status: string }[];
-}
 
 /**
  * The "Run the backfill job" console. Its inputs are deliberately kept in a
@@ -21,9 +16,11 @@ interface JobsResponse {
  * values an admin just typed (e.g. while retrying against an "already running"
  * job).
  *
- * The budget fields (max calls / max cost) have no default value on purpose —
- * an accidental "Run backfill" click must not be able to start a run that
- * spends money.
+ * This form does NOT track whether a job is running — starting a second run is
+ * rejected server-side with a visible "already running" message, and stopping a
+ * run lives on the Jobs page. The budget fields (max calls / max cost) have no
+ * default value on purpose: an accidental "Run backfill" click must not be able
+ * to start a run that spends money.
  */
 export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
   const api = useAdminFetch();
@@ -40,22 +37,6 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
   const [runNote, setRunNote] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
-  const [stopping, setStopping] = useState(false);
-
-  const { data: jobData, reload: reloadJobs } = useAsync<JobsResponse>(
-    () => api("/jobs"),
-    "backfill-job-status"
-  );
-  const backfillRunning =
-    jobData?.jobs.find((j) => j.id === "backfill-connections")?.status === "running";
-
-  // Poll while the backfill job is running so the Stop button appears/clears
-  // without a manual reload — mirrors JobRunner's poll.
-  useEffect(() => {
-    if (!backfillRunning) return;
-    const id = setInterval(() => reloadJobs({ keepDataOnError: true }), 4000);
-    return () => clearInterval(id);
-  }, [backfillRunning, reloadJobs]);
 
   const startRun = async () => {
     setRunNote(null);
@@ -81,30 +62,11 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
         },
       });
       setRunNote("Started. Watch progress on the Jobs page.");
-      reloadJobs();
       onStarted?.();
     } catch (e) {
       setRunError(e instanceof AdminApiError ? e.message : "Failed to start the backfill job.");
     } finally {
       setStarting(false);
-    }
-  };
-
-  const stopRun = async () => {
-    setRunNote(null);
-    setRunError(null);
-    setStopping(true);
-    try {
-      await api("/jobs", {
-        method: "POST",
-        json: { jobId: "backfill-connections", action: "stop" },
-      });
-      setRunNote("Stop requested. The job halts after the current verse.");
-      reloadJobs();
-    } catch (e) {
-      setRunError(e instanceof AdminApiError ? e.message : "Failed to stop the backfill job.");
-    } finally {
-      setStopping(false);
     }
   };
 
@@ -207,7 +169,12 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
       <p className="mt-2 text-[11px] text-text-muted">
         Max LLM calls and Max cost are both required — there is no default, so a stray click can
         never start a run. The job stops cleanly at whichever limit is hit first: max calls is
-        exact; max cost is a per-call estimate (token counts aren&apos;t tracked on this path).
+        exact; max cost is a per-call estimate (token counts aren&apos;t tracked on this path). Stop
+        a run in progress from the{" "}
+        <Link href="/admin/jobs" className="underline">
+          Jobs page
+        </Link>
+        .
       </p>
 
       {runError && <StateNote tone="error">{runError}</StateNote>}
@@ -220,25 +187,15 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
         </p>
       )}
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-3">
         <ConfirmButton
           variant="secondary"
-          disabled={starting || backfillRunning}
+          disabled={starting}
           onConfirm={startRun}
           confirmLabel={`Run ${mode} on ${provider}?`}
         >
           {starting ? "Starting…" : "Run backfill"}
         </ConfirmButton>
-        {backfillRunning && (
-          <ConfirmButton
-            variant="danger"
-            disabled={stopping}
-            onConfirm={stopRun}
-            confirmLabel="Stop the running backfill job?"
-          >
-            {stopping ? "Stopping…" : "Stop running job"}
-          </ConfirmButton>
-        )}
       </div>
     </section>
   );

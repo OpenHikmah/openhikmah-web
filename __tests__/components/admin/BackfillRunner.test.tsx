@@ -31,25 +31,20 @@ async function clickRun(confirmLabel: string) {
 describe("BackfillRunner", () => {
   beforeEach(() => {
     mockApi.mockReset();
-    // Default: the /jobs status poll reports nothing running.
-    mockApi.mockResolvedValue({ jobs: [] });
+    mockApi.mockResolvedValue({ runId: "run_1" });
   });
 
   it("blocks the run and posts nothing when the budget fields are blank", async () => {
     render(<BackfillRunner />);
-    await act(async () => {}); // flush the mount /jobs fetch
 
-    const postCallsBefore = mockApi.mock.calls.filter((c) => c[1]?.method === "POST").length;
     await clickRun("Run baseline on gemini?");
 
     expect(await screen.findByText(/Set Max LLM calls and Max cost/)).toBeInTheDocument();
-    const postCallsAfter = mockApi.mock.calls.filter((c) => c[1]?.method === "POST").length;
-    expect(postCallsAfter).toBe(postCallsBefore);
+    expect(mockApi).not.toHaveBeenCalled();
   });
 
   it("keeps the admin's typed inputs after an 'already running' error", async () => {
     render(<BackfillRunner />);
-    await act(async () => {});
 
     fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "topup" } });
     fillBudgets("50", "3");
@@ -63,6 +58,9 @@ describe("BackfillRunner", () => {
     await waitFor(() =>
       expect(screen.getByText('Job "backfill-connections" is already running')).toBeInTheDocument()
     );
+    // The Run button stays usable — a second attempt is allowed (and rejected
+    // server-side), not blocked client-side.
+    expect(screen.getByRole("button", { name: "Run backfill" })).not.toBeDisabled();
     expect((screen.getAllByRole("combobox")[0] as HTMLSelectElement).value).toBe("topup");
     const spin = screen.getAllByRole("spinbutton");
     expect((spin[spin.length - 2] as HTMLInputElement).value).toBe("50");
@@ -72,7 +70,6 @@ describe("BackfillRunner", () => {
   it("calls onStarted and shows the success note when the job starts", async () => {
     const onStarted = vi.fn();
     render(<BackfillRunner onStarted={onStarted} />);
-    await act(async () => {});
 
     fillBudgets("10", "2");
     mockApi.mockResolvedValueOnce({ runId: "run_1" });
@@ -93,27 +90,12 @@ describe("BackfillRunner", () => {
     );
   });
 
-  it("shows a Stop button when the backfill job is running and posts action:stop", async () => {
-    mockApi.mockResolvedValue({ jobs: [{ id: "backfill-connections", status: "running" }] });
+  it("never fetches job status — the form does not track a running job", async () => {
     render(<BackfillRunner />);
+    fillBudgets("10", "2");
+    await clickRun("Run baseline on gemini?");
 
-    const stop = await screen.findByRole("button", { name: "Stop running job" });
-    fireEvent.click(stop);
-    const confirm = await screen.findByRole("button", {
-      name: "Stop the running backfill job?",
-    });
-    await act(async () => {
-      fireEvent.click(confirm);
-    });
-
-    await waitFor(() =>
-      expect(mockApi).toHaveBeenCalledWith(
-        "/jobs",
-        expect.objectContaining({
-          method: "POST",
-          json: { jobId: "backfill-connections", action: "stop" },
-        })
-      )
-    );
+    // Only the POST to start — no GET /jobs poll.
+    expect(mockApi.mock.calls.every((c) => c[1]?.method === "POST")).toBe(true);
   });
 });
