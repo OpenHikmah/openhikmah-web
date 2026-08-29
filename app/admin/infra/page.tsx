@@ -10,8 +10,10 @@ import {
   Pill,
   StateNote,
   ConfirmButton,
+  Panel,
 } from "@/components/admin/primitives";
 import { InfoHint } from "@/components/admin/InfoHint";
+import { SectionHeading } from "@/components/admin/SectionHeading";
 import { Feedback } from "@/components/admin/Feedback";
 import { useActionMessage } from "@/components/admin/useActionMessage";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
@@ -111,8 +113,8 @@ export default function InfraPage() {
               </div>
             </div>
 
-            <section className="space-y-3 rounded-lg border border-border bg-surface p-5">
-              <h2 className="text-sm font-medium text-text-primary">Maintenance</h2>
+            <Panel className="space-y-3">
+              <SectionHeading title="Maintenance" />
               <div className="flex flex-wrap gap-2">
                 <ConfirmButton
                   variant="secondary"
@@ -140,10 +142,10 @@ export default function InfraPage() {
                 </ConfirmButton>
               </div>
               {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
-            </section>
+            </Panel>
 
             <section>
-              <h2 className="mb-2 text-sm font-medium text-text-primary">Process metrics</h2>
+              <SectionHeading title="Process metrics" />
               {Object.keys(data.metrics).length === 0 ? (
                 <StateNote>No counters recorded yet.</StateNote>
               ) : (

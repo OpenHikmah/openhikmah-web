@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { SkeletonRows } from "@/components/admin/Skeleton";
+import { formatTimestamp } from "@/lib/admin/format";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 
@@ -97,7 +98,7 @@ export function JobRunner() {
                   <Pill tone={statusTone(job.status)}>{job.status.replace("-", " ")}</Pill>
                 </Td>
                 <Td className="whitespace-nowrap text-xs text-text-muted">
-                  {job.startedAt ? new Date(job.startedAt).toLocaleString() : "—"}
+                  {job.startedAt ? formatTimestamp(job.startedAt) : "—"}
                 </Td>
                 <Td className="max-w-sm">
                   {job.id === "embed-corpus" && (

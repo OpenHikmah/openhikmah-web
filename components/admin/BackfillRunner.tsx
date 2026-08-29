@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Input, NativeSelect } from "@/components/ui";
 import { StateNote, ConfirmButton, Panel } from "@/components/admin/primitives";
 import { Field } from "@/components/admin/Field";
+import { SectionHeading } from "@/components/admin/SectionHeading";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import type { Locale } from "@/lib/i18n/config";
 import { SELECTABLE_MODELS } from "@/lib/ai/models";
@@ -73,7 +74,7 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
 
   return (
     <Panel>
-      <h3 className="text-sm font-semibold text-text-primary">Run the backfill job</h3>
+      <SectionHeading title="Run the backfill job" />
       <p className="mt-1 text-xs text-text-muted">
         Generates connections for verses that have none (baseline) or tops up the thinnest cells
         (top-up). Resumable — already-generated connections are never regenerated, and a cell with

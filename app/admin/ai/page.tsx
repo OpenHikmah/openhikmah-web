@@ -2,6 +2,7 @@
 
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { StatTile, Table, Th, Td, StateNote } from "@/components/admin/primitives";
+import { SectionHeading } from "@/components/admin/SectionHeading";
 import { SkeletonRows } from "@/components/admin/Skeleton";
 import { useAdminFetch } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
@@ -72,7 +73,7 @@ export default function AiPage() {
 
             <div className="grid gap-6 lg:grid-cols-2">
               <section>
-                <h2 className="mb-2 text-sm font-medium text-text-primary">By model</h2>
+                <SectionHeading title="By model" />
                 {data.byModel.length === 0 ? (
                   <StateNote>No generations yet.</StateNote>
                 ) : (
@@ -98,7 +99,7 @@ export default function AiPage() {
               </section>
 
               <section>
-                <h2 className="mb-2 text-sm font-medium text-text-primary">By kind</h2>
+                <SectionHeading title="By kind" />
                 {data.byKind.length === 0 ? (
                   <StateNote>No generations yet.</StateNote>
                 ) : (
@@ -125,7 +126,7 @@ export default function AiPage() {
             </div>
 
             <section>
-              <h2 className="mb-2 text-sm font-medium text-text-primary">Last 30 days</h2>
+              <SectionHeading title="Last 30 days" />
               {data.daily.length === 0 ? (
                 <StateNote>No activity in the last 30 days.</StateNote>
               ) : (
