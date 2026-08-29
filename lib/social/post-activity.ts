@@ -50,11 +50,16 @@ function enqueueDispatch(task: () => Promise<void>): Promise<void> {
   return run;
 }
 
-/** Deliver queued activities in FIFO order, stopping at the first failure. */
-async function drainQueue(accessToken: string): Promise<void> {
-  while (queue.length > 0) {
+/**
+ * Deliver queued activities in FIFO order, stopping at the first failure. `gen`
+ * is the caller's captured generation: if a sign-out bumps it mid-drain, this
+ * stops immediately without sending or shifting — the entries now in `queue`
+ * belong to a different session and must not go out under this token.
+ */
+async function drainQueue(accessToken: string, gen: number): Promise<void> {
+  while (queue.length > 0 && generation === gen) {
     const { result } = await sendWithRetry(accessToken, queue[0]);
-    if (!result) return;
+    if (generation !== gen || !result) return;
     queue.shift();
   }
 }
@@ -139,7 +144,7 @@ export async function postActivity(
     lastToken = accessToken;
     // Older queued events go first. If the backlog can't clear, this event joins
     // the tail rather than jumping ahead of it.
-    await drainQueue(accessToken);
+    await drainQueue(accessToken, gen);
     // A sign-out landed while this task was in flight — the token and any queued
     // events belong to a session that no longer exists; drop this one silently.
     if (generation !== gen) return;
@@ -165,9 +170,10 @@ export async function postActivity(
 
 /** Attempt to deliver every queued activity, FIFO, stopping at the first failure. */
 export async function flushQueue(accessToken: string): Promise<void> {
+  const gen = generation;
   await enqueueDispatch(async () => {
     lastToken = accessToken;
-    await drainQueue(accessToken);
+    await drainQueue(accessToken, gen);
   });
 }
 

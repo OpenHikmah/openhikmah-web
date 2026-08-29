@@ -180,4 +180,43 @@ describe("postActivity", () => {
     await expect(p).resolves.toBeNull();
     expect(pendingActivityCount()).toBe(0);
   });
+
+  it("a pre-reset drain that resolves later can't consume or send the new session's queued entry", async () => {
+    // Session A: leave one entry in the queue.
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(errStatus(503)));
+    const pa = postActivity("tok-a", { type: "verse_added", verseRef: "a:1" });
+    await vi.runAllTimersAsync();
+    await pa;
+    expect(pendingActivityCount()).toBe(1);
+
+    // Start a flush for A whose in-flight send hangs mid-drain.
+    let resolveHang: (v: unknown) => void = () => {};
+    const hang = new Promise((resolve) => {
+      resolveHang = resolve;
+    });
+    const fetchA = vi.fn().mockReturnValue(hang);
+    vi.stubGlobal("fetch", fetchA);
+    const flush = flushQueue("tok-a");
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Sign-out, then session B queues its own activity.
+    resetActivityQueue();
+    expect(pendingActivityCount()).toBe(0);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(errStatus(503)));
+    const pb = postActivity("tok-b", { type: "verse_added", verseRef: "b:1" });
+    await vi.runAllTimersAsync();
+    await pb;
+    expect(pendingActivityCount()).toBe(1);
+
+    // A's drain finally resolves — it must not touch B's entry.
+    resolveHang(okJson({ streak: 1, longestStreak: 1, activityDate: "2026-08-28" }));
+    await flush;
+    await vi.runAllTimersAsync();
+
+    expect(pendingActivityCount()).toBe(1);
+    const sentBUnderTokenA = fetchA.mock.calls.some(
+      (c) => JSON.parse(c[1].body).verse_ref === "b:1"
+    );
+    expect(sentBUnderTokenA).toBe(false);
+  });
 });
