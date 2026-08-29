@@ -56,6 +56,7 @@ const targetUser = {
   lastActiveAt: new Date("2026-01-02"),
   currentStreak: 3,
   longestStreak: 10,
+  timezoneOffsetMinutes: null,
   disabledAt: null,
 };
 

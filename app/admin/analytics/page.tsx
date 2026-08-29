@@ -34,7 +34,9 @@ export default function AnalyticsPage() {
       <AdminPageHeader
         title="Analytics"
         subtitle="Product usage: what people explore, search, and where search comes up empty."
-        actions={<RefreshButton onClick={reload} loading={loading} />}
+        actions={
+          <RefreshButton onClick={() => reload({ keepDataOnError: true })} loading={loading} />
+        }
       />
       <div className="space-y-6 p-7">
         {error && <StateNote tone="error">{error}</StateNote>}

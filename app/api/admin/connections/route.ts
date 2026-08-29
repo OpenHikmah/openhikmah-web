@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq, isNotNull, isNull, type SQL } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql, type SQL } from "drizzle-orm";
 import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
-import { connections } from "@/lib/infra/db/schema";
+import { connections, connectionCoverage } from "@/lib/infra/db/schema";
 import { parsePagination } from "@/lib/infra/http";
 
 const STATUSES = ["active", "flagged", "retired"] as const;
@@ -91,14 +91,52 @@ export async function PATCH(req: NextRequest) {
 
   try {
     if (status !== undefined) {
+      const [prior] = await db
+        .select({ status: connections.status })
+        .from(connections)
+        .where(eq(connections.id, id as number));
+
+      if (!prior) {
+        return NextResponse.json({ error: "Connection not found" }, { status: 404 });
+      }
+
       const [updated] = await db
         .update(connections)
         .set({ status, reviewedAt: new Date(), reviewedBy: auth.user.qfId })
         .where(eq(connections.id, id as number))
         .returning();
 
-      if (!updated) {
-        return NextResponse.json({ error: "Connection not found" }, { status: 404 });
+      // Keep the coverage cell's activeCount honest, and only move it on a real
+      // transition — re-submitting `retired` on an already-retired row, or
+      // flipping flagged↔retired, must not double-decrement. The cell keys on
+      // the English locale (see upsertCoverage, which only writes `en`).
+      const wasActive = prior.status === "active";
+      const nowActive = status === "active";
+      const coverageWhere = and(
+        eq(connectionCoverage.fromRef, updated.fromRef),
+        eq(connectionCoverage.kind, updated.kind),
+        eq(connectionCoverage.locale, "en")
+      );
+      if (wasActive && !nowActive) {
+        // Lost an active connection: un-strand the cell so the backfill job
+        // reconsiders this verse instead of skipping it forever.
+        await db
+          .update(connectionCoverage)
+          .set({
+            exhaustedAt: null,
+            activeCount: sql`GREATEST(${connectionCoverage.activeCount} - 1, 0)`,
+            updatedAt: new Date(),
+          })
+          .where(coverageWhere);
+      } else if (!wasActive && nowActive) {
+        await db
+          .update(connectionCoverage)
+          .set({
+            exhaustedAt: null,
+            activeCount: sql`${connectionCoverage.activeCount} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(coverageWhere);
       }
 
       await logAdminAction({

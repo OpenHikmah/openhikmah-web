@@ -90,6 +90,34 @@ describe("usePaginated", () => {
     expect(fetchPage).toHaveBeenLastCalledWith({ offset: 1 });
   });
 
+  it("ignores loadMore() while a reload's page 0 is still in flight", async () => {
+    let releasePageZero!: () => void;
+    let pageZeroCalls = 0;
+    const fetchPage = vi.fn(async ({ offset }: { offset: number }): Promise<Page<number>> => {
+      if (offset > 0) return { rows: [99], hasMore: false };
+      pageZeroCalls += 1;
+      if (pageZeroCalls === 2) {
+        await new Promise<void>((r) => {
+          releasePageZero = r;
+        });
+      }
+      return { rows: [pageZeroCalls], hasMore: true };
+    });
+    const { result } = renderHook(() => usePaginated(fetchPage, "k"));
+    await waitFor(() => expect(result.current.rows).toEqual([1]));
+
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current.loading).toBe(true));
+
+    // Button click lands mid-reload: the stale offset must not be fetched.
+    act(() => result.current.loadMore());
+    expect(fetchPage).not.toHaveBeenCalledWith({ offset: 1 });
+
+    act(() => releasePageZero());
+    await waitFor(() => expect(result.current.rows).toEqual([2]));
+    expect(fetchPage).not.toHaveBeenCalledWith({ offset: 1 });
+  });
+
   it("keeps rows on a failed loadMore and flags loadMoreError", async () => {
     const fetchPage = vi.fn(async ({ offset }: { offset: number }): Promise<Page<number>> => {
       if (offset === 0) return { rows: [1, 2], hasMore: true };

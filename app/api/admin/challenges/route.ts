@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
-import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
+import { requireAdmin, rateLimitAdminSelfHeal } from "@/lib/admin/admin-auth";
 import { db } from "@/lib/infra/db";
 import { challenges, users } from "@/lib/infra/db/schema";
 import { parsePagination } from "@/lib/infra/http";
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
     // as a side effect. Only throttle when there's actually something to
     // heal, so plain reads (the common case) stay unaffected.
     if (ended.length > 0 || expiredPending.length > 0) {
-      const limited = await rateLimitAdminMutation(auth);
+      const limited = await rateLimitAdminSelfHeal(auth);
       if (limited) return limited;
     }
 
@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
     // internal default) and rate-limit this write too if we haven't already.
     const staleActive = rows.filter((c) => c.status === "active" && c.endsAt < now);
     if (staleActive.length > 0 && ended.length === 0 && expiredPending.length === 0) {
-      const limited = await rateLimitAdminMutation(auth);
+      const limited = await rateLimitAdminSelfHeal(auth);
       if (limited) return limited;
     }
     const resolved = await resolveEndedChallenges(rows, now);

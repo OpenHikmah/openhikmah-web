@@ -30,6 +30,12 @@ export const users = pgTable(
     currentStreak: integer("current_streak").notNull().default(0),
     longestStreak: integer("longest_streak").notNull().default(0),
     lastActivityDate: date("last_activity_date"),
+    // Minutes east of UTC for the user's timezone (UTC+3 → 180), refreshed on
+    // each activity POST. Streaks bucket by the user's local calendar day, and
+    // reads (GET /me, leaderboard) that have no client offset decay against this
+    // stored value. Null for rows written before the offset was ever recorded —
+    // readers fall back to UTC.
+    timezoneOffsetMinutes: integer("timezone_offset_minutes"),
     // Soft-disable seam for admin moderation. Null = active; a timestamp marks
     // when an admin disabled the account. Disabled users keep their data but are
     // rejected at the auth boundary (see requireUser / lib/admin-auth.ts).

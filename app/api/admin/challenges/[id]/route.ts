@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
 import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
+import type { AuthedUser } from "@/lib/auth/social-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { challenges } from "@/lib/infra/db/schema";
@@ -30,15 +31,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  const [challenge] = await db
-    .select()
-    .from(challenges)
-    .where(eq(challenges.id, challengeId))
-    .limit(1);
-  if (!challenge) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  try {
+    const [challenge] = await db
+      .select()
+      .from(challenges)
+      .where(eq(challenges.id, challengeId))
+      .limit(1);
+    if (!challenge) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
 
+    return await patchChallenge(auth, challengeId, challenge, body);
+  } catch (err) {
+    console.error(`admin challenges PATCH (${challengeId}) error:`, err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+async function patchChallenge(
+  auth: AuthedUser,
+  challengeId: number,
+  challenge: typeof challenges.$inferSelect,
+  body: { action?: string; winnerId?: number | null }
+): Promise<NextResponse> {
   if (body.action === "end") {
     if (challenge.status !== "active") {
       return NextResponse.json({ error: "Only active challenges can be ended" }, { status: 409 });
@@ -147,15 +162,20 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const [deleted] = await db.delete(challenges).where(eq(challenges.id, challengeId)).returning();
-  if (!deleted) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  try {
+    const [deleted] = await db.delete(challenges).where(eq(challenges.id, challengeId)).returning();
+    if (!deleted) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    await logAdminAction({
+      adminQfId: auth.user.qfId,
+      action: "challenge.void",
+      targetType: "challenge",
+      targetId: String(challengeId),
+    });
+    return new NextResponse(null, { status: 204 });
+  } catch (err) {
+    console.error(`admin challenges DELETE (${challengeId}) error:`, err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-  await logAdminAction({
-    adminQfId: auth.user.qfId,
-    action: "challenge.void",
-    targetType: "challenge",
-    targetId: String(challengeId),
-  });
-  return new NextResponse(null, { status: 204 });
 }

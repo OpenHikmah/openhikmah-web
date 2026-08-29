@@ -3,7 +3,13 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { activityLog, users } from "@/lib/infra/db/schema";
 import { requireUser, invalidateTokenCache } from "@/lib/auth/social-auth";
-import { todayUTC, yesterdayUTC, effectiveStreak } from "@/lib/social/streak";
+import {
+  todayUTC,
+  yesterdayUTC,
+  previousDay,
+  effectiveStreak,
+  localDateFromOffset,
+} from "@/lib/social/streak";
 import { rateLimitOrNull, MUTATION_WINDOW_SECONDS } from "@/lib/infra/rate-limit";
 
 // Activity pings fire on ordinary reading (each verse/connection), so a genuinely
@@ -12,6 +18,43 @@ import { rateLimitOrNull, MUTATION_WINDOW_SECONDS } from "@/lib/infra/rate-limit
 const ACTIVITY_LIMIT = 300;
 
 const VALID_TYPES = new Set(["verse_added", "connection_made", "hadith_read"]);
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Widest real UTC offset is ±14h; allow a little slack for a client clock that's
+// a bit off without letting a wildly-wrong clock fabricate consecutive days.
+const MAX_TZ_OFFSET_MIN = 840;
+
+/**
+ * The day to credit this activity to. Prefer the client's local calendar day so
+ * streaks bucket by the user's midnight, not UTC — but clamp to the server's UTC
+ * date if the client's date is more than ~26h away (a broken clock), so it can't
+ * jump the streak forward or drop a day.
+ */
+function resolveActivityDate(localDate: string | undefined, offsetMinutes: number | null): string {
+  const utc = todayUTC();
+  if (!localDate || !DATE_RE.test(localDate)) return utc;
+
+  // Reject a well-formed but non-existent calendar date ("2026-99-99",
+  // "2026-02-30"): Date.parse gives NaN or silently rolls over, and the raw
+  // string would otherwise hit the Postgres `date` column as a 500.
+  const parsedMs = Date.parse(`${localDate}T00:00:00Z`);
+  if (!Number.isFinite(parsedMs) || new Date(parsedMs).toISOString().slice(0, 10) !== localDate) {
+    return utc;
+  }
+
+  // When the client sent its offset too, the offset is authoritative: the day it
+  // yields right now is the only day we credit, so a signed-in client can't
+  // pre-credit tomorrow (or any other day) by sending a mismatched local_date.
+  if (offsetMinutes !== null) {
+    const reference = localDateFromOffset(offsetMinutes);
+    return localDate === reference ? localDate : reference;
+  }
+
+  // No offset — fall back to UTC with ~26h of clock slack so a slightly-off
+  // client clock near midnight still buckets to its own day.
+  const diffDays = Math.abs((parsedMs - Date.parse(`${utc}T00:00:00Z`)) / 86_400_000);
+  return diffDays > 1 ? utc : localDate;
+}
 
 export async function POST(req: NextRequest) {
   const authed = await requireUser(req);
@@ -25,7 +68,12 @@ export async function POST(req: NextRequest) {
   );
   if (limited) return limited;
 
-  let body: { type?: string; verse_ref?: string };
+  let body: {
+    type?: string;
+    verse_ref?: string;
+    local_date?: string;
+    tz_offset_minutes?: number;
+  };
   try {
     body = await req.json();
   } catch {
@@ -35,6 +83,18 @@ export async function POST(req: NextRequest) {
   if (!body.type || !VALID_TYPES.has(body.type)) {
     return NextResponse.json({ error: "Invalid activity type" }, { status: 400 });
   }
+
+  let tzOffsetMinutes: number | null = null;
+  if (body.tz_offset_minutes !== undefined) {
+    if (
+      !Number.isInteger(body.tz_offset_minutes) ||
+      Math.abs(body.tz_offset_minutes) > MAX_TZ_OFFSET_MIN
+    ) {
+      return NextResponse.json({ error: "Invalid timezone offset" }, { status: 400 });
+    }
+    tzOffsetMinutes = body.tz_offset_minutes;
+  }
+
   // Narrow into locals: `body.type`'s non-undefined narrowing above doesn't
   // survive into the transaction closure below (TS can't prove `body` is
   // unmutated by the time the closure runs).
@@ -42,8 +102,8 @@ export async function POST(req: NextRequest) {
   const verseRef = body.verse_ref ?? null;
 
   const { userId } = authed;
-  const today = todayUTC();
-  const yesterday = yesterdayUTC();
+  const today = resolveActivityDate(body.local_date, tzOffsetMinutes);
+  const yesterday = today === todayUTC() ? yesterdayUTC() : previousDay(today);
 
   try {
     // Insert + streak read/compute/write run in one transaction: the activity
@@ -68,9 +128,19 @@ export async function POST(req: NextRequest) {
       let newStreak = freshUser.currentStreak;
       let newLongest = freshUser.longestStreak;
       let isNewDay = false;
+      let didWrite = false;
 
       if (lastDate === today) {
-        // Already counted today — no streak change
+        // Already counted today — no streak change. Still refresh the stored
+        // offset so later offset-only reads (GET /me, leaderboard) decay against
+        // the user's current timezone.
+        if (tzOffsetMinutes !== null && tzOffsetMinutes !== freshUser.timezoneOffsetMinutes) {
+          await tx
+            .update(users)
+            .set({ timezoneOffsetMinutes: tzOffsetMinutes })
+            .where(eq(users.id, userId));
+          didWrite = true;
+        }
       } else {
         isNewDay = true;
         if (lastDate === yesterday) {
@@ -89,15 +159,18 @@ export async function POST(req: NextRequest) {
             longestStreak: newLongest,
             lastActivityDate: today,
             lastActiveAt: sql`now()`,
+            ...(tzOffsetMinutes !== null ? { timezoneOffsetMinutes: tzOffsetMinutes } : {}),
           })
           .where(eq(users.id, userId));
+        didWrite = true;
       }
 
-      return { newStreak, newLongest, isNewDay, lastDate };
+      return { newStreak, newLongest, isNewDay, lastDate, didWrite };
     });
 
-    if (result.isNewDay) {
-      // Invalidate cache so next request re-reads fresh streak from DB. Kept
+    if (result.didWrite) {
+      // Invalidate cache so next request re-reads the fresh streak/offset from
+      // DB. Kept
       // outside the transaction — it's a best-effort cache flush, not part of
       // the consistency boundary.
       const rawAuth = req.headers.get("authorization");
@@ -110,6 +183,7 @@ export async function POST(req: NextRequest) {
       longestStreak: result.newLongest,
       isNewDay: result.isNewDay,
       streakBroken: result.isNewDay && result.lastDate !== null && result.lastDate !== yesterday,
+      activityDate: today,
     });
   } catch (err) {
     console.error("social/activity POST db error:", err);
@@ -124,7 +198,7 @@ export async function GET(req: NextRequest) {
 
   const { user } = authed;
   return NextResponse.json({
-    streak: effectiveStreak(user.currentStreak, user.lastActivityDate),
+    streak: effectiveStreak(user.currentStreak, user.lastActivityDate, user.timezoneOffsetMinutes),
     longestStreak: user.longestStreak,
     lastActivityDate: user.lastActivityDate,
   });

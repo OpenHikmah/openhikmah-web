@@ -156,6 +156,28 @@ describe("PUT /api/admin/flags", () => {
     expect(res.status).toBe(200);
   });
 
+  it("rejects a value larger than 8KB", async () => {
+    const insertCallsBefore = mockInsert.mock.calls.length;
+    const res = await PUT(put({ key: "big-flag", value: "x".repeat(9000) }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/too large/i);
+    expect(mockInsert.mock.calls.length).toBe(insertCallsBefore);
+  });
+
+  it("accepts a value just under the 8KB limit", async () => {
+    const res = await PUT(put({ key: "big-flag", value: "x".repeat(8000) }));
+    expect(res.status).toBe(200);
+  });
+
+  it("measures the limit in UTF-8 bytes, not UTF-16 code units", async () => {
+    const insertCallsBefore = mockInsert.mock.calls.length;
+    // 3000 three-byte chars = 9000 bytes but only 3000 `.length` units.
+    const res = await PUT(put({ key: "big-flag", value: "€".repeat(3000) }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/too large/i);
+    expect(mockInsert.mock.calls.length).toBe(insertCallsBefore);
+  });
+
   it("rejects a type mismatch for a known operational-setting key", async () => {
     const insertCallsBefore = mockInsert.mock.calls.length;
     const res = await PUT(put({ key: "ai_gen_limit", value: "not-a-number" }));

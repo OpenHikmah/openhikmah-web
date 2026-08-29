@@ -90,7 +90,10 @@ export function usePaginated<Row, Extra = undefined>(
   const reload = useCallback(() => setTick((t) => t + 1), []);
 
   const loadMore = useCallback(() => {
-    if (loadingMore) return;
+    // Don't append while page 0 is (re)loading — `reload()` keeps `rows`/`hasMore`
+    // but the offset is about to be reset, so a mid-flight append would splice a
+    // later page onto a list page 0 is replacing. Also stop once exhausted.
+    if (loadingMore || loading || !hasMore) return;
     const gen = generation.current;
     setLoadingMore(true);
     setLoadMoreError(false);
@@ -107,7 +110,7 @@ export function usePaginated<Row, Extra = undefined>(
       .finally(() => {
         if (gen === generation.current) setLoadingMore(false);
       });
-  }, [loadingMore, rows.length]);
+  }, [loadingMore, loading, hasMore, rows.length]);
 
   return {
     rows,

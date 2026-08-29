@@ -193,20 +193,27 @@ describe("VotdPage — today's live pick on the calendar", () => {
 });
 
 describe("VotdPage — calendar keyboard navigation", () => {
+  // Pin the clock to a mid-month date so the navigation math never wraps a month
+  // boundary — otherwise these tests silently self-skip near month end.
+  const FIXED = new Date("2026-06-17T12:00:00Z");
+  const todayDay = FIXED.getUTCDate();
+  const weekday = FIXED.getUTCDay();
+
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(FIXED);
     mockApi.mockReset();
     mockApi.mockResolvedValue({ entries: [], today: null });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   const cell = (day: number) =>
     screen.getByText(String(day), { selector: "span.tabular-nums" }).closest("button")!;
   // aria-selected lives on the gridcell wrapping the day button (APG grid pattern).
   const gridcell = (day: number) => cell(day).closest('[role="gridcell"]')!;
-
-  const todayDay = new Date().getUTCDate();
-  const daysThisMonth = new Date(
-    Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 0)
-  ).getUTCDate();
 
   it("labels each day and makes today's cell the tab-reachable one (roving tabindex)", async () => {
     render(<VotdPage />);
@@ -218,7 +225,6 @@ describe("VotdPage — calendar keyboard navigation", () => {
   });
 
   it("ArrowRight moves the selection one day and ArrowDown moves a week", async () => {
-    if (todayDay + 8 > daysThisMonth) return; // avoid month-boundary wrap in this test
     render(<VotdPage />);
     await screen.findByText("1", { selector: "span.tabular-nums" });
 
@@ -231,9 +237,6 @@ describe("VotdPage — calendar keyboard navigation", () => {
   });
 
   it("Home and End move to the bounds of the active week", async () => {
-    const weekday = new Date().getUTCDay();
-    // Stay within the month so `cell()` can find the target.
-    if (todayDay - weekday < 1 || todayDay + (6 - weekday) > daysThisMonth) return;
     render(<VotdPage />);
     await screen.findByText("1", { selector: "span.tabular-nums" });
     const grid = screen.getByRole("grid");
@@ -249,7 +252,7 @@ describe("VotdPage — calendar keyboard navigation", () => {
     render(<VotdPage />);
     await screen.findByText("1", { selector: "span.tabular-nums" });
 
-    const monthNow = new Date().toLocaleString("en", {
+    const monthNow = FIXED.toLocaleString("en", {
       month: "long",
       year: "numeric",
       timeZone: "UTC",
@@ -260,7 +263,7 @@ describe("VotdPage — calendar keyboard navigation", () => {
     await waitFor(() =>
       expect(screen.getByRole("heading", { level: 2 }).textContent).not.toBe(monthNow)
     );
-    const nextMonth = addMonthStr(new Date().toISOString().slice(0, 7), 1);
+    const nextMonth = addMonthStr(FIXED.toISOString().slice(0, 7), 1);
     const nextMonthDays = new Date(
       Date.UTC(Number(nextMonth.slice(0, 4)), Number(nextMonth.slice(5, 7)), 0)
     ).getUTCDate();

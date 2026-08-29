@@ -61,7 +61,9 @@ export default function InfraPage() {
       <AdminPageHeader
         title="Infra"
         subtitle="Process health, caches, and maintenance actions."
-        actions={<RefreshButton onClick={reload} loading={loading} />}
+        actions={
+          <RefreshButton onClick={() => reload({ keepDataOnError: true })} loading={loading} />
+        }
       />
       <div className="space-y-6 p-7">
         {error && <StateNote tone="error">{error}</StateNote>}

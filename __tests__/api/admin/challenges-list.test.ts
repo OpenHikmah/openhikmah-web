@@ -2,12 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import type { User } from "@/lib/infra/db/schema";
 
-const { mockRateLimitAdminMutation } = vi.hoisted(() => ({
-  mockRateLimitAdminMutation: vi.fn<() => Promise<NextResponse | null>>(async () => null),
+const { mockRateLimitAdminSelfHeal } = vi.hoisted(() => ({
+  mockRateLimitAdminSelfHeal: vi.fn<() => Promise<NextResponse | null>>(async () => null),
 }));
 vi.mock("@/lib/admin/admin-auth", () => ({
   requireAdmin: vi.fn(),
-  rateLimitAdminMutation: mockRateLimitAdminMutation,
+  rateLimitAdminSelfHeal: mockRateLimitAdminSelfHeal,
 }));
 
 const { mockResolveEndedChallenges, mockResolveExpiredPending } = vi.hoisted(() => ({
@@ -85,7 +85,7 @@ function queueSelects(
 
 beforeEach(() => {
   vi.mocked(requireAdmin).mockResolvedValue(admin);
-  mockRateLimitAdminMutation.mockReset().mockResolvedValue(null);
+  mockRateLimitAdminSelfHeal.mockReset().mockResolvedValue(null);
   mockSelect.mockReset();
   mockResolveEndedChallenges.mockClear();
   mockResolveExpiredPending.mockClear();
@@ -96,26 +96,26 @@ describe("GET /api/admin/challenges", () => {
     queueSelects([], []);
     const res = await GET(req());
     expect(res.status).toBe(200);
-    expect(mockRateLimitAdminMutation).not.toHaveBeenCalled();
+    expect(mockRateLimitAdminSelfHeal).not.toHaveBeenCalled();
   });
 
   it("rate-limits when there are ended challenges to self-heal", async () => {
     queueSelects([{ id: 1, status: "active" }], []);
     const res = await GET(req());
     expect(res.status).toBe(200);
-    expect(mockRateLimitAdminMutation).toHaveBeenCalledWith(admin);
+    expect(mockRateLimitAdminSelfHeal).toHaveBeenCalledWith(admin);
   });
 
   it("rate-limits when there are expired pending invites to self-heal", async () => {
     queueSelects([], [{ id: 2, status: "pending" }]);
     const res = await GET(req());
     expect(res.status).toBe(200);
-    expect(mockRateLimitAdminMutation).toHaveBeenCalledWith(admin);
+    expect(mockRateLimitAdminSelfHeal).toHaveBeenCalledWith(admin);
   });
 
   it("returns the rate-limit response and skips self-heal writes when throttled", async () => {
     queueSelects([{ id: 1, status: "active" }], []);
-    mockRateLimitAdminMutation.mockResolvedValue(
+    mockRateLimitAdminSelfHeal.mockResolvedValue(
       NextResponse.json({ error: "Too many admin actions — try again later" }, { status: 429 })
     );
     const res = await GET(req());
@@ -131,7 +131,7 @@ describe("GET /api/admin/challenges", () => {
     queueSelects([], [], [overdue]);
     const res = await GET(req());
     expect(res.status).toBe(200);
-    expect(mockRateLimitAdminMutation).toHaveBeenCalledWith(admin);
+    expect(mockRateLimitAdminSelfHeal).toHaveBeenCalledWith(admin);
   });
 
   it("does not double rate-limit when the earlier gate already checked", async () => {
@@ -139,7 +139,7 @@ describe("GET /api/admin/challenges", () => {
     queueSelects([{ id: 1, status: "active" }], [], [overdue]);
     const res = await GET(req());
     expect(res.status).toBe(200);
-    expect(mockRateLimitAdminMutation).toHaveBeenCalledTimes(1);
+    expect(mockRateLimitAdminSelfHeal).toHaveBeenCalledTimes(1);
   });
 
   it("caps the list page and reports hasMore when an extra row is returned", async () => {
