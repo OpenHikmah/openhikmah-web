@@ -38,13 +38,12 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
   const [runError, setRunError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
 
+  const budgetsInvalid = maxCalls === "" || maxCostUsd === "" || maxCalls <= 0 || maxCostUsd <= 0;
+
   const startRun = async () => {
     setRunNote(null);
     setRunError(null);
-    if (maxCalls === "" || maxCostUsd === "" || maxCalls <= 0 || maxCostUsd <= 0) {
-      setRunError("Set Max LLM calls and Max cost before running.");
-      return;
-    }
+    if (budgetsInvalid) return;
     setStarting(true);
     try {
       await api("/jobs", {
@@ -187,10 +186,16 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
         </p>
       )}
 
+      {budgetsInvalid && (
+        <p className="mt-2 text-[11px] text-text-muted">
+          Enter Max LLM calls and Max cost to enable the run.
+        </p>
+      )}
+
       <div className="mt-3">
         <ConfirmButton
           variant="secondary"
-          disabled={starting}
+          disabled={starting || budgetsInvalid}
           onConfirm={startRun}
           confirmLabel={`Run ${mode} on ${provider}?`}
         >
