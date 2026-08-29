@@ -58,7 +58,10 @@ describe("BackfillRunner", () => {
     expect(screen.getByText(/Watch progress on the Jobs page/)).toBeInTheDocument();
     expect(mockApi).toHaveBeenCalledWith(
       "/jobs",
-      expect.objectContaining({ method: "POST", json: expect.objectContaining({ jobId: "backfill-connections" }) })
+      expect.objectContaining({
+        method: "POST",
+        json: expect.objectContaining({ jobId: "backfill-connections" }),
+      })
     );
   });
 });

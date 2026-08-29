@@ -65,8 +65,8 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
       <h3 className="text-sm font-semibold text-text-primary">Run the backfill job</h3>
       <p className="mt-1 text-xs text-text-muted">
         Generates connections for verses that have none (baseline) or tops up the thinnest cells
-        (top-up). Resumable — already-generated connections are never regenerated, and a cell with no
-        more real connections is marked exhausted so it is never re-run.
+        (top-up). Resumable — already-generated connections are never regenerated, and a cell with
+        no more real connections is marked exhausted so it is never re-run.
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
