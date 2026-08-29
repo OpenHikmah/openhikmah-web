@@ -164,4 +164,20 @@ describe("postActivity", () => {
     await flushQueue("tok-b");
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("a reset while a POST is in flight discards its result and doesn't re-queue it", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    const inFlight = new Promise((resolve) => {
+      resolveFetch = resolve;
+    });
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(inFlight));
+
+    const p = postActivity("tok-a", { type: "verse_added", verseRef: "1:1" });
+
+    resetActivityQueue();
+    resolveFetch(okJson({ streak: 7, longestStreak: 7, activityDate: "2026-08-28" }));
+
+    await expect(p).resolves.toBeNull();
+    expect(pendingActivityCount()).toBe(0);
+  });
 });

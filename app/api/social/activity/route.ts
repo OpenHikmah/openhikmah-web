@@ -42,12 +42,18 @@ function resolveActivityDate(localDate: string | undefined, offsetMinutes: numbe
     return utc;
   }
 
-  // When the client sent its offset too, trust the offset: the reported local
-  // day has to be the one that offset actually yields now (± a day of clock
-  // slack), so a signed-in client can't pre-credit an arbitrary tomorrow.
-  const reference = offsetMinutes !== null ? localDateFromOffset(offsetMinutes) : utc;
-  const diffDays = Math.abs((parsedMs - Date.parse(`${reference}T00:00:00Z`)) / 86_400_000);
-  return diffDays > 1 ? reference : localDate;
+  // When the client sent its offset too, the offset is authoritative: the day it
+  // yields right now is the only day we credit, so a signed-in client can't
+  // pre-credit tomorrow (or any other day) by sending a mismatched local_date.
+  if (offsetMinutes !== null) {
+    const reference = localDateFromOffset(offsetMinutes);
+    return localDate === reference ? localDate : reference;
+  }
+
+  // No offset — fall back to UTC with ~26h of clock slack so a slightly-off
+  // client clock near midnight still buckets to its own day.
+  const diffDays = Math.abs((parsedMs - Date.parse(`${utc}T00:00:00Z`)) / 86_400_000);
+  return diffDays > 1 ? utc : localDate;
 }
 
 export async function POST(req: NextRequest) {

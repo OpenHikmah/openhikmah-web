@@ -30,6 +30,13 @@ const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const queue: QueuedActivity[] = [];
 let lastToken: string | null = null;
 
+// Bumped by resetActivityQueue (sign-out). A dispatch task that was already
+// in flight when the reset happened captures the pre-reset value and checks it
+// before mutating the queue or returning its result, so a stale event from the
+// previous account can't be re-queued and a stale streak result can't be
+// applied under the new session.
+let generation = 0;
+
 // Every send — a fresh event or a queue flush — runs through this one chain, so
 // there is never a concurrent drain (which could submit the same queue head
 // twice) and a new event never overtakes an older queued one (which would let
@@ -125,6 +132,7 @@ export async function postActivity(
   input: ActivityInput
 ): Promise<ActivityResult | null> {
   const queued: QueuedActivity = { ...input, localDate: clientLocalDate() };
+  const gen = generation;
   let outcome: ActivityResult | null = null;
 
   await enqueueDispatch(async () => {
@@ -132,12 +140,16 @@ export async function postActivity(
     // Older queued events go first. If the backlog can't clear, this event joins
     // the tail rather than jumping ahead of it.
     await drainQueue(accessToken);
+    // A sign-out landed while this task was in flight — the token and any queued
+    // events belong to a session that no longer exists; drop this one silently.
+    if (generation !== gen) return;
     if (queue.length > 0) {
       queue.push(queued);
       return;
     }
 
     const { result, exhausted } = await sendWithRetry(accessToken, queued);
+    if (generation !== gen) return;
     if (result) {
       outcome = result;
       return;
@@ -172,6 +184,7 @@ export function resetActivityQueue(): void {
   queue.length = 0;
   lastToken = null;
   dispatch = Promise.resolve();
+  generation++;
 }
 
 if (typeof document !== "undefined") {

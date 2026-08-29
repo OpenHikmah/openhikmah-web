@@ -328,6 +328,23 @@ describe("POST /api/social/activity", () => {
     }
   });
 
+  it("credits the offset-derived day when local_date is one day ahead of it", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T12:00:00Z"));
+    try {
+      authedAs(makeUser({ currentStreak: 2, lastActivityDate: "2026-08-27" }));
+      // UTC+0 => local day is the 28th; a client claiming the 29th can't
+      // pre-credit tomorrow even by a single day.
+      const res = await POST(
+        makeReq({ type: "verse_added", local_date: "2026-08-29", tz_offset_minutes: 0 })
+      );
+      const body = await res.json();
+      expect(body.activityDate).toBe("2026-08-28");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("persists the client's timezone offset on the user row", async () => {
     authedAs(makeUser({ currentStreak: 1, lastActivityDate: yesterdayStr() }));
     let captured: Record<string, unknown> | undefined;
