@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button, Input } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
+import { SkeletonRows } from "@/components/admin/Skeleton";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 
@@ -67,9 +68,10 @@ export default function AdminStoriesPage() {
       <div className="space-y-4 p-7">
         {error && <StateNote tone="error">{error}</StateNote>}
         {actionError && <StateNote tone="error">{actionError}</StateNote>}
-        {loading && <StateNote>Loading…</StateNote>}
+        {loading && <SkeletonRows />}
+        {data && data.stories.length === 0 && <StateNote>No stories found.</StateNote>}
 
-        {data && (
+        {data && data.stories.length > 0 && (
           <Table>
             <thead>
               <tr>

@@ -1,10 +1,10 @@
 "use client";
 
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { Table, Th, Td, StateNote } from "@/components/admin/primitives";
+import { Table, Th, Td, StateNote, LoadMore } from "@/components/admin/primitives";
+import { SkeletonRows } from "@/components/admin/Skeleton";
 import { useAdminFetch } from "@/components/admin/AdminContext";
 import { usePaginated } from "@/components/admin/usePaginated";
-import { Button } from "@/components/ui";
 
 interface Entry {
   id: number;
@@ -31,7 +31,7 @@ export default function AuditPage() {
       <AdminPageHeader title="Audit Log" subtitle="Every mutating admin action, newest first." />
       <div className="space-y-4 p-7">
         {error && <StateNote tone="error">{error}</StateNote>}
-        {loading && <StateNote>Loading…</StateNote>}
+        {loading && <SkeletonRows />}
         {!loading && !error && rows.length === 0 && (
           <StateNote>No admin actions recorded yet.</StateNote>
         )}
@@ -67,14 +67,12 @@ export default function AuditPage() {
           </Table>
         )}
 
-        {hasMore && (
-          <div className="flex flex-col items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={loadMore} disabled={loadingMore}>
-              {loadingMore ? "Loading…" : "Load more"}
-            </Button>
-            {loadMoreError && <StateNote tone="error">Couldn&apos;t load more entries.</StateNote>}
-          </div>
-        )}
+        <LoadMore
+          hasMore={hasMore}
+          loading={loadingMore}
+          error={loadMoreError}
+          onClick={loadMore}
+        />
       </div>
     </>
   );

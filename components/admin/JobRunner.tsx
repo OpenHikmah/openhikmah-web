@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
+import { SkeletonRows } from "@/components/admin/Skeleton";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 
@@ -75,7 +76,7 @@ export function JobRunner() {
     <div className="space-y-4">
       {error && <StateNote tone="error">{error}</StateNote>}
       {actionError && <StateNote tone="error">{actionError}</StateNote>}
-      {loading && <StateNote>Loading…</StateNote>}
+      {loading && !data && <SkeletonRows n={3} />}
 
       {data && (
         <Table>

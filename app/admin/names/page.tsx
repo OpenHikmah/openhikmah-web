@@ -12,6 +12,7 @@ import {
   ConfirmButton,
   LoadMore,
 } from "@/components/admin/primitives";
+import { SkeletonRows } from "@/components/admin/Skeleton";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { usePaginated } from "@/components/admin/usePaginated";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
@@ -92,7 +93,7 @@ export default function NamesPage() {
       <div className="space-y-4 p-7">
         {error && <StateNote tone="error">{error}</StateNote>}
         {msg && <StateNote tone="error">{msg}</StateNote>}
-        {loading && <StateNote>Loading…</StateNote>}
+        {loading && <SkeletonRows />}
         {!loading && !error && rows.length === 0 && (
           <StateNote>No cached name content yet.</StateNote>
         )}
