@@ -60,6 +60,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     currentStreak: 5,
     longestStreak: 10,
     lastActivityDate: null,
+    timezoneOffsetMinutes: null,
     disabledAt: null,
     ...overrides,
   };
@@ -147,6 +148,43 @@ describe("GET /api/social/leaderboard", () => {
       longestStreak: 12,
       isYou: true,
     });
+  });
+
+  it("keeps a friend's streak alive using their stored timezone offset", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-29T01:00:00Z"));
+    try {
+      authedAs(makeUser({ id: 1 }));
+      mockSelect
+        .mockReturnValueOnce(makeDbChain([{ requesterId: 1, addresseeId: 2 }]))
+        .mockReturnValueOnce(
+          makeDbChain([
+            {
+              id: 2,
+              username: "westcoast",
+              displayName: null,
+              currentStreak: 8,
+              longestStreak: 8,
+              lastActivityDate: "2026-08-27",
+              timezoneOffsetMinutes: -300,
+            },
+            {
+              id: 1,
+              username: "testuser",
+              displayName: null,
+              currentStreak: 2,
+              longestStreak: 2,
+              lastActivityDate: "2026-08-28",
+              timezoneOffsetMinutes: -300,
+            },
+          ])
+        );
+      const res = await GET(makeReq());
+      const body = await res.json();
+      expect(body.items[0]).toMatchObject({ username: "westcoast", streak: 8 });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("decays a broken streak to 0 so it ranks below an active one", async () => {

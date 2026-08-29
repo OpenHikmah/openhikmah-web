@@ -3,19 +3,21 @@ import { render, waitFor } from "@testing-library/react";
 import { StoryActivityTracker } from "@/app/stories/[slug]/StoryActivityTracker";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
+import { resetActivityQueue } from "@/lib/social/post-activity";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
 function jsonResponse(body: unknown) {
-  return { ok: true, json: async () => body };
+  return { ok: true, status: 200, json: async () => body };
 }
 
 describe("StoryActivityTracker", () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    resetActivityQueue();
     useAuthStore.setState({ accessToken: null });
-    useSocialStore.setState({ streak: 0, longestStreak: 0 });
+    useSocialStore.setState({ streak: 0, longestStreak: 0, streakAsOf: null });
   });
 
   it("does not fetch when there is no access token", () => {
@@ -34,7 +36,7 @@ describe("StoryActivityTracker", () => {
     expect(url).toBe("/api/social/activity");
     expect(init.method).toBe("POST");
     expect(init.headers.Authorization).toBe("Bearer test-token");
-    expect(JSON.parse(init.body)).toEqual({ type: "hadith_read" });
+    expect(JSON.parse(init.body)).toMatchObject({ type: "hadith_read" });
   });
 
   it("bumps the streak store from the response", async () => {
@@ -47,13 +49,20 @@ describe("StoryActivityTracker", () => {
     expect(useSocialStore.getState().longestStreak).toBe(5);
   });
 
-  it("does not throw when the fetch fails", async () => {
-    useAuthStore.setState({ accessToken: "test-token" });
-    mockFetch.mockRejectedValueOnce(new Error("network error"));
+  it("does not throw or move the streak when the fetch keeps failing", async () => {
+    vi.useFakeTimers();
+    try {
+      useAuthStore.setState({ accessToken: "test-token" });
+      mockFetch.mockRejectedValue(new Error("network error"));
 
-    render(<StoryActivityTracker slug="prophet-yusuf" />);
+      render(<StoryActivityTracker slug="prophet-yusuf" />);
 
-    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
-    expect(useSocialStore.getState().streak).toBe(0);
+      await vi.runAllTimersAsync();
+
+      expect(mockFetch).toHaveBeenCalled();
+      expect(useSocialStore.getState().streak).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

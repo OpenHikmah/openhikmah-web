@@ -69,13 +69,13 @@ describe("useActivityTracker restore vs. genuine activity", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("fires an activity POST when a node is genuinely added while mounted", () => {
+  it("fires an activity POST when a node is genuinely added while mounted", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
     vi.stubGlobal("fetch", fetchMock);
 
     renderHook(() => useActivityTracker());
 
-    act(() => {
+    await act(async () => {
       useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
     });
 
@@ -100,7 +100,34 @@ describe("useActivityTracker restore vs. genuine activity", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("resumes firing for genuine additions after a restore", () => {
+  it("still delivers the first add when it happens before the auth token arrives", async () => {
+    useAuthStore.setState({ accessToken: null });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ streak: 1, longestStreak: 1, activityDate: "2026-08-28" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderHook(() => useActivityTracker());
+
+    act(() => {
+      useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      useAuthStore.setState({ accessToken: "late-token" });
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/social/activity",
+      expect.objectContaining({ body: expect.stringContaining("verse_added") })
+    );
+  });
+
+  it("resumes firing for genuine additions after a restore", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -111,7 +138,7 @@ describe("useActivityTracker restore vs. genuine activity", () => {
     });
     expect(fetchMock).not.toHaveBeenCalled();
 
-    act(() => {
+    await act(async () => {
       useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
     });
     expect(fetchMock).toHaveBeenCalledWith(

@@ -61,6 +61,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     currentStreak: 3,
     longestStreak: 7,
     lastActivityDate: new Date().toISOString().slice(0, 10),
+    timezoneOffsetMinutes: null,
     disabledAt: null,
     ...overrides,
   };
@@ -124,6 +125,28 @@ describe("GET /api/social/me", () => {
     const body = await res.json();
     expect(body.currentStreak).toBe(0);
     expect(body.longestStreak).toBe(30);
+  });
+
+  it("decays against the user's local day using the stored timezone offset", async () => {
+    // 01:00 UTC on the 29th: UTC has rolled over, but a UTC-5 user is still on
+    // the evening of the 28th. Last activity on the 27th is local-yesterday for
+    // them (alive) even though plain UTC math would call it stale.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-29T01:00:00Z"));
+    try {
+      authedAs(
+        makeUser({
+          currentStreak: 6,
+          lastActivityDate: "2026-08-27",
+          timezoneOffsetMinutes: -300,
+        })
+      );
+      const res = await GET(makeGetReq());
+      const body = await res.json();
+      expect(body.currentStreak).toBe(6);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

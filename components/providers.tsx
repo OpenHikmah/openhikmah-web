@@ -140,10 +140,12 @@ export function SessionRestorer() {
             username?: string;
             currentStreak?: number;
             longestStreak?: number;
+            lastActivityDate?: string | null;
           };
           if (p.id && p.username) {
             setProfile({ userId: p.id, username: p.username });
-            if (p.currentStreak !== undefined) bumpStreak(p.currentStreak, p.longestStreak);
+            if (p.currentStreak !== undefined)
+              bumpStreak(p.currentStreak, p.longestStreak, p.lastActivityDate ?? null);
           }
         }
       })

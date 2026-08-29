@@ -100,6 +100,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     currentStreak: 3,
     longestStreak: 5,
     lastActivityDate: null,
+    timezoneOffsetMinutes: null,
     disabledAt: null,
     ...overrides,
   };
@@ -260,6 +261,113 @@ describe("POST /api/social/activity", () => {
     authedAs(makeUser({ currentStreak: 1, lastActivityDate: yesterdayStr() }));
     await POST(makeReq({ type: "verse_added" }));
     expect(mockTransaction).toHaveBeenCalledOnce();
+  });
+
+  it("buckets by the client's local_date, not UTC", async () => {
+    // 23:30 UTC on the 28th — a UTC+3 client is already on the 29th. Activity
+    // was last logged for the client's local day, so this is a same-day no-op.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T23:30:00Z"));
+    try {
+      authedAs(makeUser({ currentStreak: 4, lastActivityDate: "2026-08-29" }));
+      const res = await POST(makeReq({ type: "verse_added", local_date: "2026-08-29" }));
+      const body = await res.json();
+      expect(body.isNewDay).toBe(false);
+      expect(body.streak).toBe(4);
+      expect(body.activityDate).toBe("2026-08-29");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("increments when last activity was the client's local yesterday", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T23:30:00Z"));
+    try {
+      authedAs(makeUser({ currentStreak: 4, lastActivityDate: "2026-08-28" }));
+      const res = await POST(makeReq({ type: "verse_added", local_date: "2026-08-29" }));
+      const body = await res.json();
+      expect(body.isNewDay).toBe(true);
+      expect(body.streak).toBe(5);
+      expect(body.streakBroken).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ignores a wildly out-of-range local_date and falls back to UTC", async () => {
+    authedAs(makeUser({ currentStreak: 2, lastActivityDate: yesterdayStr() }));
+    const res = await POST(makeReq({ type: "verse_added", local_date: "1999-01-01" }));
+    const body = await res.json();
+    expect(body.activityDate).toBe(todayStr());
+    expect(body.streak).toBe(3);
+  });
+
+  it("falls back to UTC for a well-formed but non-existent local_date", async () => {
+    authedAs(makeUser({ currentStreak: 2, lastActivityDate: yesterdayStr() }));
+    const res = await POST(makeReq({ type: "verse_added", local_date: "2026-02-30" }));
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.activityDate).toBe(todayStr());
+  });
+
+  it("falls back when local_date disagrees with the supplied tz offset", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T12:00:00Z"));
+    try {
+      authedAs(makeUser({ currentStreak: 2, lastActivityDate: "2026-08-27" }));
+      // UTC+0 offset => local day is the 28th; a client claiming the 30th is
+      // trying to pre-credit two days ahead.
+      const res = await POST(
+        makeReq({ type: "verse_added", local_date: "2026-08-30", tz_offset_minutes: 0 })
+      );
+      const body = await res.json();
+      expect(body.activityDate).toBe("2026-08-28");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("credits the offset-derived day when local_date is one day ahead of it", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T12:00:00Z"));
+    try {
+      authedAs(makeUser({ currentStreak: 2, lastActivityDate: "2026-08-27" }));
+      // UTC+0 => local day is the 28th; a client claiming the 29th can't
+      // pre-credit tomorrow even by a single day.
+      const res = await POST(
+        makeReq({ type: "verse_added", local_date: "2026-08-29", tz_offset_minutes: 0 })
+      );
+      const body = await res.json();
+      expect(body.activityDate).toBe("2026-08-28");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("persists the client's timezone offset on the user row", async () => {
+    authedAs(makeUser({ currentStreak: 1, lastActivityDate: yesterdayStr() }));
+    let captured: Record<string, unknown> | undefined;
+    mockUpdate.mockImplementation(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c: any = {
+        set: (v: Record<string, unknown>) => {
+          captured = v;
+          return c;
+        },
+        where: () => c,
+        then: (r: (v: unknown) => unknown) => Promise.resolve(undefined).then(r),
+      };
+      return c;
+    });
+    await POST(makeReq({ type: "verse_added", tz_offset_minutes: 180 }));
+    expect(captured?.timezoneOffsetMinutes).toBe(180);
+  });
+
+  it("rejects an out-of-range tz offset without persisting it", async () => {
+    authedAs(makeUser({ currentStreak: 1, lastActivityDate: yesterdayStr() }));
+    const res = await POST(makeReq({ type: "verse_added", tz_offset_minutes: 99999 }));
+    expect(res.status).toBe(400);
   });
 });
 
