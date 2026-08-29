@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { ExpandableText } from "@/components/admin/ExpandableText";
 
@@ -38,5 +38,29 @@ describe("ExpandableText", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show less" }));
     expect(screen.getByRole("button", { name: "Show more" })).toBeInTheDocument();
     restore();
+  });
+
+  it("re-measures on resize, revealing the toggle when the element starts overflowing", () => {
+    let trigger: (() => void) | undefined;
+    class FakeResizeObserver {
+      constructor(cb: () => void) {
+        trigger = cb;
+      }
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal("ResizeObserver", FakeResizeObserver);
+
+    const restore = stubOverflow(false);
+    render(<ExpandableText>a reason that only overflows once the column narrows</ExpandableText>);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    restore();
+
+    // The column narrowed — the element now overflows its clamp.
+    const restore2 = stubOverflow(true);
+    act(() => trigger?.());
+    expect(screen.getByRole("button", { name: "Show more" })).toBeInTheDocument();
+    restore2();
+    vi.unstubAllGlobals();
   });
 });

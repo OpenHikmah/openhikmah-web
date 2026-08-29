@@ -23,12 +23,19 @@ export function ExpandableText({
   const [expanded, setExpanded] = useState(false);
 
   useLayoutEffect(() => {
+    if (expanded) return;
     const el = ref.current;
     if (!el) return;
     // Measure against the clamped height: scrollHeight > clientHeight means
-    // there's hidden content worth a toggle.
-    setOverflows(el.scrollHeight - el.clientHeight > 1);
-  }, [children, lines]);
+    // there's hidden content worth a toggle. Re-measure on resize too — a table
+    // cell narrowing can push previously-fitting text into overflow.
+    const measure = () => setOverflows(el.scrollHeight - el.clientHeight > 1);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [children, lines, expanded]);
 
   return (
     <div className={className}>
