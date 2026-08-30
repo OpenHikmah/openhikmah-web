@@ -12,6 +12,8 @@ import {
   Panel,
 } from "@/components/admin/primitives";
 import { Field } from "@/components/admin/Field";
+import { Feedback } from "@/components/admin/Feedback";
+import { SkeletonRows } from "@/components/admin/Skeleton";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 
@@ -202,12 +204,12 @@ export function ChallengeSuggestionsManager() {
               Cancel
             </Button>
           )}
-          {msg && <span className="text-xs text-error">{msg}</span>}
+          {msg && <Feedback tone="error">{msg}</Feedback>}
         </div>
       </Panel>
 
       {error && <StateNote tone="error">{error}</StateNote>}
-      {loading && <StateNote>Loading…</StateNote>}
+      {loading && !data && <SkeletonRows />}
       {data && data.suggestions.length === 0 && <StateNote>No suggestions yet.</StateNote>}
 
       {data && data.suggestions.length > 0 && (

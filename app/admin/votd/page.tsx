@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { Field } from "@/components/admin/Field";
+import { Feedback } from "@/components/admin/Feedback";
+import { useActionMessage } from "@/components/admin/useActionMessage";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import type { Verse } from "@/types/quran";
@@ -328,7 +330,7 @@ function DayEditor({
   const [preview, setPreview] = useState<Verse | null>(null);
   const [busy, setBusy] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const { message, ok, fail, clear: clearMsg } = useActionMessage();
   // `todayRef` arrives from an async fetch (useAsync) that can resolve after
   // this component has already mounted with it still null/undefined — sync
   // the field once it lands, but only while the admin hasn't started typing,
@@ -351,23 +353,23 @@ function DayEditor({
 
   const doPreview = async () => {
     if (previewBusy) return;
-    setMsg(null);
+    clearMsg();
     setPreview(null);
     const match = /^(\d+):(\d+)$/.exec(verseRef.trim());
     if (!match) {
-      setMsg("Enter a reference like 2:255.");
+      fail("Enter a reference like 2:255.");
       return;
     }
     setPreviewBusy(true);
     try {
       const v = await fetch(`/api/verse/${match[1]}/${match[2]}`);
       if (!v.ok) {
-        setMsg("That verse could not be found.");
+        fail("That verse could not be found.");
         return;
       }
       setPreview((await v.json()) as Verse);
     } catch {
-      setMsg("Preview failed.");
+      fail("Preview failed.");
     } finally {
       setPreviewBusy(false);
     }
@@ -375,13 +377,13 @@ function DayEditor({
 
   const save = async () => {
     setBusy(true);
-    setMsg(null);
+    clearMsg();
     try {
       await api("/votd", { method: "PUT", json: { date, verseRef: verseRef.trim(), reflection } });
-      setMsg("Saved.");
+      ok("Saved.");
       onSaved();
     } catch (e) {
-      setMsg(e instanceof AdminApiError ? e.message : "Save failed.");
+      fail(e instanceof AdminApiError ? e.message : "Save failed.");
     } finally {
       setBusy(false);
     }
@@ -389,13 +391,13 @@ function DayEditor({
 
   const clear = async () => {
     setBusy(true);
-    setMsg(null);
+    clearMsg();
     try {
       await api(`/votd?date=${date}`, { method: "DELETE" });
-      setMsg("Cleared.");
+      ok("Cleared.");
       onSaved();
     } catch (e) {
-      setMsg(e instanceof AdminApiError ? e.message : "Clear failed.");
+      fail(e instanceof AdminApiError ? e.message : "Clear failed.");
     } finally {
       setBusy(false);
     }
@@ -457,7 +459,7 @@ function DayEditor({
         )}
       </div>
 
-      {msg && <p className="text-xs text-text-secondary">{msg}</p>}
+      {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
     </div>
   );
 }

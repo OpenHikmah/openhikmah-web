@@ -5,6 +5,9 @@ import { Button, Input, Textarea, NativeSelect } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, StateNote, ConfirmButton, Panel } from "@/components/admin/primitives";
 import { Field } from "@/components/admin/Field";
+import { Feedback } from "@/components/admin/Feedback";
+import { SectionHeading } from "@/components/admin/SectionHeading";
+import { formatTimestamp } from "@/lib/admin/format";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { KNOWN_OPERATIONAL_FLAG_KEYS } from "@/lib/admin/feature-flag-keys";
@@ -99,7 +102,7 @@ function OperationalSettings({
 
   return (
     <Panel className="space-y-4">
-      <h2 className="text-sm font-medium text-text-primary">Operational settings</h2>
+      <SectionHeading title="Operational settings" />
 
       <div className="space-y-2">
         <span className="text-xs text-text-secondary">
@@ -241,7 +244,7 @@ function OperationalSettings({
         </Field>
       </div>
 
-      {msg && <span className="text-xs text-error">{msg}</span>}
+      {msg && <Feedback tone="error">{msg}</Feedback>}
     </Panel>
   );
 }
@@ -339,7 +342,7 @@ export default function FlagsPage() {
             >
               Save flag
             </Button>
-            {msg && <span className="text-xs text-error">{msg}</span>}
+            {msg && <Feedback tone="error">{msg}</Feedback>}
           </div>
         </Panel>
 
@@ -365,7 +368,7 @@ export default function FlagsPage() {
                     <span className="line-clamp-2 break-all">{JSON.stringify(f.value)}</span>
                   </Td>
                   <Td className="whitespace-nowrap text-xs text-text-muted">
-                    {new Date(f.updatedAt).toLocaleDateString()}
+                    {formatTimestamp(f.updatedAt)}
                   </Td>
                   <Td>
                     <div className="flex justify-end gap-1.5">

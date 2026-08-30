@@ -10,8 +10,12 @@ import {
   Pill,
   StateNote,
   ConfirmButton,
+  Panel,
 } from "@/components/admin/primitives";
 import { InfoHint } from "@/components/admin/InfoHint";
+import { SectionHeading } from "@/components/admin/SectionHeading";
+import { Feedback } from "@/components/admin/Feedback";
+import { useActionMessage } from "@/components/admin/useActionMessage";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { RefreshButton } from "@/components/admin/RefreshButton";
@@ -35,22 +39,22 @@ function uptime(s: number): string {
 export default function InfraPage() {
   const api = useAdminFetch();
   const { data, error, loading, reload } = useAsync<Infra>(() => api("/infra"), "infra");
-  const [msg, setMsg] = useState<string | null>(null);
+  const { message, ok, fail, clear } = useActionMessage();
   const [busy, setBusy] = useState(false);
 
   const run = async (action: string) => {
     if (busy) return; // guard against concurrent maintenance operations
-    setMsg(null);
+    clear();
     setBusy(true);
     try {
       const res = await api<Parameters<typeof formatInfraResult>[0]>("/infra", {
         method: "POST",
         json: { action },
       });
-      setMsg(formatInfraResult(res));
+      ok(formatInfraResult(res));
       reload();
     } catch (e) {
-      setMsg(e instanceof AdminApiError ? e.message : "Action failed.");
+      fail(e instanceof AdminApiError ? e.message : "Action failed.");
     } finally {
       setBusy(false);
     }
@@ -109,8 +113,8 @@ export default function InfraPage() {
               </div>
             </div>
 
-            <section className="space-y-3 rounded-lg border border-border bg-surface p-5">
-              <h2 className="text-sm font-medium text-text-primary">Maintenance</h2>
+            <Panel className="space-y-3">
+              <SectionHeading title="Maintenance" />
               <div className="flex flex-wrap gap-2">
                 <ConfirmButton
                   variant="secondary"
@@ -137,11 +141,11 @@ export default function InfraPage() {
                   Reset rate limits
                 </ConfirmButton>
               </div>
-              {msg && <p className="text-xs text-text-secondary">{msg}</p>}
-            </section>
+              {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
+            </Panel>
 
             <section>
-              <h2 className="mb-2 text-sm font-medium text-text-primary">Process metrics</h2>
+              <SectionHeading title="Process metrics" />
               {Object.keys(data.metrics).length === 0 ? (
                 <StateNote>No counters recorded yet.</StateNote>
               ) : (
