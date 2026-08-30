@@ -2,6 +2,8 @@
 
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { StatTile, Table, Th, Td, StateNote } from "@/components/admin/primitives";
+import { SectionHeading } from "@/components/admin/SectionHeading";
+import { SkeletonRows } from "@/components/admin/Skeleton";
 import { useAdminFetch } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 
@@ -36,8 +38,8 @@ export default function AiPage() {
         subtitle="Generation volume and token spend. One row per cache miss — the bill flattens as the graph fills."
       />
       <div className="space-y-6 p-7">
+        {loading && !data && <SkeletonRows n={6} />}
         {error && <StateNote tone="error">{error}</StateNote>}
-        {loading && <StateNote>Loading…</StateNote>}
 
         {data && (
           <>
@@ -71,64 +73,60 @@ export default function AiPage() {
 
             <div className="grid gap-6 lg:grid-cols-2">
               <section>
-                <h2 className="mb-2 text-sm font-medium text-text-primary">By model</h2>
-                <Table>
-                  <thead>
-                    <tr>
-                      <Th>Model</Th>
-                      <Th className="text-right">Gens</Th>
-                      <Th className="text-right">Tokens</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.byModel.map((r) => (
-                      <tr key={r.model}>
-                        <Td className="font-mono text-xs text-text-secondary">{r.model}</Td>
-                        <Td className="text-right tabular-nums">{r.gens}</Td>
-                        <Td className="text-right tabular-nums">{r.tokens.toLocaleString()}</Td>
-                      </tr>
-                    ))}
-                    {data.byModel.length === 0 && (
+                <SectionHeading title="By model" />
+                {data.byModel.length === 0 ? (
+                  <StateNote>No generations yet.</StateNote>
+                ) : (
+                  <Table>
+                    <thead>
                       <tr>
-                        <Td className="text-text-muted">No generations yet.</Td>
-                        <Td /> <Td />
+                        <Th>Model</Th>
+                        <Th className="text-right">Gens</Th>
+                        <Th className="text-right">Tokens</Th>
                       </tr>
-                    )}
-                  </tbody>
-                </Table>
+                    </thead>
+                    <tbody>
+                      {data.byModel.map((r) => (
+                        <tr key={r.model}>
+                          <Td className="font-mono text-xs text-text-secondary">{r.model}</Td>
+                          <Td className="text-right tabular-nums">{r.gens}</Td>
+                          <Td className="text-right tabular-nums">{r.tokens.toLocaleString()}</Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                )}
               </section>
 
               <section>
-                <h2 className="mb-2 text-sm font-medium text-text-primary">By kind</h2>
-                <Table>
-                  <thead>
-                    <tr>
-                      <Th>Kind</Th>
-                      <Th className="text-right">Gens</Th>
-                      <Th className="text-right">Tokens</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.byKind.map((r) => (
-                      <tr key={r.kind}>
-                        <Td className="text-xs text-text-secondary">{r.kind}</Td>
-                        <Td className="text-right tabular-nums">{r.gens}</Td>
-                        <Td className="text-right tabular-nums">{r.tokens.toLocaleString()}</Td>
-                      </tr>
-                    ))}
-                    {data.byKind.length === 0 && (
+                <SectionHeading title="By kind" />
+                {data.byKind.length === 0 ? (
+                  <StateNote>No generations yet.</StateNote>
+                ) : (
+                  <Table>
+                    <thead>
                       <tr>
-                        <Td className="text-text-muted">No generations yet.</Td>
-                        <Td /> <Td />
+                        <Th>Kind</Th>
+                        <Th className="text-right">Gens</Th>
+                        <Th className="text-right">Tokens</Th>
                       </tr>
-                    )}
-                  </tbody>
-                </Table>
+                    </thead>
+                    <tbody>
+                      {data.byKind.map((r) => (
+                        <tr key={r.kind}>
+                          <Td className="text-xs text-text-secondary">{r.kind}</Td>
+                          <Td className="text-right tabular-nums">{r.gens}</Td>
+                          <Td className="text-right tabular-nums">{r.tokens.toLocaleString()}</Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                )}
               </section>
             </div>
 
             <section>
-              <h2 className="mb-2 text-sm font-medium text-text-primary">Last 30 days</h2>
+              <SectionHeading title="Last 30 days" />
               {data.daily.length === 0 ? (
                 <StateNote>No activity in the last 30 days.</StateNote>
               ) : (

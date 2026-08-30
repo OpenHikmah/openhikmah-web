@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui";
+import { Button, Input } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
+import { SkeletonRows } from "@/components/admin/Skeleton";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 
@@ -64,12 +65,13 @@ export default function AdminStoriesPage() {
         title="Stories"
         subtitle="Hardcoded prophetic narratives. Flag one to pull it from /stories immediately if something in it is wrong — it stays hidden until you restore it, no redeploy needed."
       />
-      <div className="space-y-4 p-7">
+      <div className="space-y-6 p-7">
         {error && <StateNote tone="error">{error}</StateNote>}
         {actionError && <StateNote tone="error">{actionError}</StateNote>}
-        {loading && <StateNote>Loading…</StateNote>}
+        {loading && <SkeletonRows />}
+        {data && data.stories.length === 0 && <StateNote>No stories found.</StateNote>}
 
-        {data && (
+        {data && data.stories.length > 0 && (
           <Table>
             <thead>
               <tr>
@@ -97,7 +99,7 @@ export default function AdminStoriesPage() {
                     {s.hidden ? (
                       <span className="text-xs text-text-secondary">{s.reason ?? "—"}</span>
                     ) : (
-                      <input
+                      <Input
                         type="text"
                         placeholder="Reason (optional)"
                         aria-label={`Flag reason for ${s.name}`}
@@ -105,7 +107,7 @@ export default function AdminStoriesPage() {
                         onChange={(e) =>
                           setReasonDraft((prev) => ({ ...prev, [s.slug]: e.target.value }))
                         }
-                        className="w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary placeholder:text-text-muted focus:border-gold-muted focus:outline-none"
+                        className="h-8 px-2 text-xs"
                       />
                     )}
                   </Td>

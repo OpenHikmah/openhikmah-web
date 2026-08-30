@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   Table,
   Th,
@@ -12,11 +12,12 @@ import {
   LoadMore,
 } from "@/components/admin/primitives";
 import { AdminToggle } from "@/components/admin/AdminToggle";
+import { useArmedConfirm } from "@/hooks/useArmedConfirm";
+import { cn } from "@/lib/utils";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { usePaginated } from "@/components/admin/usePaginated";
 import { SkeletonRows } from "@/components/admin/Skeleton";
 import { useAdminAnnounce } from "@/components/admin/AdminLiveRegion";
-import { cn } from "@/lib/utils";
 
 interface AdminChallenge {
   id: number;
@@ -294,8 +295,9 @@ export function ChallengesModeration() {
   );
 }
 
-/** Same two-click confirm as `ConfirmButton`, but sized for the compact inline
- *  winner-override row instead of the standard `Button`. */
+/** Same two-click confirm as `ConfirmButton` (shares `useArmedConfirm`), but
+ *  sized for the compact inline winner-override row instead of the standard
+ *  `Button`. */
 function OverrideButton({
   label,
   onConfirm,
@@ -305,29 +307,12 @@ function OverrideButton({
   onConfirm: () => void;
   disabled?: boolean;
 }) {
-  const [armed, setArmed] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    },
-    []
-  );
+  const { armed, trigger } = useArmedConfirm(onConfirm);
 
   return (
     <button
       disabled={disabled}
-      onClick={() => {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        if (armed) {
-          setArmed(false);
-          onConfirm();
-        } else {
-          setArmed(true);
-          timerRef.current = setTimeout(() => setArmed(false), 3000);
-        }
-      }}
+      onClick={trigger}
       className={cn(
         "rounded px-1 text-[11px] transition-colors disabled:opacity-50",
         armed ? "text-error" : "text-text-secondary hover:text-gold"

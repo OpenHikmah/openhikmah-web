@@ -1,8 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Input } from "@/components/ui";
-import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
+import { Button, Input, Textarea, NativeSelect } from "@/components/ui";
+import {
+  Table,
+  Th,
+  Td,
+  Pill,
+  StateNote,
+  ConfirmButton,
+  Panel,
+} from "@/components/admin/primitives";
+import { Field } from "@/components/admin/Field";
+import { Feedback } from "@/components/admin/Feedback";
+import { SkeletonRows } from "@/components/admin/Skeleton";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 
@@ -125,62 +136,56 @@ export function ChallengeSuggestionsManager() {
   return (
     <div className="space-y-4">
       {/* Editor */}
-      <div className="space-y-3 rounded-lg border border-border bg-surface p-5">
+      <Panel className="space-y-3">
         <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
           {editing ? `Editing suggestion #${form.id}` : "New suggestion"}
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="space-y-1.5">
-            <span className="text-xs text-text-secondary">Title</span>
+          <Field label="Title">
             <Input
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               placeholder="e.g. A week of patience"
             />
-          </label>
-          <label className="space-y-1.5">
-            <span className="text-xs text-text-secondary">Verse (optional)</span>
+          </Field>
+          <Field label="Verse (optional)">
             <Input
               value={form.verseRef}
               onChange={(e) => setForm({ ...form, verseRef: e.target.value })}
               placeholder="e.g. 2:155"
             />
-          </label>
+          </Field>
         </div>
-        <label className="block space-y-1.5">
-          <span className="text-xs text-text-secondary">Description (optional)</span>
-          <textarea
+        <Field label="Description (optional)">
+          <Textarea
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             rows={2}
-            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-gold-muted"
             placeholder="A short prompt shown to users…"
           />
-        </label>
+        </Field>
         <div className="flex flex-wrap items-end gap-4">
-          <label className="space-y-1.5">
-            <span className="block text-xs text-text-secondary">Suggested duration</span>
-            <select
+          <Field label="Suggested duration">
+            <NativeSelect
               value={form.suggestedDuration}
               onChange={(e) => setForm({ ...form, suggestedDuration: e.target.value })}
-              className="h-10 rounded-md border border-border bg-surface px-2 text-sm text-text-primary focus:border-gold-muted"
+              className="w-40"
             >
               {DURATIONS.map((d) => (
-                <option key={d} value={d} className="bg-surface">
+                <option key={d} value={d}>
                   {d || "user picks"}
                 </option>
               ))}
-            </select>
-          </label>
-          <label className="space-y-1.5">
-            <span className="block text-xs text-text-secondary">Sort order</span>
+            </NativeSelect>
+          </Field>
+          <Field label="Sort order">
             <Input
               type="number"
               value={String(form.sortOrder)}
               onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) })}
               className="w-24"
             />
-          </label>
+          </Field>
           <label className="flex items-center gap-2 pb-2.5 text-sm text-text-secondary">
             <input
               type="checkbox"
@@ -199,12 +204,12 @@ export function ChallengeSuggestionsManager() {
               Cancel
             </Button>
           )}
-          {msg && <span className="text-xs text-error">{msg}</span>}
+          {msg && <Feedback tone="error">{msg}</Feedback>}
         </div>
-      </div>
+      </Panel>
 
       {error && <StateNote tone="error">{error}</StateNote>}
-      {loading && <StateNote>Loading…</StateNote>}
+      {loading && !data && <SkeletonRows />}
       {data && data.suggestions.length === 0 && <StateNote>No suggestions yet.</StateNote>}
 
       {data && data.suggestions.length > 0 && (
