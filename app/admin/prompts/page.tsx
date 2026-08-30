@@ -1,13 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui";
+import { Button, Textarea } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
+import {
+  Table,
+  Th,
+  Td,
+  Pill,
+  StateNote,
+  ConfirmButton,
+  Panel,
+} from "@/components/admin/primitives";
+import { AdminToggle } from "@/components/admin/AdminToggle";
+import { SkeletonRows } from "@/components/admin/Skeleton";
+import { formatTimestamp } from "@/lib/admin/format";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
-import { cn } from "@/lib/utils";
 
 interface PromptVersionRow {
   id: number;
@@ -75,37 +85,24 @@ export default function PromptsPage() {
         title="Prompts"
         subtitle="Versioned templates for the AI connection generator. No active version means the hardcoded fallback is used."
       />
-      <div className="space-y-4 p-7">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">
-            Slot
-          </span>
-          <div className="flex gap-1">
-            {PROMPT_KEYS.map((k) => (
-              <button
-                key={k}
-                onClick={() => setKey(k)}
-                // Locked with the draft/textarea during the armed window — otherwise
-                // a confirmed create could activate the draft in a slot the user
-                // never actually confirmed for.
-                disabled={createArmed || saving}
-                className={cn(
-                  "rounded border px-2 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                  key === k
-                    ? "border-gold-muted bg-gold/10 text-gold"
-                    : "border-border text-text-secondary hover:border-gold-muted"
-                )}
-              >
-                {k}
-              </button>
-            ))}
-          </div>
-        </div>
+      <div className="space-y-6 p-7">
+        {/* Locked during the armed window — otherwise a confirmed create could
+            activate the draft in a slot the user never confirmed for. */}
+        <AdminToggle
+          label="Slot"
+          options={PROMPT_KEYS.map((k) => ({
+            value: k,
+            label: k,
+            disabled: createArmed || saving,
+          }))}
+          value={key}
+          onChange={setKey}
+        />
 
         {error && <StateNote tone="error">{error}</StateNote>}
         {actionError && <StateNote tone="error">{actionError}</StateNote>}
 
-        <div className="space-y-2 rounded-lg border border-border bg-surface p-4">
+        <Panel className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs text-text-secondary">New version for {key}</span>
             {active === null && !loading && (
@@ -114,7 +111,7 @@ export default function PromptsPage() {
               </span>
             )}
           </div>
-          <textarea
+          <Textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             disabled={createArmed || saving}
@@ -124,7 +121,7 @@ export default function PromptsPage() {
                 : "e.g. Reference: {{fromRef}}\nArabic: {{arabicText}}\n... Task: {{task}} ..."
             }
             rows={10}
-            className="w-full rounded-md border border-border bg-bg px-3 py-2 font-mono text-xs text-text-primary focus:border-gold-muted disabled:opacity-60"
+            className="font-mono text-xs"
           />
           <div className="flex justify-end">
             <Button
@@ -136,9 +133,9 @@ export default function PromptsPage() {
               {saving ? "Saving…" : createArmed ? "Create & activate?" : "Create & activate"}
             </Button>
           </div>
-        </div>
+        </Panel>
 
-        {loading && <StateNote>Loading…</StateNote>}
+        {loading && !data && <SkeletonRows />}
         {data && data.versions.length === 0 && (
           <StateNote>No versions yet for this slot — using the hardcoded fallback.</StateNote>
         )}
@@ -169,7 +166,7 @@ export default function PromptsPage() {
                     {v.createdBy ?? "—"}
                   </Td>
                   <Td className="whitespace-nowrap text-xs text-text-secondary">
-                    {new Date(v.createdAt).toLocaleString()}
+                    {formatTimestamp(v.createdAt)}
                   </Td>
                   <Td>
                     <div className="flex justify-end">

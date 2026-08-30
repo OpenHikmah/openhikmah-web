@@ -2,11 +2,16 @@
 
 import { useState } from "react";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
+import { AdminToggle } from "@/components/admin/AdminToggle";
 import { ChallengesModeration } from "@/components/admin/ChallengesModeration";
 import { ChallengeSuggestionsManager } from "@/components/admin/ChallengeSuggestionsManager";
-import { cn } from "@/lib/utils";
 
 type Section = "moderation" | "suggestions";
+
+const SECTIONS = [
+  { value: "moderation", label: "Moderation" },
+  { value: "suggestions", label: "Suggestions" },
+] as const satisfies readonly { value: Section; label: string }[];
 
 export default function AdminChallengesPage() {
   const [section, setSection] = useState<Section>("moderation");
@@ -17,22 +22,7 @@ export default function AdminChallengesPage() {
         title="Challenges"
         subtitle="Moderate and resolve 1v1 challenges, and curate the suggestions users start from."
         actions={
-          <div className="flex items-center gap-1">
-            {(["moderation", "suggestions"] as Section[]).map((s) => (
-              <button
-                key={s}
-                onClick={() => setSection(s)}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm capitalize transition-colors",
-                  section === s
-                    ? "bg-gold/10 font-medium text-gold"
-                    : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
-                )}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
+          <AdminToggle options={SECTIONS} value={section} onChange={setSection} label="Section" />
         }
       />
       <div className="p-7">
