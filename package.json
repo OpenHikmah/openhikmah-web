@@ -84,7 +84,7 @@
     "jsdom": "^30.0.1",
     "lint-staged": "^17.0.7",
     "prettier": "^3.9.6",
-    "size-limit": "^12.1.0",
+    "size-limit": "^13.0.3",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vite-tsconfig-paths": "^6.1.1",
