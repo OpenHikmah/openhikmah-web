@@ -36,6 +36,10 @@ const KINDS: readonly EdgeKind[] = ["thematic", "root", "contrast"];
 // fill first.
 const POPULAR_SURAHS = [1, 36, 67, 18, 2, 112, 55, 56];
 const PROGRESS_EVERY = 25;
+// If the first N cells all throw and nothing has generated, the provider itself
+// is down (bad key, quota, wrong model) — not N unlucky verses. Abort instead of
+// draining `maxCalls` on a dead API.
+const FAIL_FAST_THRESHOLD = 5;
 
 export type BatchMode = "baseline" | "topup";
 export type StoppedReason = "completed" | "call-budget" | "cost-budget" | "error" | "cancelled";
@@ -71,7 +75,14 @@ export interface BatchSummary {
   translated: number;
   /** Cells newly marked exhausted this run. */
   exhausted: number;
+  /** Cells whose generation call threw (usually a provider/API error). */
+  cellsFailed: number;
+  /** Whole-run failure message (work-list build failure, or the post-loop
+   *  promotion when every cell failed). Drives `job_runs.error`. */
   error?: string;
+  /** Message from the most recent cell-level failure, surfaced even when the run
+   *  as a whole is not marked failed. */
+  lastError?: string;
 }
 
 interface Cell {
@@ -300,6 +311,7 @@ export async function runConnectionBatch(
     generated: 0,
     translated: 0,
     exhausted: 0,
+    cellsFailed: 0,
   };
 
   // Resolve the effective model once, up front: with no per-run pick,
@@ -355,6 +367,8 @@ export async function runConnectionBatch(
     },
   };
 
+  let consecutiveFailures = 0;
+
   for (const cell of cells) {
     // Cooperative cancel from the admin panel (job-runner aborts this signal).
     // Between-cell granularity matches the budget stop — at most one more cell's
@@ -393,6 +407,10 @@ export async function runConnectionBatch(
         // refund the reservation.
         summary.callsUsed--;
         summary.costUsd -= callCost;
+      } else {
+        // A request went out and came back without throwing — the provider is
+        // alive, so a later isolated failure isn't the fail-fast case.
+        consecutiveFailures = 0;
       }
       summary.generated += results.length;
 
@@ -426,8 +444,22 @@ export async function runConnectionBatch(
       const message = err instanceof Error ? err.message : String(err);
       console.error(`connection-batch: cell ${cell.fromRef} ${cell.kind} failed:`, err);
       incr("connection_batch_cell_failed");
+      summary.cellsFailed++;
+      summary.lastError = message;
+      consecutiveFailures++;
+      // Surface the reason in the job log tail, not just the server console —
+      // this is the only place the admin sees *why* a run generated nothing.
+      hooks.onProgress(`[${opts.mode}] cell ${cell.fromRef} ${cell.kind} FAILED: ${message}`);
       // One bad verse must not abort the run — record and move on.
       await upsertCoverage(cell.fromRef, cell.kind, { lastError: message }).catch(() => {});
+
+      if (summary.generated === 0 && consecutiveFailures >= FAIL_FAST_THRESHOLD) {
+        summary.stoppedReason = "error";
+        summary.error = `aborted after ${consecutiveFailures} consecutive cell failures with nothing generated — the provider is likely down. Last error: ${message}`;
+        hooks.onProgress(`[${opts.mode}] ${summary.error}`);
+        summary.cellsProcessed++;
+        break;
+      }
     }
 
     summary.cellsProcessed++;
@@ -435,15 +467,25 @@ export async function runConnectionBatch(
       hooks.onProgress(
         `[${opts.mode}] ${summary.cellsProcessed}/${cells.length} cells | ` +
           `${summary.callsUsed} calls | $${summary.costUsd.toFixed(2)} | ` +
-          `gen=${summary.generated} xlt=${summary.translated} exh=${summary.exhausted}`
+          `gen=${summary.generated} xlt=${summary.translated} exh=${summary.exhausted} ` +
+          `fail=${summary.cellsFailed}`
       );
     }
+  }
+
+  // A run that made calls, generated nothing, and hit only failures isn't a
+  // successful "found no new connections" pass — mark it failed so the Jobs page
+  // shows it in the error style with the reason, not a green "success / gen=0".
+  if (summary.stoppedReason === "completed" && summary.generated === 0 && summary.cellsFailed > 0) {
+    summary.stoppedReason = "error";
+    summary.error = `${summary.cellsFailed}/${summary.cellsProcessed} cells failed, 0 generated — last error: ${summary.lastError}`;
   }
 
   hooks.onProgress(
     `[${opts.mode}] DONE (${summary.stoppedReason}) | ${summary.cellsProcessed} cells | ` +
       `${summary.callsUsed} calls | $${summary.costUsd.toFixed(2)} | ` +
-      `gen=${summary.generated} xlt=${summary.translated} exh=${summary.exhausted}`
+      `gen=${summary.generated} xlt=${summary.translated} exh=${summary.exhausted} ` +
+      `fail=${summary.cellsFailed}`
   );
   return summary;
 }
