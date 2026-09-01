@@ -1,0 +1,61 @@
+# Path -> label map for actions/labeler (see .github/workflows/pr-labeler.yml).
+# Labels must already exist in the repo. `sync-labels: false` in the workflow
+# means these are only ever added, never removed — a human-applied label stays.
+
+API:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "app/api/**"
+          - "lib/ai/**"
+          - "lib/quran/**"
+
+admin:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "app/admin/**"
+          - "lib/admin/**"
+
+db:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "lib/infra/db/**"
+          - "drizzle.config.ts"
+
+CI/CD:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/workflows/**"
+          - "docker-compose.yml"
+
+dockerfile:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "Dockerfile"
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "__tests__/**"
+          - "e2e/**"
+          - "**/*.test.ts"
+          - "**/*.spec.ts"
+
+UX/UI:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "components/**"
+          - "app/**/*.tsx"
+          - "app/globals.css"
+          - "messages/**"
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - "docs/**"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "package.json"
+          - "bun.lock"
