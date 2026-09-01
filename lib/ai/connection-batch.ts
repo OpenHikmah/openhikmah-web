@@ -476,11 +476,7 @@ export async function runConnectionBatch(
   // A run that made calls, generated nothing, and hit only failures isn't a
   // successful "found no new connections" pass — mark it failed so the Jobs page
   // shows it in the error style with the reason, not a green "success / gen=0".
-  if (
-    summary.stoppedReason === "completed" &&
-    summary.generated === 0 &&
-    summary.cellsFailed > 0
-  ) {
+  if (summary.stoppedReason === "completed" && summary.generated === 0 && summary.cellsFailed > 0) {
     summary.stoppedReason = "error";
     summary.error = `${summary.cellsFailed}/${summary.cellsProcessed} cells failed, 0 generated — last error: ${summary.lastError}`;
   }
