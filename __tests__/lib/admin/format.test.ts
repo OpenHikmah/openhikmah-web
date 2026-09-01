@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { formatInfraResult } from "@/lib/admin/format";
+import { formatInfraResult, formatTimestamp } from "@/lib/admin/format";
+
+describe("formatTimestamp", () => {
+  it("renders a date with a time component", () => {
+    const out = formatTimestamp("2026-01-02T15:04:00Z");
+    expect(out).toMatch(/2026/);
+    expect(out).toMatch(/\d{1,2}:\d{2}/);
+  });
+});
 
 describe("formatInfraResult", () => {
   it("summarises flush-tokens with a pluralised count", () => {

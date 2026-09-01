@@ -3,7 +3,9 @@ export { IconButton, iconButtonVariants, type IconButtonProps } from "./IconButt
 export { Card, cardVariants, type CardProps } from "./Card";
 export { Tooltip, TooltipProvider } from "./Tooltip";
 export { Input } from "./Input";
+export { Textarea } from "./Textarea";
 export { Select, type SelectOption, type SelectProps } from "./Select";
+export { NativeSelect } from "./NativeSelect";
 export { Switch, type SwitchProps } from "./Switch";
 export { ReflectionNote } from "./ReflectionNote";
 export { Pagination, type PaginationProps } from "./Pagination";

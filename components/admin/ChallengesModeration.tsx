@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui";
+import { useState } from "react";
 import {
   Table,
   Th,
@@ -10,12 +9,15 @@ import {
   StateNote,
   ConfirmButton,
   StatTile,
+  LoadMore,
 } from "@/components/admin/primitives";
+import { AdminToggle } from "@/components/admin/AdminToggle";
+import { useArmedConfirm } from "@/hooks/useArmedConfirm";
+import { cn } from "@/lib/utils";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { usePaginated } from "@/components/admin/usePaginated";
 import { SkeletonRows } from "@/components/admin/Skeleton";
 import { useAdminAnnounce } from "@/components/admin/AdminLiveRegion";
-import { cn } from "@/lib/utils";
 
 interface AdminChallenge {
   id: number;
@@ -39,6 +41,10 @@ interface Stats {
 }
 
 const FILTERS = ["all", "pending", "active", "completed", "declined", "cancelled"] as const;
+const FILTER_OPTIONS = FILTERS.map((f) => ({
+  value: f,
+  label: f[0].toUpperCase() + f.slice(1),
+}));
 
 const statusTone = (s: AdminChallenge["status"]) =>
   s === "active"
@@ -153,24 +159,7 @@ export function ChallengesModeration() {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1">
-          {FILTERS.map((f) => (
-            <button
-              key={f}
-              type="button"
-              aria-pressed={status === f}
-              onClick={() => setStatus(f)}
-              className={cn(
-                "rounded border px-2 py-1 text-xs capitalize transition-colors",
-                status === f
-                  ? "border-gold-muted bg-gold/10 text-gold"
-                  : "border-border text-text-secondary hover:border-gold-muted"
-              )}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
+        <AdminToggle label="Status" options={FILTER_OPTIONS} value={status} onChange={setStatus} />
         <ConfirmButton variant="secondary" onConfirm={finalize} confirmLabel="Finalize ended?">
           Finalize ended
         </ConfirmButton>
@@ -301,20 +290,14 @@ export function ChallengesModeration() {
         </Table>
       )}
 
-      {hasMore && (
-        <div className="flex flex-col items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={loadMore} disabled={loadingMore}>
-            {loadingMore ? "Loading…" : "Load more"}
-          </Button>
-          {loadMoreError && <StateNote tone="error">Couldn&apos;t load more challenges.</StateNote>}
-        </div>
-      )}
+      <LoadMore hasMore={hasMore} loading={loadingMore} error={loadMoreError} onClick={loadMore} />
     </div>
   );
 }
 
-/** Same two-click confirm as `ConfirmButton`, but sized for the compact inline
- *  winner-override row instead of the standard `Button`. */
+/** Same two-click confirm as `ConfirmButton` (shares `useArmedConfirm`), but
+ *  sized for the compact inline winner-override row instead of the standard
+ *  `Button`. */
 function OverrideButton({
   label,
   onConfirm,
@@ -324,29 +307,12 @@ function OverrideButton({
   onConfirm: () => void;
   disabled?: boolean;
 }) {
-  const [armed, setArmed] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    },
-    []
-  );
+  const { armed, trigger } = useArmedConfirm(onConfirm);
 
   return (
     <button
       disabled={disabled}
-      onClick={() => {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        if (armed) {
-          setArmed(false);
-          onConfirm();
-        } else {
-          setArmed(true);
-          timerRef.current = setTimeout(() => setArmed(false), 3000);
-        }
-      }}
+      onClick={trigger}
       className={cn(
         "rounded px-1 text-[11px] transition-colors disabled:opacity-50",
         armed ? "text-error" : "text-text-secondary hover:text-gold"

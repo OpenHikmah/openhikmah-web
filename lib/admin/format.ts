@@ -4,6 +4,21 @@
  * raw `Done: {"action":"flush-tokens","cleared":12}` JSON dump.
  */
 
+/**
+ * The one timestamp format for admin tables (audit, prompts, connections,
+ * flags, users) — date + short time, so "when" is never ambiguous between a
+ * date-only and a date-time column.
+ */
+export function formatTimestamp(iso: string): string {
+  return new Date(iso).toLocaleString("en", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 interface InfraResult {
   action?: string;
   cleared?: number;

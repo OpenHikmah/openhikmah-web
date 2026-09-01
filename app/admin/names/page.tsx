@@ -1,9 +1,18 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { Button } from "@/components/ui";
+import { Button, Textarea } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
+import {
+  Table,
+  Th,
+  Td,
+  Pill,
+  StateNote,
+  ConfirmButton,
+  LoadMore,
+} from "@/components/admin/primitives";
+import { SkeletonRows } from "@/components/admin/Skeleton";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { usePaginated } from "@/components/admin/usePaginated";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
@@ -81,10 +90,10 @@ export default function NamesPage() {
         title="Names Content"
         subtitle="Cached AI content per Divine Name. Edit the payload or invalidate to regenerate."
       />
-      <div className="space-y-4 p-7">
+      <div className="space-y-6 p-7">
         {error && <StateNote tone="error">{error}</StateNote>}
         {msg && <StateNote tone="error">{msg}</StateNote>}
-        {loading && <StateNote>Loading…</StateNote>}
+        {loading && <SkeletonRows />}
         {!loading && !error && rows.length === 0 && (
           <StateNote>No cached name content yet.</StateNote>
         )}
@@ -153,14 +162,12 @@ export default function NamesPage() {
           </Table>
         )}
 
-        {hasMore && (
-          <div className="flex flex-col items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={loadMore} disabled={loadingMore}>
-              {loadingMore ? "Loading…" : "Load more"}
-            </Button>
-            {loadMoreError && <StateNote tone="error">Couldn&apos;t load more entries.</StateNote>}
-          </div>
-        )}
+        <LoadMore
+          hasMore={hasMore}
+          loading={loadingMore}
+          error={loadMoreError}
+          onClick={loadMore}
+        />
       </div>
     </>
   );
@@ -187,12 +194,12 @@ function EditRow({
 
   return (
     <>
-      <textarea
+      <Textarea
         value={draft}
         onChange={(e) => onDraftChange(e.target.value)}
         disabled={armed || disabled}
         rows={10}
-        className="w-full rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary focus:border-gold-muted disabled:opacity-60"
+        className="font-mono text-xs"
       />
       <div className="mt-2 flex items-center gap-2">
         <Button

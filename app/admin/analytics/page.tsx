@@ -2,6 +2,7 @@
 
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { StatTile, Table, Th, Td, StateNote } from "@/components/admin/primitives";
+import { SectionHeading } from "@/components/admin/SectionHeading";
 import { useAdminFetch } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { RefreshButton } from "@/components/admin/RefreshButton";
@@ -165,11 +166,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-2">
-      <div>
-        <h2 className="text-sm font-semibold text-text-primary">{title}</h2>
-        {subtitle && <p className="text-xs text-text-muted">{subtitle}</p>}
-      </div>
+    <div>
+      <SectionHeading title={title} subtitle={subtitle} />
       {children}
     </div>
   );
