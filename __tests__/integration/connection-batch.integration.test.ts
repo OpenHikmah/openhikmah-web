@@ -239,6 +239,46 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     expect(nonEnRows).toHaveLength(0);
   });
 
+  it("provider down: aborts fast and reports the reason instead of a green empty run", async () => {
+    await seed("1:1");
+    await seed("2:255");
+    await seed("3:18");
+    mockCallAI.mockRejectedValue(new Error("[GoogleGenerativeAI Error] 429 Too Many Requests"));
+
+    const lines: string[] = [];
+    const summary = await runConnectionBatch(
+      { mode: "baseline", provider: "gemini", locales: [], maxCalls: 500, maxCostUsd: 100 },
+      { onProgress: (l) => lines.push(l) }
+    );
+
+    expect(summary.stoppedReason).toBe("error");
+    expect(summary.error).toContain("consecutive cell failures");
+    expect(summary.error).toContain("429 Too Many Requests");
+    expect(summary.generated).toBe(0);
+    // Fail-fast: it stops after ~5 cells, not all 9.
+    expect(summary.cellsProcessed).toBeLessThanOrEqual(6);
+    expect(summary.cellsFailed).toBeGreaterThanOrEqual(5);
+    expect(lines.some((l) => l.includes("FAILED:") && l.includes("429"))).toBe(true);
+  });
+
+  it("all cells fail below the fail-fast threshold: run is still marked error, not completed", async () => {
+    await seed("1:1");
+    mockCallAI.mockRejectedValue(new Error("bad api key"));
+
+    const summary = await runConnectionBatch(
+      { mode: "baseline", provider: "gemini", locales: [], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+
+    // 1 verse = 3 cells, all fail — under FAIL_FAST_THRESHOLD, so the post-loop
+    // promotion is what catches it.
+    expect(summary.cellsProcessed).toBe(3);
+    expect(summary.cellsFailed).toBe(3);
+    expect(summary.stoppedReason).toBe("error");
+    expect(summary.error).toContain("0 generated");
+    expect(summary.lastError).toBe("bad api key");
+  });
+
   it("resumability: a second run picks up cells the budget-stopped run did not reach", async () => {
     for (const r of ["1:1", "1:2", "2:1"]) await seed(r);
     mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:1", reason: "x" }]));

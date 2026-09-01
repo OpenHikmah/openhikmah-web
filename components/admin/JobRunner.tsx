@@ -106,7 +106,7 @@ export function JobRunner() {
                   )}
                   {job.error && <div className="text-xs text-error">{job.error}</div>}
                   {job.logTail && (
-                    <pre className="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap break-all font-mono text-[10px] text-text-muted">
+                    <pre className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap break-all font-mono text-[10px] text-text-muted">
                       {job.logTail}
                     </pre>
                   )}
