@@ -51,12 +51,16 @@ jobs:
             // 2. Milestone — the ongoing one: earliest open milestone whose due
             //    date is still in the future. Skip if the item already has one.
             if (!item.milestone) {
-              const { data: milestones } = await github.rest.issues.listMilestones({
-                ...context.repo,
-                state: "open",
-                sort: "due_on",
-                direction: "asc",
-              });
+              const milestones = await github.paginate(
+                github.rest.issues.listMilestones,
+                {
+                  ...context.repo,
+                  state: "open",
+                  sort: "due_on",
+                  direction: "asc",
+                  per_page: 100,
+                },
+              );
               const now = Date.now();
               const target = milestones.find(
                 (m) => m.due_on && Date.parse(m.due_on) >= now,
