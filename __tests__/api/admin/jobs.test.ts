@@ -23,6 +23,7 @@ vi.mock("@/lib/admin/job-runner", async () => {
     embedCoverage: mockEmbedCoverage,
     startJob: mockStartJob,
     stopJob: mockStopJob,
+    configuredGeminiKeys: () => ["GEMINI_API1", "GEMINI_API2"],
   };
 });
 
@@ -82,6 +83,7 @@ describe("GET /api/admin/jobs", () => {
     const body = await res.json();
     expect(body.jobs).toHaveLength(1);
     expect(body.embedCoverage).toEqual({ embedded: 6000, total: 6236 });
+    expect(body.geminiKeys).toEqual(["GEMINI_API1", "GEMINI_API2"]);
   });
 });
 

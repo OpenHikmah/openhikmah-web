@@ -28,6 +28,11 @@ import type { ConnectionResult, EdgeKind, Verse } from "@/types/quran";
 export interface GenerateOpts {
   provider?: Provider;
   model?: string;
+  /** Explicit Gemini API key (the admin backfill loop's per-key pick). */
+  apiKey?: string;
+  /** Cooperative-cancel signal, threaded to the LLM call so a rate-limit backoff
+   *  wait aborts when the admin stops the job. */
+  signal?: AbortSignal;
 }
 
 function tokensFromUsage(
@@ -163,6 +168,8 @@ export async function generateConnections(
     feature: "connections",
     provider: opts.provider,
     model: opts.model,
+    apiKey: opts.apiKey,
+    signal: opts.signal,
   });
   const text = res.text;
 
@@ -305,6 +312,8 @@ export async function generateGroundedConnections(
     feature: "connections",
     provider: opts.provider,
     model: opts.model,
+    apiKey: opts.apiKey,
+    signal: opts.signal,
   });
   const text = res.text;
 
