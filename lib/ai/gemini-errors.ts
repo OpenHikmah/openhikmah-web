@@ -156,13 +156,25 @@ function safeStringify(value: unknown): string {
  *  — retrying instantly 6× is how a key gets flagged. */
 export const PER_MINUTE_MIN_DELAY_MS = 2_000;
 
-/** The backoff wait for per-minute retry `attempt` (1-based), honouring an
- *  explicit `retryAfterMs` when Google sent a usable one, else exponential with
- *  jitter. Always at least `PER_MINUTE_MIN_DELAY_MS`. */
+/** The backoff wait for per-minute retry `attempt` (1-based).
+ *
+ * When Google sends a usable `retryDelay`, that is a MINIMUM — jitter is added
+ * on top, never subtracted, so we never re-fire before the window Google named.
+ * Otherwise: exponential from `PER_MINUTE_BASE_DELAY_MS` with ±15% jitter.
+ * Always at least `PER_MINUTE_MIN_DELAY_MS`, at most `PER_MINUTE_MAX_DELAY_MS`. */
 export function perMinuteBackoffMs(attempt: number, retryAfterMs?: number): number {
-  const exponential = PER_MINUTE_BASE_DELAY_MS * Math.pow(2, Math.max(0, attempt - 1));
-  const base = retryAfterMs && retryAfterMs > 0 ? retryAfterMs : exponential;
+  const hasRetryAfter = retryAfterMs !== undefined && retryAfterMs > 0;
+  const floor = hasRetryAfter
+    ? Math.max(retryAfterMs, PER_MINUTE_MIN_DELAY_MS)
+    : PER_MINUTE_MIN_DELAY_MS;
+  const base = hasRetryAfter
+    ? floor
+    : PER_MINUTE_BASE_DELAY_MS * Math.pow(2, Math.max(0, attempt - 1));
   const capped = Math.min(Math.max(base, PER_MINUTE_MIN_DELAY_MS), PER_MINUTE_MAX_DELAY_MS);
-  const jitter = capped * (0.85 + Math.random() * 0.3);
-  return Math.round(jitter);
+  // Additive jitter only when honouring a provider delay (0..+15%); symmetric
+  // otherwise.
+  const jitter = hasRetryAfter
+    ? capped * (1 + Math.random() * 0.15)
+    : capped * (0.85 + Math.random() * 0.3);
+  return Math.max(Math.round(jitter), floor);
 }
