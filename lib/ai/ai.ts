@@ -5,6 +5,7 @@ import { DEFAULT_MODEL, isModelForProvider } from "@/lib/ai/models";
 import {
   AMBIGUOUS_429_ESCALATE_AFTER,
   GeminiDailyQuotaError,
+  GeminiKeyInvalidError,
   GeminiRateLimitError,
   PER_MINUTE_MAX_RETRIES,
   classifyGeminiError,
@@ -218,9 +219,10 @@ async function callGemini(
         model,
       };
     } catch (err) {
-      if (err instanceof GeminiDailyQuotaError) throw err;
+      if (err instanceof GeminiDailyQuotaError || err instanceof GeminiKeyInvalidError) throw err;
       const info = classifyGeminiError(err);
       if (info.cls === "not-rate-limit") throw err;
+      if (info.cls === "key-invalid") throw new GeminiKeyInvalidError(info);
       if (info.cls === "daily") throw new GeminiDailyQuotaError(info);
 
       if (info.cls === "other-429") {

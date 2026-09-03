@@ -22,10 +22,22 @@ vi.stubGlobal(
   vi.fn(async () => ({ ok: false }))
 );
 
+// Count the pacing delays without actually waiting them out.
+const { mockSleep } = vi.hoisted(() => ({
+  mockSleep: vi.fn(async (_ms: number, _signal?: AbortSignal): Promise<void> => {}),
+}));
+vi.mock("@/lib/infra/sleep", () => ({
+  interruptibleSleep: (ms: number, signal?: AbortSignal) => mockSleep(ms, signal),
+}));
+
 import { db } from "@/lib/infra/db";
 import { verses, connections, connectionCoverage, aiGenerations } from "@/lib/infra/db/schema";
 import { runConnectionBatch } from "@/lib/ai/connection-batch";
-import { GeminiDailyQuotaError, GeminiRateLimitError } from "@/lib/ai/gemini-errors";
+import {
+  GeminiDailyQuotaError,
+  GeminiKeyInvalidError,
+  GeminiRateLimitError,
+} from "@/lib/ai/gemini-errors";
 import { getCoverageReport } from "@/lib/admin/coverage-report";
 
 async function reset() {
@@ -51,6 +63,7 @@ const hooks = { onProgress: () => {} };
 
 beforeEach(async () => {
   mockCallAI.mockReset();
+  mockSleep.mockClear();
   await reset();
 });
 
@@ -301,6 +314,88 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     expect((await db.select().from(connectionCoverage)).length).toBe(0);
   });
 
+  it("invalid key: ends the pass 'key-invalid' without a cell failure or fail-fast", async () => {
+    for (const r of ["1:1", "2:255", "3:18"]) await seed(r);
+    mockCallAI.mockRejectedValue(
+      new GeminiKeyInvalidError({ cls: "key-invalid", status: 400, raw: "API_KEY_INVALID" })
+    );
+
+    const summary = await runConnectionBatch(
+      { mode: "baseline", provider: "gemini", locales: [], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+
+    expect(summary.stoppedReason).toBe("key-invalid");
+    expect(summary.generated).toBe(0);
+    expect(summary.cellsFailed).toBe(0);
+    expect(summary.cellsProcessed).toBe(0);
+    expect((await db.select().from(connections)).length).toBe(0);
+    expect((await db.select().from(connectionCoverage)).length).toBe(0);
+  });
+
+  it("baseline picks up cells whose translations were never finished — no new generation", async () => {
+    await seed("1:1");
+    await seed("2:255");
+    // Both refs in every response → each verse gets the other as a connection,
+    // so after pass 1 every cell has English coverage (self-refs are filtered).
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        { ref: "1:1", reason: "en reason" },
+        { ref: "2:255", reason: "en reason" },
+      ])
+    );
+
+    // Pass 1: generate English only (no target locales).
+    await runConnectionBatch(
+      { mode: "baseline", provider: "gemini", locales: [], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+    const enCount = (
+      await db
+        .select()
+        .from(connections)
+        .where(sql`${connections.locale} = 'en'`)
+    ).length;
+    expect(enCount).toBeGreaterThan(0);
+
+    // Pass 2: same mode, now with a target locale. The English cell must be
+    // revisited as translate-only — only translation prompts, no generation.
+    mockCallAI.mockReset();
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (!prompt.startsWith("Translate the following sentence")) {
+        throw new Error(
+          `unexpected generation call in translate-only pass: ${prompt.slice(0, 40)}`
+        );
+      }
+      return "localized";
+    });
+    const pass2 = await runConnectionBatch(
+      { mode: "baseline", provider: "gemini", locales: ["tr"], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+
+    expect(pass2.generated).toBe(0);
+    expect(pass2.cellsFailed).toBe(0);
+    expect(pass2.translated).toBe(enCount);
+    const trCount = (
+      await db
+        .select()
+        .from(connections)
+        .where(sql`${connections.locale} = 'tr'`)
+    ).length;
+    expect(trCount).toBe(enCount);
+
+    // Pass 3: fully translated now → nothing to do, no calls.
+    mockCallAI.mockClear();
+    const pass3 = await runConnectionBatch(
+      { mode: "baseline", provider: "gemini", locales: ["tr"], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+    expect(mockCallAI).not.toHaveBeenCalled();
+    expect(pass3.generated).toBe(0);
+    expect(pass3.translated).toBe(0);
+  });
+
   it("per-minute retries exhausted: treated as an ordinary cell failure", async () => {
     await seed("1:1");
     mockCallAI.mockRejectedValue(
@@ -315,6 +410,40 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     expect(summary.stoppedReason).toBe("error");
     expect(summary.cellsFailed).toBe(3);
     expect(summary.generated).toBe(0);
+  });
+
+  it("callDelayMs: exactly one delay between consecutive real LLM requests", async () => {
+    await seed("1:1");
+    await seed("2:255");
+    // Each cell generates one English connection and then translates it once.
+    // The pacer must leave exactly one delay in each gap between consecutive
+    // real requests — i.e. (requests - 1) — with no double-delay across the
+    // generation → first-translation boundary.
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.startsWith("Translate the following sentence")) return "localized";
+      return JSON.stringify([
+        { ref: "1:1", reason: "en reason" },
+        { ref: "2:255", reason: "en reason" },
+      ]);
+    });
+
+    const summary = await runConnectionBatch(
+      {
+        mode: "baseline",
+        provider: "gemini",
+        locales: ["tr"],
+        maxCalls: 500,
+        maxCostUsd: 100,
+        callDelayMs: 5,
+      },
+      hooks
+    );
+
+    expect(summary.stoppedReason).toBe("completed");
+    expect(summary.generated).toBeGreaterThan(0);
+    expect(summary.translated).toBe(summary.generated);
+    const realRequests = mockCallAI.mock.calls.length;
+    expect(mockSleep).toHaveBeenCalledTimes(realRequests - 1);
   });
 
   it("callDelayMs: a paced run still completes", async () => {

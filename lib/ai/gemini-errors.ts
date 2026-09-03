@@ -30,7 +30,8 @@ export const PER_MINUTE_MAX_DELAY_MS = 65_000;
  *  only emits shapeless 429s stalling the loop forever. */
 export const AMBIGUOUS_429_ESCALATE_AFTER = 8;
 
-export type GeminiRateClass = "daily" | "per-minute" | "other-429" | "not-rate-limit";
+export type GeminiRateClass =
+  "daily" | "per-minute" | "other-429" | "key-invalid" | "not-rate-limit";
 
 export interface GeminiRateInfo {
   cls: GeminiRateClass;
@@ -51,6 +52,18 @@ export class GeminiDailyQuotaError extends Error {
   constructor(info: GeminiRateInfo) {
     super(`Gemini daily quota exhausted${info.quotaId ? ` (${info.quotaId})` : ""}`);
     this.name = "GeminiDailyQuotaError";
+    this.info = info;
+  }
+}
+
+/** Thrown when the API key is invalid / revoked / blocked (HTTP 400
+ *  `API_KEY_INVALID` or 403 `PERMISSION_DENIED`). Per-key, not a global fault —
+ *  the backfill loop rotates to the next key rather than stopping. */
+export class GeminiKeyInvalidError extends Error {
+  readonly info: GeminiRateInfo;
+  constructor(info: GeminiRateInfo) {
+    super(`Gemini API key invalid or blocked (HTTP ${info.status ?? "?"})`);
+    this.name = "GeminiKeyInvalidError";
     this.info = info;
   }
 }
@@ -108,6 +121,15 @@ export function classifyGeminiError(err: unknown): GeminiRateInfo {
   const lower = signal.toLowerCase();
   const raw = signal.trim().slice(0, 500);
 
+  // An invalid / revoked key (400 API_KEY_INVALID): unambiguously per-key, so the
+  // loop rotates to the next key rather than stopping. Project- / service-level
+  // 403s (consumer suspended, API disabled) are deliberately left to
+  // `not-rate-limit` below — rotating past those is futile, so the loop should
+  // stop. Checked before the generic non-429 bail-out.
+  if (status === 400 && /api[_ ]?key (?:not valid|invalid)|api_key_invalid/i.test(lower)) {
+    return { cls: "key-invalid", status, raw };
+  }
+
   // A concrete non-429 status is never a rate limit for our purposes — a 403
   // "Quota exceeded ... consumer suspended" or a 400 about a quota project
   // contain the word "quota" but must NOT route into the retry/rotate path
@@ -158,23 +180,22 @@ export const PER_MINUTE_MIN_DELAY_MS = 2_000;
 
 /** The backoff wait for per-minute retry `attempt` (1-based).
  *
- * When Google sends a usable `retryDelay`, that is a MINIMUM — jitter is added
- * on top, never subtracted, so we never re-fire before the window Google named.
- * Otherwise: exponential from `PER_MINUTE_BASE_DELAY_MS` with ±15% jitter.
- * Always at least `PER_MINUTE_MIN_DELAY_MS`, at most `PER_MINUTE_MAX_DELAY_MS`. */
+ * When Google sends a usable `retryDelay`, that is a hard MINIMUM — jitter is
+ * added on top, never subtracted, so we never re-fire before the window Google
+ * named, and there is no upper cap (a provider delay above
+ * `PER_MINUTE_MAX_DELAY_MS` is honoured in full). Keeping the jitter even past
+ * the cap is what stops concurrent workers that got the same `retryDelay` from
+ * all re-firing on the same tick.
+ *
+ * Otherwise: exponential from `PER_MINUTE_BASE_DELAY_MS` with ±15% jitter,
+ * always at least `PER_MINUTE_MIN_DELAY_MS`, at most `PER_MINUTE_MAX_DELAY_MS`. */
 export function perMinuteBackoffMs(attempt: number, retryAfterMs?: number): number {
-  const hasRetryAfter = retryAfterMs !== undefined && retryAfterMs > 0;
-  const floor = hasRetryAfter
-    ? Math.max(retryAfterMs, PER_MINUTE_MIN_DELAY_MS)
-    : PER_MINUTE_MIN_DELAY_MS;
-  const base = hasRetryAfter
-    ? floor
-    : PER_MINUTE_BASE_DELAY_MS * Math.pow(2, Math.max(0, attempt - 1));
+  if (retryAfterMs !== undefined && retryAfterMs > 0) {
+    const floor = Math.max(retryAfterMs, PER_MINUTE_MIN_DELAY_MS);
+    return Math.round(floor * (1 + Math.random() * 0.15));
+  }
+  const base = PER_MINUTE_BASE_DELAY_MS * Math.pow(2, Math.max(0, attempt - 1));
   const capped = Math.min(Math.max(base, PER_MINUTE_MIN_DELAY_MS), PER_MINUTE_MAX_DELAY_MS);
-  // Additive jitter only when honouring a provider delay (0..+15%); symmetric
-  // otherwise.
-  const jitter = hasRetryAfter
-    ? capped * (1 + Math.random() * 0.15)
-    : capped * (0.85 + Math.random() * 0.3);
-  return Math.max(Math.round(jitter), floor);
+  const jittered = Math.round(capped * (0.85 + Math.random() * 0.3));
+  return Math.min(Math.max(jittered, PER_MINUTE_MIN_DELAY_MS), PER_MINUTE_MAX_DELAY_MS);
 }
