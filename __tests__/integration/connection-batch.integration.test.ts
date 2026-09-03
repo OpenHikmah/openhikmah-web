@@ -22,6 +22,14 @@ vi.stubGlobal(
   vi.fn(async () => ({ ok: false }))
 );
 
+// Count the pacing delays without actually waiting them out.
+const { mockSleep } = vi.hoisted(() => ({
+  mockSleep: vi.fn(async (_ms: number, _signal?: AbortSignal): Promise<void> => {}),
+}));
+vi.mock("@/lib/infra/sleep", () => ({
+  interruptibleSleep: (ms: number, signal?: AbortSignal) => mockSleep(ms, signal),
+}));
+
 import { db } from "@/lib/infra/db";
 import { verses, connections, connectionCoverage, aiGenerations } from "@/lib/infra/db/schema";
 import { runConnectionBatch } from "@/lib/ai/connection-batch";
@@ -55,6 +63,7 @@ const hooks = { onProgress: () => {} };
 
 beforeEach(async () => {
   mockCallAI.mockReset();
+  mockSleep.mockClear();
   await reset();
 });
 
@@ -401,6 +410,40 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     expect(summary.stoppedReason).toBe("error");
     expect(summary.cellsFailed).toBe(3);
     expect(summary.generated).toBe(0);
+  });
+
+  it("callDelayMs: exactly one delay between consecutive real LLM requests", async () => {
+    await seed("1:1");
+    await seed("2:255");
+    // Each cell generates one English connection and then translates it once.
+    // The pacer must leave exactly one delay in each gap between consecutive
+    // real requests — i.e. (requests - 1) — with no double-delay across the
+    // generation → first-translation boundary.
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.startsWith("Translate the following sentence")) return "localized";
+      return JSON.stringify([
+        { ref: "1:1", reason: "en reason" },
+        { ref: "2:255", reason: "en reason" },
+      ]);
+    });
+
+    const summary = await runConnectionBatch(
+      {
+        mode: "baseline",
+        provider: "gemini",
+        locales: ["tr"],
+        maxCalls: 500,
+        maxCostUsd: 100,
+        callDelayMs: 5,
+      },
+      hooks
+    );
+
+    expect(summary.stoppedReason).toBe("completed");
+    expect(summary.generated).toBeGreaterThan(0);
+    expect(summary.translated).toBe(summary.generated);
+    const realRequests = mockCallAI.mock.calls.length;
+    expect(mockSleep).toHaveBeenCalledTimes(realRequests - 1);
   });
 
   it("callDelayMs: a paced run still completes", async () => {

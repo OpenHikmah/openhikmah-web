@@ -180,25 +180,22 @@ export const PER_MINUTE_MIN_DELAY_MS = 2_000;
 
 /** The backoff wait for per-minute retry `attempt` (1-based).
  *
- * When Google sends a usable `retryDelay`, that is a MINIMUM — jitter is added
- * on top, never subtracted, so we never re-fire before the window Google named.
- * Otherwise: exponential from `PER_MINUTE_BASE_DELAY_MS` with ±15% jitter.
- * Always at least `PER_MINUTE_MIN_DELAY_MS`, at most `PER_MINUTE_MAX_DELAY_MS`. */
+ * When Google sends a usable `retryDelay`, that is a hard MINIMUM — jitter is
+ * added on top, never subtracted, so we never re-fire before the window Google
+ * named, and there is no upper cap (a provider delay above
+ * `PER_MINUTE_MAX_DELAY_MS` is honoured in full). Keeping the jitter even past
+ * the cap is what stops concurrent workers that got the same `retryDelay` from
+ * all re-firing on the same tick.
+ *
+ * Otherwise: exponential from `PER_MINUTE_BASE_DELAY_MS` with ±15% jitter,
+ * always at least `PER_MINUTE_MIN_DELAY_MS`, at most `PER_MINUTE_MAX_DELAY_MS`. */
 export function perMinuteBackoffMs(attempt: number, retryAfterMs?: number): number {
-  const hasRetryAfter = retryAfterMs !== undefined && retryAfterMs > 0;
-  const floor = hasRetryAfter
-    ? Math.max(retryAfterMs, PER_MINUTE_MIN_DELAY_MS)
-    : PER_MINUTE_MIN_DELAY_MS;
-  const base = hasRetryAfter
-    ? floor
-    : PER_MINUTE_BASE_DELAY_MS * Math.pow(2, Math.max(0, attempt - 1));
+  if (retryAfterMs !== undefined && retryAfterMs > 0) {
+    const floor = Math.max(retryAfterMs, PER_MINUTE_MIN_DELAY_MS);
+    return Math.round(floor * (1 + Math.random() * 0.15));
+  }
+  const base = PER_MINUTE_BASE_DELAY_MS * Math.pow(2, Math.max(0, attempt - 1));
   const capped = Math.min(Math.max(base, PER_MINUTE_MIN_DELAY_MS), PER_MINUTE_MAX_DELAY_MS);
-  // Additive jitter only when honouring a provider delay (0..+15%); symmetric
-  // otherwise.
-  const jitter = hasRetryAfter
-    ? capped * (1 + Math.random() * 0.15)
-    : capped * (0.85 + Math.random() * 0.3);
-  // Clamp to [floor, MAX] — jitter must not push a fallback wait past the max.
-  // `floor` wins when an honoured provider retryAfterMs exceeds the max.
-  return Math.min(Math.max(Math.round(jitter), floor), Math.max(PER_MINUTE_MAX_DELAY_MS, floor));
+  const jittered = Math.round(capped * (0.85 + Math.random() * 0.3));
+  return Math.min(Math.max(jittered, PER_MINUTE_MIN_DELAY_MS), PER_MINUTE_MAX_DELAY_MS);
 }

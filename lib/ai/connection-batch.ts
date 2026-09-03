@@ -134,6 +134,28 @@ async function pace(ms: number | undefined, signal?: AbortSignal): Promise<void>
   await interruptibleSleep(ms, signal);
 }
 
+interface Pacer {
+  waitTurn(): Promise<void>;
+  noteRequest(): void;
+}
+
+/** Spaces consecutive real LLM requests by exactly one `ms` delay — across the
+ *  generation→translation and cell→cell boundaries alike. `waitTurn()` before a
+ *  request waits only if a prior request is owed a delay; `noteRequest()` after a
+ *  request that actually went out arms the next wait. */
+function createPacer(ms: number | undefined, signal?: AbortSignal): Pacer {
+  let owed = false;
+  return {
+    async waitTurn() {
+      if (owed) await pace(ms, signal);
+      owed = false;
+    },
+    noteRequest() {
+      owed = true;
+    },
+  };
+}
+
 /** Cost of one generation call, estimated (the generation path doesn't return
  *  token usage). Deliberately the DEFAULT_TOKENS path so the guard errs early. */
 function perCallCost(provider: Provider, model: string): number {
@@ -313,7 +335,7 @@ async function translateCellReasons(
   provider: Provider,
   model: string,
   budget: { spend: () => boolean; stoppedReason: StoppedReason | null },
-  gen: { apiKey?: string; signal?: AbortSignal; callDelayMs?: number } = {}
+  gen: { apiKey?: string; signal?: AbortSignal; pacer?: Pacer } = {}
 ): Promise<{ inserted: number; stoppedReason: StoppedReason | null }> {
   if (locales.length === 0) return { inserted: 0, stoppedReason: null };
 
@@ -337,7 +359,7 @@ async function translateCellReasons(
     for (const en of enRows) {
       if (existing.has(en.toRef)) continue;
       if (!budget.spend()) return { inserted, stoppedReason: budget.stoppedReason };
-      await pace(gen.callDelayMs, gen.signal);
+      await gen.pacer?.waitTurn();
 
       let translated: string;
       try {
@@ -348,11 +370,13 @@ async function translateCellReasons(
           apiKey: gen.apiKey,
           signal: gen.signal,
         });
+        gen.pacer?.noteRequest();
       } catch (err) {
         // A daily-quota hit or an invalid key is not a translation problem —
         // bubble it to the single handler in runConnectionBatch so the pass ends
         // "quota-daily" / "key-invalid" and the loop rotates keys.
         if (err instanceof GeminiDailyQuotaError || err instanceof GeminiKeyInvalidError) throw err;
+        gen.pacer?.noteRequest();
         console.error(`connection-batch: translation failed ${fromRef} ${kind} ${locale}:`, err);
         incr("connection_batch_translate_failed");
         continue;
@@ -493,6 +517,7 @@ export async function runConnectionBatch(
   };
 
   let consecutiveFailures = 0;
+  const pacer = createPacer(opts.callDelayMs, signal);
 
   for (const cell of cells) {
     // Cooperative cancel from the admin panel (job-runner aborts this signal).
@@ -524,6 +549,7 @@ export async function runConnectionBatch(
           break;
         }
 
+        await pacer.waitTurn();
         const { results, calledAI } = await generateConnectionsForCell(
           cell.fromRef,
           cell.kind,
@@ -536,14 +562,14 @@ export async function runConnectionBatch(
         );
         if (!calledAI) {
           // No grounding data / drained pool — no request was actually made, so
-          // refund the reservation and don't pace (no call to space out).
+          // refund the reservation and don't arm the pacer (no call to space out).
           summary.callsUsed--;
           summary.costUsd -= callCost;
         } else {
           // A request went out and came back without throwing — the provider is
           // alive, so a later isolated failure isn't the fail-fast case.
           consecutiveFailures = 0;
-          await pace(opts.callDelayMs, signal);
+          pacer.noteRequest();
         }
         summary.generated += results.length;
 
@@ -568,7 +594,7 @@ export async function runConnectionBatch(
           opts.provider,
           model,
           budget,
-          { apiKey: opts.apiKey, signal, callDelayMs: opts.callDelayMs }
+          { apiKey: opts.apiKey, signal, pacer }
         );
         summary.translated += xlt.inserted;
         await upsertCoverage(cell.fromRef, cell.kind, { activeCount, lastError: null });

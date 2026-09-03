@@ -151,9 +151,17 @@ describe("perMinuteBackoffMs", () => {
     }
   });
 
-  it("still honours a provider retryAfterMs that exceeds the max", () => {
+  it("still honours a provider retryAfterMs that exceeds the max, and keeps jitter", () => {
     const huge = PER_MINUTE_MAX_DELAY_MS * 3;
-    expect(perMinuteBackoffMs(1, huge)).toBeGreaterThanOrEqual(huge);
+    const seen = new Set<number>();
+    for (let i = 0; i < 50; i++) {
+      const ms = perMinuteBackoffMs(1, huge);
+      expect(ms).toBeGreaterThanOrEqual(huge);
+      expect(ms).toBeLessThanOrEqual(huge * 1.15 + 1);
+      seen.add(ms);
+    }
+    // Jitter must survive past the cap — otherwise every worker re-fires in sync.
+    expect(seen.size).toBeGreaterThan(1);
   });
 
   it("floors a zero retryDelay so retries never burst back-to-back", () => {
