@@ -2,7 +2,16 @@ import { spawn } from "node:child_process";
 import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { jobRuns, verses, verseEmbeddings } from "@/lib/infra/db/schema";
-import { runConnectionBatch, type BatchOptions } from "@/lib/ai/connection-batch";
+import {
+  runConnectionBatch,
+  type BatchOptions,
+  type StoppedReason,
+} from "@/lib/ai/connection-batch";
+import {
+  runConnectionBatchLoop,
+  type LoopOptions,
+  type LoopStoppedReason,
+} from "@/lib/ai/connection-batch-loop";
 import type { Provider } from "@/lib/ai/ai";
 import { SELECTABLE_MODELS, isModelForProvider } from "@/lib/ai/models";
 import { LOCALES, type Locale } from "@/lib/i18n/config";
@@ -67,9 +76,33 @@ export const JOBS: readonly JobDefinition[] = [
   },
 ] as const;
 
-/** Validates raw admin input for the backfill job into the typed options
- *  `runConnectionBatch` takes. Throws on bad input (routes map to 400). */
-function parseBackfillParams(raw: Record<string, unknown>): BatchOptions {
+/** Env var names holding the free-tier Gemini keys the backfill "loop mode"
+ *  rotates through. Order here is the rotation order. */
+export const GEMINI_KEY_POOL = [
+  "GEMINI_API1",
+  "GEMINI_API2",
+  "GEMINI_API3",
+  "GEMINI_API4",
+  "GEMINI_API5",
+] as const;
+
+/** The subset of `GEMINI_KEY_POOL` whose env var is actually set. Names only —
+ *  never values. The coverage form fetches this to build its key picker. */
+export function configuredGeminiKeys(): string[] {
+  return GEMINI_KEY_POOL.filter((name) => !!process.env[name]);
+}
+
+const MAX_CALL_DELAY_MS = 60_000;
+const DEFAULT_CALL_DELAY_MS = 1500;
+
+export type ParsedBackfill =
+  { kind: "single"; opts: BatchOptions } | { kind: "loop"; opts: LoopOptions };
+
+/** Validates raw admin input for the backfill job. Returns either the one-pass
+ *  options `runConnectionBatch` takes, or — when `raw.loop` is set — the
+ *  key-rotating options `runConnectionBatchLoop` takes. Throws on bad input
+ *  (routes map to 400). */
+function parseBackfillParams(raw: Record<string, unknown>): ParsedBackfill {
   const mode = raw.mode;
   if (mode !== "baseline" && mode !== "topup") throw new Error("mode must be baseline or topup");
 
@@ -90,6 +123,48 @@ function parseBackfillParams(raw: Record<string, unknown>): BatchOptions {
   if (localeList.some((l) => !["tr", "ru", "az"].includes(l))) {
     throw new Error("locales must be a subset of tr,ru,az");
   }
+  const locales = localeList.filter((l): l is Locale => (LOCALES as readonly string[]).includes(l));
+
+  if (raw.loop) {
+    if (provider !== "gemini") {
+      throw new Error("loop mode requires provider=gemini (Claude has no free tier)");
+    }
+
+    const rawKeys = Array.isArray(raw.keys) ? raw.keys : [];
+    const poolOrder = GEMINI_KEY_POOL as readonly string[];
+    const keyLabels = poolOrder.filter(
+      (name) => rawKeys.includes(name) // dedupe + pool order in one pass
+    );
+    const unknown = rawKeys.filter((k) => typeof k !== "string" || !poolOrder.includes(k));
+    if (unknown.length > 0) throw new Error(`unknown key name(s): ${unknown.join(", ")}`);
+    if (keyLabels.length === 0) throw new Error("loop mode requires at least one Gemini key");
+    const missing = keyLabels.filter((name) => !process.env[name]);
+    if (missing.length > 0) {
+      throw new Error(`keys not configured in env: ${missing.join(", ")}`);
+    }
+
+    let callDelayMs = DEFAULT_CALL_DELAY_MS;
+    if (raw.callDelayMs !== undefined && raw.callDelayMs !== "") {
+      callDelayMs = Number(raw.callDelayMs);
+      if (!Number.isInteger(callDelayMs) || callDelayMs < 0 || callDelayMs > MAX_CALL_DELAY_MS) {
+        throw new Error(`callDelayMs must be an integer between 0 and ${MAX_CALL_DELAY_MS}`);
+      }
+    }
+
+    return {
+      kind: "loop",
+      opts: {
+        mode,
+        model: model as string | undefined,
+        locales,
+        apiKeys: keyLabels.map((name) => process.env[name] as string),
+        apiKeyLabels: keyLabels,
+        callDelayMs,
+        maxCalls: optionalPositiveInt(raw.maxCalls, "maxCalls"),
+        maxCostUsd: optionalPositiveNumber(raw.maxCostUsd, "maxCostUsd"),
+      },
+    };
+  }
 
   const maxCalls = Number(raw.maxCalls);
   if (!Number.isInteger(maxCalls) || maxCalls <= 0)
@@ -104,16 +179,37 @@ function parseBackfillParams(raw: Record<string, unknown>): BatchOptions {
   if (!process.env[requiredKey]) throw new Error(`Missing required env var: ${requiredKey}`);
 
   return {
-    mode,
-    provider: provider as Provider,
-    model: model as string | undefined,
-    locales: localeList.filter((l): l is Locale => (LOCALES as readonly string[]).includes(l)),
-    maxCalls,
-    maxCostUsd,
+    kind: "single",
+    opts: {
+      mode,
+      provider: provider as Provider,
+      model: model as string | undefined,
+      locales,
+      maxCalls,
+      maxCostUsd,
+    },
   };
 }
 
-const LOG_TAIL_LINES = 50;
+/** A blank optional ceiling means "no cap" — `Number.POSITIVE_INFINITY`, which
+ *  the batch's `+1 > max` / `+cost > max` guards treat as always-allowed. */
+function optionalPositiveInt(value: unknown, name: string): number {
+  if (value === undefined || value === "" || value === null) return Number.POSITIVE_INFINITY;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n <= 0) throw new Error(`${name} must be a positive integer`);
+  return n;
+}
+
+function optionalPositiveNumber(value: unknown, name: string): number {
+  if (value === undefined || value === "" || value === null) return Number.POSITIVE_INFINITY;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) throw new Error(`${name} must be a positive number`);
+  return n;
+}
+
+// 100, not 50: a loop run's per-key rotation lines need to stay visible on the
+// Jobs page alongside the inner batch's periodic progress lines.
+const LOG_TAIL_LINES = 100;
 
 interface RunningJob {
   jobId: JobDefinition["id"];
@@ -165,6 +261,18 @@ function finishRun(
   if (running?.runId === state.runId) running = null;
 }
 
+/** Maps a batch / loop terminal reason to the `job_runs.status` the Jobs page
+ *  renders. "All selected keys hit their daily quota" and "work list fully
+ *  covered" are the loop's *designed* clean endings — `success`, with the log
+ *  tail explaining which. Only a genuine fault is `failed`. */
+function mapTerminalStatus(
+  reason: StoppedReason | LoopStoppedReason
+): "success" | "failed" | "cancelled" {
+  if (reason === "cancelled") return "cancelled";
+  if (reason === "error" || reason === "quota-daily") return "failed";
+  return "success";
+}
+
 /** Starts a job if none is currently running. Throws on bad input or an
  *  already-running job — routes should catch and translate to a 400/409.
  *  `params` is required for jobs with `acceptsParams` and rejected for others. */
@@ -182,10 +290,10 @@ export async function startJob(
     throw new Error(`Missing required env var(s): ${missingEnv.join(", ")}`);
   }
 
-  let backfillOpts: BatchOptions | null = null;
+  let backfill: ParsedBackfill | null = null;
   if (job.acceptsParams) {
     if (!params) throw new Error(`Job "${job.id}" requires params`);
-    if (job.id === "backfill-connections") backfillOpts = parseBackfillParams(params);
+    if (job.id === "backfill-connections") backfill = parseBackfillParams(params);
   } else if (params) {
     throw new Error(`Job "${job.id}" does not accept params`);
   }
@@ -220,20 +328,15 @@ export async function startJob(
     // endpoint reads. `runConnectionBatch` is budget-capped and single-flight,
     // and a redeploy kills it exactly like it killed the spawned child — the
     // `job_runs` row + resumable work list cover restart recovery.
+    const parsed = backfill as ParsedBackfill;
     void (async () => {
       try {
-        const summary = await runConnectionBatch(
-          backfillOpts as BatchOptions,
-          { onProgress: (line) => pushLogLine(state, line) },
-          state.controller.signal
-        );
-        const status =
-          summary.stoppedReason === "error"
-            ? "failed"
-            : summary.stoppedReason === "cancelled"
-              ? "cancelled"
-              : "success";
-        finishRun(state, status, summary.error ?? null);
+        const hooks = { onProgress: (line: string) => pushLogLine(state, line) };
+        const summary =
+          parsed.kind === "loop"
+            ? await runConnectionBatchLoop(parsed.opts, hooks, state.controller.signal)
+            : await runConnectionBatch(parsed.opts, hooks, state.controller.signal);
+        finishRun(state, mapTerminalStatus(summary.stoppedReason), summary.error ?? null);
       } catch (err) {
         pushLogLine(state, `job failed: ${err instanceof Error ? err.message : String(err)}`);
         finishRun(state, "failed", err instanceof Error ? err.message : String(err));

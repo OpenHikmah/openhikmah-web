@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
-import { JOBS, getJobsStatus, embedCoverage, startJob, stopJob } from "@/lib/admin/job-runner";
+import {
+  JOBS,
+  getJobsStatus,
+  embedCoverage,
+  startJob,
+  stopJob,
+  configuredGeminiKeys,
+} from "@/lib/admin/job-runner";
 
 /** Job list + latest run status, plus the embedding-coverage check. */
 export async function GET(req: NextRequest) {
@@ -10,7 +17,11 @@ export async function GET(req: NextRequest) {
 
   try {
     const [jobs, coverage] = await Promise.all([getJobsStatus(), embedCoverage()]);
-    return NextResponse.json({ jobs, embedCoverage: coverage });
+    return NextResponse.json({
+      jobs,
+      embedCoverage: coverage,
+      geminiKeys: configuredGeminiKeys(),
+    });
   } catch (err) {
     console.error("admin jobs GET error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

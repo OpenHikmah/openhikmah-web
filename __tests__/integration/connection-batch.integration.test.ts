@@ -25,6 +25,7 @@ vi.stubGlobal(
 import { db } from "@/lib/infra/db";
 import { verses, connections, connectionCoverage, aiGenerations } from "@/lib/infra/db/schema";
 import { runConnectionBatch } from "@/lib/ai/connection-batch";
+import { GeminiDailyQuotaError, GeminiRateLimitError } from "@/lib/ai/gemini-errors";
 import { getCoverageReport } from "@/lib/admin/coverage-report";
 
 async function reset() {
@@ -277,6 +278,63 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     expect(summary.stoppedReason).toBe("error");
     expect(summary.error).toContain("0 generated");
     expect(summary.lastError).toBe("bad api key");
+  });
+
+  it("daily quota: ends the pass 'quota-daily' without a cell failure or fail-fast", async () => {
+    for (const r of ["1:1", "2:255", "3:18"]) await seed(r);
+    mockCallAI.mockRejectedValue(
+      new GeminiDailyQuotaError({ cls: "daily", status: 429, raw: "PerDay" })
+    );
+
+    const summary = await runConnectionBatch(
+      { mode: "baseline", provider: "gemini", locales: [], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+
+    expect(summary.stoppedReason).toBe("quota-daily");
+    expect(summary.generated).toBe(0);
+    expect(summary.cellsFailed).toBe(0);
+    // Stops at the first cell — no fail-fast draining of the work list.
+    expect(summary.cellsProcessed).toBe(0);
+    expect((await db.select().from(connections)).length).toBe(0);
+    // The quota hit is not recorded as a coverage last_error.
+    expect((await db.select().from(connectionCoverage)).length).toBe(0);
+  });
+
+  it("per-minute retries exhausted: treated as an ordinary cell failure", async () => {
+    await seed("1:1");
+    mockCallAI.mockRejectedValue(
+      new GeminiRateLimitError({ cls: "per-minute", status: 429, raw: "PerMinute" }, 6)
+    );
+
+    const summary = await runConnectionBatch(
+      { mode: "baseline", provider: "gemini", locales: [], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+
+    expect(summary.stoppedReason).toBe("error");
+    expect(summary.cellsFailed).toBe(3);
+    expect(summary.generated).toBe(0);
+  });
+
+  it("callDelayMs: a paced run still completes", async () => {
+    await seed("1:1");
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
+    await seed("2:255");
+
+    const summary = await runConnectionBatch(
+      {
+        mode: "baseline",
+        provider: "gemini",
+        locales: [],
+        maxCalls: 500,
+        maxCostUsd: 100,
+        callDelayMs: 5,
+      },
+      hooks
+    );
+    expect(summary.stoppedReason).toBe("completed");
+    expect(summary.generated).toBeGreaterThan(0);
   });
 
   it("resumability: a second run picks up cells the budget-stopped run did not reach", async () => {

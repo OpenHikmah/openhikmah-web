@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Input, NativeSelect } from "@/components/ui";
 import { StateNote, ConfirmButton, Panel } from "@/components/admin/primitives";
@@ -11,6 +11,9 @@ import type { Locale } from "@/lib/i18n/config";
 import { SELECTABLE_MODELS } from "@/lib/ai/models";
 
 const TARGET_LOCALES: Exclude<Locale, "en">[] = ["tr", "ru", "az"];
+
+const DEFAULT_CALL_DELAY_MS = 1500;
+const MAX_CALL_DELAY_MS = 60_000;
 
 /**
  * The "Run the backfill job" console. Its inputs are deliberately kept in a
@@ -24,6 +27,13 @@ const TARGET_LOCALES: Exclude<Locale, "en">[] = ["tr", "ru", "az"];
  * run lives on the Jobs page. The budget fields (max calls / max cost) have no
  * default value on purpose: an accidental "Run backfill" click must not be able
  * to start a run that spends money.
+ *
+ * "Loop" mode (Gemini-only, free tier): the job re-runs pass after pass,
+ * rotating through the selected `GEMINI_API1..5` keys, advancing to the next key
+ * only when the current one hits its per-day quota, and pacing every LLM call by
+ * the given delay. It stops when every selected key is daily-exhausted, the work
+ * list is fully covered, the admin clicks Stop, or an optional safety budget cap
+ * is reached. Per-minute 429s are waited out and retried, never fatal.
  */
 export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
   const api = useAdminFetch();
@@ -37,16 +47,70 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
   });
   const [maxCalls, setMaxCalls] = useState<number | "">("");
   const [maxCostUsd, setMaxCostUsd] = useState<number | "">("");
+
+  const [loop, setLoop] = useState(false);
+  const [geminiKeys, setGeminiKeys] = useState<string[] | null>(null);
+  const [keysError, setKeysError] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Record<string, boolean>>({});
+  const [callDelayMs, setCallDelayMs] = useState<number | "">(DEFAULT_CALL_DELAY_MS);
+
   const [runNote, setRunNote] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    api<{ keys: string[] }>("/gemini-keys")
+      .then((r) => {
+        if (cancelled) return;
+        setKeysError(false);
+        setGeminiKeys(r.keys);
+        // Seed the selection once, on first load — a token refresh re-runs this
+        // effect (api is memoised on the access token) and must not silently
+        // re-check keys the admin deliberately unticked.
+        setSelectedKeys((prev) =>
+          Object.keys(prev).length > 0 ? prev : Object.fromEntries(r.keys.map((k) => [k, true]))
+        );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Distinguish "couldn't check" from "none configured" — otherwise an auth
+        // blip reads as "set your env vars" (which are already fine).
+        setKeysError(true);
+        setGeminiKeys((prev) => prev ?? []);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
+
+  const selectedKeyList = (geminiKeys ?? []).filter((k) => selectedKeys[k]);
+  const delayInvalid =
+    callDelayMs === "" ||
+    !Number.isInteger(callDelayMs) ||
+    callDelayMs < 0 ||
+    callDelayMs > MAX_CALL_DELAY_MS;
+  const budgetInvalid = (v: number | "") => v !== "" && (!Number.isFinite(v) || v <= 0);
   const budgetsInvalid = maxCalls === "" || maxCostUsd === "" || maxCalls <= 0 || maxCostUsd <= 0;
+  const formInvalid = loop
+    ? delayInvalid ||
+      selectedKeyList.length === 0 ||
+      budgetInvalid(maxCalls) ||
+      budgetInvalid(maxCostUsd)
+    : budgetsInvalid;
+
+  const toggleLoop = (checked: boolean) => {
+    setLoop(checked);
+    if (checked && provider !== "gemini") {
+      setProvider("gemini");
+      setModel("");
+    }
+  };
 
   const startRun = async () => {
     setRunNote(null);
     setRunError(null);
-    if (budgetsInvalid) return;
+    if (formInvalid) return;
     setStarting(true);
     try {
       await api("/jobs", {
@@ -55,11 +119,18 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
           jobId: "backfill-connections",
           params: {
             mode,
-            provider,
+            provider: loop ? "gemini" : provider,
             ...(model ? { model } : {}),
             locales: TARGET_LOCALES.filter((l) => runLocales[l]).join(","),
-            maxCalls,
-            maxCostUsd,
+            ...(loop
+              ? {
+                  loop: true,
+                  keys: selectedKeyList,
+                  callDelayMs: callDelayMs === "" ? DEFAULT_CALL_DELAY_MS : callDelayMs,
+                  ...(maxCalls !== "" ? { maxCalls } : {}),
+                  ...(maxCostUsd !== "" ? { maxCostUsd } : {}),
+                }
+              : { maxCalls, maxCostUsd }),
           },
         },
       });
@@ -94,21 +165,24 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
 
         <Field label="Provider">
           <NativeSelect
-            value={provider}
+            value={loop ? "gemini" : provider}
+            disabled={loop}
             onChange={(e) => {
               setProvider(e.target.value as "claude" | "gemini");
               setModel("");
             }}
           >
             <option value="gemini">gemini — cheapest</option>
-            <option value="claude">claude — highest fidelity</option>
+            <option value="claude" disabled={loop}>
+              claude — highest fidelity
+            </option>
           </NativeSelect>
         </Field>
 
         <Field label="Model">
           <NativeSelect value={model} onChange={(e) => setModel(e.target.value)}>
             <option value="">default</option>
-            {SELECTABLE_MODELS[provider].map((m) => (
+            {SELECTABLE_MODELS[loop ? "gemini" : provider].map((m) => (
               <option key={m} value={m}>
                 {m}
               </option>
@@ -133,23 +207,23 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Max LLM calls">
+          <Field label={loop ? "Max LLM calls (optional)" : "Max LLM calls"}>
             <Input
               type="number"
               min={1}
               value={maxCalls}
-              placeholder="required"
+              placeholder={loop ? "unbounded" : "required"}
               onChange={(e) => setMaxCalls(e.target.value === "" ? "" : Number(e.target.value))}
               className="tabular-nums"
             />
           </Field>
-          <Field label="Max cost (USD, est.)">
+          <Field label={loop ? "Max cost (optional cap)" : "Max cost (USD, est.)"}>
             <Input
               type="number"
               min={0.1}
               step={0.1}
               value={maxCostUsd}
-              placeholder="required"
+              placeholder={loop ? "unbounded" : "required"}
               onChange={(e) => setMaxCostUsd(e.target.value === "" ? "" : Number(e.target.value))}
               className="tabular-nums"
             />
@@ -157,15 +231,99 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
         </div>
       </div>
 
+      <div className="mt-4 border-t border-border pt-3">
+        <label className="flex items-start gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={loop}
+            className="mt-0.5"
+            onChange={(e) => toggleLoop(e.target.checked)}
+          />
+          <span>
+            <span className="text-text-secondary">
+              Loop — keep running, rotating Gemini keys, until every selected key hits its daily
+              quota
+            </span>
+            <span className="mt-0.5 block text-text-muted">
+              Gemini-only (free tier). Per-minute rate limits are waited out and retried; only a
+              per-day quota rotates to the next key. Stop a run from the{" "}
+              <Link href="/admin/jobs" className="underline">
+                Jobs page
+              </Link>
+              .
+            </span>
+          </span>
+        </label>
+
+        {loop && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="text-xs">
+              <span className="mb-1 block text-text-secondary">Gemini keys (rotation order)</span>
+              {geminiKeys === null ? (
+                <span className="text-text-muted">Loading…</span>
+              ) : keysError ? (
+                <span className="text-text-muted">
+                  Couldn&apos;t load the key list — reload the page to retry.
+                </span>
+              ) : geminiKeys.length === 0 ? (
+                <span className="text-text-muted">
+                  No GEMINI_API1..5 keys configured — set them in the environment to use loop mode.
+                </span>
+              ) : (
+                <div className="flex flex-wrap gap-3">
+                  {geminiKeys.map((k) => (
+                    <label key={k} className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedKeys[k] ?? false}
+                        onChange={(e) => setSelectedKeys((s) => ({ ...s, [k]: e.target.checked }))}
+                      />
+                      {k}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Field
+              label="Delay between LLM calls (ms)"
+              hint="~1500 ms ≈ 3 calls / 4.5 s. Lower risks per-minute 429s (auto-retried)."
+            >
+              <Input
+                type="number"
+                min={0}
+                max={MAX_CALL_DELAY_MS}
+                step={100}
+                value={callDelayMs}
+                onChange={(e) =>
+                  setCallDelayMs(e.target.value === "" ? "" : Number(e.target.value))
+                }
+                className="tabular-nums"
+              />
+            </Field>
+          </div>
+        )}
+      </div>
+
       <p className="mt-2 text-[11px] text-text-muted">
-        Max LLM calls and Max cost are both required — there is no default, so a stray click can
-        never start a run. The job stops cleanly at whichever limit is hit first: max calls is
-        exact; max cost is a per-call estimate (token counts aren&apos;t tracked on this path). Stop
-        a run in progress from the{" "}
-        <Link href="/admin/jobs" className="underline">
-          Jobs page
-        </Link>
-        .
+        {loop ? (
+          <>
+            In loop mode both budget fields are optional safety caps — leave them blank to run until
+            the keys are exhausted or you click Stop. Free-tier keys cost $0, so the $ figure shown
+            on the Jobs page is a notional list price.
+          </>
+        ) : (
+          <>
+            Max LLM calls and Max cost are both required — there is no default, so a stray click can
+            never start a run. The job stops cleanly at whichever limit is hit first: max calls is
+            exact; max cost is a per-call estimate (token counts aren&apos;t tracked on this path).
+            Stop a run in progress from the{" "}
+            <Link href="/admin/jobs" className="underline">
+              Jobs page
+            </Link>
+            .
+          </>
+        )}
       </p>
 
       {runError && <StateNote tone="error">{runError}</StateNote>}
@@ -178,20 +336,26 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
         </p>
       )}
 
-      {budgetsInvalid && (
+      {formInvalid && (
         <p className="mt-2 text-[11px] text-text-muted">
-          Enter Max LLM calls and Max cost to enable the run.
+          {loop
+            ? "Select at least one Gemini key and a valid delay to enable the run."
+            : "Enter Max LLM calls and Max cost to enable the run."}
         </p>
       )}
 
       <div className="mt-3">
         <ConfirmButton
           variant="secondary"
-          disabled={starting || budgetsInvalid}
+          disabled={starting || formInvalid}
           onConfirm={startRun}
-          confirmLabel={`Run ${mode} on ${provider}?`}
+          confirmLabel={
+            loop
+              ? `Loop ${mode} on ${selectedKeyList.length} key(s)?`
+              : `Run ${mode} on ${provider}?`
+          }
         >
-          {starting ? "Starting…" : "Run backfill"}
+          {starting ? "Starting…" : loop ? "Start loop" : "Run backfill"}
         </ConfirmButton>
       </div>
     </Panel>

@@ -5,8 +5,10 @@ import { generateConnectionsForCell } from "@/lib/ai/graph-service";
 import { translateReason } from "@/lib/ai/translate";
 import { estimateCostUsd } from "@/lib/ai/ai-cost";
 import { resolveModel, type Provider } from "@/lib/ai/ai";
+import { GeminiDailyQuotaError } from "@/lib/ai/gemini-errors";
 import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
 import { incr } from "@/lib/infra/metrics";
+import { interruptibleSleep } from "@/lib/infra/sleep";
 import type { EdgeKind } from "@/types/quran";
 
 /**
@@ -42,7 +44,15 @@ const PROGRESS_EVERY = 25;
 const FAIL_FAST_THRESHOLD = 5;
 
 export type BatchMode = "baseline" | "topup";
-export type StoppedReason = "completed" | "call-budget" | "cost-budget" | "error" | "cancelled";
+export type StoppedReason =
+  | "completed"
+  | "call-budget"
+  | "cost-budget"
+  | "error"
+  | "cancelled"
+  /** The active Gemini key hit its per-day quota. The single-pass batch stops
+   *  here; the outer loop (connection-batch-loop.ts) rotates to the next key. */
+  | "quota-daily";
 
 export interface BatchOptions {
   mode: BatchMode;
@@ -53,11 +63,23 @@ export interface BatchOptions {
   model?: string;
   /** Target locales to translate the English reason into (subset of tr/ru/az). */
   locales: Locale[];
-  /** Hard ceiling on LLM calls this run. Always exact. */
+  /** Ceiling on *reserved* LLM calls this run — one per generation + one per
+   *  locale translation. `callGemini` may issue up to PER_MINUTE_MAX_RETRIES real
+   *  HTTP requests per reservation when it hits per-minute 429s, so against
+   *  Google's quota this under-counts; it is the run's spend guard, not a request
+   *  meter. `Number.POSITIVE_INFINITY` in loop mode when left blank. */
   maxCalls: number;
   /** Best-effort USD ceiling. Estimated per call (tokens aren't tracked on the
-   *  generation path), so treat as approximate — maxCalls is the real guard. */
+   *  generation path), so treat as approximate — maxCalls is the real guard.
+   *  `Number.POSITIVE_INFINITY` in loop mode when the admin leaves it blank. */
   maxCostUsd: number;
+  /** Explicit Gemini API key for this pass — the backfill loop's per-key pick.
+   *  Undefined for a normal single run (uses `process.env.GEMINI_API_KEY`). */
+  apiKey?: string;
+  /** Delay in ms after each successful `budget.spend()` (i.e. before each LLM
+   *  request), to stay under free-tier per-minute limits. 0 / undefined = none.
+   *  Abort-aware — a Stop click interrupts the wait. */
+  callDelayMs?: number;
 }
 
 export interface BatchHooks {
@@ -83,6 +105,9 @@ export interface BatchSummary {
   /** Message from the most recent cell-level failure, surfaced even when the run
    *  as a whole is not marked failed. */
   lastError?: string;
+  /** How many (verse × kind) cells the work list held at the start of this pass.
+   *  The loop uses `0 changes on a completed pass` to detect "work fully done." */
+  workListSize: number;
 }
 
 interface Cell {
@@ -94,6 +119,13 @@ interface Cell {
 }
 
 const cellKey = (ref: string, kind: string) => `${ref}|${kind}`;
+
+/** Throttle between LLM requests in loop mode. No-op when unset. Abort-aware so a
+ *  Stop click doesn't have to wait out the full delay. */
+async function pace(ms: number | undefined, signal?: AbortSignal): Promise<void> {
+  if (!ms || ms <= 0) return;
+  await interruptibleSleep(ms, signal);
+}
 
 /** Cost of one generation call, estimated (the generation path doesn't return
  *  token usage). Deliberately the DEFAULT_TOKENS path so the guard errs early. */
@@ -197,7 +229,8 @@ async function translateCellReasons(
   locales: Locale[],
   provider: Provider,
   model: string,
-  budget: { spend: () => boolean; stoppedReason: StoppedReason | null }
+  budget: { spend: () => boolean; stoppedReason: StoppedReason | null },
+  gen: { apiKey?: string; signal?: AbortSignal; callDelayMs?: number } = {}
 ): Promise<{ inserted: number; stoppedReason: StoppedReason | null }> {
   if (locales.length === 0) return { inserted: 0, stoppedReason: null };
 
@@ -221,6 +254,7 @@ async function translateCellReasons(
     for (const en of enRows) {
       if (existing.has(en.toRef)) continue;
       if (!budget.spend()) return { inserted, stoppedReason: budget.stoppedReason };
+      await pace(gen.callDelayMs, gen.signal);
 
       let translated: string;
       try {
@@ -228,8 +262,14 @@ async function translateCellReasons(
           feature: "connections",
           provider,
           model,
+          apiKey: gen.apiKey,
+          signal: gen.signal,
         });
       } catch (err) {
+        // A daily-quota hit is not a translation problem — bubble it to the
+        // single handler in runConnectionBatch so the pass ends "quota-daily"
+        // and the loop rotates keys.
+        if (err instanceof GeminiDailyQuotaError) throw err;
         console.error(`connection-batch: translation failed ${fromRef} ${kind} ${locale}:`, err);
         incr("connection_batch_translate_failed");
         continue;
@@ -312,6 +352,7 @@ export async function runConnectionBatch(
     translated: 0,
     exhausted: 0,
     cellsFailed: 0,
+    workListSize: 0,
   };
 
   // Resolve the effective model once, up front: with no per-run pick,
@@ -330,6 +371,7 @@ export async function runConnectionBatch(
     hooks.onProgress(`[${opts.mode}] failed to build work list: ${summary.error}`);
     return summary;
   }
+  summary.workListSize = cells.length;
 
   hooks.onProgress(
     `[${opts.mode}] ${cells.length} cells to consider | provider=${opts.provider} | ` +
@@ -392,6 +434,7 @@ export async function runConnectionBatch(
         summary.stoppedReason = budget.stoppedReason ?? "call-budget";
         break;
       }
+      await pace(opts.callDelayMs, signal);
 
       const { results, calledAI } = await generateConnectionsForCell(
         cell.fromRef,
@@ -400,7 +443,8 @@ export async function runConnectionBatch(
         excludeRefs,
         "en",
         opts.provider,
-        model
+        model,
+        { apiKey: opts.apiKey, signal }
       );
       if (!calledAI) {
         // No grounding data / drained pool — no request was actually made, so
@@ -430,7 +474,8 @@ export async function runConnectionBatch(
           opts.locales,
           opts.provider,
           model,
-          budget
+          budget,
+          { apiKey: opts.apiKey, signal, callDelayMs: opts.callDelayMs }
         );
         summary.translated += xlt.inserted;
         await upsertCoverage(cell.fromRef, cell.kind, { activeCount, lastError: null });
@@ -441,6 +486,24 @@ export async function runConnectionBatch(
         }
       }
     } catch (err) {
+      // A cooperative cancel (Stop button) can land here as the rejection of an
+      // in-flight `pace()` delay or a `callGemini` rate-limit backoff. That is
+      // not a cell failure — don't poison the coverage row or trip fail-fast.
+      if (signal?.aborted || (err instanceof Error && err.name === "AbortError")) {
+        summary.stoppedReason = "cancelled";
+        break;
+      }
+      if (err instanceof GeminiDailyQuotaError) {
+        // Not a per-cell failure: the key is spent for the day. End the pass
+        // cleanly so the outer loop rotates to the next key. Deliberately does
+        // NOT touch cellsFailed / consecutiveFailures / coverage lastError.
+        summary.stoppedReason = "quota-daily";
+        summary.lastError = err.message;
+        hooks.onProgress(
+          `[${opts.mode}] daily quota exhausted for the active key at ${cell.fromRef} ${cell.kind} — ending pass to rotate`
+        );
+        break;
+      }
       const message = err instanceof Error ? err.message : String(err);
       console.error(`connection-batch: cell ${cell.fromRef} ${cell.kind} failed:`, err);
       incr("connection_batch_cell_failed");

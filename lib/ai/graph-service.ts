@@ -188,9 +188,10 @@ export async function generateConnectionsForCell(
   excludeRefs: string[] = [],
   locale: Locale = "en",
   provider: Provider,
-  model: string
+  model: string,
+  gen: { apiKey?: string; signal?: AbortSignal } = {}
 ): Promise<CellGenerationResult> {
-  const genOpts = [{ provider, model }] as const;
+  const genOpts = [{ provider, model, apiKey: gen.apiKey, signal: gen.signal }] as const;
   const candidates = await discoverCandidates(fromRef, kind, undefined, excludeRefs);
   const calledAI = candidates.length > 0 || excludeRefs.length === 0;
   // The legacy ungrounded path has no notion of excludeRefs — it would just

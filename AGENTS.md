@@ -81,6 +81,7 @@ Describe the theological implications of any AI prompt change in the PR (see the
 - **Error handling** — no silent `catch` blocks. A failure should surface loudly, especially around parsing AI responses, where silently falling back could produce wrong theological content instead of a visible error.
 - **Testing bar** — new logic requires new tests in the same PR, not left for CI to catch after the fact.
 - **AI-specific correctness** — never "fix" a failing theological/verse-reference test by loosening the validation; only by fixing the underlying data or prompt. This is the failure mode most specific to this repo: an agent under test pressure weakening a real guardrail.
+- **Connection-backfill loop mode** — the admin coverage page can run the backfill in a continuous loop (Gemini-only, free tier) that rotates through a pool of keys named `GEMINI_API1..GEMINI_API5` (see `.env.example`). It advances to the next key only on a per-day quota exhaustion; per-minute 429s are waited out and retried, and a non-quota pass failure stops the loop. Gemini 429s are classified in exactly one place — `lib/ai/gemini-errors.ts` — do not scatter status-code checks elsewhere. Default pace is ~1500 ms between LLM calls.
 
 ## Available tooling
 

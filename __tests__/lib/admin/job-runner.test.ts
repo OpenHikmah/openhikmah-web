@@ -48,7 +48,20 @@ vi.mock("node:child_process", () => ({
 const { mockRunConnectionBatch } = vi.hoisted(() => ({ mockRunConnectionBatch: vi.fn() }));
 vi.mock("@/lib/ai/connection-batch", () => ({ runConnectionBatch: mockRunConnectionBatch }));
 
-import { startJob, stopJob, embedCoverage, JOBS } from "@/lib/admin/job-runner";
+const { mockRunConnectionBatchLoop } = vi.hoisted(() => ({
+  mockRunConnectionBatchLoop: vi.fn(),
+}));
+vi.mock("@/lib/ai/connection-batch-loop", () => ({
+  runConnectionBatchLoop: mockRunConnectionBatchLoop,
+}));
+
+import {
+  startJob,
+  stopJob,
+  embedCoverage,
+  JOBS,
+  configuredGeminiKeys,
+} from "@/lib/admin/job-runner";
 
 beforeEach(() => {
   mockInsert.mockReset().mockReturnValue(makeDbChain([{ id: 42 }]));
@@ -60,6 +73,7 @@ beforeEach(() => {
     return child;
   });
   mockRunConnectionBatch.mockReset().mockResolvedValue({ stoppedReason: "completed" });
+  mockRunConnectionBatchLoop.mockReset().mockResolvedValue({ stoppedReason: "all-keys-daily" });
 });
 
 // `running` is module-level state in job-runner.ts (by design — it's the
@@ -328,6 +342,138 @@ describe("stopJob", () => {
   it("refuses to stop a spawned (script) job", async () => {
     await startJob("seed-morphology", "qf-admin");
     expect(() => stopJob("qf-admin")).toThrow(/can't be stopped/);
+  });
+});
+
+describe("startJob — backfill-connections loop mode", () => {
+  const base = { mode: "baseline", provider: "gemini", locales: "tr,ru", loop: true };
+
+  beforeEach(() => {
+    process.env.GEMINI_API1 = "key-1";
+    process.env.GEMINI_API2 = "key-2";
+    delete process.env.GEMINI_API3;
+  });
+  afterEach(() => {
+    delete process.env.GEMINI_API1;
+    delete process.env.GEMINI_API2;
+  });
+
+  it("rejects loop mode with provider=claude", async () => {
+    await expect(
+      startJob("backfill-connections", "qf-admin", {
+        ...base,
+        provider: "claude",
+        keys: ["GEMINI_API1"],
+      })
+    ).rejects.toThrow(/gemini/i);
+  });
+
+  it("rejects loop mode with no keys / an unknown key / an unset key", async () => {
+    await expect(
+      startJob("backfill-connections", "qf-admin", { ...base, keys: [] })
+    ).rejects.toThrow(/at least one Gemini key/);
+    await expect(
+      startJob("backfill-connections", "qf-admin", { ...base, keys: ["GEMINI_API9"] })
+    ).rejects.toThrow(/unknown key/);
+    await expect(
+      startJob("backfill-connections", "qf-admin", { ...base, keys: ["GEMINI_API3"] })
+    ).rejects.toThrow(/not configured in env/);
+  });
+
+  it("rejects an out-of-range or non-integer callDelayMs", async () => {
+    for (const callDelayMs of [-5, 70000, 1.5]) {
+      await expect(
+        startJob("backfill-connections", "qf-admin", {
+          ...base,
+          keys: ["GEMINI_API1"],
+          callDelayMs,
+        })
+      ).rejects.toThrow(/callDelayMs/);
+    }
+  });
+
+  it("dispatches to runConnectionBatchLoop with resolved key values, labels, and Infinity caps", async () => {
+    mockRunConnectionBatchLoop.mockReturnValueOnce(new Promise(() => {}));
+    await startJob("backfill-connections", "qf-admin", {
+      ...base,
+      keys: ["GEMINI_API2", "GEMINI_API1"],
+    });
+    expect(mockRunConnectionBatch).not.toHaveBeenCalled();
+    expect(mockRunConnectionBatchLoop).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: "baseline",
+        locales: ["tr", "ru"],
+        apiKeys: ["key-1", "key-2"],
+        apiKeyLabels: ["GEMINI_API1", "GEMINI_API2"],
+        callDelayMs: 1500,
+        maxCalls: Number.POSITIVE_INFINITY,
+        maxCostUsd: Number.POSITIVE_INFINITY,
+      }),
+      expect.objectContaining({ onProgress: expect.any(Function) }),
+      expect.any(AbortSignal)
+    );
+  });
+
+  it("does not require GEMINI_API_KEY for loop mode", async () => {
+    const prev = process.env.GEMINI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    try {
+      mockRunConnectionBatchLoop.mockReturnValueOnce(new Promise(() => {}));
+      await expect(
+        startJob("backfill-connections", "qf-admin", { ...base, keys: ["GEMINI_API1"] })
+      ).resolves.toEqual({ runId: 42 });
+    } finally {
+      if (prev !== undefined) process.env.GEMINI_API_KEY = prev;
+    }
+  });
+
+  it("maps all-keys-daily → success, error → failed, cancelled → cancelled", async () => {
+    const cases = [
+      ["all-keys-daily", "success"],
+      ["work-exhausted", "success"],
+      ["error", "failed"],
+      ["cancelled", "cancelled"],
+    ] as const;
+    for (const [stoppedReason, expected] of cases) {
+      // Capture the status object passed to db.update(...).set({ status, ... }).
+      const setSpy = vi.fn().mockReturnValue(makeDbChain([]));
+      mockUpdate.mockReturnValue(
+        new Proxy(() => {}, { get: (_t, p) => (p === "set" ? setSpy : () => mockUpdate()) })
+      );
+      mockRunConnectionBatchLoop.mockResolvedValueOnce({ stoppedReason, error: "x" });
+      await startJob("backfill-connections", "qf-admin", { ...base, keys: ["GEMINI_API1"] });
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(setSpy).toHaveBeenCalledWith(expect.objectContaining({ status: expected }));
+      const next = await startJob("seed-quran", "qf-admin");
+      expect(next.runId).toBe(42);
+      lastChild.current?.emit("close", 0);
+      await Promise.resolve();
+      mockUpdate.mockReturnValue(makeDbChain([]));
+    }
+  });
+
+  it("stopJob aborts the loop's signal", async () => {
+    mockRunConnectionBatchLoop.mockReturnValueOnce(new Promise(() => {}));
+    await startJob("backfill-connections", "qf-admin", { ...base, keys: ["GEMINI_API1"] });
+    const signal = mockRunConnectionBatchLoop.mock.calls[0][2] as AbortSignal;
+    expect(signal.aborted).toBe(false);
+    expect(stopJob("qf-admin")).toEqual({ jobId: "backfill-connections" });
+    expect(signal.aborted).toBe(true);
+  });
+});
+
+describe("configuredGeminiKeys", () => {
+  it("returns only the pool names whose env var is set, in pool order", () => {
+    delete process.env.GEMINI_API1;
+    process.env.GEMINI_API2 = "b";
+    process.env.GEMINI_API4 = "d";
+    try {
+      expect(configuredGeminiKeys()).toEqual(["GEMINI_API2", "GEMINI_API4"]);
+    } finally {
+      delete process.env.GEMINI_API2;
+      delete process.env.GEMINI_API4;
+    }
   });
 });
 

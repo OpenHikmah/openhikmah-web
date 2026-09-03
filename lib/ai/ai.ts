@@ -2,6 +2,15 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getFlagString } from "@/lib/admin/feature-flags";
 import { DEFAULT_MODEL, isModelForProvider } from "@/lib/ai/models";
+import {
+  AMBIGUOUS_429_ESCALATE_AFTER,
+  GeminiDailyQuotaError,
+  GeminiRateLimitError,
+  PER_MINUTE_MAX_RETRIES,
+  classifyGeminiError,
+  perMinuteBackoffMs,
+} from "@/lib/ai/gemini-errors";
+import { interruptibleSleep } from "@/lib/infra/sleep";
 
 export type Provider = "claude" | "gemini";
 
@@ -30,6 +39,12 @@ export interface CallAiOptions {
   /** Hard model override (the admin batch job's per-run pick). Applied only when
    *  it belongs to the resolved provider; otherwise ignored. */
   model?: string;
+  /** Explicit Gemini API key for this call — the admin backfill loop's per-key
+   *  pick. When set, overrides `process.env.GEMINI_API_KEY`. Ignored for Claude. */
+  apiKey?: string;
+  /** Cooperative-cancel signal. Currently only Gemini honours it, to abort a
+   *  rate-limit backoff wait mid-sleep when the admin stops the job. */
+  signal?: AbortSignal;
 }
 
 /** The model id a provider will use by default: the `<PROVIDER>_MODEL` env var
@@ -118,7 +133,9 @@ export async function resolveProvider(feature?: AiFeature, override?: Provider):
 export async function callAIDetailed(prompt: string, opts: CallAiOptions = {}): Promise<AiResult> {
   const provider = await resolveProvider(opts.feature, opts.provider);
   const model = await resolveModel(opts.feature, provider, opts.model);
-  return provider === "gemini" ? callGemini(prompt, model) : callClaude(prompt, model);
+  return provider === "gemini"
+    ? callGemini(prompt, model, opts.apiKey, opts.signal)
+    : callClaude(prompt, model);
 }
 
 /**
@@ -153,24 +170,69 @@ async function callClaude(prompt: string, model: string): Promise<AiResult> {
   };
 }
 
-async function callGemini(prompt: string, model: string): Promise<AiResult> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
-  const ai = new GoogleGenerativeAI(apiKey);
+/**
+ * Consecutive ambiguous 429s (429 with no clear per-day / per-minute marker) per
+ * API key, with no successful call on that key in between. Keyed by the key value
+ * so the admin backfill loop's pool keys and live site traffic (which uses
+ * `process.env.GEMINI_API_KEY`) never reset or trip each other's counter. Reset
+ * on any success for that key and by `resetGeminiRateLimitState(key)` (the loop
+ * calls it when it switches keys). At `AMBIGUOUS_429_ESCALATE_AFTER` a
+ * `callGemini` throws `GeminiDailyQuotaError` so a daily-dead key that only emits
+ * shapeless 429s still triggers a key rotation instead of retrying forever.
+ */
+const ambiguous429Streak = new Map<string, number>();
+
+/** Clears the ambiguous-429 streak for one key, or all keys when omitted. */
+export function resetGeminiRateLimitState(key?: string): void {
+  if (key === undefined) ambiguous429Streak.clear();
+  else ambiguous429Streak.delete(key);
+}
+
+async function callGemini(
+  prompt: string,
+  model: string,
+  apiKey?: string,
+  signal?: AbortSignal
+): Promise<AiResult> {
+  const key = apiKey ?? process.env.GEMINI_API_KEY;
+  if (!key) throw new Error("GEMINI_API_KEY is not set");
+  const ai = new GoogleGenerativeAI(key);
   const genModel = ai.getGenerativeModel({ model });
-  const result = await genModel.generateContent(prompt);
-  const meta = result.response.usageMetadata;
-  return {
-    text: result.response.text(),
-    usage: meta
-      ? {
-          inputTokens: meta.promptTokenCount ?? 0,
-          outputTokens: meta.candidatesTokenCount ?? 0,
+
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const result = await genModel.generateContent(prompt);
+      ambiguous429Streak.delete(key);
+      const meta = result.response.usageMetadata;
+      return {
+        text: result.response.text(),
+        usage: meta
+          ? {
+              inputTokens: meta.promptTokenCount ?? 0,
+              outputTokens: meta.candidatesTokenCount ?? 0,
+            }
+          : null,
+        provider: "gemini",
+        model,
+      };
+    } catch (err) {
+      if (err instanceof GeminiDailyQuotaError) throw err;
+      const info = classifyGeminiError(err);
+      if (info.cls === "not-rate-limit") throw err;
+      if (info.cls === "daily") throw new GeminiDailyQuotaError(info);
+
+      if (info.cls === "other-429") {
+        const streak = (ambiguous429Streak.get(key) ?? 0) + 1;
+        ambiguous429Streak.set(key, streak);
+        if (streak >= AMBIGUOUS_429_ESCALATE_AFTER) {
+          ambiguous429Streak.delete(key);
+          throw new GeminiDailyQuotaError(info);
         }
-      : null,
-    provider: "gemini",
-    model,
-  };
+      }
+      if (attempt >= PER_MINUTE_MAX_RETRIES) throw new GeminiRateLimitError(info, attempt);
+      await interruptibleSleep(perMinuteBackoffMs(attempt, info.retryAfterMs), signal);
+    }
+  }
 }
 
 // ─── Embeddings ───────────────────────────────────────────────────────────────
