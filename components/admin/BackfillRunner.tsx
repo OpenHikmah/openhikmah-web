@@ -287,7 +287,7 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
 
             <Field
               label="Delay between LLM calls (ms)"
-              hint="~1500 ms ≈ 3 calls / 4.5 s. Lower risks per-minute 429s (auto-retried)."
+              hint="~1500 ms ≈ 3 calls / 4.5 s. A higher delay lowers the risk of per-minute 429s (which are auto-retried anyway)."
             >
               <Input
                 type="number"

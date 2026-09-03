@@ -102,10 +102,12 @@ describe("typed errors", () => {
 });
 
 describe("perMinuteBackoffMs", () => {
-  it("honours an explicit retryAfterMs (within jitter)", () => {
-    const ms = perMinuteBackoffMs(1, 12_000);
-    expect(ms).toBeGreaterThanOrEqual(12_000 * 0.85);
-    expect(ms).toBeLessThanOrEqual(12_000 * 1.15);
+  it("never returns less than the provider-supplied retryAfterMs", () => {
+    for (let i = 0; i < 50; i++) {
+      const ms = perMinuteBackoffMs(1, 12_000);
+      expect(ms).toBeGreaterThanOrEqual(12_000);
+      expect(ms).toBeLessThanOrEqual(12_000 * 1.15 + 1);
+    }
   });
 
   it("caps the exponential backoff", () => {

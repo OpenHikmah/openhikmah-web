@@ -85,6 +85,23 @@ describe("callGemini retry / classification", () => {
     expect(ctorKeys).toEqual(["loop-key-2"]);
   });
 
+  it("forwards the AbortSignal into the generateContent request", async () => {
+    mockGenerate.mockResolvedValueOnce(ok);
+    const ac = new AbortController();
+    await callAIDetailed("hi", { provider: "gemini", signal: ac.signal });
+    expect(mockGenerate).toHaveBeenCalledWith("hi", { signal: ac.signal });
+  });
+
+  it("propagates an abort thrown by generateContent itself", async () => {
+    mockGenerate.mockRejectedValueOnce(
+      Object.assign(new Error("The operation was aborted"), { name: "AbortError" })
+    );
+    await expect(callAIDetailed("hi", { provider: "gemini" })).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
+  });
+
   it("aborts a backoff wait when the signal fires", async () => {
     mockGenerate.mockRejectedValue(fetchError(perMinute));
     const ac = new AbortController();
