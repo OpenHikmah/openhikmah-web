@@ -1,0 +1,26 @@
+name: PR labeler
+
+# Adds area labels to PRs based on which paths changed (map in
+# .github/labeler.yml). Uses `pull_request_target` so PRs from forks also get
+# labeled — labeler@v5 reads its config from the base branch and never checks
+# out PR head code, so there is no untrusted-code execution here.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-labeler-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    name: Apply path labels
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          sync-labels: false

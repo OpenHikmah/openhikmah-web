@@ -1,0 +1,96 @@
+name: Auto triage
+
+# On issue / PR creation, fill in the fields that are otherwise set by hand:
+#   - assignee: the author (if unset and the author is a real user)
+#   - milestone: the currently-running milestone (earliest open one whose due
+#     date has not passed), if unset
+#   - label: a conventional-commit prefix on the title -> matching label, as a
+#     fallback for items opened without an issue template
+# None of these override a choice a human already made on the item.
+on:
+  issues:
+    types: [opened, reopened]
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: triage-${{ github.event_name }}-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    name: Assign, milestone, label
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const item = context.payload.issue ?? context.payload.pull_request;
+            const issue_number = item.number;
+            const author = item.user?.login;
+
+            // 1. Assignee — author, if nobody is assigned and the author is a real user.
+            if ((item.assignees ?? []).length === 0 && author && !author.endsWith("[bot]")) {
+              try {
+                await github.rest.issues.addAssignees({
+                  ...context.repo,
+                  issue_number,
+                  assignees: [author],
+                });
+              } catch (e) {
+                // External contributors who aren't collaborators can't be assigned.
+                core.warning(`Could not assign @${author}: ${e.message}`);
+              }
+            }
+
+            // 2. Milestone — the ongoing one: earliest open milestone whose due
+            //    date is still in the future. Skip if the item already has one.
+            if (!item.milestone) {
+              const milestones = await github.paginate(
+                github.rest.issues.listMilestones,
+                {
+                  ...context.repo,
+                  state: "open",
+                  sort: "due_on",
+                  direction: "asc",
+                  per_page: 100,
+                },
+              );
+              const now = Date.now();
+              const target = milestones.find(
+                (m) => m.due_on && Date.parse(m.due_on) >= now,
+              );
+              if (target) {
+                await github.rest.issues.update({
+                  ...context.repo,
+                  issue_number,
+                  milestone: target.number,
+                });
+                core.info(`Milestone set to "${target.title}" (#${target.number}).`);
+              } else {
+                core.info("No open milestone with a future due date; leaving milestone unset.");
+              }
+            }
+
+            // 3. Label fallback — conventional-commit prefix on the title.
+            const prefixLabels = {
+              feat: "enhancement",
+              fix: "bug",
+              docs: "docs",
+              chore: "chore",
+            };
+            const prefix = (item.title || "").match(/^(\w+)(\([^)]*\))?!?:/)?.[1];
+            const label = prefixLabels[prefix];
+            const current = (item.labels ?? []).map((l) => (typeof l === "string" ? l : l.name));
+            if (label && !current.includes(label)) {
+              await github.rest.issues.addLabels({
+                ...context.repo,
+                issue_number,
+                labels: [label],
+              });
+            }
