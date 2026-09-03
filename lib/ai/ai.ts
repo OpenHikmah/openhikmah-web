@@ -201,7 +201,9 @@ async function callGemini(
 
   for (let attempt = 1; ; attempt++) {
     try {
-      const result = await genModel.generateContent(prompt);
+      // `signal` aborts the client-side wait on a Stop click; it does not cancel
+      // the request in Google's service (still billed) — SDK docs are explicit.
+      const result = await genModel.generateContent(prompt, signal ? { signal } : {});
       ambiguous429Streak.delete(key);
       const meta = result.response.usageMetadata;
       return {
