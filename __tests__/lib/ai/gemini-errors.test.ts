@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   GeminiDailyQuotaError,
+  GeminiKeyInvalidError,
   GeminiRateLimitError,
   classifyGeminiError,
   perMinuteBackoffMs,
   PER_MINUTE_MAX_DELAY_MS,
+  PER_MINUTE_MIN_DELAY_MS,
 } from "@/lib/ai/gemini-errors";
 
 /** Shape of what `@google/generative-ai` throws for a non-2xx. */
@@ -73,6 +75,27 @@ describe("classifyGeminiError", () => {
     ).toBe("not-rate-limit");
   });
 
+  it("classifies a 400 API_KEY_INVALID as key-invalid", () => {
+    const detail = {
+      "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+      reason: "API_KEY_INVALID",
+      domain: "googleapis.com",
+    };
+    const info = classifyGeminiError(
+      fetchError(400, [detail], "API key not valid. Please pass a valid API key.")
+    );
+    expect(info.cls).toBe("key-invalid");
+    expect(info.status).toBe(400);
+  });
+
+  it("leaves a 403 PERMISSION_DENIED as not-rate-limit (project-level, loop should stop)", () => {
+    expect(
+      classifyGeminiError(
+        fetchError(403, [], "PERMISSION_DENIED: API has not been used in project")
+      ).cls
+    ).toBe("not-rate-limit");
+  });
+
   it("treats a 500 / network error as not-rate-limit", () => {
     expect(classifyGeminiError(fetchError(500, [], "500 Internal Server Error")).cls).toBe(
       "not-rate-limit"
@@ -99,6 +122,14 @@ describe("typed errors", () => {
     const err = new GeminiRateLimitError(classifyGeminiError(fetchError(429, [])), 6);
     expect(err.attempts).toBe(6);
   });
+
+  it("GeminiKeyInvalidError carries the classification info", () => {
+    const info = classifyGeminiError(fetchError(400, [], "API key not valid"));
+    const err = new GeminiKeyInvalidError(info);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.info.cls).toBe("key-invalid");
+    expect(err.name).toBe("GeminiKeyInvalidError");
+  });
 });
 
 describe("perMinuteBackoffMs", () => {
@@ -110,8 +141,19 @@ describe("perMinuteBackoffMs", () => {
     }
   });
 
-  it("caps the exponential backoff", () => {
-    expect(perMinuteBackoffMs(20)).toBeLessThanOrEqual(PER_MINUTE_MAX_DELAY_MS * 1.15);
+  it("never exceeds PER_MINUTE_MAX_DELAY_MS in the fallback path, at any attempt", () => {
+    for (const attempt of [1, 2, 3, 5, 10, 20]) {
+      for (let i = 0; i < 30; i++) {
+        const ms = perMinuteBackoffMs(attempt);
+        expect(ms).toBeGreaterThanOrEqual(PER_MINUTE_MIN_DELAY_MS);
+        expect(ms).toBeLessThanOrEqual(PER_MINUTE_MAX_DELAY_MS);
+      }
+    }
+  });
+
+  it("still honours a provider retryAfterMs that exceeds the max", () => {
+    const huge = PER_MINUTE_MAX_DELAY_MS * 3;
+    expect(perMinuteBackoffMs(1, huge)).toBeGreaterThanOrEqual(huge);
   });
 
   it("floors a zero retryDelay so retries never burst back-to-back", () => {

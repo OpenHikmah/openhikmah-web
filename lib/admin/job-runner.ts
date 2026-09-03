@@ -269,7 +269,9 @@ function mapTerminalStatus(
   reason: StoppedReason | LoopStoppedReason
 ): "success" | "failed" | "cancelled" {
   if (reason === "cancelled") return "cancelled";
-  if (reason === "error" || reason === "quota-daily") return "failed";
+  // "quota-daily" / "key-invalid" are per-pass reasons the loop consumes
+  // internally; if one ever surfaces as a terminal reason, it's a fault.
+  if (reason === "error" || reason === "quota-daily" || reason === "key-invalid") return "failed";
   return "success";
 }
 

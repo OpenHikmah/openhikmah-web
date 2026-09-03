@@ -21,7 +21,11 @@ vi.mock("@/lib/admin/feature-flags", () => ({
 }));
 
 import { callAIDetailed, resetGeminiRateLimitState } from "@/lib/ai/ai";
-import { GeminiDailyQuotaError, GeminiRateLimitError } from "@/lib/ai/gemini-errors";
+import {
+  GeminiDailyQuotaError,
+  GeminiKeyInvalidError,
+  GeminiRateLimitError,
+} from "@/lib/ai/gemini-errors";
 
 function fetchError(details: unknown[], message = "429") {
   return Object.assign(new Error(message), { status: 429, errorDetails: details });
@@ -99,6 +103,39 @@ describe("callGemini retry / classification", () => {
     await expect(callAIDetailed("hi", { provider: "gemini" })).rejects.toMatchObject({
       name: "AbortError",
     });
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels a pending in-flight generateContent when the signal aborts — no retry", async () => {
+    // Request stays pending until the signal aborts.
+    mockGenerate.mockImplementation(
+      (_prompt: string, opts?: { signal?: AbortSignal }) =>
+        new Promise((_res, rej) => {
+          opts?.signal?.addEventListener("abort", () =>
+            rej(Object.assign(new Error("aborted"), { name: "AbortError" }))
+          );
+        })
+    );
+    const ac = new AbortController();
+    const p = callAIDetailed("hi", { provider: "gemini", signal: ac.signal }).catch((e) => e);
+    await vi.advanceTimersByTimeAsync(1);
+    ac.abort();
+    const err = await p;
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).name).toBe("AbortError");
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws GeminiKeyInvalidError immediately for an invalid key, no retry", async () => {
+    mockGenerate.mockRejectedValue(
+      Object.assign(new Error("API key not valid. Please pass a valid API key."), {
+        status: 400,
+        errorDetails: [{ "@type": "google.rpc.ErrorInfo", reason: "API_KEY_INVALID" }],
+      })
+    );
+    await expect(callAIDetailed("hi", { provider: "gemini" })).rejects.toBeInstanceOf(
+      GeminiKeyInvalidError
+    );
     expect(mockGenerate).toHaveBeenCalledTimes(1);
   });
 

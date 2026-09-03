@@ -432,6 +432,7 @@ describe("startJob — backfill-connections loop mode", () => {
       ["all-keys-daily", "success"],
       ["work-exhausted", "success"],
       ["error", "failed"],
+      ["key-invalid", "failed"],
       ["cancelled", "cancelled"],
     ] as const;
     for (const [stoppedReason, expected] of cases) {

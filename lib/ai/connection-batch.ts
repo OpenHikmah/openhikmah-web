@@ -1,11 +1,11 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { verses, connections, connectionCoverage, aiGenerations } from "@/lib/infra/db/schema";
 import { generateConnectionsForCell } from "@/lib/ai/graph-service";
 import { translateReason } from "@/lib/ai/translate";
 import { estimateCostUsd } from "@/lib/ai/ai-cost";
 import { resolveModel, type Provider } from "@/lib/ai/ai";
-import { GeminiDailyQuotaError } from "@/lib/ai/gemini-errors";
+import { GeminiDailyQuotaError, GeminiKeyInvalidError } from "@/lib/ai/gemini-errors";
 import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
 import { incr } from "@/lib/infra/metrics";
 import { interruptibleSleep } from "@/lib/infra/sleep";
@@ -52,7 +52,10 @@ export type StoppedReason =
   | "cancelled"
   /** The active Gemini key hit its per-day quota. The single-pass batch stops
    *  here; the outer loop (connection-batch-loop.ts) rotates to the next key. */
-  | "quota-daily";
+  | "quota-daily"
+  /** The active Gemini key is invalid / revoked. Same handling as `quota-daily`
+   *  — the outer loop rotates to the next key. */
+  | "key-invalid";
 
 export interface BatchOptions {
   mode: BatchMode;
@@ -116,6 +119,10 @@ interface Cell {
   translation: string;
   kind: EdgeKind;
   activeCount: number;
+  /** Baseline only: this cell already has English connections but is missing one
+   *  or more requested-locale rows (an earlier pass stopped mid-cell). Translate
+   *  the existing English reasons; do NOT run generation. */
+  translateOnly?: boolean;
 }
 
 const cellKey = (ref: string, kind: string) => `${ref}|${kind}`;
@@ -133,8 +140,65 @@ function perCallCost(provider: Provider, model: string): number {
   return estimateCostUsd(model, provider, null);
 }
 
-/** Builds the ordered work list from current DB state. */
-async function buildWorkList(mode: BatchMode): Promise<Cell[]> {
+/**
+ * Cells (baseline only) that already have active English connections but are
+ * missing an active row in one or more of `targetLocales` for some English
+ * target. This catches the gap left when an earlier pass generated the English
+ * rows and then stopped (budget / daily quota / invalid key / Stop) before
+ * translating — baseline would otherwise never revisit the cell.
+ *
+ * Row-by-row (not a count compare) so a retired-and-replaced English edge can't
+ * make a locale look complete when it isn't. Mirrors how `translateCellReasons`
+ * decides what to insert.
+ */
+async function findTranslationGaps(targetLocales: Locale[]): Promise<Set<string>> {
+  if (targetLocales.length === 0) return new Set();
+
+  const rows = await db
+    .select({
+      fromRef: connections.fromRef,
+      toRef: connections.toRef,
+      kind: connections.kind,
+      locale: connections.locale,
+    })
+    .from(connections)
+    .where(
+      and(eq(connections.status, "active"), inArray(connections.locale, ["en", ...targetLocales]))
+    );
+
+  // key = `${fromRef}|${kind}` → locale → set of toRefs
+  const byCell = new Map<string, Map<string, Set<string>>>();
+  for (const r of rows) {
+    const key = cellKey(r.fromRef, r.kind);
+    let locales = byCell.get(key);
+    if (!locales) byCell.set(key, (locales = new Map()));
+    let refs = locales.get(r.locale);
+    if (!refs) locales.set(r.locale, (refs = new Set()));
+    refs.add(r.toRef);
+  }
+
+  const gaps = new Set<string>();
+  for (const [key, locales] of byCell) {
+    const enRefs = locales.get("en");
+    if (!enRefs || enRefs.size === 0) continue;
+    for (const loc of targetLocales) {
+      const locRefs = locales.get(loc) ?? new Set<string>();
+      for (const ref of enRefs) {
+        if (!locRefs.has(ref)) {
+          gaps.add(key);
+          break;
+        }
+      }
+      if (gaps.has(key)) break;
+    }
+  }
+  return gaps;
+}
+
+/** Builds the ordered work list from current DB state. `locales` is only used in
+ *  baseline mode, to also pick up cells whose English rows exist but whose
+ *  translations were never finished. */
+async function buildWorkList(mode: BatchMode, locales: Locale[] = []): Promise<Cell[]> {
   const verseRows = await db
     .select({
       ref: verses.ref,
@@ -168,13 +232,30 @@ async function buildWorkList(mode: BatchMode): Promise<Cell[]> {
     countByCell.set(cellKey(row.fromRef, row.kind), row.activeCount);
   }
 
+  const translationGaps =
+    mode === "baseline" ? await findTranslationGaps(locales) : new Set<string>();
+
   const cells: Cell[] = [];
+  const gapCells: Cell[] = [];
   for (const v of verseRows) {
     for (const kind of KINDS) {
       const key = cellKey(v.ref, kind);
       if (mode === "baseline") {
-        // Only cells with no active English connection.
-        if (coveredEn.has(key)) continue;
+        if (coveredEn.has(key)) {
+          // Already has English rows — normally excluded, but pick it up if its
+          // translations were left unfinished.
+          if (translationGaps.has(key)) {
+            gapCells.push({
+              fromRef: v.ref,
+              arabicText: v.arabicText,
+              translation: v.translation,
+              kind,
+              activeCount: countByCell.get(key) ?? 1,
+              translateOnly: true,
+            });
+          }
+          continue;
+        }
       } else {
         // topup: only cells that already have >=1 connection (filling a
         // zero-connection cell is baseline's job) and aren't exhausted.
@@ -195,7 +276,9 @@ async function buildWorkList(mode: BatchMode): Promise<Cell[]> {
   if (mode === "topup") {
     cells.sort((a, b) => a.activeCount - b.activeCount);
   }
-  return cells;
+  // baseline: finish real (zero-English) coverage first, then close translation
+  // gaps.
+  return [...cells, ...gapCells];
 }
 
 /** Existing active en connection targets for a cell. */
@@ -266,10 +349,10 @@ async function translateCellReasons(
           signal: gen.signal,
         });
       } catch (err) {
-        // A daily-quota hit is not a translation problem — bubble it to the
-        // single handler in runConnectionBatch so the pass ends "quota-daily"
-        // and the loop rotates keys.
-        if (err instanceof GeminiDailyQuotaError) throw err;
+        // A daily-quota hit or an invalid key is not a translation problem —
+        // bubble it to the single handler in runConnectionBatch so the pass ends
+        // "quota-daily" / "key-invalid" and the loop rotates keys.
+        if (err instanceof GeminiDailyQuotaError || err instanceof GeminiKeyInvalidError) throw err;
         console.error(`connection-batch: translation failed ${fromRef} ${kind} ${locale}:`, err);
         incr("connection_batch_translate_failed");
         continue;
@@ -364,7 +447,7 @@ export async function runConnectionBatch(
 
   let cells: Cell[];
   try {
-    cells = await buildWorkList(opts.mode);
+    cells = await buildWorkList(opts.mode, opts.locales);
   } catch (err) {
     summary.stoppedReason = "error";
     summary.error = err instanceof Error ? err.message : String(err);
@@ -425,48 +508,58 @@ export async function runConnectionBatch(
     }
 
     try {
-      const excludeRefs =
-        opts.mode === "topup" ? await activeToRefs(cell.fromRef, cell.kind, "en") : [];
+      let exhaustedThisCell = false;
 
-      // Reserve the generation call up front. If the budget is already spent we
-      // stop before making the request.
-      if (!budget.spend()) {
-        summary.stoppedReason = budget.stoppedReason ?? "call-budget";
-        break;
+      // `translateOnly` cells (baseline, closing a translation gap left by an
+      // earlier mid-cell stop) skip generation entirely — no reservation, no
+      // grounding call — and go straight to translating existing English rows.
+      if (!cell.translateOnly) {
+        const excludeRefs =
+          opts.mode === "topup" ? await activeToRefs(cell.fromRef, cell.kind, "en") : [];
+
+        // Reserve the generation call up front. If the budget is already spent we
+        // stop before making the request.
+        if (!budget.spend()) {
+          summary.stoppedReason = budget.stoppedReason ?? "call-budget";
+          break;
+        }
+
+        const { results, calledAI } = await generateConnectionsForCell(
+          cell.fromRef,
+          cell.kind,
+          { arabicText: cell.arabicText, translation: cell.translation },
+          excludeRefs,
+          "en",
+          opts.provider,
+          model,
+          { apiKey: opts.apiKey, signal }
+        );
+        if (!calledAI) {
+          // No grounding data / drained pool — no request was actually made, so
+          // refund the reservation and don't pace (no call to space out).
+          summary.callsUsed--;
+          summary.costUsd -= callCost;
+        } else {
+          // A request went out and came back without throwing — the provider is
+          // alive, so a later isolated failure isn't the fail-fast case.
+          consecutiveFailures = 0;
+          await pace(opts.callDelayMs, signal);
+        }
+        summary.generated += results.length;
+
+        if (opts.mode === "topup" && excludeRefs.length > 0 && results.length === 0) {
+          // Grounded pool is genuinely empty for this cell — record it so no
+          // future run pays for it again.
+          await upsertCoverage(cell.fromRef, cell.kind, {
+            exhaustedAt: new Date(),
+            activeCount: excludeRefs.length,
+          });
+          summary.exhausted++;
+          exhaustedThisCell = true;
+        }
       }
-      await pace(opts.callDelayMs, signal);
 
-      const { results, calledAI } = await generateConnectionsForCell(
-        cell.fromRef,
-        cell.kind,
-        { arabicText: cell.arabicText, translation: cell.translation },
-        excludeRefs,
-        "en",
-        opts.provider,
-        model,
-        { apiKey: opts.apiKey, signal }
-      );
-      if (!calledAI) {
-        // No grounding data / drained pool — no request was actually made, so
-        // refund the reservation.
-        summary.callsUsed--;
-        summary.costUsd -= callCost;
-      } else {
-        // A request went out and came back without throwing — the provider is
-        // alive, so a later isolated failure isn't the fail-fast case.
-        consecutiveFailures = 0;
-      }
-      summary.generated += results.length;
-
-      if (opts.mode === "topup" && excludeRefs.length > 0 && results.length === 0) {
-        // Grounded pool is genuinely empty for this cell — record it so no
-        // future run pays for it again.
-        await upsertCoverage(cell.fromRef, cell.kind, {
-          exhaustedAt: new Date(),
-          activeCount: excludeRefs.length,
-        });
-        summary.exhausted++;
-      } else {
+      if (!exhaustedThisCell) {
         const activeCount = (await activeToRefs(cell.fromRef, cell.kind, "en")).length;
         const xlt = await translateCellReasons(
           cell.fromRef,
@@ -501,6 +594,16 @@ export async function runConnectionBatch(
         summary.lastError = err.message;
         hooks.onProgress(
           `[${opts.mode}] daily quota exhausted for the active key at ${cell.fromRef} ${cell.kind} — ending pass to rotate`
+        );
+        break;
+      }
+      if (err instanceof GeminiKeyInvalidError) {
+        // The key is invalid / revoked — per-key, so the loop rotates. Same
+        // clean-stop treatment as a daily-quota hit.
+        summary.stoppedReason = "key-invalid";
+        summary.lastError = err.message;
+        hooks.onProgress(
+          `[${opts.mode}] active key invalid/blocked at ${cell.fromRef} ${cell.kind} — ending pass to rotate`
         );
         break;
       }

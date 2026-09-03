@@ -58,6 +58,35 @@ describe("runConnectionBatchLoop", () => {
     expect(mockReset).toHaveBeenCalledTimes(2);
   });
 
+  it("rotates to the next key on key-invalid (not a whole-loop stop)", async () => {
+    mockRunConnectionBatch
+      .mockResolvedValueOnce(pass({ stoppedReason: "key-invalid" }))
+      .mockResolvedValueOnce(pass({ stoppedReason: "completed", generated: 2 }))
+      .mockResolvedValueOnce(pass({ stoppedReason: "completed" }))
+      .mockResolvedValueOnce(pass({ stoppedReason: "completed" }));
+
+    const summary = await runConnectionBatchLoop(opts(), hooks, new AbortController().signal);
+    expect(summary.keysInvalid).toEqual(["GEMINI_API1"]);
+    expect(mockRunConnectionBatch.mock.calls[1][0].apiKey).toBe("k2");
+    expect(summary.stoppedReason).toBe("work-exhausted");
+  });
+
+  it("ends 'error' when every selected key is invalid", async () => {
+    mockRunConnectionBatch.mockResolvedValue(pass({ stoppedReason: "key-invalid" }));
+    const summary = await runConnectionBatchLoop(opts(), hooks, new AbortController().signal);
+    expect(summary.stoppedReason).toBe("error");
+    expect(summary.error).toMatch(/invalid\/blocked/);
+    expect(summary.keysInvalid).toEqual(["GEMINI_API1", "GEMINI_API2"]);
+  });
+
+  it("still ends all-keys-daily when keys are a mix of daily-exhausted and invalid", async () => {
+    mockRunConnectionBatch
+      .mockResolvedValueOnce(pass({ stoppedReason: "key-invalid" }))
+      .mockResolvedValueOnce(pass({ stoppedReason: "quota-daily" }));
+    const summary = await runConnectionBatchLoop(opts(), hooks, new AbortController().signal);
+    expect(summary.stoppedReason).toBe("all-keys-daily");
+  });
+
   it("ends all-keys-daily when every key hits its daily quota", async () => {
     mockRunConnectionBatch.mockResolvedValue(pass({ stoppedReason: "quota-daily" }));
     const summary = await runConnectionBatchLoop(opts(), hooks, new AbortController().signal);

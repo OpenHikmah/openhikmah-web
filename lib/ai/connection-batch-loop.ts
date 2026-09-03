@@ -52,6 +52,8 @@ export interface LoopSummary {
   keysUsed: number;
   /** Labels of keys that hit their daily quota this run. */
   keysExhausted: string[];
+  /** Labels of keys that turned out to be invalid / revoked this run. */
+  keysInvalid: string[];
   cellsProcessed: number;
   callsUsed: number;
   costUsd: number;
@@ -104,6 +106,7 @@ export async function runConnectionBatchLoop(
     passes: 0,
     keysUsed: 0,
     keysExhausted: [],
+    keysInvalid: [],
     cellsProcessed: 0,
     callsUsed: 0,
     costUsd: 0,
@@ -180,6 +183,13 @@ export async function runConnectionBatchLoop(
           rotate = true;
           break;
 
+        case "key-invalid":
+          // Per-key fault (revoked / invalid key) — rotate, don't stop.
+          agg.keysInvalid.push(label);
+          hooks.onProgress(`[loop] key ${k + 1}/${n} (${label}) invalid/blocked — rotating`);
+          rotate = true;
+          break;
+
         case "cancelled":
           agg.stoppedReason = "cancelled";
           return finish(agg, hooks);
@@ -243,9 +253,16 @@ export async function runConnectionBatchLoop(
     }
   }
 
-  // Fell out of the key loop → every selected key hit its daily quota.
+  // Fell out of the key loop → every key rotated (daily quota and/or invalid).
+  if (agg.keysInvalid.length === n) {
+    // Every selected key is invalid/blocked — nothing the loop can do.
+    agg.stoppedReason = "error";
+    agg.error = `all ${n} selected key(s) are invalid/blocked`;
+    hooks.onProgress(`[loop] ${agg.error} — stopping the loop`);
+    return finish(agg, hooks);
+  }
   agg.stoppedReason = "all-keys-daily";
-  hooks.onProgress(`[loop] all ${n} selected key(s) exhausted for the day — stopping`);
+  hooks.onProgress(`[loop] all ${n} selected key(s) exhausted or invalid — stopping`);
   return finish(agg, hooks);
 }
 
@@ -254,7 +271,8 @@ function finish(agg: LoopSummary, hooks: BatchHooks): LoopSummary {
     `[loop] DONE (${agg.stoppedReason}) | ${agg.passes} pass(es) | ${agg.keysUsed} key(s) | ` +
       `${agg.callsUsed} calls | $${agg.costUsd.toFixed(2)} | ` +
       `gen=${agg.generated} xlt=${agg.translated} exh=${agg.exhausted} fail=${agg.cellsFailed}` +
-      (agg.keysExhausted.length ? ` | exhausted: ${agg.keysExhausted.join(", ")}` : "")
+      (agg.keysExhausted.length ? ` | exhausted: ${agg.keysExhausted.join(", ")}` : "") +
+      (agg.keysInvalid.length ? ` | invalid: ${agg.keysInvalid.join(", ")}` : "")
   );
   return agg;
 }
