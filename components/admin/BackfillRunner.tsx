@@ -50,6 +50,7 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
 
   const [loop, setLoop] = useState(false);
   const [geminiKeys, setGeminiKeys] = useState<string[] | null>(null);
+  const [keysError, setKeysError] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Record<string, boolean>>({});
   const [callDelayMs, setCallDelayMs] = useState<number | "">(DEFAULT_CALL_DELAY_MS);
 
@@ -62,11 +63,21 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
     api<{ keys: string[] }>("/gemini-keys")
       .then((r) => {
         if (cancelled) return;
+        setKeysError(false);
         setGeminiKeys(r.keys);
-        setSelectedKeys(Object.fromEntries(r.keys.map((k) => [k, true])));
+        // Seed the selection once, on first load — a token refresh re-runs this
+        // effect (api is memoised on the access token) and must not silently
+        // re-check keys the admin deliberately unticked.
+        setSelectedKeys((prev) =>
+          Object.keys(prev).length > 0 ? prev : Object.fromEntries(r.keys.map((k) => [k, true]))
+        );
       })
       .catch(() => {
-        if (!cancelled) setGeminiKeys([]);
+        if (cancelled) return;
+        // Distinguish "couldn't check" from "none configured" — otherwise an auth
+        // blip reads as "set your env vars" (which are already fine).
+        setKeysError(true);
+        setGeminiKeys((prev) => prev ?? []);
       });
     return () => {
       cancelled = true;
@@ -74,9 +85,19 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
   }, [api]);
 
   const selectedKeyList = (geminiKeys ?? []).filter((k) => selectedKeys[k]);
-  const delayInvalid = callDelayMs === "" || callDelayMs < 0 || callDelayMs > MAX_CALL_DELAY_MS;
+  const delayInvalid =
+    callDelayMs === "" ||
+    !Number.isInteger(callDelayMs) ||
+    callDelayMs < 0 ||
+    callDelayMs > MAX_CALL_DELAY_MS;
+  const budgetInvalid = (v: number | "") => v !== "" && (!Number.isFinite(v) || v <= 0);
   const budgetsInvalid = maxCalls === "" || maxCostUsd === "" || maxCalls <= 0 || maxCostUsd <= 0;
-  const formInvalid = loop ? delayInvalid || selectedKeyList.length === 0 : budgetsInvalid;
+  const formInvalid = loop
+    ? delayInvalid ||
+      selectedKeyList.length === 0 ||
+      budgetInvalid(maxCalls) ||
+      budgetInvalid(maxCostUsd)
+    : budgetsInvalid;
 
   const toggleLoop = (checked: boolean) => {
     setLoop(checked);
@@ -240,6 +261,10 @@ export function BackfillRunner({ onStarted }: { onStarted?: () => void }) {
               <span className="mb-1 block text-text-secondary">Gemini keys (rotation order)</span>
               {geminiKeys === null ? (
                 <span className="text-text-muted">Loading…</span>
+              ) : keysError ? (
+                <span className="text-text-muted">
+                  Couldn&apos;t load the key list — reload the page to retry.
+                </span>
               ) : geminiKeys.length === 0 ? (
                 <span className="text-text-muted">
                   No GEMINI_API1..5 keys configured — set them in the environment to use loop mode.

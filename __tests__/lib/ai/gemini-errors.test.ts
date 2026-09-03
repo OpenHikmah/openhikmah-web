@@ -61,6 +61,18 @@ describe("classifyGeminiError", () => {
     expect(info.cls).toBe("other-429");
   });
 
+  it("does NOT treat a non-429 status as rate-limited even when it mentions quota", () => {
+    // 403 PERMISSION_DENIED "Quota exceeded ... consumer suspended", 400 quota-project
+    expect(
+      classifyGeminiError(
+        fetchError(403, [], "Quota exceeded for quota metric; consumer suspended")
+      ).cls
+    ).toBe("not-rate-limit");
+    expect(
+      classifyGeminiError(fetchError(400, [], "RESOURCE_EXHAUSTED quota project issue")).cls
+    ).toBe("not-rate-limit");
+  });
+
   it("treats a 500 / network error as not-rate-limit", () => {
     expect(classifyGeminiError(fetchError(500, [], "500 Internal Server Error")).cls).toBe(
       "not-rate-limit"
@@ -98,5 +110,10 @@ describe("perMinuteBackoffMs", () => {
 
   it("caps the exponential backoff", () => {
     expect(perMinuteBackoffMs(20)).toBeLessThanOrEqual(PER_MINUTE_MAX_DELAY_MS * 1.15);
+  });
+
+  it("floors a zero retryDelay so retries never burst back-to-back", () => {
+    // Google does emit "retryDelay": "0s" → parsed as 0, must not mean "no wait".
+    expect(perMinuteBackoffMs(1, 0)).toBeGreaterThanOrEqual(1000);
   });
 });

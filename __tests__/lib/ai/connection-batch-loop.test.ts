@@ -115,6 +115,40 @@ describe("runConnectionBatchLoop", () => {
     expect(mockRunConnectionBatch.mock.calls[1][0].maxCalls).toBe(4);
   });
 
+  it("stops the loop (error) after consecutive passes that only fail cells", async () => {
+    mockRunConnectionBatch.mockResolvedValue(
+      pass({ stoppedReason: "completed", cellsFailed: 4, lastError: "bad JSON" })
+    );
+    const summary = await runConnectionBatchLoop(
+      opts({ apiKeys: ["k1"], apiKeyLabels: ["GEMINI_API1"] }),
+      hooks,
+      new AbortController().signal
+    );
+    expect(summary.stoppedReason).toBe("error");
+    expect(summary.error).toMatch(/only failed cells/);
+    // FAILING_PASSES_BEFORE_ABORT = 3 → does not run thousands of passes
+    expect(summary.passes).toBe(3);
+  });
+
+  it("propagates a cancelled inner pass", async () => {
+    mockRunConnectionBatch.mockResolvedValueOnce(pass({ stoppedReason: "cancelled" }));
+    const summary = await runConnectionBatchLoop(opts(), hooks, new AbortController().signal);
+    expect(summary.stoppedReason).toBe("cancelled");
+  });
+
+  it("treats an empty work list as immediately done", async () => {
+    mockRunConnectionBatch.mockResolvedValueOnce(
+      pass({ stoppedReason: "completed", workListSize: 0 })
+    );
+    const summary = await runConnectionBatchLoop(
+      opts({ apiKeys: ["k1"], apiKeyLabels: ["GEMINI_API1"] }),
+      hooks,
+      new AbortController().signal
+    );
+    expect(summary.stoppedReason).toBe("work-exhausted");
+    expect(summary.passes).toBe(1);
+  });
+
   it("never trips the budget with Infinity caps", async () => {
     mockRunConnectionBatch.mockResolvedValue(
       pass({ stoppedReason: "quota-daily", callsUsed: 999 })

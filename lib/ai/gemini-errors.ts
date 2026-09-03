@@ -108,6 +108,14 @@ export function classifyGeminiError(err: unknown): GeminiRateInfo {
   const lower = signal.toLowerCase();
   const raw = signal.trim().slice(0, 500);
 
+  // A concrete non-429 status is never a rate limit for our purposes — a 403
+  // "Quota exceeded ... consumer suspended" or a 400 about a quota project
+  // contain the word "quota" but must NOT route into the retry/rotate path
+  // (they'd cost ~4 min of backoff per key and end the run as a false "success").
+  if (status !== undefined && status !== 429) {
+    return { cls: "not-rate-limit", status, raw };
+  }
+
   const looksRateLimited =
     status === 429 ||
     lower.includes("resource_exhausted") ||
@@ -144,11 +152,17 @@ function safeStringify(value: unknown): string {
   }
 }
 
+/** Smallest per-minute backoff wait, even when Google says `"retryDelay": "0s"`
+ *  — retrying instantly 6× is how a key gets flagged. */
+export const PER_MINUTE_MIN_DELAY_MS = 2_000;
+
 /** The backoff wait for per-minute retry `attempt` (1-based), honouring an
- *  explicit `retryAfterMs` when Google sent one, else exponential with jitter. */
+ *  explicit `retryAfterMs` when Google sent a usable one, else exponential with
+ *  jitter. Always at least `PER_MINUTE_MIN_DELAY_MS`. */
 export function perMinuteBackoffMs(attempt: number, retryAfterMs?: number): number {
-  const base = retryAfterMs ?? PER_MINUTE_BASE_DELAY_MS * Math.pow(2, Math.max(0, attempt - 1));
-  const capped = Math.min(base, PER_MINUTE_MAX_DELAY_MS);
+  const exponential = PER_MINUTE_BASE_DELAY_MS * Math.pow(2, Math.max(0, attempt - 1));
+  const base = retryAfterMs && retryAfterMs > 0 ? retryAfterMs : exponential;
+  const capped = Math.min(Math.max(base, PER_MINUTE_MIN_DELAY_MS), PER_MINUTE_MAX_DELAY_MS);
   const jitter = capped * (0.85 + Math.random() * 0.3);
   return Math.round(jitter);
 }

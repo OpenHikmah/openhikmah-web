@@ -171,17 +171,21 @@ async function callClaude(prompt: string, model: string): Promise<AiResult> {
 }
 
 /**
- * Consecutive ambiguous 429s (429 with no clear per-day / per-minute marker)
- * seen across `callGemini` invocations, with no successful call in between. Reset
- * on any success and by `resetGeminiRateLimitState` (the backfill loop calls it
- * when it switches keys). At `AMBIGUOUS_429_ESCALATE_AFTER` a `callGemini` throws
- * `GeminiDailyQuotaError` so a daily-dead key that only emits shapeless 429s
- * still triggers a key rotation instead of retrying forever.
+ * Consecutive ambiguous 429s (429 with no clear per-day / per-minute marker) per
+ * API key, with no successful call on that key in between. Keyed by the key value
+ * so the admin backfill loop's pool keys and live site traffic (which uses
+ * `process.env.GEMINI_API_KEY`) never reset or trip each other's counter. Reset
+ * on any success for that key and by `resetGeminiRateLimitState(key)` (the loop
+ * calls it when it switches keys). At `AMBIGUOUS_429_ESCALATE_AFTER` a
+ * `callGemini` throws `GeminiDailyQuotaError` so a daily-dead key that only emits
+ * shapeless 429s still triggers a key rotation instead of retrying forever.
  */
-let ambiguous429Streak = 0;
+const ambiguous429Streak = new Map<string, number>();
 
-export function resetGeminiRateLimitState(): void {
-  ambiguous429Streak = 0;
+/** Clears the ambiguous-429 streak for one key, or all keys when omitted. */
+export function resetGeminiRateLimitState(key?: string): void {
+  if (key === undefined) ambiguous429Streak.clear();
+  else ambiguous429Streak.delete(key);
 }
 
 async function callGemini(
@@ -198,7 +202,7 @@ async function callGemini(
   for (let attempt = 1; ; attempt++) {
     try {
       const result = await genModel.generateContent(prompt);
-      ambiguous429Streak = 0;
+      ambiguous429Streak.delete(key);
       const meta = result.response.usageMetadata;
       return {
         text: result.response.text(),
@@ -218,9 +222,10 @@ async function callGemini(
       if (info.cls === "daily") throw new GeminiDailyQuotaError(info);
 
       if (info.cls === "other-429") {
-        ambiguous429Streak++;
-        if (ambiguous429Streak >= AMBIGUOUS_429_ESCALATE_AFTER) {
-          ambiguous429Streak = 0;
+        const streak = (ambiguous429Streak.get(key) ?? 0) + 1;
+        ambiguous429Streak.set(key, streak);
+        if (streak >= AMBIGUOUS_429_ESCALATE_AFTER) {
+          ambiguous429Streak.delete(key);
           throw new GeminiDailyQuotaError(info);
         }
       }

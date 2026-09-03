@@ -63,7 +63,11 @@ export interface BatchOptions {
   model?: string;
   /** Target locales to translate the English reason into (subset of tr/ru/az). */
   locales: Locale[];
-  /** Hard ceiling on LLM calls this run. Always exact. */
+  /** Ceiling on *reserved* LLM calls this run — one per generation + one per
+   *  locale translation. `callGemini` may issue up to PER_MINUTE_MAX_RETRIES real
+   *  HTTP requests per reservation when it hits per-minute 429s, so against
+   *  Google's quota this under-counts; it is the run's spend guard, not a request
+   *  meter. `Number.POSITIVE_INFINITY` in loop mode when left blank. */
   maxCalls: number;
   /** Best-effort USD ceiling. Estimated per call (tokens aren't tracked on the
    *  generation path), so treat as approximate — maxCalls is the real guard.
@@ -482,6 +486,13 @@ export async function runConnectionBatch(
         }
       }
     } catch (err) {
+      // A cooperative cancel (Stop button) can land here as the rejection of an
+      // in-flight `pace()` delay or a `callGemini` rate-limit backoff. That is
+      // not a cell failure — don't poison the coverage row or trip fail-fast.
+      if (signal?.aborted || (err instanceof Error && err.name === "AbortError")) {
+        summary.stoppedReason = "cancelled";
+        break;
+      }
       if (err instanceof GeminiDailyQuotaError) {
         // Not a per-cell failure: the key is spent for the day. End the pass
         // cleanly so the outer loop rotates to the next key. Deliberately does

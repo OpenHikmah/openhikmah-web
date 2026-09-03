@@ -64,10 +64,24 @@ export interface LoopSummary {
   lastError?: string;
 }
 
-/** Defensive ceiling: a single key that keeps returning "completed, work remains"
- *  without ever converging (should be impossible — every pass commits progress or
- *  is caught by the zero-progress guard) must not spin forever. */
+/** Defensive ceiling per key — the productivity guards below should always stop a
+ *  key first; hitting this means something is wrong, so it ends the loop as an
+ *  error, not a clean rotation. */
 const MAX_PASSES_PER_KEY = 5000;
+/** Consecutive `completed` passes that generated / translated / exhausted
+ *  nothing AND failed nothing → the work list is genuinely done for this mode. */
+const UNPRODUCTIVE_PASSES_BEFORE_DONE = 2;
+/** Consecutive `completed` passes that produced nothing useful and DID fail
+ *  cells → the model is misbehaving (e.g. mostly-malformed JSON) rather than the
+ *  work being done. Stop the whole loop — the same fault will hit every key. */
+const FAILING_PASSES_BEFORE_ABORT = 3;
+
+/** A `completed` pass that actually moved the graph forward. `cellsFailed` is
+ *  deliberately NOT progress — a pass that only fails cells must not keep the
+ *  loop alive. */
+function passWasProductive(pass: BatchSummary): boolean {
+  return pass.generated > 0 || pass.translated > 0 || pass.exhausted > 0;
+}
 
 function mergeCounters(agg: LoopSummary, pass: BatchSummary): void {
   agg.cellsProcessed += pass.cellsProcessed;
@@ -78,10 +92,6 @@ function mergeCounters(agg: LoopSummary, pass: BatchSummary): void {
   agg.exhausted += pass.exhausted;
   agg.cellsFailed += pass.cellsFailed;
   if (pass.lastError) agg.lastError = pass.lastError;
-}
-
-function passChangedSomething(pass: BatchSummary): boolean {
-  return pass.generated > 0 || pass.translated > 0 || pass.exhausted > 0 || pass.cellsFailed > 0;
 }
 
 export async function runConnectionBatchLoop(
@@ -121,13 +131,16 @@ export async function runConnectionBatchLoop(
     const label = opts.apiKeyLabels[k];
     agg.keysUsed = k + 1;
     hooks.onProgress(`[loop] key ${k + 1}/${n} (${label}) — starting`);
-    // Per-key: the ambiguous-429 escalation counter in ai.ts is about "this key
-    // looks daily-dead", so it must not carry over from the previous key.
-    resetGeminiRateLimitState();
+    // Per-key: the ambiguous-429 escalation counter in ai.ts is keyed by the key
+    // value, so clear THIS key's before we start (a redeploy or a previous run
+    // could have left a stale count).
+    resetGeminiRateLimitState(opts.apiKeys[k]);
 
-    let prevPassChanged = true;
+    let unproductivePasses = 0;
+    let failingPasses = 0;
+    let rotate = false;
 
-    for (let p = 0; p < MAX_PASSES_PER_KEY; p++) {
+    for (let p = 0; p < MAX_PASSES_PER_KEY && !rotate; p++) {
       if (signal.aborted) {
         agg.stoppedReason = "cancelled";
         return finish(agg, hooks);
@@ -164,8 +177,8 @@ export async function runConnectionBatchLoop(
           hooks.onProgress(
             `[loop] key ${k + 1}/${n} (${label}) daily quota hit after ${agg.passes} pass(es) — rotating`
           );
-          p = MAX_PASSES_PER_KEY; // break to next key
-          continue;
+          rotate = true;
+          break;
 
         case "cancelled":
           agg.stoppedReason = "cancelled";
@@ -187,27 +200,46 @@ export async function runConnectionBatchLoop(
           return finish(agg, hooks);
 
         case "completed": {
-          const changed = passChangedSomething(pass);
-          if (!changed && !prevPassChanged) {
-            // Two consecutive completed passes that changed nothing: the work
-            // list has nothing left this mode can act on.
-            agg.stoppedReason = "work-exhausted";
-            hooks.onProgress(`[loop] ${opts.mode} work list fully covered — done`);
+          if (passWasProductive(pass)) {
+            unproductivePasses = 0;
+            failingPasses = 0;
+            hooks.onProgress(
+              `[loop] pass ${agg.passes} done (gen=${pass.generated} xlt=${pass.translated} ` +
+                `exh=${pass.exhausted} fail=${pass.cellsFailed}) — work remains, continuing on ${label}`
+            );
+            break;
+          }
+          // Nothing useful this pass.
+          if (pass.workListSize === 0 || pass.cellsFailed === 0) {
+            if (
+              ++unproductivePasses >= UNPRODUCTIVE_PASSES_BEFORE_DONE ||
+              pass.workListSize === 0
+            ) {
+              agg.stoppedReason = "work-exhausted";
+              hooks.onProgress(`[loop] ${opts.mode} work list fully covered — done`);
+              return finish(agg, hooks);
+            }
+          } else if (++failingPasses >= FAILING_PASSES_BEFORE_ABORT) {
+            agg.stoppedReason = "error";
+            agg.error = `${failingPasses} consecutive passes generated nothing and only failed cells — last error: ${pass.lastError ?? "unknown"}`;
+            hooks.onProgress(`[loop] ${agg.error} — stopping the loop`);
             return finish(agg, hooks);
           }
-          if (!changed && pass.workListSize === 0) {
-            agg.stoppedReason = "work-exhausted";
-            hooks.onProgress(`[loop] ${opts.mode} work list empty — done`);
-            return finish(agg, hooks);
-          }
-          prevPassChanged = changed;
           hooks.onProgress(
-            `[loop] pass ${agg.passes} done (gen=${pass.generated} xlt=${pass.translated} ` +
-              `exh=${pass.exhausted} fail=${pass.cellsFailed}) — work remains, continuing on ${label}`
+            `[loop] pass ${agg.passes} made no progress (fail=${pass.cellsFailed}) — retrying on ${label}`
           );
-          continue;
+          break;
         }
       }
+    }
+
+    if (!rotate) {
+      // Inner loop hit MAX_PASSES_PER_KEY without converging or rotating — the
+      // productivity guards above should have caught this, so treat it as a bug.
+      agg.stoppedReason = "error";
+      agg.error = `key ${label} ran ${MAX_PASSES_PER_KEY} passes without converging`;
+      hooks.onProgress(`[loop] ${agg.error} — stopping the loop`);
+      return finish(agg, hooks);
     }
   }
 

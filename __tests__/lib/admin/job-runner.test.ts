@@ -428,15 +428,28 @@ describe("startJob — backfill-connections loop mode", () => {
   });
 
   it("maps all-keys-daily → success, error → failed, cancelled → cancelled", async () => {
-    for (const [stoppedReason] of [["all-keys-daily"], ["error"], ["cancelled"]] as const) {
-      mockRunConnectionBatchLoop.mockResolvedValueOnce({ stoppedReason });
+    const cases = [
+      ["all-keys-daily", "success"],
+      ["work-exhausted", "success"],
+      ["error", "failed"],
+      ["cancelled", "cancelled"],
+    ] as const;
+    for (const [stoppedReason, expected] of cases) {
+      // Capture the status object passed to db.update(...).set({ status, ... }).
+      const setSpy = vi.fn().mockReturnValue(makeDbChain([]));
+      mockUpdate.mockReturnValue(
+        new Proxy(() => {}, { get: (_t, p) => (p === "set" ? setSpy : () => mockUpdate()) })
+      );
+      mockRunConnectionBatchLoop.mockResolvedValueOnce({ stoppedReason, error: "x" });
       await startJob("backfill-connections", "qf-admin", { ...base, keys: ["GEMINI_API1"] });
       await Promise.resolve();
       await Promise.resolve();
+      expect(setSpy).toHaveBeenCalledWith(expect.objectContaining({ status: expected }));
       const next = await startJob("seed-quran", "qf-admin");
       expect(next.runId).toBe(42);
       lastChild.current?.emit("close", 0);
       await Promise.resolve();
+      mockUpdate.mockReturnValue(makeDbChain([]));
     }
   });
 
