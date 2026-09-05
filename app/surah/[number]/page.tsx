@@ -53,7 +53,7 @@ export default async function SurahReaderPage({ params }: Props) {
   const surah: MatchedSurah = { number: surahNum, name, nameArabic, ayahCount };
 
   return (
-    <div className="min-h-dvh bg-bg text-text-primary">
+    <div className="min-h-dvh bg-bg pb-mobile-nav text-text-primary md:pb-0">
       <LandingHeader />
       <MobileNavBar />
 
@@ -73,7 +73,7 @@ export default async function SurahReaderPage({ params }: Props) {
         <SurahReaderActions surah={surah} />
       </div>
 
-      <div className="mx-auto max-w-3xl px-6 pt-10 pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-10">
+      <div className="mx-auto max-w-3xl px-6 py-10">
         <SurahReaderList verses={verses} />
       </div>
     </div>

@@ -54,7 +54,7 @@ export default async function StoryDetailPage({ params }: Props) {
   );
 
   return (
-    <div className="min-h-dvh bg-bg text-text-primary">
+    <div className="min-h-dvh bg-bg pb-mobile-nav text-text-primary md:pb-0">
       <LandingHeader />
       <MobileNavBar />
       <StoryActivityTracker slug={slug} />
@@ -118,7 +118,7 @@ export default async function StoryDetailPage({ params }: Props) {
         })}
       </div>
 
-      <footer className="border-t border-border-subtle pt-6 pb-[calc(72px+env(safe-area-inset-bottom))] text-center text-xs text-text-muted md:pb-6">
+      <footer className="border-t border-border-subtle py-6 text-center text-xs text-text-muted">
         {t("footer")}
       </footer>
     </div>

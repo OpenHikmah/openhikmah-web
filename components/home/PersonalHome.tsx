@@ -80,7 +80,7 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
   const hasContinue = continueCount !== null && continueCount > 0;
 
   return (
-    <main className="mx-auto w-full min-h-0 max-w-5xl flex-1 overflow-y-auto px-6 pt-[clamp(0.75rem,4.5vh,2.5rem)] pb-[calc(72px+env(safe-area-inset-bottom))] md:px-8 md:pb-[clamp(0.75rem,4.5vh,2.5rem)]">
+    <main className="mx-auto w-full min-h-0 max-w-5xl flex-1 overflow-y-auto px-6 pt-[clamp(0.75rem,4.5vh,2.5rem)] pb-mobile-nav md:px-8 md:pb-[clamp(0.75rem,4.5vh,2.5rem)]">
       {/* Greeting */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
