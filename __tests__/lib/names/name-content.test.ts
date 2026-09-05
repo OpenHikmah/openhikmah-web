@@ -168,8 +168,81 @@ describe("getOrGenerateNameContent", () => {
     const out = await getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr);
 
     expect(out).toEqual([]);
+    // Test env defaults to Claude (see vitest setup), so an empty result
+    // triggers one Gemini-fallback retry — also empty here, so still nothing
+    // to persist.
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("falls back to Gemini once when the primary (Claude) result is empty, and persists the Gemini result", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    const ai = await import("@/lib/ai/ai");
+    const providerSpy = vi.spyOn(ai, "resolveProvider").mockResolvedValue("claude");
+    const modelSpy = vi
+      .spyOn(ai, "resolveModel")
+      .mockImplementation(async (_feature, provider) =>
+        provider === "claude" ? "claude-opus-5" : "gemini-3.7-flash"
+      );
+
+    const generate = vi.fn(async (resolved: { provider: string; model: string }) =>
+      resolved.provider === "claude" ? [] : ["a", "b"]
+    );
+
+    const out = await getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr);
+
+    expect(out).toEqual(["a", "b"]);
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(generate.mock.calls[0][0]).toEqual({ provider: "claude", model: "claude-opus-5" });
+    expect(generate.mock.calls[1][0]).toEqual({ provider: "gemini", model: "gemini-3.7-flash" });
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    const values = mockValues.mock.calls[0][0] as Record<string, unknown>;
+    expect(values.model).toBe("gemini-3.7-flash");
+    providerSpy.mockRestore();
+    modelSpy.mockRestore();
+  });
+
+  it("does not fall back when the primary provider is already Gemini", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    const ai = await import("@/lib/ai/ai");
+    const providerSpy = vi.spyOn(ai, "resolveProvider").mockResolvedValue("gemini");
+    const modelSpy = vi.spyOn(ai, "resolveModel").mockResolvedValue("gemini-3.7-flash");
+    const generate = vi.fn().mockResolvedValue([]);
+
+    const out = await getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr);
+
+    expect(out).toEqual([]);
     expect(generate).toHaveBeenCalledTimes(1);
     expect(mockInsert).not.toHaveBeenCalled();
+    providerSpy.mockRestore();
+    modelSpy.mockRestore();
+  });
+
+  it("a Gemini fallback that itself throws still returns the primary's (empty) result, not an unhandled rejection", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    const ai = await import("@/lib/ai/ai");
+    const providerSpy = vi.spyOn(ai, "resolveProvider").mockResolvedValue("claude");
+    const modelSpy = vi
+      .spyOn(ai, "resolveModel")
+      .mockImplementation(async (_feature, provider) =>
+        provider === "claude" ? "claude-opus-5" : "gemini-3.7-flash"
+      );
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const generate = vi.fn(async (resolved: { provider: string; model: string }) => {
+      if (resolved.provider === "gemini") throw new Error("GEMINI_API_KEY is not set");
+      return [];
+    });
+
+    const out = await getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr);
+
+    expect(out).toEqual([]);
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith("Names: Gemini fallback failed:", expect.any(Error));
+    providerSpy.mockRestore();
+    modelSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   it("round-trips a string payload (reflection)", async () => {
@@ -425,7 +498,35 @@ describe("getOrGenerateVerseReason", () => {
     const out = await getOrGenerateVerseReason("ar-rahman", "2:255", "tr", generate);
 
     expect(out).toBe("");
+    // Test env defaults to Claude, so an empty translation triggers one
+    // Gemini-fallback retry — also empty here, so still nothing to persist.
+    expect(generate).toHaveBeenCalledTimes(2);
     expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("falls back to Gemini once when the primary (Claude) translation is empty, and persists the Gemini result", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    const ai = await import("@/lib/ai/ai");
+    const providerSpy = vi.spyOn(ai, "resolveProvider").mockResolvedValue("claude");
+    const modelSpy = vi
+      .spyOn(ai, "resolveModel")
+      .mockImplementation(async (_feature, provider) =>
+        provider === "claude" ? "claude-opus-5" : "gemini-3.7-flash"
+      );
+
+    const generate = vi.fn(async (resolved: { provider: string; model: string }) =>
+      resolved.provider === "claude" ? "" : "çeviri"
+    );
+
+    const out = await getOrGenerateVerseReason("ar-rahman", "2:255", "tr", generate);
+
+    expect(out).toBe("çeviri");
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    const values = mockValues.mock.calls[0][0] as Record<string, unknown>;
+    expect(values.model).toBe("gemini-3.7-flash");
+    providerSpy.mockRestore();
+    modelSpy.mockRestore();
   });
 
   it("when another process wins the insert race, returns the persisted (stored) translation, not the local one", async () => {
