@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { nameContent, nameVerseReasons, type NameContentKind } from "@/lib/infra/db/schema";
 import { resolveModel, resolveProvider, type Provider } from "@/lib/ai/ai";
+import { incr } from "@/lib/infra/metrics";
 import type { Locale } from "@/lib/i18n/config";
 
 /** The provider+model to use for (and attribute) one names generation. */
@@ -20,6 +21,42 @@ const resolveNamesModel = async (): Promise<ResolvedNamesModel> => {
   const model = await resolveModel("names", provider);
   return { provider, model };
 };
+
+/**
+ * Resolves the primary provider+model, generates once, and — only when the
+ * primary is Claude and the result comes back empty (the shape a route's own
+ * caught AI failure already takes, see reflection/pairings/verses routes) —
+ * retries once against Gemini, whose API key is already provisioned in every
+ * deployment (see .env.example) and whose free tier easily absorbs an
+ * occasional retry. One-directional (Claude -> Gemini only): a deployment
+ * already pointed at Gemini for "names" has nothing to fall back to.
+ *
+ * Returns whichever (result, model) pair actually produced the value, so the
+ * persisted `model` column never disagrees with what actually ran.
+ */
+async function resolveAndGenerate<T>(
+  generate: (resolved: ResolvedNamesModel) => Promise<T>,
+  isEmpty: (value: T) => boolean
+): Promise<{ result: T; model: string }> {
+  const resolved = await resolveNamesModel();
+  const result = await generate(resolved);
+  if (!isEmpty(result) || resolved.provider !== "claude") {
+    return { result, model: resolved.model };
+  }
+
+  try {
+    const fallbackModel = await resolveModel("names", "gemini");
+    const fallbackResult = await generate({ provider: "gemini", model: fallbackModel });
+    if (!isEmpty(fallbackResult)) incr("names_ai_fallback_used");
+    return { result: fallbackResult, model: fallbackModel };
+  } catch (err) {
+    // A fallback-attempt failure must degrade to the primary's (empty)
+    // result — same as a primary failure already does — never let the retry
+    // surface as an unhandled rejection callers didn't have to handle before.
+    console.error("Names: Gemini fallback failed:", err);
+    return { result, model: resolved.model };
+  }
+}
 
 /**
  * Durable, write-once/read-many cache for the AI-generated 99-Names content
@@ -150,11 +187,7 @@ async function generateAndPersist<T>(
   generate: (resolved: ResolvedNamesModel) => Promise<T>,
   isEmpty: (value: T) => boolean
 ): Promise<T> {
-  // Resolve the provider+model before generation and use the same pair for the
-  // request and the persisted attribution.
-  const resolved = await resolveNamesModel();
-  const result = await generate(resolved);
-  const model = resolved.model;
+  const { result, model } = await resolveAndGenerate(generate, isEmpty);
 
   if (!isEmpty(result)) {
     const data = JSON.stringify(result);
@@ -215,9 +248,7 @@ export async function getOrGenerateVerseReason(
   if (pending) return pending;
 
   const work = (async () => {
-    const resolved = await resolveNamesModel();
-    const reason = await generate(resolved);
-    const model = resolved.model;
+    const { result: reason, model } = await resolveAndGenerate(generate, (r) => r.trim() === "");
     if (reason.trim() === "") return reason;
 
     try {
