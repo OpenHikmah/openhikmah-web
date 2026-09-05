@@ -32,7 +32,7 @@ export default async function TodayPage() {
       <LandingHeader />
       <MobileNavBar />
 
-      <main className="mx-auto flex w-full max-w-[1180px] flex-1 flex-col items-center justify-center px-6 py-12 md:px-12">
+      <main className="mx-auto flex w-full max-w-[1180px] flex-1 flex-col items-center justify-center overflow-y-auto px-6 pt-12 pb-[calc(72px+env(safe-area-inset-bottom))] md:px-12 md:pb-12">
         <h1 className="sr-only">{tToday("verseOfTheDay")}</h1>
         {today ? (
           <VerseOfDayCard verse={today.verse} reflection={today.reflection ?? undefined} />
