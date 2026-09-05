@@ -8,7 +8,8 @@ import {
   CATEGORY_LABEL_KEYS,
   type NameCategory,
 } from "@/lib/names/divine-names";
-import { Wordmark } from "@/components/layout/Wordmark";
+import { LandingHeader } from "@/components/layout/LandingHeader";
+import { MobileNavBar } from "@/components/layout/MobileNavBar";
 import { NameVerses } from "./NameVerses";
 import { NameReflection } from "./NameReflection";
 import { NamePairings, type Pairing } from "./NamePairings";
@@ -71,22 +72,20 @@ export default async function NameDetailPage({ params }: Props) {
   const nextName = DIVINE_NAMES.find((n) => n.id === name.id + 1);
 
   return (
-    <div className="min-h-screen bg-bg text-text-primary">
-      {/* Header */}
-      <header className="sticky top-0 z-20 flex h-12 items-center justify-between border-b border-border bg-surface px-6">
-        <Wordmark />
-        <Link
-          href="/names"
-          className="flex items-center gap-1.5 text-xs text-text-secondary transition-colors hover:text-text-primary"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          <span>{t("allNames")}</span>
-        </Link>
-      </header>
+    <div className="min-h-dvh bg-bg pb-mobile-nav text-text-primary md:pb-0">
+      <LandingHeader />
+      <MobileNavBar />
 
       <main>
         {/* Name hero */}
         <div className="mx-auto max-w-3xl border-b border-border-subtle px-6 pt-14 pb-12 text-center">
+          <Link
+            href="/names"
+            className="mb-6 inline-flex items-center gap-1.5 text-xs text-text-secondary transition-colors hover:text-text-primary"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>{t("allNames")}</span>
+          </Link>
           <div className="mb-6 inline-block rounded border border-border bg-surface-raised px-2 py-1 font-mono text-xs text-text-muted">
             {t("ofNinetyNine", { id: name.id })}
           </div>

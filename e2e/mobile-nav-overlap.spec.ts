@@ -84,4 +84,16 @@ test.describe("mobile nav bar overlap", () => {
     expect(textBottom).not.toBeNull();
     expect(textBottom!).toBeLessThanOrEqual(navTop + 1);
   });
+
+  test("verse feed on a divine name detail page clears the nav bar", async ({ page }) => {
+    await page.goto("/names/al-malik");
+    const navTop = await navBarTop(page);
+    await scrollToBottom(page, null);
+
+    const lastVerse = page.locator("main p:not([dir='rtl'])").last();
+    await expect(lastVerse).toBeVisible();
+    const box = await lastVerse.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(navTop + 1);
+  });
 });
