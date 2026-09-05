@@ -53,7 +53,7 @@ export default async function SurahReaderPage({ params }: Props) {
   const surah: MatchedSurah = { number: surahNum, name, nameArabic, ayahCount };
 
   return (
-    <div className="min-h-screen bg-bg text-text-primary">
+    <div className="min-h-dvh bg-bg pb-mobile-nav text-text-primary md:pb-0">
       <LandingHeader />
       <MobileNavBar />
 

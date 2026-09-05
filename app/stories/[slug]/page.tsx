@@ -54,7 +54,7 @@ export default async function StoryDetailPage({ params }: Props) {
   );
 
   return (
-    <div className="min-h-screen bg-bg text-text-primary">
+    <div className="min-h-dvh bg-bg pb-mobile-nav text-text-primary md:pb-0">
       <LandingHeader />
       <MobileNavBar />
       <StoryActivityTracker slug={slug} />

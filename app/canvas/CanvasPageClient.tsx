@@ -140,7 +140,7 @@ export function CanvasPageClient() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-bg">
+    <div className="flex flex-col h-dvh w-full overflow-hidden bg-bg">
       <Suspense>
         <VerseLoader />
       </Suspense>

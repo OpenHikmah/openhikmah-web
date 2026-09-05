@@ -28,7 +28,7 @@ export default async function TodayPage() {
   });
 
   return (
-    <div className="flex min-h-dvh flex-col bg-bg">
+    <div className="flex min-h-dvh flex-col bg-bg pb-mobile-nav md:pb-0">
       <LandingHeader />
       <MobileNavBar />
 
