@@ -3,7 +3,13 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { activityLog, users } from "@/lib/infra/db/schema";
 import { requireUser, invalidateTokenCache } from "@/lib/auth/social-auth";
-import { todayUTC, yesterdayUTC, previousDay, effectiveStreak } from "@/lib/social/streak";
+import {
+  todayUTC,
+  yesterdayUTC,
+  previousDay,
+  effectiveStreak,
+  localDateFromOffset,
+} from "@/lib/social/streak";
 import { resolveActivityDate } from "@/lib/social/activity-date";
 import { rateLimitOrNull, MUTATION_WINDOW_SECONDS } from "@/lib/infra/rate-limit";
 
@@ -163,5 +169,7 @@ export async function GET(req: NextRequest) {
     streak: effectiveStreak(user.currentStreak, user.lastActivityDate, user.timezoneOffsetMinutes),
     longestStreak: user.longestStreak,
     lastActivityDate: user.lastActivityDate,
+    // The local calendar day `streak` was decayed against — see /api/social/me.
+    streakDate: localDateFromOffset(user.timezoneOffsetMinutes),
   });
 }

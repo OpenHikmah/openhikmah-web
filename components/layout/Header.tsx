@@ -230,10 +230,11 @@ export function Header({ onSearchOpen }: HeaderProps) {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.streak !== undefined)
-          // asOf = the client-local day this read is reconciled against, not
-          // lastActivityDate (which doesn't advance on a broken streak — see
-          // components/providers.tsx).
-          bumpStreak(data.streak, data.longestStreak, clientLocalDate());
+          // asOf = the day the server decayed the streak against (streakDate),
+          // not lastActivityDate (which doesn't advance on a broken streak) and
+          // not the browser's day (which can disagree with the stored offset).
+          // See components/providers.tsx.
+          bumpStreak(data.streak, data.longestStreak, data.streakDate ?? clientLocalDate());
       })
       .catch((e) => console.error("header: streak hydration failed", e));
     // eslint-disable-next-line react-hooks/exhaustive-deps

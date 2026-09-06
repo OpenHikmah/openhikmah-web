@@ -412,4 +412,17 @@ describe("GET /api/social/activity", () => {
     expect(body.longestStreak).toBe(14);
     expect(body.lastActivityDate).toBe(todayStr());
   });
+
+  it("returns streakDate = the local day the streak was decayed against", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T22:30:00Z"));
+    try {
+      authedAs(makeUser({ currentStreak: 3, timezoneOffsetMinutes: 180 }));
+      const res = await GET(makeGetReq());
+      const body = await res.json();
+      expect(body.streakDate).toBe("2026-08-29");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

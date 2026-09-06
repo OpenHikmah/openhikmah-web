@@ -142,16 +142,17 @@ export function SessionRestorer() {
             currentStreak?: number;
             longestStreak?: number;
             lastActivityDate?: string | null;
+            streakDate?: string;
           };
           if (p.id && p.username) {
             setProfile({ userId: p.id, username: p.username });
             if (p.currentStreak !== undefined)
-              // asOf is the client-local day this read was reconciled against,
-              // NOT lastActivityDate — that doesn't advance when a streak breaks,
-              // so passing it would let bumpStreak's same-day regression guard
-              // reject the server's legitimate decay to 0 and keep showing a
-              // stale value forever.
-              bumpStreak(p.currentStreak, p.longestStreak, clientLocalDate());
+              // asOf is the day the server decayed currentStreak against
+              // (streakDate), NOT lastActivityDate — that doesn't advance when a
+              // streak breaks, so passing it would let bumpStreak's same-day
+              // guard reject the server's legitimate decay to 0. Fall back to the
+              // browser's local day only if the server didn't send streakDate.
+              bumpStreak(p.currentStreak, p.longestStreak, p.streakDate ?? clientLocalDate());
           }
         }
       })

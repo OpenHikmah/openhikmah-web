@@ -154,10 +154,18 @@ function parseRawConnections(text: string): Array<{ ref: string; reason: string 
   if (!Array.isArray(parsed)) {
     throw new ConnectionParseError("AI response JSON was not an array", jsonMatch[0]);
   }
-  return parsed.filter(
+  const valid = parsed.filter(
     (c): c is { ref: string; reason: string } =>
       c && typeof c.ref === "string" && typeof c.reason === "string"
   );
+  // A non-empty array whose entries are ALL the wrong shape is malformed output,
+  // not a valid empty selection — the caller must not read it as "pool
+  // exhausted". A partially-valid array (some good entries, some junk) keeps the
+  // good ones, matching the model's evident intent.
+  if (parsed.length > 0 && valid.length === 0) {
+    throw new ConnectionParseError("AI response array had no well-formed entries", jsonMatch[0]);
+  }
+  return valid;
 }
 
 /**

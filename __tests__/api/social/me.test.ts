@@ -127,6 +127,20 @@ describe("GET /api/social/me", () => {
     expect(body.longestStreak).toBe(30);
   });
 
+  it("returns streakDate = the local day the streak was decayed against", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T22:30:00Z"));
+    try {
+      authedAs(makeUser({ currentStreak: 5, timezoneOffsetMinutes: 180 }));
+      const res = await GET(makeGetReq());
+      const body = await res.json();
+      // UTC+3 → already the 29th locally.
+      expect(body.streakDate).toBe("2026-08-29");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("decays against the user's local day using the stored timezone offset", async () => {
     // 01:00 UTC on the 29th: UTC has rolled over, but a UTC-5 user is still on
     // the evening of the 28th. Last activity on the 27th is local-yesterday for
