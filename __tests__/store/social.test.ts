@@ -96,6 +96,18 @@ describe("social store", () => {
     expect(useSocialStore.getState().streak).toBe(5);
   });
 
+  it("bumpStreak applies a server decay to 0 on reload when asOf is the current day (broken-streak case)", () => {
+    // The persisted state from an earlier active day.
+    useSocialStore.setState({ streak: 10, longestStreak: 10, streakAsOf: "2026-09-04" });
+    // On reload days later, the server reports the streak is dead. The hydration
+    // caller passes *today's* local date as asOf (NOT lastActivityDate, which is
+    // still "2026-09-04" and would trip the same-day regression guard).
+    useSocialStore.getState().bumpStreak(0, 10, "2026-09-10");
+    expect(useSocialStore.getState().streak).toBe(0);
+    expect(useSocialStore.getState().longestStreak).toBe(10);
+    expect(useSocialStore.getState().streakAsOf).toBe("2026-09-10");
+  });
+
   it("bumpStreak applies a newer hydration read, including a legitimate decay to 0", () => {
     useSocialStore.getState().applyActivityResult({
       streak: 5,

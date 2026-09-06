@@ -42,7 +42,11 @@ vi.mock("@/lib/ai/prompt-registry", async (importOriginal) => {
   };
 });
 
-import { generateConnections, generateGroundedConnections } from "@/lib/ai/connection-generator";
+import {
+  generateConnections,
+  generateGroundedConnections,
+  ConnectionParseError,
+} from "@/lib/ai/connection-generator";
 import { getPrompt } from "@/lib/ai/prompt-registry";
 
 function verse(ref: string): Verse {
@@ -125,41 +129,31 @@ describe("generateConnections", () => {
     expect(out.map((c) => c.ref)).toEqual(["2:255"]);
   });
 
-  it("returns [] when the AI returns no parseable JSON", async () => {
+  it("throws ConnectionParseError when the AI returns no JSON array (e.g. a refusal)", async () => {
     mockCallAI.mockResolvedValue("Sorry, I cannot help with that.");
+    await expect(generateConnections("1:1", "ar", "tr", "thematic")).rejects.toBeInstanceOf(
+      ConnectionParseError
+    );
+  });
+
+  it("throws ConnectionParseError when the JSON array is malformed", async () => {
+    mockCallAI.mockResolvedValue("[{ not: valid json }]");
+    await expect(generateConnections("1:1", "ar", "tr", "thematic")).rejects.toBeInstanceOf(
+      ConnectionParseError
+    );
+  });
+
+  it("throws ConnectionParseError when the response JSON is not an array", async () => {
+    mockCallAI.mockResolvedValue('{ "ref": "2:255", "reason": "x" }');
+    await expect(generateConnections("1:1", "ar", "tr", "thematic")).rejects.toBeInstanceOf(
+      ConnectionParseError
+    );
+  });
+
+  it("returns [] (no throw) when the model well-formedly selects nothing", async () => {
+    mockCallAI.mockResolvedValue("[]");
     const out = await generateConnections("1:1", "ar", "tr", "thematic");
     expect(out).toEqual([]);
-  });
-
-  it("logs when the AI response contains no JSON array", async () => {
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    try {
-      mockCallAI.mockResolvedValue("Sorry, I cannot help with that.");
-      const out = await generateConnections("1:1", "ar", "tr", "thematic");
-      expect(out).toEqual([]);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining("no JSON array"),
-        expect.stringContaining("Sorry, I cannot help")
-      );
-    } finally {
-      consoleErrorSpy.mockRestore();
-    }
-  });
-
-  it("logs when the AI response's JSON array is malformed", async () => {
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    try {
-      mockCallAI.mockResolvedValue("[{ not: valid json }]");
-      const out = await generateConnections("1:1", "ar", "tr", "thematic");
-      expect(out).toEqual([]);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining("failed to parse"),
-        expect.stringContaining("not: valid json"),
-        expect.any(Error)
-      );
-    } finally {
-      consoleErrorSpy.mockRestore();
-    }
   });
 
   it("caps at 3 connections even if the model returns more", async () => {
@@ -291,6 +285,19 @@ describe("generateGroundedConnections", () => {
     const out = await generateGroundedConnections("1:1", "ar", "tr", "thematic", ["2:255"]);
     expect(out).toEqual([]);
     expect(mockCallAI).not.toHaveBeenCalled();
+  });
+
+  it("throws ConnectionParseError on an unparseable grounded response", async () => {
+    mockCallAI.mockResolvedValue("I can't assist with that request.");
+    await expect(
+      generateGroundedConnections("1:1", "ar", "tr", "thematic", ["2:255"])
+    ).rejects.toBeInstanceOf(ConnectionParseError);
+  });
+
+  it("returns [] (no throw) when the model well-formedly picks none of the candidates", async () => {
+    mockCallAI.mockResolvedValue("[]");
+    const out = await generateGroundedConnections("1:1", "ar", "tr", "thematic", ["2:255"]);
+    expect(out).toEqual([]);
   });
 
   it("logs exactly one ai_generations row per grounded generation", async () => {

@@ -23,6 +23,7 @@ import { useAudioStore } from "@/store/audio";
 import type { AudioVerse } from "@/store/audio";
 import type { Verse } from "@/types/quran";
 import { buildShareUrl } from "@/hooks/useCanvasPersistence";
+import { clientLocalDate } from "@/lib/social/post-activity";
 import { useState, useEffect, useRef, forwardRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
@@ -229,7 +230,10 @@ export function Header({ onSearchOpen }: HeaderProps) {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.streak !== undefined)
-          bumpStreak(data.streak, data.longestStreak, data.lastActivityDate ?? null);
+          // asOf = the client-local day this read is reconciled against, not
+          // lastActivityDate (which doesn't advance on a broken streak — see
+          // components/providers.tsx).
+          bumpStreak(data.streak, data.longestStreak, clientLocalDate());
       })
       .catch((e) => console.error("header: streak hydration failed", e));
     // eslint-disable-next-line react-hooks/exhaustive-deps

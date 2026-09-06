@@ -112,8 +112,13 @@ export default async function NameDetailPage({ params }: Props) {
           </p>
         </div>
 
-        {/* Reflection + Pairings + Verses */}
-        <div className="max-w-3xl mx-auto px-6 py-10 space-y-10">
+        {/* Reflection + Pairings + Verses.
+            key={slug}: prev/next and pairing cross-links are client-side
+            navigations within this same route segment, so without a key React
+            reuses these client components across names and their fetch-once
+            state (and the "server prefetch present ⇒ skip fetch" guard) would
+            keep showing the previous name's content. */}
+        <div key={slug} className="max-w-3xl mx-auto px-6 py-10 space-y-10">
           {/* Believer's Reflection */}
           <NameReflection
             slug={slug}

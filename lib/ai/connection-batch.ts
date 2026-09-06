@@ -2,6 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { verses, connections, connectionCoverage, aiGenerations } from "@/lib/infra/db/schema";
 import { generateConnectionsForCell } from "@/lib/ai/graph-service";
+import { ConnectionParseError } from "@/lib/ai/connection-generator";
 import { translateReason } from "@/lib/ai/translate";
 import { estimateCostUsd } from "@/lib/ai/ai-cost";
 import { resolveModel, type Provider } from "@/lib/ai/ai";
@@ -573,6 +574,11 @@ export async function runConnectionBatch(
         }
         summary.generated += results.length;
 
+        // NB: an unparseable model response (refusal, prose, truncated JSON)
+        // throws ConnectionParseError out of generateConnectionsForCell before
+        // this point, so it's handled as a cell failure in the catch below and
+        // never reaches the exhausted branch. Only a *well-formed* empty
+        // selection lands here with results.length === 0.
         if (opts.mode === "topup" && excludeRefs.length > 0 && results.length === 0) {
           // Grounded pool is genuinely empty for this cell — record it so no
           // future run pays for it again.
@@ -635,7 +641,11 @@ export async function runConnectionBatch(
       }
       const message = err instanceof Error ? err.message : String(err);
       console.error(`connection-batch: cell ${cell.fromRef} ${cell.kind} failed:`, err);
-      incr("connection_batch_cell_failed");
+      incr(
+        err instanceof ConnectionParseError
+          ? "connection_batch_unparseable_response"
+          : "connection_batch_cell_failed"
+      );
       summary.cellsFailed++;
       summary.lastError = message;
       consecutiveFailures++;

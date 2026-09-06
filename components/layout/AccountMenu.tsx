@@ -128,7 +128,7 @@ export function AccountMenu() {
     );
   }
 
-  const initial = (username ?? "?")[0].toUpperCase();
+  const initial = (username?.trim() || "?")[0].toUpperCase();
 
   return (
     <div ref={ref} className="relative">

@@ -263,14 +263,16 @@ describe("POST /api/social/activity", () => {
     expect(mockTransaction).toHaveBeenCalledOnce();
   });
 
-  it("buckets by the client's local_date, not UTC", async () => {
+  it("buckets by the client's local day (from its tz offset), not UTC", async () => {
     // 23:30 UTC on the 28th — a UTC+3 client is already on the 29th. Activity
     // was last logged for the client's local day, so this is a same-day no-op.
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-28T23:30:00Z"));
     try {
       authedAs(makeUser({ currentStreak: 4, lastActivityDate: "2026-08-29" }));
-      const res = await POST(makeReq({ type: "verse_added", local_date: "2026-08-29" }));
+      const res = await POST(
+        makeReq({ type: "verse_added", local_date: "2026-08-29", tz_offset_minutes: 180 })
+      );
       const body = await res.json();
       expect(body.isNewDay).toBe(false);
       expect(body.streak).toBe(4);
@@ -285,7 +287,9 @@ describe("POST /api/social/activity", () => {
     vi.setSystemTime(new Date("2026-08-28T23:30:00Z"));
     try {
       authedAs(makeUser({ currentStreak: 4, lastActivityDate: "2026-08-28" }));
-      const res = await POST(makeReq({ type: "verse_added", local_date: "2026-08-29" }));
+      const res = await POST(
+        makeReq({ type: "verse_added", local_date: "2026-08-29", tz_offset_minutes: 180 })
+      );
       const body = await res.json();
       expect(body.isNewDay).toBe(true);
       expect(body.streak).toBe(5);
@@ -340,6 +344,23 @@ describe("POST /api/social/activity", () => {
       );
       const body = await res.json();
       expect(body.activityDate).toBe("2026-08-28");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("buckets by UTC (not the client date) when no tz offset is sent — streak-inflation guard", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T12:00:00Z"));
+    try {
+      // A crafted request omits the offset and claims tomorrow. Without the
+      // guard this would credit the 29th and let the next real ping double-count.
+      authedAs(makeUser({ currentStreak: 3, lastActivityDate: "2026-08-28" }));
+      const res = await POST(makeReq({ type: "verse_added", local_date: "2026-08-29" }));
+      const body = await res.json();
+      expect(body.activityDate).toBe("2026-08-28");
+      expect(body.isNewDay).toBe(false);
+      expect(body.streak).toBe(3);
     } finally {
       vi.useRealTimers();
     }

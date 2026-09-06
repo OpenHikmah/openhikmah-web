@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getConnections } from "@/lib/ai/graph-service";
+import { ConnectionParseError } from "@/lib/ai/connection-generator";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
@@ -76,6 +77,16 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof RateLimitError) {
       return NextResponse.json({ error: "Too many requests — please slow down." }, { status: 429 });
+    }
+    if (err instanceof ConnectionParseError) {
+      // The model returned something unparseable (refusal, prose, truncated
+      // JSON). That is a transient upstream failure, not "no connections" —
+      // surface it so the client can retry rather than caching an empty result.
+      console.error("Connections route: unparseable AI response:", err);
+      return NextResponse.json(
+        { error: "Connection generation failed — please retry." },
+        { status: 502 }
+      );
     }
     console.error("Connections route error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

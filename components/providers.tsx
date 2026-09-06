@@ -9,6 +9,7 @@ import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { usePreferencesStore } from "@/store/preferences";
 import { mergeGuestWorkspace } from "@/hooks/useCanvasPersistence";
+import { clientLocalDate } from "@/lib/social/post-activity";
 import { HAS_SESSION_COOKIE_NAME } from "@/lib/auth/session-cookie";
 import type { Locale } from "@/lib/i18n/config";
 
@@ -145,7 +146,12 @@ export function SessionRestorer() {
           if (p.id && p.username) {
             setProfile({ userId: p.id, username: p.username });
             if (p.currentStreak !== undefined)
-              bumpStreak(p.currentStreak, p.longestStreak, p.lastActivityDate ?? null);
+              // asOf is the client-local day this read was reconciled against,
+              // NOT lastActivityDate — that doesn't advance when a streak breaks,
+              // so passing it would let bumpStreak's same-day regression guard
+              // reject the server's legitimate decay to 0 and keep showing a
+              // stale value forever.
+              bumpStreak(p.currentStreak, p.longestStreak, clientLocalDate());
           }
         }
       })
