@@ -9,7 +9,6 @@ import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { usePreferencesStore } from "@/store/preferences";
 import { mergeGuestWorkspace } from "@/hooks/useCanvasPersistence";
-import { clientLocalDate } from "@/lib/social/post-activity";
 import { HAS_SESSION_COOKIE_NAME } from "@/lib/auth/session-cookie";
 import type { Locale } from "@/lib/i18n/config";
 
@@ -142,17 +141,17 @@ export function SessionRestorer() {
             currentStreak?: number;
             longestStreak?: number;
             lastActivityDate?: string | null;
-            streakDate?: string;
+            streakDate: string;
           };
           if (p.id && p.username) {
             setProfile({ userId: p.id, username: p.username });
             if (p.currentStreak !== undefined)
               // asOf is the day the server decayed currentStreak against
-              // (streakDate), NOT lastActivityDate — that doesn't advance when a
-              // streak breaks, so passing it would let bumpStreak's same-day
-              // guard reject the server's legitimate decay to 0. Fall back to the
-              // browser's local day only if the server didn't send streakDate.
-              bumpStreak(p.currentStreak, p.longestStreak, p.streakDate ?? clientLocalDate());
+              // (streakDate) — NOT lastActivityDate (doesn't advance on a broken
+              // streak) and NOT the browser's day (can disagree with the stored
+              // offset). bumpStreak's same-day guard then reconciles against the
+              // same calendar day the server used.
+              bumpStreak(p.currentStreak, p.longestStreak, p.streakDate);
           }
         }
       })
