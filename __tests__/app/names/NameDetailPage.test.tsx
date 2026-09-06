@@ -19,8 +19,28 @@ vi.mock("@/lib/names/name-content", () => ({ getCachedNameContent }));
 vi.mock("@/lib/i18n/request-prefs", () => ({ getUiLocale: async () => "en" }));
 vi.mock("@/components/layout/LandingHeader", () => ({ LandingHeader: () => null }));
 vi.mock("@/components/layout/MobileNavBar", () => ({ MobileNavBar: () => null }));
-vi.mock("@/app/names/[slug]/NameVerses", () => ({ NameVerses: () => null }));
-vi.mock("@/app/names/[slug]/NamePairings", () => ({ NamePairings: () => null }));
+
+// Stateful stubs: each freezes the slug it first mounted with. If the page stops
+// keying the section by slug, these keep rendering the previous name after a
+// prev/next nav — which is exactly the bleed this test guards against.
+vi.mock("@/app/names/[slug]/NameVerses", async () => {
+  const { useState } = await import("react");
+  return {
+    NameVerses: ({ slug }: { slug: string }) => {
+      const [initial] = useState(slug);
+      return <div>Verses for {initial}</div>;
+    },
+  };
+});
+vi.mock("@/app/names/[slug]/NamePairings", async () => {
+  const { useState } = await import("react");
+  return {
+    NamePairings: ({ slug }: { slug: string }) => {
+      const [initial] = useState(slug);
+      return <div>Pairings for {initial}</div>;
+    },
+  };
+});
 
 import NameDetailPage from "@/app/names/[slug]/page";
 
@@ -46,6 +66,8 @@ describe("NameDetailPage", () => {
   it("keys the reflection/pairings/verses section by slug so a prev/next nav shows the new name, not the old", async () => {
     const { rerender } = await renderSlug("ar-rahman");
     expect(screen.getByText("Reflection for ar-rahman")).toBeInTheDocument();
+    expect(screen.getByText("Pairings for ar-rahman")).toBeInTheDocument();
+    expect(screen.getByText("Verses for ar-rahman")).toBeInTheDocument();
 
     const nextTree = await NameDetailPage({ params: Promise.resolve({ slug: "ar-rahim" }) });
     rerender(
@@ -54,10 +76,12 @@ describe("NameDetailPage", () => {
       </NextIntlClientProvider>
     );
 
-    // key={slug} on the section container remounts NameReflection, so it seeds
-    // from the new name's prefetched content instead of keeping ar-rahman's.
+    // key={slug} on the section container remounts all three client sections, so
+    // each seeds from the new name instead of keeping ar-rahman's state.
     expect(screen.getByText("Reflection for ar-rahim")).toBeInTheDocument();
-    expect(screen.queryByText("Reflection for ar-rahman")).not.toBeInTheDocument();
+    expect(screen.getByText("Pairings for ar-rahim")).toBeInTheDocument();
+    expect(screen.getByText("Verses for ar-rahim")).toBeInTheDocument();
+    expect(screen.queryByText(/for ar-rahman$/)).not.toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
   });
 });
