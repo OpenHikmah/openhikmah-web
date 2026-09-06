@@ -141,11 +141,17 @@ export function SessionRestorer() {
             currentStreak?: number;
             longestStreak?: number;
             lastActivityDate?: string | null;
+            streakDate: string;
           };
           if (p.id && p.username) {
             setProfile({ userId: p.id, username: p.username });
             if (p.currentStreak !== undefined)
-              bumpStreak(p.currentStreak, p.longestStreak, p.lastActivityDate ?? null);
+              // asOf is the day the server decayed currentStreak against
+              // (streakDate) — NOT lastActivityDate (doesn't advance on a broken
+              // streak) and NOT the browser's day (can disagree with the stored
+              // offset). bumpStreak's same-day guard then reconciles against the
+              // same calendar day the server used.
+              bumpStreak(p.currentStreak, p.longestStreak, p.streakDate);
           }
         }
       })

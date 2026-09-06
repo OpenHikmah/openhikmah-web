@@ -229,7 +229,10 @@ export function Header({ onSearchOpen }: HeaderProps) {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.streak !== undefined)
-          bumpStreak(data.streak, data.longestStreak, data.lastActivityDate ?? null);
+          // asOf = the day the server decayed the streak against (streakDate) —
+          // see components/providers.tsx for why not lastActivityDate / the
+          // browser's day.
+          bumpStreak(data.streak, data.longestStreak, data.streakDate);
       })
       .catch((e) => console.error("header: streak hydration failed", e));
     // eslint-disable-next-line react-hooks/exhaustive-deps

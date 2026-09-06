@@ -59,9 +59,18 @@ const {
 });
 
 vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect, insert: mockInsert } }));
+const { ConnectionParseError } = vi.hoisted(() => ({
+  ConnectionParseError: class ConnectionParseError extends Error {
+    constructor(msg = "unparseable") {
+      super(msg);
+      this.name = "ConnectionParseError";
+    }
+  },
+}));
 vi.mock("@/lib/ai/connection-generator", () => ({
   generateConnections: mockGenerate,
   generateGroundedConnections: mockGenerateGrounded,
+  ConnectionParseError,
 }));
 vi.mock("@/lib/ai/connection-discovery", () => ({ discoverCandidates: mockDiscover }));
 vi.mock("@/lib/quran/verse-resolver", () => ({ resolveVerse: mockResolveVerse }));
@@ -202,6 +211,27 @@ describe("getConnections", () => {
     expect(mockGenerate).toHaveBeenCalledTimes(1);
     expect(mockInsert).not.toHaveBeenCalled();
     expect(out).toEqual([]);
+  });
+
+  it("propagates a ConnectionParseError from generation (not swallowed to []) and persists nothing", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    mockGenerate.mockRejectedValue(new ConnectionParseError("no JSON array in AI response"));
+
+    await expect(getConnections("1:1", "thematic", source)).rejects.toBeInstanceOf(
+      ConnectionParseError
+    );
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("propagates a ConnectionParseError from the grounded path too", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    mockDiscover.mockResolvedValue(["2:255", "3:18"]); // grounded path
+    mockGenerateGrounded.mockRejectedValue(new ConnectionParseError());
+
+    await expect(getConnections("1:1", "thematic", source)).rejects.toBeInstanceOf(
+      ConnectionParseError
+    );
+    expect(mockInsert).not.toHaveBeenCalled();
   });
 
   it("rate-limits the generation path: over budget throws and does not generate", async () => {

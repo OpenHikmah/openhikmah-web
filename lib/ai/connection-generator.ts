@@ -123,31 +123,57 @@ async function buildPrompt(
   return { text, promptVersion: version };
 }
 
+/**
+ * A connection-generation response that could not be parsed as a JSON array —
+ * a refusal, a prose preamble, truncated output, or invalid JSON. Distinct from
+ * a *well-formed* empty selection (`[]`), which is a valid "nothing more to
+ * connect" answer. Callers must treat this as a transient generation failure,
+ * never as a genuinely exhausted candidate pool (see lib/ai/connection-batch.ts).
+ */
+export class ConnectionParseError extends Error {
+  constructor(reason: string, sample: string) {
+    super(`${reason}: ${sample.slice(0, 300)}`);
+    this.name = "ConnectionParseError";
+  }
+}
+
 function parseRawConnections(text: string): Array<{ ref: string; reason: string }> {
   const jsonMatch = text.match(/\[[\s\S]*\]/);
   if (!jsonMatch) {
-    console.error("Connections: no JSON array found in AI response:", text.slice(0, 500));
-    return [];
+    throw new ConnectionParseError("no JSON array in AI response", text);
   }
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(jsonMatch[0]);
-    if (!Array.isArray(parsed)) {
-      console.error("Connections: AI response JSON was not an array:", jsonMatch[0].slice(0, 500));
-      return [];
-    }
-    return parsed.filter(
-      (c): c is { ref: string; reason: string } =>
-        c && typeof c.ref === "string" && typeof c.reason === "string"
-    );
+    parsed = JSON.parse(jsonMatch[0]);
   } catch (err) {
-    console.error("Connections: failed to parse AI response:", text.slice(0, 500), err);
-    return [];
+    throw new ConnectionParseError(
+      `invalid JSON in AI response (${(err as Error).message})`,
+      jsonMatch[0]
+    );
   }
+  if (!Array.isArray(parsed)) {
+    throw new ConnectionParseError("AI response JSON was not an array", jsonMatch[0]);
+  }
+  const valid = parsed.filter(
+    (c): c is { ref: string; reason: string } =>
+      c && typeof c.ref === "string" && typeof c.reason === "string"
+  );
+  // A non-empty array whose entries are ALL the wrong shape is malformed output,
+  // not a valid empty selection — the caller must not read it as "pool
+  // exhausted". A partially-valid array (some good entries, some junk) keeps the
+  // good ones, matching the model's evident intent.
+  if (parsed.length > 0 && valid.length === 0) {
+    throw new ConnectionParseError("AI response array had no well-formed entries", jsonMatch[0]);
+  }
+  return valid;
 }
 
 /**
  * Generates up to 3 validated, fully-hydrated connections for a source verse.
- * Returns an empty array if generation fails or nothing resolves.
+ * Returns an empty array when the model well-formedly proposes nothing (or
+ * nothing survives corpus validation). Throws {@link ConnectionParseError} when
+ * the model response can't be parsed — callers must treat that as a transient
+ * failure, not an empty result.
  */
 export async function generateConnections(
   fromRef: string,
@@ -283,7 +309,9 @@ function toResult(verse: Verse, reason: string, kind: EdgeKind): ConnectionResul
  * Grounded generation: the model SELECTS from real discovered candidates and
  * explains each. Refs are validated against the candidate set, so a verse the
  * discovery step did not surface can never appear. Returns [] if no candidate
- * verses resolve (caller falls back to legacy generation).
+ * verses resolve (caller falls back to legacy generation) or the model
+ * well-formedly selects nothing. Throws {@link ConnectionParseError} when the
+ * model response can't be parsed.
  */
 export async function generateGroundedConnections(
   fromRef: string,

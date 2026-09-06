@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { users } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
-import { effectiveStreak } from "@/lib/social/streak";
+import { effectiveStreak, localDateFromOffset } from "@/lib/social/streak";
 import { isUniqueViolation } from "@/lib/infra/http";
 
 export async function GET(req: NextRequest) {
@@ -22,6 +22,11 @@ export async function GET(req: NextRequest) {
     ),
     longestStreak: user.longestStreak,
     lastActivityDate: user.lastActivityDate,
+    // The local calendar day currentStreak was decayed against — the client
+    // passes this to the store's same-day guard so it reconciles against the
+    // server's notion of "today", not the browser's (which can disagree when
+    // the stored offset is null/stale).
+    streakDate: localDateFromOffset(user.timezoneOffsetMinutes),
     createdAt: user.createdAt,
   });
 }

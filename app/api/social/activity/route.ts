@@ -10,6 +10,7 @@ import {
   effectiveStreak,
   localDateFromOffset,
 } from "@/lib/social/streak";
+import { resolveActivityDate } from "@/lib/social/activity-date";
 import { rateLimitOrNull, MUTATION_WINDOW_SECONDS } from "@/lib/infra/rate-limit";
 
 // Activity pings fire on ordinary reading (each verse/connection), so a genuinely
@@ -19,42 +20,9 @@ const ACTIVITY_LIMIT = 300;
 
 const VALID_TYPES = new Set(["verse_added", "connection_made", "hadith_read"]);
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // Widest real UTC offset is ±14h; allow a little slack for a client clock that's
 // a bit off without letting a wildly-wrong clock fabricate consecutive days.
 const MAX_TZ_OFFSET_MIN = 840;
-
-/**
- * The day to credit this activity to. Prefer the client's local calendar day so
- * streaks bucket by the user's midnight, not UTC — but clamp to the server's UTC
- * date if the client's date is more than ~26h away (a broken clock), so it can't
- * jump the streak forward or drop a day.
- */
-function resolveActivityDate(localDate: string | undefined, offsetMinutes: number | null): string {
-  const utc = todayUTC();
-  if (!localDate || !DATE_RE.test(localDate)) return utc;
-
-  // Reject a well-formed but non-existent calendar date ("2026-99-99",
-  // "2026-02-30"): Date.parse gives NaN or silently rolls over, and the raw
-  // string would otherwise hit the Postgres `date` column as a 500.
-  const parsedMs = Date.parse(`${localDate}T00:00:00Z`);
-  if (!Number.isFinite(parsedMs) || new Date(parsedMs).toISOString().slice(0, 10) !== localDate) {
-    return utc;
-  }
-
-  // When the client sent its offset too, the offset is authoritative: the day it
-  // yields right now is the only day we credit, so a signed-in client can't
-  // pre-credit tomorrow (or any other day) by sending a mismatched local_date.
-  if (offsetMinutes !== null) {
-    const reference = localDateFromOffset(offsetMinutes);
-    return localDate === reference ? localDate : reference;
-  }
-
-  // No offset — fall back to UTC with ~26h of clock slack so a slightly-off
-  // client clock near midnight still buckets to its own day.
-  const diffDays = Math.abs((parsedMs - Date.parse(`${utc}T00:00:00Z`)) / 86_400_000);
-  return diffDays > 1 ? utc : localDate;
-}
 
 export async function POST(req: NextRequest) {
   const authed = await requireUser(req);
@@ -201,5 +169,7 @@ export async function GET(req: NextRequest) {
     streak: effectiveStreak(user.currentStreak, user.lastActivityDate, user.timezoneOffsetMinutes),
     longestStreak: user.longestStreak,
     lastActivityDate: user.lastActivityDate,
+    // The local calendar day `streak` was decayed against — see /api/social/me.
+    streakDate: localDateFromOffset(user.timezoneOffsetMinutes),
   });
 }

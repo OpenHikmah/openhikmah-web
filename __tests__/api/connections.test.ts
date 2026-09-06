@@ -382,6 +382,26 @@ describe("POST /api/connections", () => {
     expect(mockAnthropicCreate).toHaveBeenCalled();
   });
 
+  it("returns 502 (not 200 []) when the model returns an unparseable response", async () => {
+    // A miss that reaches generation, but the model refuses / returns prose.
+    // That must surface as a retryable failure, never be cached as "no results".
+    mockSelect.mockReturnValue(makeDbChain([]));
+    mockAnthropicCreate.mockResolvedValue({
+      content: [{ type: "text", text: "I'm sorry, I can't help with that." }],
+    });
+
+    const req = makeRequest({
+      fromRef: "1:1",
+      kind: "thematic",
+      arabicText: "بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ",
+      translation: "In the name of Allah, the Most Gracious, the Most Merciful.",
+    });
+    const res = await POST(req);
+    const body = await res.json();
+    expect(res.status).toBe(502);
+    expect(body.error).toMatch(/retry/i);
+  });
+
   it("returns 200 with an empty array (not a 500) when excludeRefs exhausts a repeat request", async () => {
     // Cache hit path would normally return the stored edge, but with excludeRefs
     // matching it, the DB filter should exclude it — simulate that by returning

@@ -179,6 +179,29 @@ describe("GET /api/names/[slug]/verses", () => {
     }
   });
 
+  it("strips footnote markup from AI-fallback verse translations (search returned nothing)", async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (typeof url !== "string") return { ok: false };
+      // quran.com search finds nothing → the route takes the AI-fallback path.
+      if (new URL(url).hostname === "api.quran.com")
+        return { ok: true, json: async () => ({ search: { results: [] } }) };
+      if (url.includes("ar.alafasy")) return arabicResp("اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ");
+      if (url.includes("en.sahih"))
+        return transResp('And He is the Most Merciful.<sup foot_note="12345">1</sup>');
+      return { ok: false };
+    });
+
+    const req = new NextRequest("http://localhost/api/names/ar-rahman/verses");
+    const res = await getNameVerses(req, params("ar-rahman"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.length).toBeGreaterThan(0);
+    for (const verse of body) {
+      expect(verse.translation).not.toMatch(/<sup/);
+      expect(verse.translation).toBe("And He is the Most Merciful.1");
+    }
+  });
+
   it("quran.com search fetch passes an abort signal so a hung upstream fails fast", async () => {
     mockFetch.mockImplementation(async (url: string) => {
       if (typeof url !== "string") return { ok: false };

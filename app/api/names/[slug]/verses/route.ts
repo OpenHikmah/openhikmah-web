@@ -212,7 +212,14 @@ async function getVersesBySlug(
         .map((item, i) => {
           const vd = verseDataResults[i];
           if (!vd) return null;
-          return { ...vd, reason: item.reason } as NameVerse;
+          // Same as the search path above: Saheeh International text carries
+          // footnote markup (<sup foot_note=…>) that must be stripped before it
+          // is cached and rendered.
+          return {
+            ...vd,
+            translation: stripHtml(vd.translation),
+            reason: item.reason,
+          } as NameVerse;
         })
         .filter((v): v is NameVerse => v !== null);
     },

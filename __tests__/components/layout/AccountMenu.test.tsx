@@ -25,6 +25,34 @@ describe("AccountMenu — logged-out sign-in button", () => {
   });
 });
 
+describe("AccountMenu — avatar initial", () => {
+  const previousAuth = useAuthStore.getState();
+  const previousSocial = useSocialStore.getState();
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 200 })));
+    useAuthStore.setState({ accessToken: "test-token", isSessionLoading: false });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    useAuthStore.setState(previousAuth);
+    useSocialStore.setState(previousSocial);
+  });
+
+  it.each([
+    ["a normal username", "shabnam", "S"],
+    ["a null username", null, "?"],
+    ["an empty-string username", "", "?"],
+    ["a whitespace-only username", "   ", "?"],
+  ])("renders %s without throwing, initial %s", (_desc, username, expected) => {
+    useSocialStore.setState({ username, streak: 3, longestStreak: 10 });
+    renderWithIntl(<AccountMenu />);
+    const trigger = screen.getByRole("button", { name: /account menu/i });
+    expect(trigger.textContent?.trimStart().startsWith(expected)).toBe(true);
+  });
+});
+
 describe("AccountMenu — dropdown a11y", () => {
   const previousAuth = useAuthStore.getState();
   const previousSocial = useSocialStore.getState();

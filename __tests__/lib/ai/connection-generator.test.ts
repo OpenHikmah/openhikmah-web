@@ -42,8 +42,17 @@ vi.mock("@/lib/ai/prompt-registry", async (importOriginal) => {
   };
 });
 
-import { generateConnections, generateGroundedConnections } from "@/lib/ai/connection-generator";
+import {
+  generateConnections,
+  generateGroundedConnections,
+  ConnectionParseError,
+} from "@/lib/ai/connection-generator";
 import { getPrompt } from "@/lib/ai/prompt-registry";
+
+// Sacred-data rule (AGENTS.md): plausible Arabic + a real translation even in
+// fixtures. Al-Fatiha 1:1.
+const SOURCE_AR = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ";
+const SOURCE_TR = "In the name of Allah, the Entirely Merciful, the Especially Merciful.";
 
 function verse(ref: string): Verse {
   const [s, a] = ref.split(":");
@@ -86,7 +95,7 @@ describe("generateConnections", () => {
         { ref: "112:1", reason: "Pure tawhid." },
       ])
     );
-    const out = await generateConnections("1:1", "ar", "tr", "thematic");
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
     expect(mockCallAI).toHaveBeenCalledTimes(1);
     expect(out).toHaveLength(3);
     expect(out[0]).toMatchObject({ ref: "2:255", reason: "Throne verse.", kind: "thematic" });
@@ -94,7 +103,7 @@ describe("generateConnections", () => {
 
   it("logs exactly one ai_generations row per generation", async () => {
     mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
-    await generateConnections("1:1", "ar", "tr", "root");
+    await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "root");
     expect(mockInsert).toHaveBeenCalledTimes(1);
   });
 
@@ -108,7 +117,7 @@ describe("generateConnections", () => {
     mockGetVerses.mockImplementation(
       async (refs: string[]) => new Map(refs.filter((r) => r !== "9:999").map((r) => [r, verse(r)]))
     );
-    const out = await generateConnections("1:1", "ar", "tr", "thematic");
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
     expect(out.map((c) => c.ref)).toEqual(["2:255"]);
   });
 
@@ -121,45 +130,35 @@ describe("generateConnections", () => {
         { ref: "2:255", reason: "valid" },
       ])
     );
-    const out = await generateConnections("1:1", "ar", "tr", "contrast");
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "contrast");
     expect(out.map((c) => c.ref)).toEqual(["2:255"]);
   });
 
-  it("returns [] when the AI returns no parseable JSON", async () => {
+  it("throws ConnectionParseError when the AI returns no JSON array (e.g. a refusal)", async () => {
     mockCallAI.mockResolvedValue("Sorry, I cannot help with that.");
-    const out = await generateConnections("1:1", "ar", "tr", "thematic");
+    await expect(
+      generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic")
+    ).rejects.toBeInstanceOf(ConnectionParseError);
+  });
+
+  it("throws ConnectionParseError when the JSON array is malformed", async () => {
+    mockCallAI.mockResolvedValue("[{ not: valid json }]");
+    await expect(
+      generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic")
+    ).rejects.toBeInstanceOf(ConnectionParseError);
+  });
+
+  it("throws ConnectionParseError when the response JSON is not an array", async () => {
+    mockCallAI.mockResolvedValue('{ "ref": "2:255", "reason": "x" }');
+    await expect(
+      generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic")
+    ).rejects.toBeInstanceOf(ConnectionParseError);
+  });
+
+  it("returns [] (no throw) when the model well-formedly selects nothing", async () => {
+    mockCallAI.mockResolvedValue("[]");
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
     expect(out).toEqual([]);
-  });
-
-  it("logs when the AI response contains no JSON array", async () => {
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    try {
-      mockCallAI.mockResolvedValue("Sorry, I cannot help with that.");
-      const out = await generateConnections("1:1", "ar", "tr", "thematic");
-      expect(out).toEqual([]);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining("no JSON array"),
-        expect.stringContaining("Sorry, I cannot help")
-      );
-    } finally {
-      consoleErrorSpy.mockRestore();
-    }
-  });
-
-  it("logs when the AI response's JSON array is malformed", async () => {
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    try {
-      mockCallAI.mockResolvedValue("[{ not: valid json }]");
-      const out = await generateConnections("1:1", "ar", "tr", "thematic");
-      expect(out).toEqual([]);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining("failed to parse"),
-        expect.stringContaining("not: valid json"),
-        expect.any(Error)
-      );
-    } finally {
-      consoleErrorSpy.mockRestore();
-    }
   });
 
   it("caps at 3 connections even if the model returns more", async () => {
@@ -171,13 +170,13 @@ describe("generateConnections", () => {
         { ref: "2:4", reason: "d" },
       ])
     );
-    const out = await generateConnections("1:1", "ar", "tr", "thematic");
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
     expect(out).toHaveLength(3);
   });
 
   it("omits any language directive and keeps the Tanzih rule for the default (English) locale", async () => {
     mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
-    await generateConnections("1:1", "ar", "tr", "thematic");
+    await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
     const prompt = mockCallAI.mock.calls[0][0] as string;
     expect(prompt).not.toMatch(/write each "reason" in/i);
     expect(prompt).toMatch(/strict tanzih/i);
@@ -185,7 +184,7 @@ describe("generateConnections", () => {
 
   it("appends a language directive for a non-English locale without dropping the Tanzih rule", async () => {
     mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
-    await generateConnections("1:1", "ar", "tr", "thematic", "tr");
+    await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", "tr");
     const prompt = mockCallAI.mock.calls[0][0] as string;
     expect(prompt).toMatch(/write each "reason" in turkish/i);
     expect(prompt).toMatch(/strict tanzih/i);
@@ -203,7 +202,7 @@ Return ONLY a valid JSON array of { "ref": "surah:ayah", "reason": "..." }.`,
       version: 7,
     });
     mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
-    await generateConnections("1:1", "ar", "tr", "thematic");
+    await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
     const prompt = mockCallAI.mock.calls[0][0] as string;
     expect(prompt).not.toMatch(/you are a classical islamic scholar/i);
     expect(prompt).toMatch(/strict tanzih/i);
@@ -216,7 +215,7 @@ Return ONLY a valid JSON array of { "ref": "surah:ayah", "reason": "..." }.`,
       provider: "gemini" as const,
       model: "gemini-3.5-flash-lite",
     });
-    await generateConnections("1:1", "ar", "tr", "thematic", "en", {
+    await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", "en", {
       provider: "gemini",
       model: "gemini-3.7-flash",
     });
@@ -255,7 +254,7 @@ describe("generateGroundedConnections", () => {
         { ref: "3:18", reason: "witness of oneness" },
       ])
     );
-    const out = await generateGroundedConnections("1:1", "ar", "tr", "thematic", [
+    const out = await generateGroundedConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", [
       "2:255",
       "3:18",
       "112:1",
@@ -271,7 +270,10 @@ describe("generateGroundedConnections", () => {
         { ref: "9:99", reason: "NOT a candidate — must be dropped" },
       ])
     );
-    const out = await generateGroundedConnections("1:1", "ar", "tr", "root", ["2:255", "3:18"]);
+    const out = await generateGroundedConnections("1:1", SOURCE_AR, SOURCE_TR, "root", [
+      "2:255",
+      "3:18",
+    ]);
     expect(out.map((c) => c.ref)).toEqual(["2:255"]);
   });
 
@@ -282,26 +284,45 @@ describe("generateGroundedConnections", () => {
         { ref: "2:255", reason: "valid" },
       ])
     );
-    const out = await generateGroundedConnections("1:1", "ar", "tr", "contrast", ["2:255"]);
+    const out = await generateGroundedConnections("1:1", SOURCE_AR, SOURCE_TR, "contrast", [
+      "2:255",
+    ]);
     expect(out.map((c) => c.ref)).toEqual(["2:255"]);
   });
 
   it("returns [] without calling the AI when no candidate verse resolves", async () => {
     mockGetVerses.mockResolvedValue(new Map());
-    const out = await generateGroundedConnections("1:1", "ar", "tr", "thematic", ["2:255"]);
+    const out = await generateGroundedConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", [
+      "2:255",
+    ]);
     expect(out).toEqual([]);
     expect(mockCallAI).not.toHaveBeenCalled();
   });
 
+  it("throws ConnectionParseError on an unparseable grounded response", async () => {
+    mockCallAI.mockResolvedValue("I can't assist with that request.");
+    await expect(
+      generateGroundedConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", ["2:255"])
+    ).rejects.toBeInstanceOf(ConnectionParseError);
+  });
+
+  it("returns [] (no throw) when the model well-formedly picks none of the candidates", async () => {
+    mockCallAI.mockResolvedValue("[]");
+    const out = await generateGroundedConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", [
+      "2:255",
+    ]);
+    expect(out).toEqual([]);
+  });
+
   it("logs exactly one ai_generations row per grounded generation", async () => {
     mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
-    await generateGroundedConnections("1:1", "ar", "tr", "root", ["2:255"]);
+    await generateGroundedConnections("1:1", SOURCE_AR, SOURCE_TR, "root", ["2:255"]);
     expect(mockInsert).toHaveBeenCalledTimes(1);
   });
 
   it("omits any language directive and keeps the Tanzih rule for the default (English) locale", async () => {
     mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
-    await generateGroundedConnections("1:1", "ar", "tr", "thematic", ["2:255"]);
+    await generateGroundedConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", ["2:255"]);
     const prompt = mockCallAI.mock.calls[0][0] as string;
     expect(prompt).not.toMatch(/write each "reason" in/i);
     expect(prompt).toMatch(/strict tanzih/i);
@@ -309,7 +330,7 @@ describe("generateGroundedConnections", () => {
 
   it("appends a language directive for a non-English locale without dropping the Tanzih rule", async () => {
     mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
-    await generateGroundedConnections("1:1", "ar", "tr", "thematic", ["2:255"], "ru");
+    await generateGroundedConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", ["2:255"], "ru");
     const prompt = mockCallAI.mock.calls[0][0] as string;
     expect(prompt).toMatch(/write each "reason" in russian/i);
     expect(prompt).toMatch(/strict tanzih/i);
@@ -322,7 +343,7 @@ describe("generateGroundedConnections", () => {
       provider: "gemini" as const,
       model: "gemini-3.5-flash-lite",
     });
-    await generateGroundedConnections("1:1", "ar", "tr", "root", ["2:255"], "en", {
+    await generateGroundedConnections("1:1", SOURCE_AR, SOURCE_TR, "root", ["2:255"], "en", {
       provider: "gemini",
       model: "gemini-3.7-flash",
     });
