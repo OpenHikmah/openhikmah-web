@@ -3,6 +3,7 @@ import { db } from "@/lib/infra/db";
 import { verses, verseTranslations, type VerseRow } from "@/lib/infra/db/schema";
 import { getSurahName } from "@/lib/quran/surah-names";
 import { SURAH_LENGTHS } from "@/lib/quran/audio";
+import { correctTranslation } from "@/lib/quran/translation-corrections";
 import type { Verse, VerseRef } from "@/types/quran";
 
 /**
@@ -15,14 +16,18 @@ import type { Verse, VerseRef } from "@/types/quran";
  * requested edition has no row for that verse.
  */
 
-function rowToVerse(row: VerseRow, translationOverride?: string): Verse {
+function rowToVerse(
+  row: VerseRow,
+  opts?: { edition?: string; translationOverride?: string }
+): Verse {
   const [surahName, surahNameArabic] = getSurahName(row.surah);
+  const rawTranslation = opts?.translationOverride ?? row.translation;
   return {
     surah: row.surah,
     ayah: row.ayah,
     ref: row.ref as VerseRef,
     arabicText: row.arabicText,
-    translation: translationOverride ?? row.translation,
+    translation: correctTranslation(row.ref, opts?.edition, rawTranslation),
     surahName,
     surahNameArabic,
   };
@@ -60,7 +65,9 @@ export async function getVerse(ref: string, edition?: string): Promise<Verse | n
     .where(eq(verses.ref, ref))
     .limit(1);
   const row = rows[0];
-  return row ? rowToVerse(row.verse, row.translationText ?? undefined) : null;
+  return row
+    ? rowToVerse(row.verse, { edition, translationOverride: row.translationText ?? undefined })
+    : null;
 }
 
 /** Batch lookup. Returns a map keyed by ref; missing refs are simply absent. */
@@ -79,7 +86,10 @@ export async function getVerses(refs: string[], edition?: string): Promise<Map<s
     )
     .where(inArray(verses.ref, refs));
   return new Map(
-    rows.map((r) => [r.verse.ref, rowToVerse(r.verse, r.translationText ?? undefined)])
+    rows.map((r) => [
+      r.verse.ref,
+      rowToVerse(r.verse, { edition, translationOverride: r.translationText ?? undefined }),
+    ])
   );
 }
 
