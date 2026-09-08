@@ -286,7 +286,19 @@ async function getVersesBySlug(
         slug,
         v.ref,
         locale,
-        (resolved) => translateReason(v.reason, language, { feature: "names", ...resolved }),
+        (resolved) =>
+          translateReason(v.reason, language, { feature: "names", ...resolved }).catch((err) => {
+            // A provider failure on the translation call must degrade to the
+            // English reason (handled just below), never 500 the whole verses
+            // response — mirrors the callAI try/catch in reflection/pairings.
+            // Returned "" is treated as a blank translation by the caller.
+            console.error(
+              `Name verses: translation call failed for ${slug}/${v.ref}/${locale}:`,
+              err
+            );
+            incr("names_ai_call_error");
+            return "";
+          }),
         onBeforeGenerateOnce
       );
       // A blank/failed translation must never silently replace an

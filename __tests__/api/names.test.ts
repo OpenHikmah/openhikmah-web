@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
 // Mocks must be declared before static imports so Vitest hoists them first
@@ -58,8 +58,8 @@ vi.mock("@/lib/infra/db", () => ({
 // Shared (not per-instance) so tests can inspect every prompt sent to the AI
 // across the module's several `new Anthropic()` call sites (callAI creates a
 // fresh client per call).
-const { mockCreate } = vi.hoisted(() => ({
-  mockCreate: vi.fn(async (_args: { messages: Array<{ content: string }> }) => ({
+const { mockCreate, defaultAiCreate } = vi.hoisted(() => {
+  const defaultAiCreate = async (_args: { messages: Array<{ content: string }> }) => ({
     content: [
       {
         type: "text",
@@ -72,8 +72,9 @@ const { mockCreate } = vi.hoisted(() => ({
         ]),
       },
     ],
-  })),
-}));
+  });
+  return { mockCreate: vi.fn(defaultAiCreate), defaultAiCreate };
+});
 
 vi.mock("@anthropic-ai/sdk", () => {
   class MockAnthropic {
@@ -129,6 +130,13 @@ describe("GET /api/names/[slug]/verses", () => {
     mockGetUiLocale.mockResolvedValue("en");
     mockGetQuranEdition.mockReset();
     mockGetQuranEdition.mockResolvedValue("en.sahih");
+  });
+
+  afterEach(() => {
+    // Restore the default AI response — individual tests may replace it with a
+    // rejecting implementation to simulate a provider outage.
+    mockCreate.mockReset();
+    mockCreate.mockImplementation(defaultAiCreate);
   });
 
   function params(slug: string) {
@@ -237,6 +245,47 @@ describe("GET /api/names/[slug]/verses", () => {
     expect(body.length).toBeGreaterThan(0);
     for (const verse of body) {
       expect(verse.translation).toBe("Türkçe çeviri");
+    }
+  });
+
+  it("returns 200 with the English reason (never 500) for a non-English locale when every AI call fails", async () => {
+    // Reproduces the production outage: with the paid-AI budget spent, every
+    // Claude call throws. English pages serve cached content, but a non-English
+    // request must still translate each verse reason — that call path had no
+    // guard and 500'd the whole response. It must now degrade to the English
+    // reason instead.
+    mockGetUiLocale.mockResolvedValue("tr");
+    mockGetQuranEdition.mockResolvedValue("tr.diyanet");
+    mockFetch.mockImplementation(async (url: string) => {
+      if (typeof url !== "string") return { ok: false };
+      // quran.com search returns real verse keys so selection succeeds with no AI.
+      if (new URL(url).hostname === "api.quran.com")
+        return {
+          ok: true,
+          json: async () => ({
+            search: { results: [{ verse_key: "2:255" }, { verse_key: "3:18" }] },
+          }),
+        };
+      if (url.includes("ar.alafasy")) return arabicResp("اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ");
+      if (url.includes("tr.diyanet")) return transResp("Türkçe çeviri");
+      if (url.includes("en.sahih")) return transResp("English translation");
+      return { ok: false };
+    });
+    mockCreate.mockReset();
+    mockCreate.mockImplementation(async () => {
+      throw new Error("provider unavailable");
+    });
+
+    const req = new NextRequest("http://localhost/api/names/al-alim/verses");
+    const res = await getNameVerses(req, params("al-alim"));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body)).toBe(true);
+    expect(body.length).toBeGreaterThan(0);
+    for (const verse of body) {
+      expect(typeof verse.reason).toBe("string");
+      expect(verse.reason.trim().length).toBeGreaterThan(0);
     }
   });
 
