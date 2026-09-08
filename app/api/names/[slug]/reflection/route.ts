@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callAI } from "@/lib/ai/ai";
+import { looksLikeRefusal } from "@/lib/ai/refusal";
 import { getNameBySlug } from "@/lib/names/divine-names";
 import { getOrGenerateNameContent } from "@/lib/names/name-content";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
@@ -56,10 +57,19 @@ async function getReflection(
     REFLECTION_VERSION,
     async (resolved) => {
       try {
-        return await callAI(
+        const text = await callAI(
           buildPrompt(name.arabic, name.transliteration, name.meaning, name.description, locale),
           { feature: "names", ...resolved }
         );
+        if (looksLikeRefusal(text)) {
+          // A soft refusal / disclaimer is not canonical theology — treat it
+          // like an empty result (not cached, retried) rather than version-pin
+          // it as this name's reflection.
+          console.error(`Reflection: model returned a refusal for ${slug}, not caching`);
+          incr("names_ai_refusal");
+          return "";
+        }
+        return text;
       } catch (err) {
         // Not cached (empty result), so the next request retries — mirrors how
         // buildReasons/fallbackAIVerses in verses/route.ts tolerate a provider

@@ -155,6 +155,29 @@ describe("generateConnections", () => {
     ).rejects.toBeInstanceOf(ConnectionParseError);
   });
 
+  it("throws ConnectionParseError when every entry has a blank reason", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        { ref: "2:255", reason: "" },
+        { ref: "3:18", reason: "   " },
+      ])
+    );
+    await expect(
+      generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic")
+    ).rejects.toBeInstanceOf(ConnectionParseError);
+  });
+
+  it("drops entries with a blank reason but keeps the well-formed ones", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        { ref: "2:255", reason: "A grounded explanation." },
+        { ref: "3:18", reason: "" },
+      ])
+    );
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+    expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+  });
+
   it("returns [] (no throw) when the model well-formedly selects nothing", async () => {
     mockCallAI.mockResolvedValue("[]");
     const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
