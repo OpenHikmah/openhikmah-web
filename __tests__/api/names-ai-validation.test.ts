@@ -104,9 +104,10 @@ describe("names AI routes — model output validation", () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([
         {
-          transliteration: "Ar-Rahim",
+          // Exact DIVINE_NAMES values so it resolves to one of the 99.
+          transliteration: "Ar-Rahīm",
           arabic: "الرَّحِيم",
-          explanation: "Balances majesty with mercy.",
+          explanation: "Balances universal grace with mercy specific to the believers.",
         },
         { transliteration: 42, arabic: null },
         "junk",
@@ -118,7 +119,55 @@ describe("names AI routes — model output validation", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveLength(1);
-    expect(body[0].transliteration).toBe("Ar-Rahim");
+    expect(body[0]).toMatchObject({ name: "ar-rahim", transliteration: "Ar-Rahīm" });
+  });
+
+  it("pairings: a shape-valid entry whose name doesn't resolve to one of the 99 is dropped", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        {
+          transliteration: "Ar-Rahīm",
+          arabic: "الرَّحِيم",
+          explanation: "Resolves — kept.",
+        },
+        {
+          transliteration: "Al-Fictitious",
+          arabic: "لا شيء",
+          explanation: 'Not one of the 99 — must be dropped, never cached with name: "".',
+        },
+      ])
+    );
+
+    const res = await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.map((p: { transliteration: string }) => p.transliteration)).toEqual(["Ar-Rahīm"]);
+    expect(body.every((p: { name: string }) => p.name.length > 0)).toBe(true);
+  });
+
+  it("reflection: a model refusal is not cached — returns 200 with empty content", async () => {
+    mockCallAI.mockResolvedValue("I'm sorry, but I can't help with religious interpretation.");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ reflection: "" });
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("returned a refusal"));
+    errorSpy.mockRestore();
+  });
+
+  it("pairings: a model refusal is not cached — returns 200 with an empty array", async () => {
+    mockCallAI.mockResolvedValue("As an AI, I cannot produce this content.");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([]);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("returned a refusal"));
+    errorSpy.mockRestore();
   });
 
   it("verses: AI fallback refs outside real Quran bounds are dropped (no 500)", async () => {

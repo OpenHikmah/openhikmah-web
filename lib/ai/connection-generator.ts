@@ -156,12 +156,18 @@ function parseRawConnections(text: string): Array<{ ref: string; reason: string 
   }
   const valid = parsed.filter(
     (c): c is { ref: string; reason: string } =>
-      c && typeof c.ref === "string" && typeof c.reason === "string"
+      c &&
+      typeof c.ref === "string" &&
+      typeof c.reason === "string" &&
+      // A blank reason is the wrong shape here too: every edge on the canvas
+      // links to its explanation, so a connection with no text isn't one. The
+      // translation write-paths already reject blank output.
+      c.reason.trim() !== ""
   );
-  // A non-empty array whose entries are ALL the wrong shape is malformed output,
-  // not a valid empty selection — the caller must not read it as "pool
-  // exhausted". A partially-valid array (some good entries, some junk) keeps the
-  // good ones, matching the model's evident intent.
+  // A non-empty array whose entries are ALL the wrong shape (or all blank) is
+  // malformed output, not a valid empty selection — the caller must not read it
+  // as "pool exhausted". A partially-valid array (some good entries, some junk)
+  // keeps the good ones, matching the model's evident intent.
   if (parsed.length > 0 && valid.length === 0) {
     throw new ConnectionParseError("AI response array had no well-formed entries", jsonMatch[0]);
   }

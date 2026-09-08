@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callAI } from "@/lib/ai/ai";
+import { looksLikeRefusal } from "@/lib/ai/refusal";
 import { getNameBySlug, DIVINE_NAMES } from "@/lib/names/divine-names";
 import { getOrGenerateNameContent } from "@/lib/names/name-content";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
@@ -77,6 +78,14 @@ async function getPairings(
         return [];
       }
 
+      if (looksLikeRefusal(text)) {
+        // A soft refusal is not canonical content — treat it like an empty
+        // result (not cached, retried), same as the no-JSON-array case below.
+        console.error(`Pairings: model returned a refusal for ${slug}, not caching`);
+        incr("names_ai_refusal");
+        return [];
+      }
+
       let raw: unknown;
       try {
         const match = text.match(/\[[\s\S]*\]/);
@@ -108,19 +117,31 @@ async function getPairings(
         return [];
       }
 
-      return items.slice(0, 3).map((p) => {
-        const match = DIVINE_NAMES.find(
-          (n) =>
-            n.transliteration.toLowerCase() === p.transliteration.toLowerCase() ||
-            n.arabic === p.arabic
-        );
-        return {
-          name: match?.slug ?? "",
-          transliteration: p.transliteration,
-          arabic: p.arabic,
-          explanation: p.explanation,
-        };
-      });
+      return items
+        .slice(0, 3)
+        .map((p): Pairing | null => {
+          const match = DIVINE_NAMES.find(
+            (n) =>
+              n.transliteration.toLowerCase() === p.transliteration.toLowerCase() ||
+              n.arabic === p.arabic
+          );
+          if (!match) {
+            // The admin editor's isValidPairings rejects a pairing whose name
+            // doesn't resolve to one of the 99 — hold generation to the same
+            // bar. A pairing we can't link isn't cacheable canonical content.
+            console.error(
+              `Pairings: dropping unresolved pairing "${p.transliteration}" for ${slug}`
+            );
+            return null;
+          }
+          return {
+            name: match.slug,
+            transliteration: p.transliteration,
+            arabic: p.arabic,
+            explanation: p.explanation,
+          };
+        })
+        .filter((p): p is Pairing => p !== null);
     },
     (v) => v.length === 0,
     onBeforeGenerate
