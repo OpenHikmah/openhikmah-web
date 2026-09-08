@@ -32,13 +32,19 @@ function rowToVerse(row: VerseRow, translationOverride?: string): Verse {
  * A syntactically valid verse reference within real Quran bounds: surah 1–114
  * and ayah within that surah's actual Hafs/Uthmani ayah count (so "1:8" is
  * rejected — Al-Fatihah has 7 ayahs — not just refs beyond a global ceiling).
+ *
+ * Also rejects non-canonical spellings ("02:255", "2:0255"): they pass the
+ * numeric bounds but miss the corpus lookup (which keys on the canonical
+ * "surah:ayah" string), and the live fallback would then resolve real verse
+ * text under the malformed ref.
  */
 export function isValidRef(ref: string): boolean {
   const match = /^(\d+):(\d+)$/.exec(ref);
   if (!match) return false;
   const surah = parseInt(match[1], 10);
   const ayah = parseInt(match[2], 10);
-  return surah >= 1 && surah <= 114 && ayah >= 1 && ayah <= SURAH_LENGTHS[surah - 1];
+  if (surah < 1 || surah > 114 || ayah < 1 || ayah > SURAH_LENGTHS[surah - 1]) return false;
+  return `${surah}:${ayah}` === ref;
 }
 
 /**

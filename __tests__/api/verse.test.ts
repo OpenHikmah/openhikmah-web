@@ -5,7 +5,11 @@ const { mockGetVerse, mockGetQuranEdition } = vi.hoisted(() => ({
   mockGetVerse: vi.fn(),
   mockGetQuranEdition: vi.fn(),
 }));
-vi.mock("@/lib/quran/quran-corpus", () => ({ getVerse: mockGetVerse }));
+// Partial mock: real isValidRef (the shared ref gate), stubbed getVerse.
+vi.mock("@/lib/quran/quran-corpus", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/quran/quran-corpus")>();
+  return { ...actual, getVerse: mockGetVerse };
+});
 vi.mock("@/lib/i18n/request-prefs", () => ({ getQuranEdition: mockGetQuranEdition }));
 
 import { GET } from "@/app/api/verse/[surah]/[ayah]/route";
@@ -78,6 +82,15 @@ describe("GET /api/verse/[surah]/[ayah]", () => {
     const req = new NextRequest("http://localhost/api/verse/1/0");
     const res = await GET(req, params("1", "0"));
     expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for an out-of-range ayah, without a live fetch", async () => {
+    // Al-Fatihah has 7 ayahs — "1:8" must be a fast 400, not a 404 after a
+    // wasted alquran.cloud round-trip.
+    const req = new NextRequest("http://localhost/api/verse/1/8");
+    const res = await GET(req, params("1", "8"));
+    expect(res.status).toBe(400);
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it("returns 404 when external API returns non-ok", async () => {

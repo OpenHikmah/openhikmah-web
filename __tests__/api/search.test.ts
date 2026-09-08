@@ -29,10 +29,11 @@ vi.mock("@/lib/infra/rate-limit", () => ({
   KEYWORD_SEARCH_LIMIT: 60,
   KEYWORD_SEARCH_WINDOW_SECONDS: 60,
 }));
-vi.mock("@/lib/quran/quran-corpus", () => ({
-  getVerse: mockGetVerse,
-  getVerses: mockGetVerses,
-}));
+// Partial mock: real isValidRef (the shared ref gate), stubbed getVerse/getVerses.
+vi.mock("@/lib/quran/quran-corpus", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/quran/quran-corpus")>();
+  return { ...actual, getVerse: mockGetVerse, getVerses: mockGetVerses };
+});
 vi.mock("@/lib/infra/search-log", () => ({ logSearchQuery: mockLogSearchQuery }));
 vi.mock("@/lib/i18n/request-prefs", () => ({
   getQuranEdition: mockGetQuranEdition,
@@ -123,6 +124,15 @@ describe("GET /api/search", () => {
 
   it("does not crash when the local DB lookup throws for a ref-format query", async () => {
     mockGetVerse.mockRejectedValueOnce(new Error("connection refused"));
+    // DB down → resolveVerse falls through to the live fetch, still returns the verse.
+    mockFetch.mockImplementation(async (url: string) =>
+      String(url).includes("ar.alafasy")
+        ? { ok: true, json: async () => ({ data: { text: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ" } }) }
+        : {
+            ok: true,
+            json: async () => ({ data: { text: "Allah - there is no deity except Him." } }),
+          }
+    );
     const req = makeSearchReq("2:255");
     const res = await GET(req);
     expect(res.status).toBe(200);
@@ -130,12 +140,26 @@ describe("GET /api/search", () => {
     expect(body.results[0].ref).toBe("2:255");
   });
 
-  it("includes correct surahNameArabic for ref-format query", async () => {
-    mockGetVerse.mockResolvedValueOnce(null);
-    const req = makeSearchReq("1:1");
-    const res = await GET(req);
+  it("carries the resolved verse's surah names on a ref-format query", async () => {
+    mockGetVerse.mockResolvedValueOnce(verse("2:255", "Allah - there is no deity except Him."));
+    const res = await GET(makeSearchReq("2:255"));
     const body = await res.json();
-    expect(body.results[0].surahNameArabic).toBe("الفاتحة");
+    expect(body.results[0].surahName).toBe("Surah");
+    expect(body.results[0].surahNameArabic).toBe("سورة");
+  });
+
+  it("returns no results for a ref-shaped query that isn't a real verse", async () => {
+    // Out of range, past a surah's length, and zero-padded — none must produce a
+    // fabricated verse card (AGENTS.md: no invented references).
+    for (const q of ["2:9999", "200:1", "1:8", "02:255"]) {
+      const res = await GET(makeSearchReq(q));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.results).toEqual([]);
+      expect(body.total).toBe(0);
+    }
+    expect(mockGetVerse).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it("calls quran.com for text query and returns results", async () => {

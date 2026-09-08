@@ -4,7 +4,7 @@ import { getSurahName, isExactSurahNameMatch, matchSurahsByQuery } from "@/lib/q
 import { fetchLocalizedChapterNames } from "@/lib/quran/chapters";
 import { SURAH_LENGTHS } from "@/lib/quran/audio";
 import { searchByMeaning, type SemanticMatch } from "@/lib/quran/semantic-search";
-import { getVerses } from "@/lib/quran/quran-corpus";
+import { getVerses, isValidRef } from "@/lib/quran/quran-corpus";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
 import {
   consume,
@@ -195,17 +195,22 @@ export async function GET(req: NextRequest) {
   }
 
   if (/^\d+:\d+$/.test(q)) {
-    // resolveVerse falls back to a live alquran.cloud fetch on a local DB
-    // failure — unlike a bare getVerse() call, this never crashes the route.
-    const verse = await resolveVerse(q, edition);
-    const [surahName, surahNameArabic] = getSurahName(parseInt(q.split(":")[0], 10));
+    // A ref-shaped query that isn't a real verse (out of range, zero-padded),
+    // or that resolves nowhere, is not a result — never fabricate a verse card
+    // (AGENTS.md: no invented references). resolveVerse still falls back to a
+    // live fetch on a local DB failure, so a valid ref never 500s the route.
+    const verse = isValidRef(q) ? await resolveVerse(q, edition) : null;
+    if (!verse) {
+      const response: SearchResponse = { results: [], total: 0, page: 1, pageSize };
+      return NextResponse.json(response);
+    }
     const result: SearchResult = {
-      ref: q as VerseRef,
-      surahName: verse?.surahName ?? surahName,
-      surahNameArabic: verse?.surahNameArabic ?? surahNameArabic,
-      snippet: verse?.translation ?? `${surahName} ${q.split(":")[1]}`,
-      arabicText: verse?.arabicText ?? "",
-      translation: verse?.translation ?? "",
+      ref: verse.ref,
+      surahName: verse.surahName,
+      surahNameArabic: verse.surahNameArabic,
+      snippet: verse.translation,
+      arabicText: verse.arabicText,
+      translation: verse.translation,
     };
     const response: SearchResponse = { results: [result], total: 1, page: 1, pageSize };
     return NextResponse.json(response);
