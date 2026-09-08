@@ -12,10 +12,12 @@ export async function GET(
   { params }: { params: Promise<{ surah: string; ayah: string }> }
 ) {
   const { surah, ayah } = await params;
-  const ref = `${parseInt(surah, 10)}:${parseInt(ayah, 10)}`;
+  const ref = `${surah}:${ayah}`;
 
-  // Single gate for every ref-accepting endpoint: surah 1–114 and ayah within
-  // that surah's real length (so "1:8" is a fast 400, not a live round-trip).
+  // Single gate for every ref-accepting endpoint: surah 1–114, ayah within that
+  // surah's real length, and canonical spelling (so "1:8", "02:255" and "2abc:1"
+  // are all a fast 400, not a live round-trip). Passing the raw segments — not
+  // parseInt'd ones — is what lets isValidRef reject non-canonical spellings.
   if (!isValidRef(ref)) {
     return NextResponse.json({ error: "Invalid reference" }, { status: 400 });
   }

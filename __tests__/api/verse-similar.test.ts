@@ -51,6 +51,18 @@ describe("GET /api/verse/[surah]/[ayah]/similar", () => {
     expect(mockSimilarVerses).not.toHaveBeenCalled();
   });
 
+  it("returns 400 for non-canonical path params", async () => {
+    for (const [surah, ayah] of [
+      ["02", "255"],
+      ["2", "0255"],
+      ["2abc", "255"],
+    ]) {
+      const res = await call(surah, ayah);
+      expect(res.status).toBe(400);
+    }
+    expect(mockSimilarVerses).not.toHaveBeenCalled();
+  });
+
   it("returns [] (200) when the service throws", async () => {
     mockSimilarVerses.mockRejectedValueOnce(new Error("no embeddings"));
     const res = await call("1", "1");

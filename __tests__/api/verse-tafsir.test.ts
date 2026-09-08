@@ -41,6 +41,18 @@ describe("GET /api/verse/[surah]/[ayah]/tafsir", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("returns 400 for non-canonical path params without calling the upstream API", async () => {
+    for (const [surah, ayah] of [
+      ["02", "255"],
+      ["2", "0255"],
+      ["2abc", "255"],
+    ]) {
+      const res = await call(surah, ayah);
+      expect(res.status).toBe(400);
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("returns tafsir blocks for a valid ref", async () => {
     const res = await call("1", "1");
     expect(res.status).toBe(200);
