@@ -53,16 +53,24 @@ jobs:
             # errors out on the range instead of scanning anything. Fall back
             # to the merge-base with the default branch, which is unaffected
             # by how the branch's own history was rewritten and still
-            # captures every commit unique to it. If there's no merge-base to
-            # diff against either (e.g. this push *is* to the default
-            # branch, so the merge-base is just HEAD itself, or the
-            # histories are unrelated), scan everything reachable from HEAD
-            # rather than only the latest commit, so nothing gets skipped.
+            # captures every commit unique to it.
             git fetch --quiet origin "$DEFAULT_BRANCH"
             BASE=$(git merge-base "origin/$DEFAULT_BRANCH" HEAD 2>/dev/null || true)
             if [ -n "$BASE" ] && [ "$BASE" != "$(git rev-parse HEAD)" ]; then
               RANGE="$BASE..HEAD"
+            elif [ -n "$BASE" ]; then
+              # BASE == HEAD: HEAD is already contained in the default branch
+              # (a branch pushed before it has any commits of its own, or
+              # pushed just to back it up). It introduces nothing, and every
+              # commit reachable here was already scanned when it landed on the
+              # default branch — re-check only the tip. Scanning all of history
+              # from HEAD here would re-flag long-settled findings on a
+              # no-op branch push and add no coverage.
+              RANGE="HEAD~1..HEAD"
             else
+              # No shared history with the default branch (e.g. an orphan
+              # branch): can't scope to the commits this push introduces, so
+              # scan everything reachable from HEAD rather than skip anything.
               RANGE="HEAD"
             fi
           fi
