@@ -1,4 +1,4 @@
-import { getVerse } from "@/lib/quran/quran-corpus";
+import { getVerse, isValidRef } from "@/lib/quran/quran-corpus";
 import { getSurahName } from "@/lib/quran/surah-names";
 import { isValidEdition } from "@/lib/i18n/config";
 import type { Verse, VerseRef } from "@/types/quran";
@@ -27,11 +27,12 @@ export async function resolveVerse(ref: string, edition?: string): Promise<Verse
 }
 
 async function fetchVerseLive(ref: string, edition: string): Promise<Verse | null> {
-  const match = /^(\d+):(\d+)$/.exec(ref);
-  if (!match) return null;
+  // Same gate as the generation path: rejects out-of-range ayahs (e.g. "1:8")
+  // and non-canonical refs ("02:255") before they cost a live round-trip.
+  if (!isValidRef(ref)) return null;
+  const match = /^(\d+):(\d+)$/.exec(ref)!;
   const surahNum = parseInt(match[1], 10);
   const ayahNum = parseInt(match[2], 10);
-  if (surahNum < 1 || surahNum > 114 || ayahNum < 1) return null;
 
   try {
     const [arabicRes, translationRes] = await Promise.all([

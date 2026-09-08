@@ -83,6 +83,12 @@ describe("quran-corpus", () => {
       expect(isValidRef("50:45")).toBe(true); // Qaf's last ayah
       expect(isValidRef("50:46")).toBe(false);
     });
+    it("rejects non-canonical (zero-padded) spellings that would miss the corpus", () => {
+      expect(isValidRef("02:255")).toBe(false);
+      expect(isValidRef("2:0255")).toBe(false);
+      expect(isValidRef("002:007")).toBe(false);
+      expect(isValidRef("1:07")).toBe(false);
+    });
   });
 
   describe("getVerse", () => {

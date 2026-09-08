@@ -6,7 +6,11 @@ const { mockGetVerse, mockGetSurahName } = vi.hoisted(() => ({
   mockGetSurahName: vi.fn(),
 }));
 
-vi.mock("@/lib/quran/quran-corpus", () => ({ getVerse: mockGetVerse }));
+// Partial mock: real isValidRef (the live-fetch gate), stubbed getVerse.
+vi.mock("@/lib/quran/quran-corpus", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/quran/quran-corpus")>();
+  return { ...actual, getVerse: mockGetVerse };
+});
 vi.mock("@/lib/quran/surah-names", () => ({ getSurahName: mockGetSurahName }));
 
 import { resolveVerse } from "@/lib/quran/verse-resolver";
@@ -81,6 +85,20 @@ describe("resolveVerse", () => {
   it("returns null for a surah number out of bounds", async () => {
     mockGetVerse.mockResolvedValue(null);
     const result = await resolveVerse("115:1");
+    expect(result).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("returns null for an out-of-range ayah without hitting the live API", async () => {
+    mockGetVerse.mockResolvedValue(null);
+    const result = await resolveVerse("1:8"); // Al-Fatihah has only 7 ayahs
+    expect(result).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("returns null for a zero-padded ref without hitting the live API", async () => {
+    mockGetVerse.mockResolvedValue(null);
+    const result = await resolveVerse("02:255");
     expect(result).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
   });
