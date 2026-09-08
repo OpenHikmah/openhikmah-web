@@ -33,7 +33,9 @@ export async function GET(
   if (limited) return limited;
 
   const { surah, ayah } = await params;
-  const ref = `${parseInt(surah, 10)}:${parseInt(ayah, 10)}`;
+  // Raw segments, not parseInt'd — lets isValidRef reject non-canonical spellings
+  // ("02:255", "2abc:1") instead of silently normalizing them into the fetch URL.
+  const ref = `${surah}:${ayah}`;
 
   if (!isValidRef(ref)) {
     return NextResponse.json({ error: "Invalid reference" }, { status: 400 });

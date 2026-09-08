@@ -93,6 +93,22 @@ describe("GET /api/verse/[surah]/[ayah]", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it("returns 400 for non-canonical path params, without a live fetch", async () => {
+    // The ref gate used to parseInt the segments first, so "02" and "2abc" both
+    // normalized to 2 and resolved a real verse. isValidRef now sees the raw
+    // segments and its canonical-spelling check rejects them.
+    for (const [surah, ayah] of [
+      ["02", "255"],
+      ["2", "0255"],
+      ["2abc", "255"],
+    ]) {
+      const req = new NextRequest(`http://localhost/api/verse/${surah}/${ayah}`);
+      const res = await GET(req, params(surah, ayah));
+      expect(res.status).toBe(400);
+    }
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it("returns 404 when external API returns non-ok", async () => {
     mockFetch.mockResolvedValue({ ok: false });
     const req = new NextRequest("http://localhost/api/verse/1/1");

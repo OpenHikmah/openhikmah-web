@@ -47,6 +47,18 @@ describe("GET /api/verse/[surah]/[ayah]/morphology", () => {
     expect(res.status).toBe(400);
   });
 
+  it("400s on non-canonical path params without touching the DB", async () => {
+    for (const [surah, ayah] of [
+      ["02", "255"],
+      ["2", "0255"],
+      ["2abc", "255"],
+    ]) {
+      const res = await GET(req(), params(surah, ayah));
+      expect(res.status).toBe(400);
+    }
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
+
   it("returns the seeded words for a valid, seeded verse", async () => {
     const words = [
       { position: 1, surface: "اللَّهُ", root: "أله", lemma: "الله" },
