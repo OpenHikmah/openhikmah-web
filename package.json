@@ -64,7 +64,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@next/env": "16.3.0",
-    "@playwright/test": "^1.61.1",
+    "@playwright/test": "^1.63.0",
     "@size-limit/file": "^13.0.1",
     "@tailwindcss/postcss": "^4",
     "@testcontainers/postgresql": "^12.1.0",
