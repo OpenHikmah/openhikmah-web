@@ -24,6 +24,13 @@ export const PER_MINUTE_MAX_RETRIES = 6;
 export const PER_MINUTE_BASE_DELAY_MS = 20_000;
 /** Ceiling for a single per-minute backoff wait. */
 export const PER_MINUTE_MAX_DELAY_MS = 65_000;
+/** Longest provider-supplied `retryDelay` still treated as a per-minute wait.
+ *  Free-tier RPM windows reset in ~60s, so a provider delay past a couple of
+ *  minutes is not a per-minute window — it means that key is out for the day.
+ *  `classifyGeminiError` promotes such an error to `daily` so the loop rotates
+ *  keys instead of sleeping minutes/hours on one cell with no rotation, and
+ *  `perMinuteBackoffMs` clamps to this as a backstop. */
+export const PER_MINUTE_PROVIDER_DELAY_CAP_MS = 120_000;
 /** Consecutive ambiguous 429s (429 with no clear per-day / per-minute marker) on
  *  one key, with no successful call in between, after which the key is assumed
  *  daily-exhausted and the loop rotates. Guards against a genuinely dead key that
@@ -106,10 +113,13 @@ function parseRetryAfterMs(text: string): number | undefined {
  * Classifies an error thrown by a Gemini `generateContent` call.
  *
  * Conservative fallback: an unrecognised 429 is `other-429`, which the retry
- * wrapper treats as per-minute (wait + retry). A misclassified per-minute error
- * that were treated as daily would burn a key permanently on a transient blip;
- * the reverse only wastes bounded, capped retry time. `AMBIGUOUS_429_ESCALATE_AFTER`
- * is the backstop for a truly daily-dead key that only emits `other-429`.
+ * wrapper treats as per-minute (wait + retry). Treating a per-minute error as
+ * daily would burn a key on a transient blip, while the reverse only wastes
+ * bounded, capped retry time — so the default leans per-minute. The one
+ * exception is a provider `retryDelay` past `PER_MINUTE_PROVIDER_DELAY_CAP_MS`:
+ * honouring it would cost far more than a wrong rotation, so it is promoted to
+ * `daily` regardless of the quota markers. `AMBIGUOUS_429_ESCALATE_AFTER` is the
+ * backstop for a truly daily-dead key that only emits `other-429`.
  */
 export function classifyGeminiError(err: unknown): GeminiRateInfo {
   const e = asFetchErrorLike(err);
@@ -152,6 +162,13 @@ export function classifyGeminiError(err: unknown): GeminiRateInfo {
   const retryAfterMs = parseRetryAfterMs(signal);
   const quotaId = signal.match(/"quotaId"\s*:\s*"([^"]+)"/)?.[1];
 
+  // A retryDelay past the per-minute cap is not a transient window — honouring it
+  // would stall the backfill loop for minutes/hours on one cell with no key
+  // rotation. Treat it as daily so the loop moves to the next key.
+  if (retryAfterMs !== undefined && retryAfterMs > PER_MINUTE_PROVIDER_DELAY_CAP_MS) {
+    return { cls: "daily", status, retryAfterMs, quotaId, raw };
+  }
+
   const perDay =
     /per\s*day|perday|requests per day|generaterequestsperday/i.test(quotaId ?? "") ||
     /perdayper|requests per day|generaterequestsperday/i.test(lower);
@@ -182,17 +199,21 @@ export const PER_MINUTE_MIN_DELAY_MS = 2_000;
  *
  * When Google sends a usable `retryDelay`, that is a hard MINIMUM — jitter is
  * added on top, never subtracted, so we never re-fire before the window Google
- * named, and there is no upper cap (a provider delay above
- * `PER_MINUTE_MAX_DELAY_MS` is honoured in full). Keeping the jitter even past
- * the cap is what stops concurrent workers that got the same `retryDelay` from
- * all re-firing on the same tick.
+ * named. It is clamped to `PER_MINUTE_PROVIDER_DELAY_CAP_MS`; a delay past that
+ * should already have been classified `daily` (rotate key), and this is the
+ * backstop so one function can't schedule an hours-long sleep. Jitter is kept
+ * even at the clamp so concurrent workers that got the same `retryDelay` don't
+ * all re-fire on the same tick.
  *
  * Otherwise: exponential from `PER_MINUTE_BASE_DELAY_MS` with ±15% jitter,
  * always at least `PER_MINUTE_MIN_DELAY_MS`, at most `PER_MINUTE_MAX_DELAY_MS`. */
 export function perMinuteBackoffMs(attempt: number, retryAfterMs?: number): number {
   if (retryAfterMs !== undefined && retryAfterMs > 0) {
-    const floor = Math.max(retryAfterMs, PER_MINUTE_MIN_DELAY_MS);
-    return Math.round(floor * (1 + Math.random() * 0.15));
+    const bounded = Math.min(
+      Math.max(retryAfterMs, PER_MINUTE_MIN_DELAY_MS),
+      PER_MINUTE_PROVIDER_DELAY_CAP_MS
+    );
+    return Math.round(bounded * (1 + Math.random() * 0.15));
   }
   const base = PER_MINUTE_BASE_DELAY_MS * Math.pow(2, Math.max(0, attempt - 1));
   const capped = Math.min(Math.max(base, PER_MINUTE_MIN_DELAY_MS), PER_MINUTE_MAX_DELAY_MS);
