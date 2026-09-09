@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import type { User } from "@/lib/infra/db/schema";
+import { and, eq, inArray } from "drizzle-orm";
+import { bookmarks, type User } from "@/lib/infra/db/schema";
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
 
@@ -251,22 +252,55 @@ describe("DELETE /api/bookmarks/[ref]", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns 200 ok when bookmark is deleted", async () => {
+  it("deletes the canonical ref, scoped to the user", async () => {
     authedUser();
+    const calls: Record<string, unknown[][]> = {};
+    mockDelete.mockReturnValue(makeRecordingChain([], calls));
+    // Next.js hands the route a URL-decoded param, i.e. the canonical ref.
     const res = await DELETE(deleteReq(), {
-      params: Promise.resolve({ ref: "2%3A255" }),
+      params: Promise.resolve({ ref: "2:255" }),
     });
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.ok).toBe(true);
+    expect((await res.json()).ok).toBe(true);
+    expect(calls.where?.[0]?.[0]).toEqual(
+      and(eq(bookmarks.userId, 1), inArray(bookmarks.verseRef, ["2:255"]))
+    );
   });
 
-  it("returns 400 for invalid id", async () => {
+  it("returns 400 for a blank ref, without touching the DB", async () => {
     authedUser();
     const res = await DELETE(deleteReq(), {
-      params: Promise.resolve({ ref: "" }),
+      params: Promise.resolve({ ref: "   " }),
     });
-    // empty ref decodes to "" — still valid for delete (just won't match rows)
-    expect([200, 400]).toContain(res.status);
+    expect(res.status).toBe(400);
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it("matches both the raw param and its trimmed form so a padded ref still deletes", async () => {
+    authedUser();
+    const calls: Record<string, unknown[][]> = {};
+    mockDelete.mockReturnValue(makeRecordingChain([], calls));
+    const res = await DELETE(deleteReq(), {
+      params: Promise.resolve({ ref: " 2:255 " }),
+    });
+    expect(res.status).toBe(200);
+    expect(calls.where?.[0]?.[0]).toEqual(
+      and(eq(bookmarks.userId, 1), inArray(bookmarks.verseRef, [" 2:255 ", "2:255"]))
+    );
+  });
+
+  it("still deletes a legacy row stored under a non-canonical key", async () => {
+    authedUser();
+    const calls: Record<string, unknown[][]> = {};
+    mockDelete.mockReturnValue(makeRecordingChain([], calls));
+    // "02:255" was writable via POST before isValidRef rejected zero-padding;
+    // DELETE must not strand such rows behind a 400.
+    const res = await DELETE(deleteReq(), {
+      params: Promise.resolve({ ref: "02:255" }),
+    });
+    expect(res.status).toBe(200);
+    expect(calls.where?.[0]?.[0]).toEqual(
+      and(eq(bookmarks.userId, 1), inArray(bookmarks.verseRef, ["02:255"]))
+    );
   });
 });
