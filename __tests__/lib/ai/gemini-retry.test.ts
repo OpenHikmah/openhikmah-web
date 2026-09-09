@@ -83,6 +83,24 @@ describe("callGemini retry / classification", () => {
     expect(mockGenerate).toHaveBeenCalledTimes(1);
   });
 
+  it("throws GeminiDailyQuotaError immediately for a per-minute 429 with an absurd retryDelay", async () => {
+    // A per-minute-shaped 429 carrying "retryDelay":"86400s" must NOT become a
+    // 24h interruptibleSleep on one cell — it is promoted to daily so the loop
+    // rotates keys, exactly like a per-day quota.
+    const absurd = [
+      {
+        "@type": "google.rpc.QuotaFailure",
+        violations: [{ quotaId: "GenerateRequestsPerMinute" }],
+      },
+      { "@type": "google.rpc.RetryInfo", retryDelay: "86400s" },
+    ];
+    mockGenerate.mockRejectedValue(fetchError(absurd));
+    await expect(callAIDetailed("hi", { provider: "gemini" })).rejects.toBeInstanceOf(
+      GeminiDailyQuotaError
+    );
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
+  });
+
   it("uses the explicit apiKey, not process.env.GEMINI_API_KEY", async () => {
     mockGenerate.mockResolvedValueOnce(ok);
     await callAIDetailed("hi", { provider: "gemini", apiKey: "loop-key-2" });

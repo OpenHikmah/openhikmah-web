@@ -7,6 +7,7 @@ import {
   perMinuteBackoffMs,
   PER_MINUTE_MAX_DELAY_MS,
   PER_MINUTE_MIN_DELAY_MS,
+  PER_MINUTE_PROVIDER_DELAY_CAP_MS,
 } from "@/lib/ai/gemini-errors";
 
 /** Shape of what `@google/generative-ai` throws for a non-2xx. */
@@ -37,6 +38,10 @@ const perMinuteViolation = {
   violations: [{ quotaId: "GenerateRequestsPerMinutePerProjectPerModel-FreeTier" }],
 };
 const retryInfo = { "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: "39s" };
+const absurdRetryInfo = {
+  "@type": "type.googleapis.com/google.rpc.RetryInfo",
+  retryDelay: "86400s",
+};
 
 describe("classifyGeminiError", () => {
   it("classifies a per-day QuotaFailure from errorDetails as daily", () => {
@@ -56,6 +61,42 @@ describe("classifyGeminiError", () => {
   it("classifies a per-minute QuotaFailure as per-minute", () => {
     const info = classifyGeminiError(fetchError(429, [perMinuteViolation]));
     expect(info.cls).toBe("per-minute");
+  });
+
+  it("keeps per-minute classification when retryDelay is within the cap", () => {
+    const info = classifyGeminiError(fetchError(429, [perMinuteViolation, retryInfo]));
+    expect(info.cls).toBe("per-minute");
+    expect(info.retryAfterMs).toBe(39_000);
+  });
+
+  it("reclassifies as daily when a per-minute 429 carries an absurd retryDelay", () => {
+    // "retryDelay":"86400s" on one cell would otherwise stall the loop 24h with
+    // no key rotation — past the cap it is effectively a per-day exhaustion.
+    const info = classifyGeminiError(fetchError(429, [perMinuteViolation, absurdRetryInfo]));
+    expect(info.cls).toBe("daily");
+    expect(info.retryAfterMs).toBe(86_400_000);
+  });
+
+  it("reclassifies a bare 429 as daily when its retryDelay exceeds the cap", () => {
+    const info = classifyGeminiError(fetchError(429, [absurdRetryInfo], "429 Too Many Requests"));
+    expect(info.cls).toBe("daily");
+  });
+
+  it("treats the cap boundary as inclusive — exactly the cap stays per-minute, just past it is daily", () => {
+    const retry = (ms: number) => ({
+      "@type": "type.googleapis.com/google.rpc.RetryInfo",
+      retryDelay: `${ms / 1000}s`,
+    });
+    expect(
+      classifyGeminiError(
+        fetchError(429, [perMinuteViolation, retry(PER_MINUTE_PROVIDER_DELAY_CAP_MS)])
+      ).cls
+    ).toBe("per-minute");
+    expect(
+      classifyGeminiError(
+        fetchError(429, [perMinuteViolation, retry(PER_MINUTE_PROVIDER_DELAY_CAP_MS + 1000)])
+      ).cls
+    ).toBe("daily");
   });
 
   it("falls back to other-429 for a bare 429 with no quota markers", () => {
@@ -151,16 +192,26 @@ describe("perMinuteBackoffMs", () => {
     }
   });
 
-  it("still honours a provider retryAfterMs that exceeds the max, and keeps jitter", () => {
-    const huge = PER_MINUTE_MAX_DELAY_MS * 3;
+  it("honours a provider retryAfterMs between the max and the cap (inclusive)", () => {
+    for (const target of [PER_MINUTE_MAX_DELAY_MS + 20_000, PER_MINUTE_PROVIDER_DELAY_CAP_MS]) {
+      for (let i = 0; i < 50; i++) {
+        const ms = perMinuteBackoffMs(1, target);
+        expect(ms).toBeGreaterThanOrEqual(target);
+        expect(ms).toBeLessThanOrEqual(target * 1.15 + 1);
+      }
+    }
+  });
+
+  it("clamps a provider retryAfterMs above the cap, and keeps jitter", () => {
+    const huge = PER_MINUTE_PROVIDER_DELAY_CAP_MS * 5;
     const seen = new Set<number>();
     for (let i = 0; i < 50; i++) {
       const ms = perMinuteBackoffMs(1, huge);
-      expect(ms).toBeGreaterThanOrEqual(huge);
-      expect(ms).toBeLessThanOrEqual(huge * 1.15 + 1);
+      expect(ms).toBeGreaterThanOrEqual(PER_MINUTE_PROVIDER_DELAY_CAP_MS);
+      expect(ms).toBeLessThanOrEqual(PER_MINUTE_PROVIDER_DELAY_CAP_MS * 1.15 + 1);
       seen.add(ms);
     }
-    // Jitter must survive past the cap — otherwise every worker re-fires in sync.
+    // Jitter must survive the clamp — otherwise every worker re-fires in sync.
     expect(seen.size).toBeGreaterThan(1);
   });
 
