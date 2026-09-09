@@ -45,6 +45,16 @@ vi.mock("node:child_process", () => ({
   default: { spawn: mockSpawn },
 }));
 
+const { mockTryAcquireJobLock, mockReleaseJobLock } = vi.hoisted(() => ({
+  mockTryAcquireJobLock: vi.fn(),
+  mockReleaseJobLock: vi.fn(),
+}));
+vi.mock("@/lib/admin/job-lock", () => ({
+  JOB_LOCK_KEY: 776142517,
+  tryAcquireJobLock: mockTryAcquireJobLock,
+  releaseJobLock: mockReleaseJobLock,
+}));
+
 const { mockRunConnectionBatch } = vi.hoisted(() => ({ mockRunConnectionBatch: vi.fn() }));
 vi.mock("@/lib/ai/connection-batch", () => ({ runConnectionBatch: mockRunConnectionBatch }));
 
@@ -74,6 +84,8 @@ beforeEach(() => {
   });
   mockRunConnectionBatch.mockReset().mockResolvedValue({ stoppedReason: "completed" });
   mockRunConnectionBatchLoop.mockReset().mockResolvedValue({ stoppedReason: "all-keys-daily" });
+  mockTryAcquireJobLock.mockReset().mockResolvedValue(true);
+  mockReleaseJobLock.mockReset().mockResolvedValue(undefined);
 });
 
 // `running` is module-level state in job-runner.ts (by design — it's the
@@ -135,6 +147,31 @@ describe("startJob", () => {
     const { runId } = await startJob("seed-quran", "qf-admin");
     expect(runId).toBe(42);
     expect(mockInsert).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects when another process holds the advisory lock, without inserting a row", async () => {
+    mockTryAcquireJobLock.mockResolvedValueOnce(false);
+    await expect(startJob("seed-morphology", "qf-admin")).rejects.toThrow("already running");
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockSpawn).not.toHaveBeenCalled();
+    // Guard released → a retry (once the lock frees) can proceed.
+    const { runId } = await startJob("seed-quran", "qf-admin");
+    expect(runId).toBe(42);
+  });
+
+  it("releases the advisory lock when the insert rejects", async () => {
+    mockInsert.mockReturnValueOnce(makeDbChain(Promise.reject(new Error("insert failed"))));
+    await expect(startJob("seed-morphology", "qf-admin")).rejects.toThrow("insert failed");
+    expect(mockReleaseJobLock).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases the advisory lock once the child process closes", async () => {
+    await startJob("seed-morphology", "qf-admin");
+    expect(mockTryAcquireJobLock).toHaveBeenCalledTimes(1);
+    lastChild.current?.emit("close", 0);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(mockReleaseJobLock).toHaveBeenCalledTimes(1);
   });
 
   it("clears the running guard once the child process closes", async () => {
