@@ -29,4 +29,15 @@ describe("useMobileNavVisible", () => {
     mockNodeCount.mockReturnValue(3);
     expect(renderHook(() => useMobileNavVisible()).result.current).toBe(false);
   });
+
+  it("becomes visible again after navigating off a populated canvas", () => {
+    mockUsePathname.mockReturnValue("/canvas");
+    mockNodeCount.mockReturnValue(3);
+    const { result, rerender } = renderHook(() => useMobileNavVisible());
+    expect(result.current).toBe(false);
+
+    mockUsePathname.mockReturnValue("/search");
+    rerender();
+    expect(result.current).toBe(true);
+  });
 });
