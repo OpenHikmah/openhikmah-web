@@ -174,6 +174,18 @@ describe("startJob", () => {
     expect(mockReleaseJobLock).toHaveBeenCalledTimes(1);
   });
 
+  it("releases the advisory lock and guard if spawn throws synchronously", async () => {
+    mockSpawn.mockImplementationOnce(() => {
+      throw new Error("EAGAIN");
+    });
+    await expect(startJob("seed-morphology", "qf-admin")).rejects.toThrow("EAGAIN");
+    await Promise.resolve();
+    expect(mockReleaseJobLock).toHaveBeenCalledTimes(1);
+    // Guard released → a retry can proceed.
+    const { runId } = await startJob("seed-quran", "qf-admin");
+    expect(runId).toBe(42);
+  });
+
   it("clears the running guard once the child process closes", async () => {
     await startJob("seed-morphology", "qf-admin");
     lastChild.current?.emit("close", 0);

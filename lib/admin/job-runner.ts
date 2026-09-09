@@ -375,25 +375,36 @@ export async function startJob(
     return { runId: row.id };
   }
 
-  const child = spawn("bun", [job.script as string], { cwd: process.cwd() });
+  // A synchronous throw from `spawn` (bad args / resource exhaustion) would
+  // otherwise leave `running` set and the advisory lock held with no child and
+  // no `finishRun` ever scheduled — wedging the runner across every process.
+  // `finishRun` records the failed run and releases both; the caller still sees
+  // the error. (A missing `bun` binary surfaces as an `error` event, handled
+  // below, not a throw here.)
+  try {
+    const child = spawn("bun", [job.script as string], { cwd: process.cwd() });
 
-  const onData = (chunk: Buffer) => {
-    for (const line of chunk.toString("utf8").split("\n")) {
-      if (line.trim()) pushLogLine(state, line);
-    }
-  };
-  child.stdout.on("data", onData);
-  child.stderr.on("data", onData);
+    const onData = (chunk: Buffer) => {
+      for (const line of chunk.toString("utf8").split("\n")) {
+        if (line.trim()) pushLogLine(state, line);
+      }
+    };
+    child.stdout.on("data", onData);
+    child.stderr.on("data", onData);
 
-  child.on("close", (code) => {
-    finishRun(
-      state,
-      code === 0 ? "success" : "failed",
-      code === 0 ? null : `Exited with code ${code}`
-    );
-  });
+    child.on("close", (code) => {
+      finishRun(
+        state,
+        code === 0 ? "success" : "failed",
+        code === 0 ? null : `Exited with code ${code}`
+      );
+    });
 
-  child.on("error", (err) => finishRun(state, "failed", err.message));
+    child.on("error", (err) => finishRun(state, "failed", err.message));
+  } catch (err) {
+    finishRun(state, "failed", err instanceof Error ? err.message : String(err));
+    throw err;
+  }
 
   return { runId: row.id };
 }
