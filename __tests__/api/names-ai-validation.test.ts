@@ -353,6 +353,6 @@ describe("names AI routes — model output validation", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body[0].reason).toBe("Ayat al-Kursi."); // refusal rejected, canonical reason served
+    expect(body[0].reason).toBe("Ayat al-Kursi.");
   });
 });

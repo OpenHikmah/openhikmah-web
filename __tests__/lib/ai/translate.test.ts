@@ -48,7 +48,6 @@ describe("validateTranslation", () => {
       ok: false,
       reason: "english_echo",
     });
-    // trailing period dropped, wrapping quotes, doubled space
     expect(
       validateTranslation(
         EN,
