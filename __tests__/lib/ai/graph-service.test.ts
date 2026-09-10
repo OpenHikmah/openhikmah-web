@@ -488,6 +488,67 @@ describe("getConnections — en-canonical localized reasons", () => {
     expect(mockTranslateReason).toHaveBeenCalledTimes(1); // only the tr caller translates
   });
 
+  it("a fully-translated locale cell is served from cache without generating or translating", async () => {
+    const trRows = [
+      { fromRef: "1:1", toRef: "2:255", kind: "thematic", reason: "tr A", status: "active" },
+      { fromRef: "1:1", toRef: "3:18", kind: "thematic", reason: "tr B", status: "active" },
+    ];
+    const enRows = [
+      { fromRef: "1:1", toRef: "2:255", kind: "thematic", reason: "en A", status: "active" },
+      { fromRef: "1:1", toRef: "3:18", kind: "thematic", reason: "en B", status: "active" },
+    ];
+    mockSelect
+      .mockReturnValueOnce(makeSelectChain(trRows))
+      .mockReturnValue(makeSelectChain(enRows));
+
+    const out = await getConnections("1:1", "thematic", source, { locale: "tr" });
+
+    expect(mockGenerate).not.toHaveBeenCalled();
+    expect(mockTranslateReason).not.toHaveBeenCalled();
+    expect(out.map((c) => c.reason)).toEqual(["tr A", "tr B"]);
+  });
+
+  it("a PARTIAL locale cell is not a hit — it translates only the refs still missing", async () => {
+    // tr has 1 of the 2 canonical en rows (a prior pass failed or ran out of budget).
+    const trRows = [
+      { fromRef: "1:1", toRef: "2:255", kind: "thematic", reason: "tr A", status: "active" },
+    ];
+    const enRows = [
+      { fromRef: "1:1", toRef: "2:255", kind: "thematic", reason: "en A", status: "active" },
+      { fromRef: "1:1", toRef: "3:18", kind: "thematic", reason: "en B", status: "active" },
+    ];
+    mockSelect
+      .mockReturnValueOnce(makeSelectChain(trRows))
+      .mockReturnValue(makeSelectChain(enRows));
+    mockTranslateReason.mockImplementation(async (reason: string) => `TR(${reason})`);
+    mockReturning.mockResolvedValue([{ toRef: "3:18" }]);
+
+    const out = await getConnections("1:1", "thematic", source, { locale: "tr" });
+
+    expect(mockGenerate).not.toHaveBeenCalled(); // en selection already exists
+    // only the missing ref is translated; the already-translated one is reused
+    expect(mockTranslateReason).toHaveBeenCalledTimes(1);
+    expect(mockTranslateReason).toHaveBeenCalledWith("en B", "Turkish", RESOLVED);
+    const trInsert = mockValues.mock.calls.at(-1)?.[0] as Array<Record<string, unknown>>;
+    expect(trInsert).toEqual([
+      expect.objectContaining({ toRef: "3:18", locale: "tr", reason: "TR(en B)" }),
+    ]);
+    expect(out.map((c) => c.reason)).toEqual(["tr A", "TR(en B)"]);
+  });
+
+  it("serves pre-#594 native locale rows (no en canonical) as a hit, without regenerating", async () => {
+    const trRows = [
+      { fromRef: "1:1", toRef: "2:255", kind: "thematic", reason: "native tr", status: "active" },
+    ];
+    mockSelect.mockReturnValueOnce(makeSelectChain(trRows)).mockReturnValue(makeSelectChain([])); // no en rows to compare against
+
+    const out = await getConnections("1:1", "thematic", source, { locale: "tr" });
+
+    expect(mockGenerate).not.toHaveBeenCalled();
+    expect(mockTranslateReason).not.toHaveBeenCalled();
+    expect(out.map((c) => c.reason)).toEqual(["native tr"]);
+  });
+
   it("spends the client budget per translation and serves English once it is out", async () => {
     mockSelect.mockReturnValue(makeSelectChain([]));
     mockGenerate.mockResolvedValue([result("2:255"), result("3:18"), result("59:22")]);

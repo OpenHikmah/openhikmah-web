@@ -20,7 +20,9 @@ import type { ConnectionResult, EdgeKind } from "@/types/quran";
  * SELECTION in that language — it ensures the `en` rows exist, then translates
  * their reasons for the requested locale (mirrors lib/ai/connection-batch.ts, so
  * live traffic and the admin backfill converge on the same rows instead of
- * layering mixed-provenance ones).
+ * layering mixed-provenance ones). A non-`en` locale is only served from cache
+ * once it has a translation for every canonical `en` row; an incomplete locale
+ * set re-enters the miss path and translates just the rows still missing.
  */
 
 /**
@@ -136,7 +138,8 @@ async function hydrate(
 
 /** Raw active cached edges for one cell+locale (not hydrated — callers decide a
  *  hit on the ROW count, so a cell whose target verses transiently fail to
- *  resolve is still a hit, not a re-generation trigger). */
+ *  resolve is still a hit, not a re-generation trigger; a non-`en` locale
+ *  additionally checks that count against the canonical `en` one). */
 async function readActiveRows(
   fromRef: string,
   kind: EdgeKind,
@@ -177,7 +180,19 @@ export async function getConnections(
   const locale = options.locale ?? "en";
 
   const existing = await readActiveRows(fromRef, kind, locale, excludeRefs);
-  if (existing.length > 0) return hydrate(existing, kind);
+  if (locale === "en") {
+    if (existing.length > 0) return hydrate(existing, kind);
+  } else if (existing.length > 0) {
+    // A non-`en` cell is a hit only when it is as complete as the canonical
+    // English set. A partial locale set — left by a translation that failed or
+    // an exhausted client budget on an earlier request — would otherwise be a
+    // permanent short cache that only the admin backfill could repair; instead
+    // fall through so the miss path translates the rows still missing for this
+    // locale. (`enCount === 0` means there is no canonical set to compare
+    // against — pre-#594 native locale rows — so serve what's there.)
+    const enCount = (await readActiveRows(fromRef, kind, "en", excludeRefs)).length;
+    if (enCount === 0 || existing.length >= enCount) return hydrate(existing, kind);
+  }
 
   // Cache miss — this is the expensive path, so rate-limit it (per client, as
   // before: the limiter runs for every caller, so the budget semantics are
@@ -210,6 +225,7 @@ export async function getConnections(
             locale,
             provider,
             model,
+            existing,
             options.clientKey
           ),
     locale === "en"
@@ -224,10 +240,14 @@ export async function getConnections(
  *
  * A row whose translation fails (empty, rejected, or the provider threw) is
  * served in English for this response and left unpersisted so a later request or
- * the backfill retries it. Each translation call also spends the client's
- * generation budget when `clientKey` is set, so a cold non-`en` cell can't turn
- * one rate-limit token into a dozen LLM calls; once the budget is out, the
- * remaining rows are served in English.
+ * the backfill retries it — the `getConnections` completeness gate re-enters
+ * this path until every canonical row has a locale translation. Rows already
+ * translated for this locale (by a prior pass or the batch) are reused as-is, so
+ * a repair only translates what is still missing and never duplicates a row.
+ * Each translation call also spends the client's generation budget when
+ * `clientKey` is set, so a cold non-`en` cell can't turn one rate-limit token
+ * into a dozen LLM calls; once the budget is out, the remaining rows are served
+ * in English (and picked up on a later request or by the backfill).
  */
 async function generateLocalizedCell(
   fromRef: string,
@@ -237,6 +257,9 @@ async function generateLocalizedCell(
   locale: Locale,
   provider: Provider,
   model: string,
+  // The rows already active for this locale (read by `getConnections` for its
+  // completeness check) — reused so a repair pass doesn't re-query them.
+  existingLocaleRows: Connection[],
   clientKey?: string
 ): Promise<CellGenerationResult> {
   const enRows = await readActiveRows(fromRef, kind, "en", excludeRefs);
@@ -256,10 +279,20 @@ async function generateLocalizedCell(
   }
   if (enPairs.length === 0) return { results: [], calledAI };
 
+  // Rows already translated for this locale (a prior partial pass, or the
+  // backfill) — reuse verbatim so this repair only pays for the refs still
+  // missing and can't duplicate or re-translate an existing row.
+  const existingLocale = new Map(existingLocaleRows.map((r) => [r.toRef, r.reason]));
+
   const toPersist: { toRef: string; reason: string }[] = [];
   const localized: { toRef: string; reason: string }[] = [];
   let budgetSpent = false;
   for (const en of enPairs) {
+    const already = existingLocale.get(en.ref);
+    if (already !== undefined) {
+      localized.push({ toRef: en.ref, reason: already });
+      continue;
+    }
     if (budgetSpent) {
       localized.push({ toRef: en.ref, reason: en.reason });
       continue;

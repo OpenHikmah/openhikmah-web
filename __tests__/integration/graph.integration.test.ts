@@ -132,6 +132,55 @@ describe("connection graph (integration, real Postgres)", () => {
     expect(mockCallAI).toHaveBeenCalledTimes(2);
   });
 
+  it("a partial locale cache is repaired on the next request — only the missing ref is re-translated", async () => {
+    await seed("2:255");
+    await seed("3:18");
+    let attemptsForA = 0;
+    let translationCalls = 0;
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.startsWith("Translate the following sentence")) {
+        translationCalls++;
+        if (prompt.includes("reason A")) {
+          // First attempt for A fails (empty → English fallback, not persisted);
+          // a later attempt succeeds.
+          return attemptsForA++ === 0 ? "" : "tr A";
+        }
+        return "tr B";
+      }
+      return JSON.stringify([
+        { ref: "2:255", reason: "reason A" },
+        { ref: "3:18", reason: "reason B" },
+      ]);
+    });
+
+    // Cold tr request: en generated, B translates, A fails → only B persisted for tr.
+    const first = await getConnections("1:1", "thematic", source, { locale: "tr" });
+    expect(first.map((c) => c.reason)).toEqual(["reason A", "tr B"]);
+    let rows = await db.select().from(connections);
+    expect(rows.filter((r) => r.locale === "tr").map((r) => r.toRef)).toEqual(["3:18"]);
+    expect(translationCalls).toBe(2);
+
+    // Next tr request: 1 tr row < 2 en rows → not a hit. It re-translates ONLY A
+    // (B is reused from cache) and does NOT regenerate the English selection.
+    const second = await getConnections("1:1", "thematic", source, { locale: "tr" });
+    expect(second.map((c) => c.reason)).toEqual(["tr A", "tr B"]);
+    expect(translationCalls).toBe(3); // just the one retry for A
+    rows = await db.select().from(connections);
+    expect(
+      rows
+        .filter((r) => r.locale === "tr")
+        .map((r) => r.toRef)
+        .sort()
+    ).toEqual(["2:255", "3:18"]);
+    // One English generation total across both requests.
+    expect(await db.select().from(aiGenerations)).toHaveLength(1);
+
+    // Now complete: a third tr request is a pure cache hit.
+    const third = await getConnections("1:1", "thematic", source, { locale: "tr" });
+    expect(third.map((c) => c.reason)).toEqual(["tr A", "tr B"]);
+    expect(translationCalls).toBe(3);
+  });
+
   it("a cold non-en request generates English first, then translates it", async () => {
     await seed("2:255");
     mockCallAI.mockImplementation(async (prompt: string) => {
