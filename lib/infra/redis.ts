@@ -38,6 +38,12 @@ export function getRedis(): Redis | null {
     // Bound every command so a stalled Redis can't hang a request; on failure
     // the helpers below catch and fall back.
     maxRetriesPerRequest: 2,
+    // Strict per-command deadline: a command that gets no reply in this long
+    // rejects with a timeout error instead of staying pending. Every helper
+    // below catches it and falls back. Kept below the auth refresh lock TTL
+    // (app/api/auth/refresh/route.ts) so a result publish can never land after
+    // the lease has passed to another leader.
+    commandTimeout: 5000,
     // Don't buffer commands while disconnected — fail fast to the fallback path.
     enableOfflineQueue: false,
     connectTimeout: 3000,

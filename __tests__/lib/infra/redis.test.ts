@@ -118,6 +118,11 @@ describe("lib/redis — enabled, healthy", () => {
     expect(await r.redisGet("k")).toBe("hello");
     expect(await r.redisIncrWithTtl("k", 60)).toBe(4);
     expect(behavior.ctor).toHaveBeenCalledTimes(1);
+    // A strict per-command deadline so no operation stays pending indefinitely.
+    expect(behavior.ctor).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ commandTimeout: 5000 })
+    );
   });
 
   it("redisSetNx returns true and issues SET ... EX NX when it takes the key", async () => {

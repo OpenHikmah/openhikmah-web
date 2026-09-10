@@ -96,6 +96,22 @@ describe("POST /api/auth/refresh", () => {
     expect(setCookie).toContain("qf_refresh_token=refresh-same-2");
   });
 
+  it("treats a 2xx response with no access_token as transient (503, cookie kept, not cached)", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ refresh_token: "r-only" }) });
+
+    const first = await POST(makeReq("refresh-noaccess"));
+    expect(first.status).toBe(503);
+    expect(first.headers.get("set-cookie")).toBeNull();
+
+    // Not cached — a retry hits the endpoint again.
+    const second = await POST(makeReq("refresh-noaccess"));
+    expect(second.status).toBe(503);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("no access_token"));
+    errSpy.mockRestore();
+  });
+
   it("returns 401 and clears the cookie on invalid_grant", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
@@ -263,7 +279,7 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
     const res = await POST(makeReq("tok-lead"));
 
     expect(res.status).toBe(200);
-    expect(mockRedis.redisSetNx).toHaveBeenCalledWith(lockKey("tok-lead"), expect.any(String), 15);
+    expect(mockRedis.redisSetNx).toHaveBeenCalledWith(lockKey("tok-lead"), expect.any(String), 20);
     expect(JSON.parse(redisStore.get(resultKey("tok-lead"))!)).toMatchObject({
       kind: "ok",
       accessToken: "acc-lead",

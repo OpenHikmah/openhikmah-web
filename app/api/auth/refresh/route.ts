@@ -45,16 +45,16 @@ const RESULT_TTL_MS = 30_000;
 const RESULT_TTL_SECONDS = RESULT_TTL_MS / 1000;
 // Hard timeout on the upstream token call.
 const UPSTREAM_TIMEOUT_MS = 8_000;
-// Hard bound on the leader's result publish (a Redis SET). Together with
-// UPSTREAM_TIMEOUT_MS this caps the whole leader critical section — call the
-// endpoint, publish the outcome, release the lock — well under LOCK_TTL_SECONDS,
-// so the lease can't auto-expire while the leader is still working and let a
-// second caller present the same (rotated) token.
+// Wrapper-level bound on the leader's result publish — lets the route proceed
+// promptly if the Redis SET is slow. The SET itself is also cancelled at the
+// client `commandTimeout` (lib/infra/redis.ts, 5s), so a slow publish can't
+// still land after the lease has passed to another leader.
 const PUBLISH_TIMEOUT_MS = 2_000;
 // A crashed leader's lock self-clears after this so the next request can lead.
-// Must stay above UPSTREAM_TIMEOUT_MS + PUBLISH_TIMEOUT_MS (+ a margin for the
-// tiny release call) so a live leader always finishes inside its own lease.
-const LOCK_TTL_SECONDS = 15;
+// Must exceed the whole leader critical section — UPSTREAM_TIMEOUT_MS + the
+// Redis `commandTimeout` for the publish + the same for the release — so a live
+// leader always finishes (or gives up) inside its own lease (8 + 5 + 5 < 20).
+const LOCK_TTL_SECONDS = 20;
 // A waiter that can't get the lock polls the shared result cache this long
 // before giving up with a retryable 503 (well under LOCK_TTL_SECONDS).
 const POLL_TIMEOUT_MS = 5_000;
@@ -125,9 +125,9 @@ function rememberLocally(refreshToken: string, outcome: RefreshOutcome): void {
   if (isCacheable(outcome)) recent.set(refreshToken, { outcome, at: Date.now() });
 }
 
-/** Resolve to `p`'s value, or to `onTimeout` if it hasn't settled in `ms` — so a
- *  stalled Redis command can't stretch the leader's critical section past its
- *  lease. */
+/** Resolve to `p`'s value, or to `onTimeout` if it hasn't settled in `ms`, so a
+ *  slow Redis publish doesn't hold up the response. The command itself is still
+ *  bounded by the client `commandTimeout`; this is only the wrapper. */
 function withTimeout<T>(p: Promise<T>, ms: number, onTimeout: T): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
   const timeout = new Promise<T>((resolve) => {
@@ -161,13 +161,25 @@ async function callTokenEndpoint(refreshToken: string): Promise<RefreshOutcome> 
       return body?.error === "invalid_grant" ? { kind: "invalid" } : { kind: "transient" };
     }
 
-    const data = (await res.json()) as { access_token: string; refresh_token?: string };
+    const data = (await res.json().catch(() => null)) as {
+      access_token?: unknown;
+      refresh_token?: unknown;
+    } | null;
+    // Validate the token payload at this system boundary: a 2xx with no usable
+    // access_token must not be cached as an `ok` outcome (a peer would reject
+    // the malformed record and could re-present the token). Treat it as a
+    // transient upstream fault — the lease is freed so a retry can lead, and if
+    // the grant really was consumed the retry surfaces invalid_grant → re-login.
+    if (typeof data?.access_token !== "string" || data.access_token === "") {
+      console.error("auth/refresh: token endpoint returned a 2xx response with no access_token");
+      return { kind: "transient" };
+    }
+    const refreshTokenOut =
+      typeof data.refresh_token === "string" && data.refresh_token !== ""
+        ? data.refresh_token
+        : refreshToken;
     // Re-stamp the existing token if the provider didn't rotate.
-    return {
-      kind: "ok",
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token ?? refreshToken,
-    };
+    return { kind: "ok", accessToken: data.access_token, refreshToken: refreshTokenOut };
   } catch {
     return { kind: "transient" };
   }
