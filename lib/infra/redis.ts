@@ -78,14 +78,18 @@ export async function redisGet(key: string): Promise<string | null> {
   }
 }
 
-/** SET a string value with a TTL (seconds); silently no-ops on disable/error. */
-export async function redisSet(key: string, value: string, ttlSeconds: number): Promise<void> {
+/** SET a string value with a TTL (seconds). Returns `true` when the write
+ *  landed, `false` when Redis is disabled or the write errored — callers that
+ *  only cache can ignore it; a caller that must know the value is visible to
+ *  peers (e.g. a lock/result publish) can branch on it. */
+export async function redisSet(key: string, value: string, ttlSeconds: number): Promise<boolean> {
   const r = getRedis();
-  if (!r) return;
+  if (!r) return false;
   try {
     await r.set(key, value, "EX", ttlSeconds);
+    return true;
   } catch {
-    // Best-effort cache write; ignore failures.
+    return false;
   }
 }
 

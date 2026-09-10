@@ -87,7 +87,7 @@ describe("lib/redis — disabled (no REDIS_URL)", () => {
     const r = await import("@/lib/infra/redis");
     expect(r.redisEnabled()).toBe(false);
     expect(await r.redisGet("k")).toBeNull();
-    await expect(r.redisSet("k", "v", 60)).resolves.toBeUndefined();
+    expect(await r.redisSet("k", "v", 60)).toBe(false);
     await expect(r.redisDel("k")).resolves.toBeUndefined();
     expect(await r.redisIncrWithTtl("k", 60)).toBeNull();
     expect(await r.redisSetNx("k", "v", 60)).toBeNull();
@@ -142,7 +142,7 @@ describe("lib/redis — enabled, but every call errors (fail-open)", () => {
     const r = await import("@/lib/infra/redis");
 
     expect(await r.redisGet("k")).toBeNull();
-    await expect(r.redisSet("k", "v", 60)).resolves.toBeUndefined();
+    expect(await r.redisSet("k", "v", 60)).toBe(false);
     await expect(r.redisDel("k")).resolves.toBeUndefined();
     expect(await r.redisIncrWithTtl("k", 60)).toBeNull();
     expect(await r.redisSetNx("k", "v", 60)).toBeNull();
