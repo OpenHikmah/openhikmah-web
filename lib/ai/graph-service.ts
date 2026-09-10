@@ -24,13 +24,13 @@ import type { ConnectionResult, EdgeKind } from "@/types/quran";
  */
 
 /**
- * Single-flight registry: concurrent cache misses for the SAME verse+kind+locale
- * share one in-flight generation instead of each firing its own (expensive) AI
- * call. Per-process — full coverage on the single box; a multi-instance deployment
+ * Single-flight registry: concurrent cache misses for the SAME cell+locale share
+ * one in-flight generation instead of each firing its own (expensive) AI call.
+ * Per-process — full coverage on the single box; a multi-instance deployment
  * would need a Redis lock to coalesce across processes (deferred). Keyed by
  * `${fromRef}:${kind}:${locale}:${provider}:${model}:${excludeRefs}`; entries are
- * removed as soon as the generation settles. A non-`en` miss also joins the `en`
- * key while it ensures the canonical rows.
+ * removed as soon as the work settles. A non-`en` miss also joins the `en` key
+ * while it ensures the canonical rows.
  */
 const inFlight = new Map<string, Promise<CellGenerationResult>>();
 
@@ -81,19 +81,24 @@ function cellKey(
   return `${fromRef}:${kind}:${locale}:${provider}:${model}:${[...excludeRefs].sort().join(",")}`;
 }
 
-/** Join an in-flight identical generation if one is running, otherwise lead it.
- *  The get→set MUST stay synchronous (no await between them) or two concurrent
- *  callers could both become the leader. */
+/**
+ * Join an in-flight identical unit of work if one is running, otherwise lead it.
+ * The get→set MUST stay synchronous (no await between them) or two concurrent
+ * callers could both become the leader. `meterAsGeneration` counts the lead /
+ * coalesce as an AI selection-generation — set only for the `en` generation key,
+ * not the non-`en` wrapper (which is a translation batch, not a generation).
+ */
 async function singleFlight(
   key: string,
-  factory: () => Promise<CellGenerationResult>
+  factory: () => Promise<CellGenerationResult>,
+  meterAsGeneration = false
 ): Promise<CellGenerationResult> {
   const pending = inFlight.get(key);
   if (pending) {
-    incr("gen_coalesced");
+    if (meterAsGeneration) incr("gen_coalesced");
     return pending;
   }
-  incr("gen_started");
+  if (meterAsGeneration) incr("gen_started");
   const work = factory();
   inFlight.set(key, work);
   try {
@@ -104,7 +109,10 @@ async function singleFlight(
 }
 
 /** Hydrate stored edges (which carry only refs + reason) into full results. */
-async function hydrate(rows: Connection[], kind: EdgeKind): Promise<ConnectionResult[]> {
+async function hydrate(
+  rows: Pick<Connection, "toRef" | "reason">[],
+  kind: EdgeKind
+): Promise<ConnectionResult[]> {
   const resolved = await Promise.all(rows.map((r) => resolveVerse(r.toRef)));
   return rows
     .map((r, i) => {
@@ -126,14 +134,20 @@ async function hydrate(rows: Connection[], kind: EdgeKind): Promise<ConnectionRe
     .filter((c): c is ConnectionResult => c !== null);
 }
 
-/** Read the active cached edges for one cell+locale, hydrated. */
-async function readActiveConnections(
+/** Raw active cached edges for one cell+locale (not hydrated — callers decide a
+ *  hit on the ROW count, so a cell whose target verses transiently fail to
+ *  resolve is still a hit, not a re-generation trigger). */
+async function readActiveRows(
   fromRef: string,
   kind: EdgeKind,
   locale: Locale,
   excludeRefs: string[]
-): Promise<ConnectionResult[]> {
-  const rows = await db
+): Promise<Connection[]> {
+  // A single generation inserts ~12 edges (see discoverCandidates), but this has
+  // no upper bound enforced at write time — cap defensively so a future code path
+  // that inserts more edges per source ref can't turn this into an unbounded
+  // per-key list query, the same shape hardened elsewhere.
+  return db
     .select()
     .from(connections)
     .where(
@@ -145,12 +159,7 @@ async function readActiveConnections(
         ...(excludeRefs.length > 0 ? [notInArray(connections.toRef, excludeRefs)] : [])
       )
     )
-    // A single generation inserts ~12 edges (see discoverCandidates), but this
-    // has no upper bound enforced at write time — cap defensively so a future
-    // code path that inserts more edges per source ref can't turn this into an
-    // unbounded per-key list query, the same shape hardened elsewhere.
     .limit(200);
-  return hydrate(rows, kind);
 }
 
 /**
@@ -167,8 +176,8 @@ export async function getConnections(
   const excludeRefs = options.excludeRefs ?? [];
   const locale = options.locale ?? "en";
 
-  const existing = await readActiveConnections(fromRef, kind, locale, excludeRefs);
-  if (existing.length > 0) return existing;
+  const existing = await readActiveRows(fromRef, kind, locale, excludeRefs);
+  if (existing.length > 0) return hydrate(existing, kind);
 
   // Cache miss — this is the expensive path, so rate-limit it (per client, as
   // before: the limiter runs for every caller, so the budget semantics are
@@ -188,10 +197,22 @@ export async function getConnections(
   const model = await resolveModel("connections", provider, options.model);
 
   const key = cellKey(fromRef, kind, locale, provider, model, excludeRefs);
-  const result = await singleFlight(key, () =>
+  const result = await singleFlight(
+    key,
+    () =>
+      locale === "en"
+        ? generateConnectionsForCell(fromRef, kind, source, excludeRefs, provider, model)
+        : generateLocalizedCell(
+            fromRef,
+            kind,
+            source,
+            excludeRefs,
+            locale,
+            provider,
+            model,
+            options.clientKey
+          ),
     locale === "en"
-      ? generateConnectionsForCell(fromRef, kind, source, excludeRefs, provider, model)
-      : generateLocalizedCell(fromRef, kind, source, excludeRefs, locale, provider, model)
   );
   return result.results;
 }
@@ -199,9 +220,14 @@ export async function getConnections(
 /**
  * Non-`en` miss body: ensure the canonical English rows exist (generating them
  * through the same single-flight if not), then translate each English reason
- * into `locale` and cache the translated rows under that locale. A reason whose
- * translation fails is served in English for this response and left unpersisted
- * so a later request or the backfill retries it.
+ * into `locale` and cache the translated rows under that locale.
+ *
+ * A row whose translation fails (empty, rejected, or the provider threw) is
+ * served in English for this response and left unpersisted so a later request or
+ * the backfill retries it. Each translation call also spends the client's
+ * generation budget when `clientKey` is set, so a cold non-`en` cell can't turn
+ * one rate-limit token into a dozen LLM calls; once the budget is out, the
+ * remaining rows are served in English.
  */
 async function generateLocalizedCell(
   fromRef: string,
@@ -210,45 +236,71 @@ async function generateLocalizedCell(
   excludeRefs: string[],
   locale: Locale,
   provider: Provider,
-  model: string
+  model: string,
+  clientKey?: string
 ): Promise<CellGenerationResult> {
-  let enResults = await readActiveConnections(fromRef, kind, "en", excludeRefs);
+  const enRows = await readActiveRows(fromRef, kind, "en", excludeRefs);
+  let enPairs: { ref: string; reason: string }[];
   let calledAI = false;
-  if (enResults.length === 0) {
+  if (enRows.length > 0) {
+    enPairs = enRows.map((r) => ({ ref: r.toRef, reason: r.reason }));
+  } else {
     const enKey = cellKey(fromRef, kind, "en", provider, model, excludeRefs);
-    const gen = await singleFlight(enKey, () =>
-      generateConnectionsForCell(fromRef, kind, source, excludeRefs, provider, model)
+    const gen = await singleFlight(
+      enKey,
+      () => generateConnectionsForCell(fromRef, kind, source, excludeRefs, provider, model),
+      true
     );
-    enResults = gen.results;
+    enPairs = gen.results.map((r) => ({ ref: r.ref, reason: r.reason }));
     calledAI = gen.calledAI;
   }
-  if (enResults.length === 0) return { results: [], calledAI };
+  if (enPairs.length === 0) return { results: [], calledAI };
 
   const toPersist: { toRef: string; reason: string }[] = [];
-  const localized: ConnectionResult[] = [];
-  for (const en of enResults) {
-    const translated = await translateReason(en.reason, LOCALE_LANGUAGE_NAME[locale], {
-      provider,
-      model,
-    });
-    calledAI = true;
-    if (translated === "") {
+  const localized: { toRef: string; reason: string }[] = [];
+  let budgetSpent = false;
+  for (const en of enPairs) {
+    if (budgetSpent) {
+      localized.push({ toRef: en.ref, reason: en.reason });
+      continue;
+    }
+    if (clientKey && !(await consume(`gen:${clientKey}`))) {
+      budgetSpent = true;
+      localized.push({ toRef: en.ref, reason: en.reason });
+      continue;
+    }
+
+    let translated = "";
+    try {
+      translated = await translateReason(en.reason, LOCALE_LANGUAGE_NAME[locale], {
+        provider,
+        model,
+      });
+      calledAI = true;
+    } catch (err) {
+      // Degrade to the canonical English reason for this row rather than 500 the
+      // whole response — logged + metered, not swallowed.
+      console.error(`connections: live translation into ${locale} failed for ${en.ref}:`, err);
+    }
+    if (typeof translated !== "string" || translated.trim() === "") {
       incr("connections_live_translate_failed");
-      localized.push(en);
+      localized.push({ toRef: en.ref, reason: en.reason });
       continue;
     }
     toPersist.push({ toRef: en.ref, reason: translated });
-    localized.push({ ...en, reason: translated });
+    localized.push({ toRef: en.ref, reason: translated });
   }
 
   if (toPersist.length > 0) {
-    const persisted = await persistTranslatedRows(fromRef, kind, locale, model, toPersist);
+    const stored = await persistTranslatedRows(fromRef, kind, locale, model, toPersist);
     for (const row of localized) {
-      const stored = persisted.get(row.ref);
-      if (stored !== undefined && stored !== row.reason) row.reason = stored;
+      const persistedReason = stored.get(row.toRef);
+      if (persistedReason !== undefined && persistedReason !== row.reason) {
+        row.reason = persistedReason;
+      }
     }
   }
-  return { results: localized, calledAI };
+  return { results: await hydrate(localized, kind), calledAI };
 }
 
 /** Insert translated rows; a concurrent writer (another instance, or the batch)

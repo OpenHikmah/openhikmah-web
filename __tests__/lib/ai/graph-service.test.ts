@@ -487,6 +487,27 @@ describe("getConnections — en-canonical localized reasons", () => {
     expect(mockGenerate).toHaveBeenCalledTimes(1);
     expect(mockTranslateReason).toHaveBeenCalledTimes(1); // only the tr caller translates
   });
+
+  it("spends the client budget per translation and serves English once it is out", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockGenerate.mockResolvedValue([result("2:255"), result("3:18"), result("59:22")]);
+    mockTranslateReason.mockImplementation(async (r: string) => `TR(${r})`);
+    // Upfront miss consume passes; then the first per-row consume passes and the
+    // rest are over budget.
+    mockConsume.mockResolvedValueOnce(true).mockResolvedValueOnce(true).mockResolvedValue(false);
+
+    const out = await getConnections("1:1", "thematic", source, {
+      locale: "tr",
+      clientKey: "9.9.9.9",
+    });
+
+    expect(mockTranslateReason).toHaveBeenCalledTimes(1); // stopped after the budget ran out
+    expect(out.map((c) => c.reason)).toEqual(["TR(because)", "because", "because"]);
+    // only the one successful translation is persisted
+    const trInsert = mockValues.mock.calls.at(-1)?.[0] as Array<Record<string, unknown>>;
+    expect(trInsert).toHaveLength(1);
+    expect(trInsert[0]).toMatchObject({ toRef: "2:255", locale: "tr" });
+  });
 });
 
 describe("getConnections — single-flight de-duplication", () => {
