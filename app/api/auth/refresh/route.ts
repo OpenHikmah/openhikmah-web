@@ -43,12 +43,18 @@ const inflight = new Map<string, Promise<RefreshOutcome>>();
 const recent = new Map<string, { outcome: RefreshOutcome; at: number }>();
 const RESULT_TTL_MS = 30_000;
 const RESULT_TTL_SECONDS = RESULT_TTL_MS / 1000;
-// Hard timeout on the upstream token call. Kept below LOCK_TTL_SECONDS so the
-// leader always settles (releasing or deliberately holding its lock) before the
-// lock could auto-expire under it and let a second caller present the same token.
+// Hard timeout on the upstream token call.
 const UPSTREAM_TIMEOUT_MS = 8_000;
+// Hard bound on the leader's result publish (a Redis SET). Together with
+// UPSTREAM_TIMEOUT_MS this caps the whole leader critical section — call the
+// endpoint, publish the outcome, release the lock — well under LOCK_TTL_SECONDS,
+// so the lease can't auto-expire while the leader is still working and let a
+// second caller present the same (rotated) token.
+const PUBLISH_TIMEOUT_MS = 2_000;
 // A crashed leader's lock self-clears after this so the next request can lead.
-const LOCK_TTL_SECONDS = 10;
+// Must stay above UPSTREAM_TIMEOUT_MS + PUBLISH_TIMEOUT_MS (+ a margin for the
+// tiny release call) so a live leader always finishes inside its own lease.
+const LOCK_TTL_SECONDS = 15;
 // A waiter that can't get the lock polls the shared result cache this long
 // before giving up with a retryable 503 (well under LOCK_TTL_SECONDS).
 const POLL_TIMEOUT_MS = 5_000;
@@ -119,6 +125,17 @@ function rememberLocally(refreshToken: string, outcome: RefreshOutcome): void {
   if (isCacheable(outcome)) recent.set(refreshToken, { outcome, at: Date.now() });
 }
 
+/** Resolve to `p`'s value, or to `onTimeout` if it hasn't settled in `ms` — so a
+ *  stalled Redis command can't stretch the leader's critical section past its
+ *  lease. */
+function withTimeout<T>(p: Promise<T>, ms: number, onTimeout: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(onTimeout), ms);
+  });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
+}
+
 async function callTokenEndpoint(refreshToken: string): Promise<RefreshOutcome> {
   const tokenUrl = `${process.env.QF_AUTH_BASE}/oauth2/token`;
   const clientId = process.env.NEXT_PUBLIC_QF_CLIENT_ID!;
@@ -177,13 +194,22 @@ function refresh(refreshToken: string): Promise<RefreshOutcome> {
   return pending;
 }
 
+let loggedRedisConfigError = false;
+
 /** `redisEnabled()` constructs the client on first call and can throw
  *  synchronously on a malformed REDIS_URL — never let that 500 the refresh
- *  endpoint; fall back to the per-process path. */
+ *  endpoint; fall back to the per-process path. Surface it once (per the repo's
+ *  "no silent catch" rule) without logging the URL: a bad REDIS_URL silently
+ *  disabling cross-instance coordination is exactly the kind of failure an
+ *  operator needs to see. */
 function redisAvailable(): boolean {
   try {
     return redisEnabled();
   } catch {
+    if (!loggedRedisConfigError) {
+      loggedRedisConfigError = true;
+      console.error("auth/refresh: REDIS_URL is invalid; coordinating per-process only");
+    }
     return false;
   }
 }
@@ -236,16 +262,18 @@ async function leadRefreshCoordinated(refreshToken: string): Promise<RefreshOutc
       // re-presenting the (now consumed) token. The key is a hash of the incoming
       // token; the deployment must run Redis with auth + TLS + network isolation
       // (same trust assumption as lib/auth/social-auth.ts's token cache).
-      const published = await redisSet(
-        resultKey(refreshToken),
-        JSON.stringify(outcome),
-        RESULT_TTL_SECONDS
+      const published = await withTimeout(
+        redisSet(resultKey(refreshToken), JSON.stringify(outcome), RESULT_TTL_SECONDS),
+        PUBLISH_TIMEOUT_MS,
+        false
       );
       rememberLocally(refreshToken, outcome);
       // Only release the lock once peers can actually read the result. If the
-      // publish didn't land, keep the lock until its TTL so peers keep getting a
-      // retryable 503 rather than re-leading and presenting the (now consumed)
-      // token a second time.
+      // publish didn't land (or didn't land in time), keep the lock until its
+      // TTL so peers keep getting a retryable 503 rather than re-leading and
+      // presenting the (now consumed) token a second time — by then the local
+      // `recent` cache and any peer that reads the eventually-written result
+      // replay it directly.
       if (published) await releaseLock(refreshToken, nonce);
     } else {
       // transient — the token wasn't successfully consumed, so a retry can lead.

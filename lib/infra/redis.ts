@@ -55,6 +55,7 @@ export function getRedis(): Redis | null {
   });
   c.on("ready", () => {
     loggedError = false;
+    loggedLockError = false;
   });
 
   client = c;
@@ -111,9 +112,23 @@ export async function redisSetNx(
   try {
     const res = await r.set(key, value, "EX", ttlSeconds, "NX");
     return res === "OK";
-  } catch {
+  } catch (err) {
+    logLockError("redisSetNx", err);
     return null;
   }
+}
+
+// One-shot logging for the lock helpers below. A silently-swallowed failure on
+// a lock acquire/release is not "best-effort cache" territory — it can leave a
+// cross-instance lock stuck or let two callers both proceed — so it must surface
+// (per the repo's "no silent catch" rule). Rate-limited to one line until Redis
+// recovers so a sustained outage on a hot path (the refresh endpoint) can't
+// flood the log.
+let loggedLockError = false;
+function logLockError(op: string, err: unknown): void {
+  if (loggedLockError) return;
+  loggedLockError = true;
+  console.error(`Redis ${op} failed, falling back:`, err);
 }
 
 /** DELETE a key; silently no-ops on disable/error. */
@@ -143,8 +158,10 @@ export async function redisDelIfEqual(key: string, expected: string): Promise<vo
       key,
       expected
     );
-  } catch {
-    // Best-effort; ignore.
+  } catch (err) {
+    // A stuck lock still self-clears at its TTL, but a failed release on a hot
+    // path should not be invisible.
+    logLockError("redisDelIfEqual", err);
   }
 }
 

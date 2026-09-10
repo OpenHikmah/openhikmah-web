@@ -173,6 +173,24 @@ describe("lib/redis — enabled, but every call errors (fail-open)", () => {
     expect(behavior.del).toHaveBeenCalledOnce();
   });
 
+  it("the lock helpers surface a failure (once) instead of swallowing it silently", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    behavior.set.mockRejectedValue(new Error("down"));
+    behavior.eval.mockRejectedValue(new Error("down"));
+    const r = await import("@/lib/infra/redis");
+
+    expect(await r.redisSetNx("lock:k", "n", 10)).toBeNull();
+    await r.redisDelIfEqual("lock:k", "n");
+    await r.redisSetNx("lock:k", "n", 10); // rate-limited: still only one line
+
+    expect(errSpy).toHaveBeenCalledTimes(1);
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Redis redisSetNx failed"),
+      expect.any(Error)
+    );
+    errSpy.mockRestore();
+  });
+
   it("redisIncrWithTtl returns null when exec() reports an INCR error", async () => {
     behavior.multiExec.mockResolvedValue([[new Error("partial"), undefined]]);
     const r = await import("@/lib/infra/redis");

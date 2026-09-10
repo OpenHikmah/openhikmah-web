@@ -263,7 +263,7 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
     const res = await POST(makeReq("tok-lead"));
 
     expect(res.status).toBe(200);
-    expect(mockRedis.redisSetNx).toHaveBeenCalledWith(lockKey("tok-lead"), expect.any(String), 10);
+    expect(mockRedis.redisSetNx).toHaveBeenCalledWith(lockKey("tok-lead"), expect.any(String), 15);
     expect(JSON.parse(redisStore.get(resultKey("tok-lead"))!)).toMatchObject({
       kind: "ok",
       accessToken: "acc-lead",
@@ -428,5 +428,52 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("treats a publish that stalls past the publish timeout as unpublished and keeps the lock", async () => {
+    vi.useFakeTimers();
+    try {
+      // The publish never settles — withTimeout() must resolve it to `false`
+      // rather than let the leader's critical section run past its lease.
+      mockRedis.redisSet.mockImplementation(() => new Promise<boolean>(() => {}));
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "acc-slow", refresh_token: "ref-slow" }),
+      });
+
+      const pending = POST(makeReq("tok-slowpub"));
+      await vi.advanceTimersByTimeAsync(2_500); // past PUBLISH_TIMEOUT_MS (2s)
+      const res = await pending;
+
+      expect(res.status).toBe(200); // leader still returns its own outcome
+      expect((await res.json()).accessToken).toBe("acc-slow");
+      expect(mockRedis.redisDelIfEqual).not.toHaveBeenCalledWith(
+        lockKey("tok-slowpub"),
+        expect.anything()
+      );
+      expect(redisStore.has(lockKey("tok-slowpub"))).toBe(true); // held to TTL
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("logs once and coordinates per-process when redisEnabled() throws (malformed REDIS_URL)", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockRedis.redisEnabled.mockImplementationOnce(() => {
+      throw new Error("bad url");
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: "acc-badurl", refresh_token: "ref-badurl" }),
+    });
+
+    const res = await POST(makeReq("tok-badurl"));
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).accessToken).toBe("acc-badurl");
+    expect(mockFetch).toHaveBeenCalledTimes(1); // direct upstream, no Redis coordination
+    expect(mockRedis.redisSetNx).not.toHaveBeenCalled();
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("REDIS_URL is invalid"));
+    errSpy.mockRestore();
   });
 });
