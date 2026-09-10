@@ -35,6 +35,7 @@ const {
   mockResolveVerse,
   mockConsume,
   mockIncr,
+  mockTranslateReason,
 } = vi.hoisted(() => {
   // Mirrors the real chain: .values(...).onConflictDoNothing().returning(...) —
   // `returning` resolves with the rows actually inserted (empty by default here,
@@ -55,10 +56,12 @@ const {
     mockResolveVerse: vi.fn(),
     mockConsume: vi.fn(),
     mockIncr: vi.fn(),
+    mockTranslateReason: vi.fn(),
   };
 });
 
 vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect, insert: mockInsert } }));
+vi.mock("@/lib/ai/translate", () => ({ translateReason: mockTranslateReason }));
 const { ConnectionParseError } = vi.hoisted(() => ({
   ConnectionParseError: class ConnectionParseError extends Error {
     constructor(msg = "unparseable") {
@@ -368,7 +371,7 @@ describe("getConnections", () => {
   });
 });
 
-describe("getConnections — per-locale caching", () => {
+describe("getConnections — en-canonical localized reasons", () => {
   beforeEach(() => {
     mockSelect.mockReset();
     mockInsert.mockClear();
@@ -384,36 +387,18 @@ describe("getConnections — per-locale caching", () => {
     mockConsume.mockResolvedValue(true);
     mockDiscover.mockResolvedValue([]);
     mockResolveVerse.mockImplementation(async (ref: string) => verse(ref));
+    mockTranslateReason.mockReset();
   });
 
-  it("persists the reason under the requested locale", async () => {
-    mockSelect.mockReturnValue(makeSelectChain([]));
-    mockGenerate.mockResolvedValue([result("2:255")]);
+  it("on a non-en miss with no en rows, generates the selection in ENGLISH then translates each reason", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // tr read + en read both miss
+    mockGenerate.mockResolvedValue([result("2:255"), result("3:18")]);
+    mockTranslateReason.mockImplementation(async (reason: string) => `TR(${reason})`);
 
-    await getConnections("1:1", "thematic", source, { locale: "tr" });
+    const out = await getConnections("1:1", "thematic", source, { locale: "tr" });
 
-    expect(mockGenerate).toHaveBeenCalledWith(
-      "1:1",
-      SOURCE_ARABIC,
-      "tr",
-      "thematic",
-      "tr",
-      RESOLVED
-    );
-    const persisted = mockValues.mock.calls[0][0] as Array<Record<string, unknown>>;
-    expect(persisted[0]).toMatchObject({ locale: "tr" });
-  });
-
-  it("does not coalesce concurrent misses for the same verse+kind but different locales", async () => {
-    mockSelect.mockReturnValue(makeSelectChain([]));
-    mockGenerate.mockImplementation(async () => [result("2:255")]);
-
-    await Promise.all([
-      getConnections("1:1", "thematic", source, { locale: "en" }),
-      getConnections("1:1", "thematic", source, { locale: "tr" }),
-    ]);
-
-    expect(mockGenerate).toHaveBeenCalledTimes(2);
+    // selection derived once, in English — never natively per locale
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
     expect(mockGenerate).toHaveBeenCalledWith(
       "1:1",
       SOURCE_ARABIC,
@@ -422,14 +407,85 @@ describe("getConnections — per-locale caching", () => {
       "en",
       RESOLVED
     );
-    expect(mockGenerate).toHaveBeenCalledWith(
-      "1:1",
-      SOURCE_ARABIC,
-      "tr",
-      "thematic",
-      "tr",
-      RESOLVED
+    // each English reason translated for the requested locale
+    expect(mockTranslateReason).toHaveBeenCalledTimes(2);
+    expect(mockTranslateReason).toHaveBeenCalledWith("because", "Turkish", RESOLVED);
+    // the persisted locale rows carry the translated text, tagged tr
+    const trInsert = mockValues.mock.calls.at(-1)?.[0] as Array<Record<string, unknown>>;
+    expect(trInsert).toEqual([
+      expect.objectContaining({
+        toRef: "2:255",
+        kind: "thematic",
+        locale: "tr",
+        reason: "TR(because)",
+      }),
+      expect.objectContaining({ toRef: "3:18", locale: "tr", reason: "TR(because)" }),
+    ]);
+    expect(out.map((c) => c.reason)).toEqual(["TR(because)", "TR(because)"]);
+  });
+
+  it("translates the existing en rows without regenerating when they are already cached", async () => {
+    // First select (tr cache read) misses; second (en cache read) hits.
+    mockSelect.mockReturnValueOnce(makeSelectChain([])).mockReturnValue(
+      makeSelectChain([
+        {
+          fromRef: "1:1",
+          toRef: "2:255",
+          kind: "thematic",
+          reason: "en reason",
+          status: "active",
+        },
+      ])
     );
+    mockReturning.mockResolvedValue([{ toRef: "2:255" }]); // tr insert wins its row, no conflict re-read
+    mockTranslateReason.mockResolvedValue("ru reason");
+
+    const out = await getConnections("1:1", "thematic", source, { locale: "ru" });
+
+    expect(mockGenerate).not.toHaveBeenCalled();
+    expect(mockGenerateGrounded).not.toHaveBeenCalled();
+    expect(mockTranslateReason).toHaveBeenCalledWith("en reason", "Russian", RESOLVED);
+    expect(out[0]).toMatchObject({ ref: "2:255", reason: "ru reason" });
+  });
+
+  it("serves the English reason (and does not persist) when a row's translation fails", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockGenerate.mockResolvedValue([result("2:255")]);
+    mockTranslateReason.mockResolvedValue(""); // rejected / failed translation
+
+    const out = await getConnections("1:1", "thematic", source, { locale: "tr" });
+
+    expect(out[0].reason).toBe("because"); // English reason served
+    expect(mockIncr).toHaveBeenCalledWith("connections_live_translate_failed");
+    // only the en insert happened — no tr row persisted
+    const insertLocales = mockValues.mock.calls.map(
+      (c) => (c[0] as Array<Record<string, unknown>>)[0]?.locale
+    );
+    expect(insertLocales).not.toContain("tr");
+  });
+
+  it("a concurrent en + tr miss derives the English selection ONCE, then tr translates it", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    let releaseGen!: (v: ConnectionResult[]) => void;
+    mockGenerate.mockImplementation(
+      () =>
+        new Promise<ConnectionResult[]>((res) => {
+          releaseGen = res;
+        })
+    );
+    mockTranslateReason.mockImplementation(async (r: string) => `TR(${r})`);
+
+    const all = Promise.all([
+      getConnections("1:1", "thematic", source, { locale: "en" }),
+      getConnections("1:1", "thematic", source, { locale: "tr" }),
+    ]);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockGenerate).toHaveBeenCalledTimes(1); // en generation coalesced across both
+
+    releaseGen([result("2:255")]);
+    await all;
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
+    expect(mockTranslateReason).toHaveBeenCalledTimes(1); // only the tr caller translates
   });
 });
 

@@ -6,6 +6,7 @@ import { sql } from "drizzle-orm";
 // count / response body are unchanged.
 const { mockCallAI } = vi.hoisted(() => ({ mockCallAI: vi.fn() }));
 vi.mock("@/lib/ai/ai", () => ({
+  callAI: vi.fn((prompt: string) => mockCallAI(prompt)),
   callAIDetailed: vi.fn(async (prompt: string) => ({
     text: await mockCallAI(prompt),
     usage: { inputTokens: 100, outputTokens: 20 },
@@ -102,26 +103,49 @@ describe("connection graph (integration, real Postgres)", () => {
     expect(await db.select().from(connections)).toHaveLength(1);
   });
 
-  it("caches connections per locale: a hit in one locale still generates for another", async () => {
+  it("a non-en request translates the canonical English selection, never re-derives it", async () => {
     await seed("2:255");
-    mockCallAI
-      .mockResolvedValueOnce(JSON.stringify([{ ref: "2:255", reason: "throne verse" }]))
-      .mockResolvedValueOnce(JSON.stringify([{ ref: "2:255", reason: "ayet-el kursi" }]));
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.startsWith("Translate the following sentence")) return "ayet-el kürsi";
+      return JSON.stringify([{ ref: "2:255", reason: "throne verse" }]);
+    });
 
     const en = await getConnections("1:1", "thematic", source, { locale: "en" });
-    expect(en[0]).toMatchObject({ reason: "throne verse" });
-    expect(mockCallAI).toHaveBeenCalledTimes(1);
+    expect(en[0]).toMatchObject({ ref: "2:255", reason: "throne verse" });
+    expect(mockCallAI).toHaveBeenCalledTimes(1); // one generation
 
-    // Different locale — must NOT hit the English row, generates its own.
+    // Turkish: same verse selection, reason translated — one extra call, NO regeneration.
     const tr = await getConnections("1:1", "thematic", source, { locale: "tr" });
-    expect(tr[0]).toMatchObject({ reason: "ayet-el kursi" });
+    expect(tr[0]).toMatchObject({ ref: "2:255", reason: "ayet-el kürsi" });
     expect(mockCallAI).toHaveBeenCalledTimes(2);
-    expect(await db.select().from(connections)).toHaveLength(2);
+    const rows = await db.select().from(connections);
+    expect(rows).toHaveLength(2); // en + tr, same toRef
+    expect(rows.filter((r) => r.locale === "tr").map((r) => r.toRef)).toEqual(["2:255"]);
 
-    // Re-requesting English now serves from cache, not a third AI call.
-    const enAgain = await getConnections("1:1", "thematic", source, { locale: "en" });
-    expect(enAgain[0]).toMatchObject({ reason: "throne verse" });
+    // Both locales now cached — no further AI calls.
+    expect((await getConnections("1:1", "thematic", source, { locale: "en" }))[0]).toMatchObject({
+      reason: "throne verse",
+    });
+    expect((await getConnections("1:1", "thematic", source, { locale: "tr" }))[0]).toMatchObject({
+      reason: "ayet-el kürsi",
+    });
     expect(mockCallAI).toHaveBeenCalledTimes(2);
+  });
+
+  it("a cold non-en request generates English first, then translates it", async () => {
+    await seed("2:255");
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.startsWith("Translate the following sentence")) return "witness of oneness (ru)";
+      return JSON.stringify([{ ref: "2:255", reason: "witness of oneness" }]);
+    });
+
+    const ru = await getConnections("1:1", "thematic", source, { locale: "ru" });
+
+    expect(ru[0]).toMatchObject({ ref: "2:255", reason: "witness of oneness (ru)" });
+    expect(mockCallAI).toHaveBeenCalledTimes(2); // 1 English generation + 1 translation
+    const rows = await db.select().from(connections);
+    expect(rows.map((r) => r.locale).sort()).toEqual(["en", "ru"]);
+    expect(rows.find((r) => r.locale === "en")?.reason).toBe("witness of oneness");
   });
 
   it("persists a concrete model id even when no provider is passed (resolves the flag)", async () => {
