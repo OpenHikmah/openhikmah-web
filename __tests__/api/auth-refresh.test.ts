@@ -16,8 +16,8 @@ const { redisStore, mockRedis } = vi.hoisted(() => {
         redisStore.set(k, v);
         return true;
       }),
-      redisDel: vi.fn(async (k: string) => {
-        redisStore.delete(k);
+      redisDelIfEqual: vi.fn(async (k: string, expected: string) => {
+        if (redisStore.get(k) === expected) redisStore.delete(k);
       }),
       redisSetNx: vi.fn(async (k: string, v: string): Promise<boolean | null> => {
         if (redisStore.has(k)) return false;
@@ -222,7 +222,7 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
     mockRedis.redisEnabled.mockReturnValue(true);
     mockRedis.redisGet.mockClear();
     mockRedis.redisSet.mockClear();
-    mockRedis.redisDel.mockClear();
+    mockRedis.redisDelIfEqual.mockClear();
     mockRedis.redisSetNx.mockClear();
     mockRedis.redisSetNx.mockImplementation(async (k: string, v: string) => {
       if (redisStore.has(k)) return false;
@@ -234,8 +234,8 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
       redisStore.set(k, v);
       return true;
     });
-    mockRedis.redisDel.mockImplementation(async (k: string) => {
-      redisStore.delete(k);
+    mockRedis.redisDelIfEqual.mockImplementation(async (k: string, expected: string) => {
+      if (redisStore.get(k) === expected) redisStore.delete(k);
     });
   });
   afterAll(() => mockRedis.redisEnabled.mockReturnValue(false));
@@ -387,7 +387,10 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
     const res = await POST(makeReq("tok-nopublish"));
 
     expect(res.status).toBe(200); // the leader still returns its own outcome
-    expect(mockRedis.redisDel).not.toHaveBeenCalledWith(lockKey("tok-nopublish"));
+    expect(mockRedis.redisDelIfEqual).not.toHaveBeenCalledWith(
+      lockKey("tok-nopublish"),
+      expect.anything()
+    );
     expect(redisStore.has(lockKey("tok-nopublish"))).toBe(true); // lock held to TTL
   });
 

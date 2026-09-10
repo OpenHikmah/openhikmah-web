@@ -127,6 +127,27 @@ export async function redisDel(key: string): Promise<void> {
   }
 }
 
+/**
+ * Atomically DELETE `key` only if its current value equals `expected` (a Lua
+ * compare-and-delete, no check-then-act gap). For releasing a lock so a holder
+ * can only remove its own lease. No-op on disable/error — a stuck lock then
+ * self-clears at its TTL.
+ */
+export async function redisDelIfEqual(key: string, expected: string): Promise<void> {
+  const r = getRedis();
+  if (!r) return;
+  try {
+    await r.eval(
+      "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+      1,
+      key,
+      expected
+    );
+  } catch {
+    // Best-effort; ignore.
+  }
+}
+
 /** Publishes `message` on `channel`; silently no-ops on disable/error. Used for
  *  cross-instance cache invalidation (e.g. auth cache flushes). */
 export function redisPublish(channel: string, message: string): void {

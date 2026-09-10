@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { HAS_SESSION_COOKIE_NAME, hasSessionCookieOptions } from "@/lib/auth/session-cookie";
-import { redisDel, redisEnabled, redisGet, redisSet, redisSetNx } from "@/lib/infra/redis";
+import { redisDelIfEqual, redisEnabled, redisGet, redisSet, redisSetNx } from "@/lib/infra/redis";
 
 const COOKIE_NAME = "qf_refresh_token";
 
@@ -108,12 +108,11 @@ async function pollSharedOutcome(refreshToken: string): Promise<RefreshOutcome |
   return null;
 }
 
-/** Release the lock only if it is still the one we took — so a leader that
- *  overran its TTL can't delete a successor's lock. */
-async function releaseLock(refreshToken: string, nonce: string): Promise<void> {
-  if ((await redisGet(lockKey(refreshToken))) === nonce) {
-    await redisDel(lockKey(refreshToken));
-  }
+/** Release the lock only if it is still the exact one we took (atomic
+ *  compare-and-delete) — so a leader that overran its TTL can't delete a
+ *  successor's lock. */
+function releaseLock(refreshToken: string, nonce: string): Promise<void> {
+  return redisDelIfEqual(lockKey(refreshToken), nonce);
 }
 
 function rememberLocally(refreshToken: string, outcome: RefreshOutcome): void {

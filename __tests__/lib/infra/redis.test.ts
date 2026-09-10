@@ -7,6 +7,7 @@ const behavior = vi.hoisted(() => ({
   get: vi.fn(),
   set: vi.fn(),
   del: vi.fn(),
+  eval: vi.fn(),
   ping: vi.fn(),
   multiExec: vi.fn(),
   subscribe: vi.fn((..._args: unknown[]) => Promise.resolve()),
@@ -44,6 +45,9 @@ vi.mock("ioredis", () => {
     del(...a: unknown[]) {
       return behavior.del(...a);
     }
+    eval(...a: unknown[]) {
+      return behavior.eval(...a);
+    }
     ping(...a: unknown[]) {
       return behavior.ping(...a);
     }
@@ -77,6 +81,7 @@ beforeEach(() => {
   behavior.get.mockReset();
   behavior.set.mockReset();
   behavior.del.mockReset();
+  behavior.eval.mockReset();
   behavior.ping.mockReset();
   behavior.multiExec.mockReset();
   behavior.subscribe.mockReset().mockReturnValue(Promise.resolve());
@@ -91,6 +96,7 @@ describe("lib/redis — disabled (no REDIS_URL)", () => {
     await expect(r.redisDel("k")).resolves.toBeUndefined();
     expect(await r.redisIncrWithTtl("k", 60)).toBeNull();
     expect(await r.redisSetNx("k", "v", 60)).toBeNull();
+    await expect(r.redisDelIfEqual("k", "v")).resolves.toBeUndefined();
     expect(behavior.ctor).not.toHaveBeenCalled();
   });
 });
@@ -127,6 +133,19 @@ describe("lib/redis — enabled, healthy", () => {
     const r = await import("@/lib/infra/redis");
     expect(await r.redisSetNx("lock:k", "1", 10)).toBe(false);
   });
+
+  it("redisDelIfEqual runs an atomic compare-and-delete Lua script", async () => {
+    behavior.eval.mockResolvedValue(1);
+    const r = await import("@/lib/infra/redis");
+
+    await r.redisDelIfEqual("lock:k", "nonce-1");
+    expect(behavior.eval).toHaveBeenCalledWith(
+      expect.stringContaining("redis.call('del', KEYS[1])"),
+      1,
+      "lock:k",
+      "nonce-1"
+    );
+  });
 });
 
 describe("lib/redis — enabled, but every call errors (fail-open)", () => {
@@ -138,12 +157,14 @@ describe("lib/redis — enabled, but every call errors (fail-open)", () => {
     behavior.get.mockRejectedValue(new Error("down"));
     behavior.set.mockRejectedValue(new Error("down"));
     behavior.del.mockRejectedValue(new Error("down"));
+    behavior.eval.mockRejectedValue(new Error("down"));
     behavior.multiExec.mockRejectedValue(new Error("down"));
     const r = await import("@/lib/infra/redis");
 
     expect(await r.redisGet("k")).toBeNull();
     expect(await r.redisSet("k", "v", 60)).toBe(false);
     await expect(r.redisDel("k")).resolves.toBeUndefined();
+    await expect(r.redisDelIfEqual("k", "v")).resolves.toBeUndefined();
     expect(await r.redisIncrWithTtl("k", 60)).toBeNull();
     expect(await r.redisSetNx("k", "v", 60)).toBeNull();
     // The Redis path was genuinely entered (then swallowed) — not short-circuited:
