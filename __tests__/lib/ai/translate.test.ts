@@ -28,7 +28,7 @@ describe("validateTranslation", () => {
   it("rejects output that is only a label", () => {
     expect(validateTranslation(EN, "Sure! Here is the translation:")).toEqual({
       ok: false,
-      reason: "label-prefix",
+      reason: "label_prefix",
     });
   });
 
@@ -42,23 +42,30 @@ describe("validateTranslation", () => {
     ).toEqual({ ok: false, reason: "refusal" });
   });
 
-  it("rejects a verbatim English echo for a non-English locale (case-insensitive)", () => {
-    expect(validateTranslation(EN, EN)).toEqual({ ok: false, reason: "english-echo" });
+  it("rejects an English echo despite re-punctuation / re-casing", () => {
+    expect(validateTranslation(EN, EN)).toEqual({ ok: false, reason: "english_echo" });
     expect(validateTranslation(EN, EN.toUpperCase())).toEqual({
       ok: false,
-      reason: "english-echo",
+      reason: "english_echo",
     });
+    // trailing period dropped, wrapping quotes, doubled space
+    expect(
+      validateTranslation(
+        EN,
+        `"The believer  rests the heart in certainty of Allah's subtle awareness"`
+      )
+    ).toEqual({ ok: false, reason: "english_echo" });
   });
 
   it("rejects a wildly long translation", () => {
     expect(validateTranslation(EN, EN.repeat(4))).toEqual({
       ok: false,
-      reason: "length-ratio",
+      reason: "length_ratio",
     });
   });
 
   it("rejects a translation far too short for a non-trivial source", () => {
-    expect(validateTranslation(EN, "Evet.")).toEqual({ ok: false, reason: "length-ratio" });
+    expect(validateTranslation(EN, "Evet.")).toEqual({ ok: false, reason: "length_ratio" });
   });
 
   it("does not apply the short-ratio floor to a very short source", () => {
@@ -101,6 +108,6 @@ describe("translateReason", () => {
     mockCallAI.mockResolvedValue(EN);
 
     await expect(translateReason(EN, "Russian")).resolves.toBe("");
-    expect(incrSpy).toHaveBeenCalledWith("translation_rejected_english-echo");
+    expect(incrSpy).toHaveBeenCalledWith("translation_rejected_english_echo");
   });
 });
