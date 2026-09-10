@@ -15,6 +15,7 @@ import {
 import type { Provider } from "@/lib/ai/ai";
 import { SELECTABLE_MODELS, isModelForProvider } from "@/lib/ai/models";
 import { LOCALES, type Locale } from "@/lib/i18n/config";
+import { tryAcquireJobLock, releaseJobLock } from "@/lib/admin/job-lock";
 
 /**
  * Triggers and tracks the project's one-time/resumable backfill jobs from the
@@ -22,7 +23,9 @@ import { LOCALES, type Locale } from "@/lib/i18n/config";
  * deployment: one job runs at a time, tracked by in-memory state in this module
  * (the source of truth for "is a job running right now") backed by a `job_runs`
  * DB row per invocation (the source of truth for history/last-run status, so it
- * survives a server restart).
+ * survives a server restart). A Postgres advisory lock (see `job-lock.ts`)
+ * extends that "one at a time" guarantee across processes, so the in-memory
+ * state only has to coordinate callers within one process.
  *
  * Two execution shapes:
  *   - `script` jobs spawn `bun scripts/<name>.mjs` as a child process. Those
@@ -258,7 +261,14 @@ function finishRun(
     .set({ status, completedAt: new Date(), error, logTail: state.logTail.join("\n") })
     .where(eq(jobRuns.id, state.runId))
     .catch((err) => console.error("job-runner: failed to record job completion", err));
-  if (running?.runId === state.runId) running = null;
+  // Every terminal path funnels through here (spawn close/error, in-process
+  // success/catch), so this is where the cross-process advisory lock is
+  // released — guarded by the same runId check as the in-memory slot so a
+  // double `close`/`error` from one child doesn't unbalance the lock.
+  if (running?.runId === state.runId) {
+    running = null;
+    void releaseJobLock();
+  }
 }
 
 /** Maps a batch / loop terminal reason to the `job_runs.status` the Jobs page
@@ -301,9 +311,10 @@ export async function startJob(
   }
 
   // Claim the slot synchronously (no await between the `if (running)` check
-  // above and this assignment) so two near-simultaneous calls can't both pass
-  // the guard — matches lib/names/name-content.ts's inFlight/reasonInFlight
-  // pattern. `runId` is filled in once the insert below resolves.
+  // above and this assignment) so two near-simultaneous calls in this process
+  // can't both pass the guard — matches lib/names/name-content.ts's
+  // inFlight/reasonInFlight pattern. `runId` is filled in once the insert below
+  // resolves.
   const state: RunningJob = {
     jobId: job.id,
     runId: -1,
@@ -311,6 +322,22 @@ export async function startJob(
     controller: new AbortController(),
   };
   running = state;
+
+  // Cross-process guard: acquire the Postgres advisory lock so a second app
+  // process can't start its own run in parallel. Taken AFTER the synchronous
+  // in-memory claim above — advisory locks are re-entrant within a session, so
+  // relying on this alone would let a second same-process caller through.
+  let lockHeld: boolean;
+  try {
+    lockHeld = await tryAcquireJobLock();
+  } catch (err) {
+    if (running === state) running = null;
+    throw err;
+  }
+  if (!lockHeld) {
+    if (running === state) running = null;
+    throw new Error("A job is already running");
+  }
 
   let row: { id: number };
   try {
@@ -320,6 +347,7 @@ export async function startJob(
       .returning({ id: jobRuns.id });
   } catch (err) {
     if (running === state) running = null;
+    void releaseJobLock();
     throw err;
   }
   state.runId = row.id;
@@ -347,25 +375,36 @@ export async function startJob(
     return { runId: row.id };
   }
 
-  const child = spawn("bun", [job.script as string], { cwd: process.cwd() });
+  // A synchronous throw from `spawn` (bad args / resource exhaustion) would
+  // otherwise leave `running` set and the advisory lock held with no child and
+  // no `finishRun` ever scheduled — wedging the runner across every process.
+  // `finishRun` records the failed run and releases both; the caller still sees
+  // the error. (A missing `bun` binary surfaces as an `error` event, handled
+  // below, not a throw here.)
+  try {
+    const child = spawn("bun", [job.script as string], { cwd: process.cwd() });
 
-  const onData = (chunk: Buffer) => {
-    for (const line of chunk.toString("utf8").split("\n")) {
-      if (line.trim()) pushLogLine(state, line);
-    }
-  };
-  child.stdout.on("data", onData);
-  child.stderr.on("data", onData);
+    const onData = (chunk: Buffer) => {
+      for (const line of chunk.toString("utf8").split("\n")) {
+        if (line.trim()) pushLogLine(state, line);
+      }
+    };
+    child.stdout.on("data", onData);
+    child.stderr.on("data", onData);
 
-  child.on("close", (code) => {
-    finishRun(
-      state,
-      code === 0 ? "success" : "failed",
-      code === 0 ? null : `Exited with code ${code}`
-    );
-  });
+    child.on("close", (code) => {
+      finishRun(
+        state,
+        code === 0 ? "success" : "failed",
+        code === 0 ? null : `Exited with code ${code}`
+      );
+    });
 
-  child.on("error", (err) => finishRun(state, "failed", err.message));
+    child.on("error", (err) => finishRun(state, "failed", err.message));
+  } catch (err) {
+    finishRun(state, "failed", err instanceof Error ? err.message : String(err));
+    throw err;
+  }
 
   return { runId: row.id };
 }
