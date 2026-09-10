@@ -90,6 +90,7 @@ describe("lib/redis — disabled (no REDIS_URL)", () => {
     await expect(r.redisSet("k", "v", 60)).resolves.toBeUndefined();
     await expect(r.redisDel("k")).resolves.toBeUndefined();
     expect(await r.redisIncrWithTtl("k", 60)).toBeNull();
+    expect(await r.redisSetNx("k", "v", 60)).toBeNull();
     expect(behavior.ctor).not.toHaveBeenCalled();
   });
 });
@@ -112,6 +113,20 @@ describe("lib/redis — enabled, healthy", () => {
     expect(await r.redisIncrWithTtl("k", 60)).toBe(4);
     expect(behavior.ctor).toHaveBeenCalledTimes(1);
   });
+
+  it("redisSetNx returns true and issues SET ... EX NX when it takes the key", async () => {
+    behavior.set.mockResolvedValue("OK");
+    const r = await import("@/lib/infra/redis");
+
+    expect(await r.redisSetNx("lock:k", "1", 10)).toBe(true);
+    expect(behavior.set).toHaveBeenCalledWith("lock:k", "1", "EX", 10, "NX");
+  });
+
+  it("redisSetNx returns false when the key is already held", async () => {
+    behavior.set.mockResolvedValue(null);
+    const r = await import("@/lib/infra/redis");
+    expect(await r.redisSetNx("lock:k", "1", 10)).toBe(false);
+  });
 });
 
 describe("lib/redis — enabled, but every call errors (fail-open)", () => {
@@ -130,9 +145,10 @@ describe("lib/redis — enabled, but every call errors (fail-open)", () => {
     await expect(r.redisSet("k", "v", 60)).resolves.toBeUndefined();
     await expect(r.redisDel("k")).resolves.toBeUndefined();
     expect(await r.redisIncrWithTtl("k", 60)).toBeNull();
+    expect(await r.redisSetNx("k", "v", 60)).toBeNull();
     // The Redis path was genuinely entered (then swallowed) — not short-circuited:
     expect(behavior.get).toHaveBeenCalledOnce();
-    expect(behavior.set).toHaveBeenCalledOnce();
+    expect(behavior.set).toHaveBeenCalledTimes(2);
     expect(behavior.del).toHaveBeenCalledOnce();
   });
 

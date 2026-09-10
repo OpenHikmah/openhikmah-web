@@ -89,6 +89,29 @@ export async function redisSet(key: string, value: string, ttlSeconds: number): 
   }
 }
 
+/**
+ * SET `key`=`value` only if it does not already exist (NX), with a TTL in
+ * seconds. Returns `true` when this call took the key, `false` when another
+ * holder already has it, and `null` when Redis is disabled or errored — so a
+ * caller using this as a cross-instance lock can tell "someone else is doing it"
+ * (wait) apart from "no distributed lock available" (fall back to local-only),
+ * the same tri-state convention as {@link redisIncrWithTtl}.
+ */
+export async function redisSetNx(
+  key: string,
+  value: string,
+  ttlSeconds: number
+): Promise<boolean | null> {
+  const r = getRedis();
+  if (!r) return null;
+  try {
+    const res = await r.set(key, value, "EX", ttlSeconds, "NX");
+    return res === "OK";
+  } catch {
+    return null;
+  }
+}
+
 /** DELETE a key; silently no-ops on disable/error. */
 export async function redisDel(key: string): Promise<void> {
   const r = getRedis();

@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { HAS_SESSION_COOKIE_NAME, hasSessionCookieOptions } from "@/lib/auth/session-cookie";
+import { redisDel, redisEnabled, redisGet, redisSet, redisSetNx } from "@/lib/infra/redis";
 
 const COOKIE_NAME = "qf_refresh_token";
 
@@ -31,9 +33,71 @@ type RefreshOutcome =
 // concurrent requests share the in-flight promise, and requests that arrive just
 // afterwards (still holding the old cookie) get the cached result — so Ory only
 // ever sees T used once, and every caller's browser converges onto the new token.
+//
+// The per-process maps below only coalesce within one instance. When Redis is
+// configured this is also backed by a shared result cache + lock keyed on a hash
+// of T, so two instances (or a restart mid-rotation) still present T upstream
+// exactly once. Redis stays optional: with it disabled, or unreachable, this
+// degrades to the per-process behavior.
 const inflight = new Map<string, Promise<RefreshOutcome>>();
 const recent = new Map<string, { outcome: RefreshOutcome; at: number }>();
 const RESULT_TTL_MS = 30_000;
+const RESULT_TTL_SECONDS = RESULT_TTL_MS / 1000;
+// Upper bound on one upstream token call; a crashed leader's lock self-clears
+// after this so the next request can lead.
+const LOCK_TTL_SECONDS = 10;
+// A waiter that can't get the lock polls the shared result cache this long
+// before giving up with a retryable 503 (well under LOCK_TTL_SECONDS).
+const POLL_TIMEOUT_MS = 5_000;
+const POLL_INTERVAL_MS = 250;
+
+// Tokens are secrets — the Redis key is a hash of the token, never the token
+// itself (mirrors lib/auth/social-auth.ts).
+function resultKey(refreshToken: string): string {
+  return `auth:refresh:${createHash("sha256").update(refreshToken).digest("hex")}`;
+}
+function lockKey(refreshToken: string): string {
+  return `${resultKey(refreshToken)}:lock`;
+}
+
+// "ok" and "invalid" are definitive and safe to replay; "transient" must be
+// retried against the live endpoint.
+function isCacheable(outcome: RefreshOutcome): boolean {
+  return outcome.kind === "ok" || outcome.kind === "invalid";
+}
+
+async function readSharedOutcome(refreshToken: string): Promise<RefreshOutcome | null> {
+  const raw = await redisGet(resultKey(refreshToken));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as RefreshOutcome;
+    if (
+      parsed.kind === "ok" &&
+      typeof parsed.accessToken === "string" &&
+      typeof parsed.refreshToken === "string"
+    ) {
+      return parsed;
+    }
+    if (parsed.kind === "invalid") return { kind: "invalid" };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function pollSharedOutcome(refreshToken: string): Promise<RefreshOutcome | null> {
+  const deadline = Date.now() + POLL_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    const shared = await readSharedOutcome(refreshToken);
+    if (shared) return shared;
+  }
+  return null;
+}
+
+function rememberLocally(refreshToken: string, outcome: RefreshOutcome): void {
+  if (isCacheable(outcome)) recent.set(refreshToken, { outcome, at: Date.now() });
+}
 
 async function callTokenEndpoint(refreshToken: string): Promise<RefreshOutcome> {
   const tokenUrl = `${process.env.QF_AUTH_BASE}/oauth2/token`;
@@ -80,19 +144,74 @@ function refresh(refreshToken: string): Promise<RefreshOutcome> {
   const cached = recent.get(refreshToken);
   if (cached) return Promise.resolve(cached.outcome);
 
+  // In-process coalescing (no Redis round-trip for same-instance races). The
+  // get→set must stay synchronous — no await between them.
   const existing = inflight.get(refreshToken);
   if (existing) return existing;
 
-  const pending = callTokenEndpoint(refreshToken)
-    .then((outcome) => {
-      // Cache definitive outcomes; let transient failures be retried immediately.
-      if (outcome.kind !== "transient") recent.set(refreshToken, { outcome, at: Date.now() });
-      return outcome;
-    })
-    .finally(() => inflight.delete(refreshToken));
-
+  const pending = (
+    redisEnabled() ? leadRefreshCoordinated(refreshToken) : leadRefreshLocal(refreshToken)
+  ).finally(() => inflight.delete(refreshToken));
   inflight.set(refreshToken, pending);
   return pending;
+}
+
+/** One upstream call, its definitive outcome remembered per-process. */
+function leadRefreshLocal(refreshToken: string): Promise<RefreshOutcome> {
+  return callTokenEndpoint(refreshToken).then((outcome) => {
+    rememberLocally(refreshToken, outcome);
+    return outcome;
+  });
+}
+
+/**
+ * Perform (or wait out) one refresh for `refreshToken`, coordinating across
+ * instances via Redis:
+ *  - a result another instance already cached is replayed;
+ *  - otherwise take a short Redis lock and call the token endpoint once,
+ *    publishing the definitive outcome for peers;
+ *  - a caller that can't take the lock waits for the winner's result rather than
+ *    presenting the (rotated) token itself, and returns a retryable "transient"
+ *    if none appears in time.
+ * If Redis turns out to be unreachable it falls back to a plain per-process call.
+ */
+async function leadRefreshCoordinated(refreshToken: string): Promise<RefreshOutcome> {
+  const shared = await readSharedOutcome(refreshToken);
+  if (shared) {
+    rememberLocally(refreshToken, shared);
+    return shared;
+  }
+
+  const gotLock = await redisSetNx(lockKey(refreshToken), "1", LOCK_TTL_SECONDS);
+
+  if (gotLock === false) {
+    // A peer instance is refreshing this token. Wait for its result; never call
+    // the endpoint ourselves — that's the double-present that revokes the session.
+    const waited = await pollSharedOutcome(refreshToken);
+    if (waited) {
+      rememberLocally(refreshToken, waited);
+      return waited;
+    }
+    return { kind: "transient" };
+  }
+
+  if (gotLock === true) {
+    try {
+      const outcome = await callTokenEndpoint(refreshToken);
+      if (isCacheable(outcome)) {
+        await redisSet(resultKey(refreshToken), JSON.stringify(outcome), RESULT_TTL_SECONDS);
+        rememberLocally(refreshToken, outcome);
+      }
+      return outcome;
+    } finally {
+      await redisDel(lockKey(refreshToken));
+    }
+  }
+
+  // gotLock === null → Redis went unreachable between redisEnabled() and here.
+  // Behave as a single instance: the per-process inflight/recent maps still
+  // coalesce this instance; a cross-instance race is the pre-existing latent risk.
+  return leadRefreshLocal(refreshToken);
 }
 
 export async function POST(req: NextRequest) {
