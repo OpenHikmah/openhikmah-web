@@ -11,6 +11,7 @@ describe("auth store", () => {
     useAuthStore.setState({
       accessToken: null,
       bookmarks: [],
+      pendingBookmarkAdds: [],
       bookmarksLoadError: false,
       bookmarkBusy: {},
       bookmarkGeneration: 0,
@@ -28,13 +29,14 @@ describe("auth store", () => {
     expect(useAuthStore.getState().accessToken).toBe("access-abc");
   });
 
-  it("clearAuth resets token and bookmarks", () => {
+  it("clearAuth resets token, bookmarks, and the pending-sync set", () => {
     useAuthStore.getState().setTokens("tok");
-    useAuthStore.setState({ bookmarks: ["2:255"] });
+    useAuthStore.setState({ bookmarks: ["2:255"], pendingBookmarkAdds: ["2:255"] });
     useAuthStore.getState().clearAuth();
     const s = useAuthStore.getState();
     expect(s.accessToken).toBeNull();
     expect(s.bookmarks).toEqual([]);
+    expect(s.pendingBookmarkAdds).toEqual([]);
   });
 
   it("isBookmarked returns false when not bookmarked", () => {
@@ -224,6 +226,50 @@ describe("auth store", () => {
     expect(useAuthStore.getState().bookmarks).toEqual(["2:255", "112:1"]);
   });
 
+  it("loadRemoteBookmarks drops a previously-synced ref the server no longer has (issue #554)", async () => {
+    // "2:255" was synced on a prior session (persisted, not pending); it was
+    // deleted on another device, so the server GET no longer returns it.
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ refs: ["1:1"] }) });
+    useAuthStore.setState({
+      accessToken: "tok",
+      bookmarks: ["2:255", "1:1"],
+      pendingBookmarkAdds: [],
+    });
+
+    await useAuthStore.getState().loadRemoteBookmarks();
+
+    expect(useAuthStore.getState().bookmarks).toEqual(["1:1"]);
+    expect(useAuthStore.getState().pendingBookmarkAdds).toEqual([]);
+    // Not re-uploaded.
+    const posts = mockFetch.mock.calls.filter(
+      ([, init]) => (init as RequestInit | undefined)?.method === "POST"
+    );
+    expect(posts).toHaveLength(0);
+  });
+
+  it("a guest add survives login, syncs up, then is not resurrected on a later load", async () => {
+    // Guest bookmarks "7:1" with no token → it's a pending add.
+    useAuthStore.getState().toggleBookmark("7:1");
+    expect(useAuthStore.getState().pendingBookmarkAdds).toEqual(["7:1"]);
+
+    // Log in; server has nothing yet. The pending add is kept and uploaded.
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ refs: [] }) }) // GET
+      .mockResolvedValueOnce({ ok: true }); // sync POST for 7:1
+    useAuthStore.setState({ accessToken: "tok" });
+    await useAuthStore.getState().loadRemoteBookmarks();
+    expect(useAuthStore.getState().bookmarks).toEqual(["7:1"]);
+    await vi.waitFor(() => {
+      expect(useAuthStore.getState().pendingBookmarkAdds).toEqual([]);
+    });
+
+    // A later load where the server still doesn't return it (e.g. deleted
+    // elsewhere) now drops it instead of re-adding.
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ refs: [] }) });
+    await useAuthStore.getState().loadRemoteBookmarks();
+    expect(useAuthStore.getState().bookmarks).toEqual([]);
+  });
+
   it("loadRemoteBookmarks keeps the existing list but sets bookmarksLoadError on a non-OK response", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
@@ -267,7 +313,11 @@ describe("auth store", () => {
         releaseSync = res;
       })
     );
-    useAuthStore.setState({ accessToken: "tok", bookmarks: ["2:255", "1:1"] });
+    useAuthStore.setState({
+      accessToken: "tok",
+      bookmarks: ["2:255", "1:1"],
+      pendingBookmarkAdds: ["1:1"],
+    });
 
     await useAuthStore.getState().loadRemoteBookmarks();
     expect(useAuthStore.getState().bookmarks).toEqual(["2:255", "1:1"]);
@@ -275,16 +325,17 @@ describe("auth store", () => {
     releaseSync({ ok: true }); // avoid an unresolved promise leaking into later tests
   });
 
-  it("loadRemoteBookmarks syncs local-only bookmarks to the server in bounded-size batches", async () => {
+  it("loadRemoteBookmarks syncs still-pending bookmarks to the server in bounded-size batches", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ refs: ["2:255"] }),
     });
-    // 5 local-only refs, plus the initial GET, plus 5 sync POSTs = 6 total calls.
+    // 5 pending refs the server doesn't have, plus the GET, plus 5 sync POSTs.
     for (let i = 0; i < 5; i++) mockFetch.mockResolvedValueOnce({ ok: true });
     useAuthStore.setState({
       accessToken: "tok",
       bookmarks: ["2:255", "1:1", "112:1", "3:18", "5:1", "18:10"],
+      pendingBookmarkAdds: ["2:255", "1:1", "112:1", "3:18", "5:1", "18:10"],
     });
 
     await useAuthStore.getState().loadRemoteBookmarks();
@@ -295,6 +346,11 @@ describe("auth store", () => {
       );
       expect(syncCalls).toHaveLength(5);
     });
+    // "2:255" was on the server → dropped from pending immediately; the other
+    // five clear as their POSTs succeed.
+    await vi.waitFor(() => {
+      expect(useAuthStore.getState().pendingBookmarkAdds).toEqual([]);
+    });
   });
 
   it("loadRemoteBookmarks logs a count of failed syncs without throwing", async () => {
@@ -303,7 +359,11 @@ describe("auth store", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => ({ refs: [] }) })
       .mockResolvedValueOnce({ ok: false, status: 500 })
       .mockResolvedValueOnce({ ok: true });
-    useAuthStore.setState({ accessToken: "tok", bookmarks: ["3:18", "5:1"] });
+    useAuthStore.setState({
+      accessToken: "tok",
+      bookmarks: ["3:18", "5:1"],
+      pendingBookmarkAdds: ["3:18", "5:1"],
+    });
 
     await expect(useAuthStore.getState().loadRemoteBookmarks()).resolves.toBeUndefined();
 
@@ -311,5 +371,16 @@ describe("auth store", () => {
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("failed to sync 1/2"));
     });
     errorSpy.mockRestore();
+  });
+
+  it("persist migrate seeds pendingBookmarkAdds from a pre-v1 persisted bookmark list", async () => {
+    localStorage.setItem(
+      "open-hikmah-auth",
+      JSON.stringify({ state: { bookmarks: ["2:255", "18:10"] }, version: 0 })
+    );
+    await useAuthStore.persist.rehydrate();
+    const s = useAuthStore.getState();
+    expect(s.bookmarks).toEqual(["2:255", "18:10"]);
+    expect(s.pendingBookmarkAdds).toEqual(["2:255", "18:10"]);
   });
 });
