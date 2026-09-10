@@ -197,16 +197,23 @@ export const useAuthStore = create<AuthStore>()(
       loadRemoteBookmarks: async () => {
         const { accessToken, bookmarkGeneration: generation } = get();
         if (!accessToken) return;
+        // The fetch below is async, so clearAuth (which bumps bookmarkGeneration)
+        // can run — and a new session start — before it resolves. Every state
+        // write here is gated on the generation still matching so a pre-logout
+        // response can't stomp the next session's bookmarks or error flag.
+        const isStale = () => get().bookmarkGeneration !== generation;
         try {
           const res = await fetch("/api/bookmarks", {
             headers: { Authorization: `Bearer ${accessToken}` },
           });
+          if (isStale()) return;
           if (!res.ok) {
             console.error(`loadRemoteBookmarks: /api/bookmarks returned ${res.status}`);
             set({ bookmarksLoadError: true });
             return;
           }
           const { refs } = (await res.json()) as { refs: string[] };
+          if (isStale()) return;
           // The server list is authoritative. A local ref the server doesn't
           // return is kept (and re-uploaded) ONLY if it's still in
           // pendingBookmarkAdds — an add we haven't confirmed. A ref that was
@@ -227,6 +234,7 @@ export const useAuthStore = create<AuthStore>()(
             );
           }
         } catch (err) {
+          if (isStale()) return;
           console.error("loadRemoteBookmarks: failed to load bookmarks", err);
           set({ bookmarksLoadError: true });
         }

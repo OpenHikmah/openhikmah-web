@@ -270,6 +270,53 @@ describe("auth store", () => {
     expect(useAuthStore.getState().bookmarks).toEqual([]);
   });
 
+  it("a pre-logout load resolving after a new session starts does not stomp the new session", async () => {
+    let resolveGet: (v: unknown) => void = () => {};
+    const pending = new Promise((r) => {
+      resolveGet = r;
+    });
+    mockFetch.mockReturnValueOnce(pending);
+
+    // Session A kicks off a load, then logs out and session B signs in before
+    // the GET resolves.
+    useAuthStore.setState({ accessToken: "tok-A", bookmarks: ["9:1"] });
+    const inFlight = useAuthStore.getState().loadRemoteBookmarks();
+    useAuthStore.getState().clearAuth();
+    useAuthStore.setState({
+      accessToken: "tok-B",
+      bookmarks: ["1:1"],
+      pendingBookmarkAdds: [],
+      bookmarksLoadError: false,
+    });
+
+    resolveGet({ ok: true, json: async () => ({ refs: ["2:255", "112:1"] }) });
+    await inFlight;
+
+    expect(useAuthStore.getState().bookmarks).toEqual(["1:1"]);
+    expect(useAuthStore.getState().pendingBookmarkAdds).toEqual([]);
+    expect(useAuthStore.getState().bookmarksLoadError).toBe(false);
+  });
+
+  it("a pre-logout load failing after a new session starts does not stomp the new session's error flag", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    let rejectGet: (e: unknown) => void = () => {};
+    const pending = new Promise((_, rej) => {
+      rejectGet = rej;
+    });
+    mockFetch.mockReturnValueOnce(pending);
+
+    useAuthStore.setState({ accessToken: "tok-A" });
+    const inFlight = useAuthStore.getState().loadRemoteBookmarks();
+    useAuthStore.getState().clearAuth();
+    useAuthStore.setState({ accessToken: "tok-B", bookmarksLoadError: false });
+
+    rejectGet(new Error("network down"));
+    await inFlight;
+
+    expect(useAuthStore.getState().bookmarksLoadError).toBe(false);
+    errorSpy.mockRestore();
+  });
+
   it("loadRemoteBookmarks keeps the existing list but sets bookmarksLoadError on a non-OK response", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
