@@ -131,6 +131,52 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     expect(rerun.generated).toBe(0);
   });
 
+  it("a junk translation (model refusal) is not persisted and the gap is retried on the next pass", async () => {
+    await seed("1:1");
+    await seed("2:255");
+    await seed("3:18");
+
+    // Pass 1: English generates fine, but every translation call refuses.
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.startsWith("Translate the following sentence"))
+        return "I'm sorry, but I can't help with that.";
+      return JSON.stringify([
+        { ref: "2:255", reason: "throne verse" },
+        { ref: "3:18", reason: "witness of oneness" },
+      ]);
+    });
+
+    const pass1 = await runConnectionBatch(
+      { mode: "baseline", provider: "claude", locales: ["tr"], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+    expect(pass1.stoppedReason).toBe("completed");
+    const trAfterPass1 = await db
+      .select()
+      .from(connections)
+      .where(sql`${connections.locale} = 'tr'`);
+    expect(trAfterPass1).toHaveLength(0);
+
+    // Pass 2: translation now succeeds — the still-open gap is picked up, no
+    // regeneration of the English rows.
+    mockCallAI.mockReset();
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.startsWith("Translate the following sentence")) return "localized reason";
+      throw new Error("unexpected generation call — English rows already exist");
+    });
+    const pass2 = await runConnectionBatch(
+      { mode: "baseline", provider: "claude", locales: ["tr"], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+    expect(pass2.generated).toBe(0);
+    const trAfterPass2 = await db
+      .select()
+      .from(connections)
+      .where(sql`${connections.locale} = 'tr'`);
+    expect(trAfterPass2.length).toBeGreaterThan(0);
+    expect(trAfterPass2.every((r) => r.reason === "localized reason")).toBe(true);
+  });
+
   it("stops immediately with reason 'cancelled' when the signal is already aborted", async () => {
     await seed("1:1");
     await seed("2:255");
