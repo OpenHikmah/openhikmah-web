@@ -7,6 +7,7 @@ const behavior = vi.hoisted(() => ({
   get: vi.fn(),
   set: vi.fn(),
   del: vi.fn(),
+  eval: vi.fn(),
   ping: vi.fn(),
   multiExec: vi.fn(),
   subscribe: vi.fn((..._args: unknown[]) => Promise.resolve()),
@@ -44,6 +45,9 @@ vi.mock("ioredis", () => {
     del(...a: unknown[]) {
       return behavior.del(...a);
     }
+    eval(...a: unknown[]) {
+      return behavior.eval(...a);
+    }
     ping(...a: unknown[]) {
       return behavior.ping(...a);
     }
@@ -77,6 +81,7 @@ beforeEach(() => {
   behavior.get.mockReset();
   behavior.set.mockReset();
   behavior.del.mockReset();
+  behavior.eval.mockReset();
   behavior.ping.mockReset();
   behavior.multiExec.mockReset();
   behavior.subscribe.mockReset().mockReturnValue(Promise.resolve());
@@ -87,9 +92,11 @@ describe("lib/redis — disabled (no REDIS_URL)", () => {
     const r = await import("@/lib/infra/redis");
     expect(r.redisEnabled()).toBe(false);
     expect(await r.redisGet("k")).toBeNull();
-    await expect(r.redisSet("k", "v", 60)).resolves.toBeUndefined();
+    expect(await r.redisSet("k", "v", 60)).toBe(false);
     await expect(r.redisDel("k")).resolves.toBeUndefined();
     expect(await r.redisIncrWithTtl("k", 60)).toBeNull();
+    expect(await r.redisSetNx("k", "v", 60)).toBeNull();
+    await expect(r.redisDelIfEqual("k", "v")).resolves.toBeUndefined();
     expect(behavior.ctor).not.toHaveBeenCalled();
   });
 });
@@ -111,6 +118,61 @@ describe("lib/redis — enabled, healthy", () => {
     expect(await r.redisGet("k")).toBe("hello");
     expect(await r.redisIncrWithTtl("k", 60)).toBe(4);
     expect(behavior.ctor).toHaveBeenCalledTimes(1);
+    // A strict per-command deadline so no operation stays pending indefinitely.
+    expect(behavior.ctor).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ commandTimeout: 5000 })
+    );
+  });
+
+  it("redisSetNx returns true and issues SET ... EX NX when it takes the key", async () => {
+    behavior.set.mockResolvedValue("OK");
+    const r = await import("@/lib/infra/redis");
+
+    expect(await r.redisSetNx("lock:k", "1", 10)).toBe(true);
+    expect(behavior.set).toHaveBeenCalledWith("lock:k", "1", "EX", 10, "NX");
+  });
+
+  it("redisSetNx returns false when the key is already held", async () => {
+    behavior.set.mockResolvedValue(null);
+    const r = await import("@/lib/infra/redis");
+    expect(await r.redisSetNx("lock:k", "1", 10)).toBe(false);
+  });
+
+  it("redisDelIfEqual runs an atomic compare-and-delete Lua script", async () => {
+    behavior.eval.mockResolvedValue(1);
+    const r = await import("@/lib/infra/redis");
+
+    await r.redisDelIfEqual("lock:k", "nonce-1");
+    expect(behavior.eval).toHaveBeenCalledWith(
+      expect.stringContaining("redis.call('del', KEYS[1])"),
+      1,
+      "lock:k",
+      "nonce-1"
+    );
+  });
+
+  it("redisSetGuarded writes and returns true when the guard key matches", async () => {
+    behavior.eval.mockResolvedValue(1);
+    const r = await import("@/lib/infra/redis");
+
+    expect(await r.redisSetGuarded("result:k", "payload", 30, "lock:k", "nonce-1")).toBe(true);
+    expect(behavior.eval).toHaveBeenCalledWith(
+      expect.stringContaining("redis.call('set', KEYS[1]"),
+      2,
+      "result:k",
+      "lock:k",
+      "nonce-1",
+      "payload",
+      30
+    );
+  });
+
+  it("redisSetGuarded does not write and returns false when the guard key no longer matches", async () => {
+    behavior.eval.mockResolvedValue(0);
+    const r = await import("@/lib/infra/redis");
+
+    expect(await r.redisSetGuarded("result:k", "payload", 30, "lock:k", "stale-nonce")).toBe(false);
   });
 });
 
@@ -123,17 +185,51 @@ describe("lib/redis — enabled, but every call errors (fail-open)", () => {
     behavior.get.mockRejectedValue(new Error("down"));
     behavior.set.mockRejectedValue(new Error("down"));
     behavior.del.mockRejectedValue(new Error("down"));
+    behavior.eval.mockRejectedValue(new Error("down"));
     behavior.multiExec.mockRejectedValue(new Error("down"));
     const r = await import("@/lib/infra/redis");
 
     expect(await r.redisGet("k")).toBeNull();
-    await expect(r.redisSet("k", "v", 60)).resolves.toBeUndefined();
+    expect(await r.redisSet("k", "v", 60)).toBe(false);
     await expect(r.redisDel("k")).resolves.toBeUndefined();
+    await expect(r.redisDelIfEqual("k", "v")).resolves.toBeUndefined();
     expect(await r.redisIncrWithTtl("k", 60)).toBeNull();
+    expect(await r.redisSetNx("k", "v", 60)).toBeNull();
     // The Redis path was genuinely entered (then swallowed) — not short-circuited:
     expect(behavior.get).toHaveBeenCalledOnce();
-    expect(behavior.set).toHaveBeenCalledOnce();
+    expect(behavior.set).toHaveBeenCalledTimes(2);
     expect(behavior.del).toHaveBeenCalledOnce();
+  });
+
+  it("the lock helpers surface a failure (once) instead of swallowing it silently", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    behavior.set.mockRejectedValue(new Error("down"));
+    behavior.eval.mockRejectedValue(new Error("down"));
+    const r = await import("@/lib/infra/redis");
+
+    expect(await r.redisSetNx("lock:k", "n", 10)).toBeNull();
+    await r.redisDelIfEqual("lock:k", "n");
+    await r.redisSetNx("lock:k", "n", 10); // rate-limited: still only one line
+
+    expect(errSpy).toHaveBeenCalledTimes(1);
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Redis redisSetNx failed"),
+      expect.any(Error)
+    );
+    errSpy.mockRestore();
+  });
+
+  it("redisSetGuarded returns false (not a throw) when the guarded eval errors", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    behavior.eval.mockRejectedValue(new Error("down"));
+    const r = await import("@/lib/infra/redis");
+
+    expect(await r.redisSetGuarded("result:k", "v", 30, "lock:k", "n")).toBe(false);
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Redis redisSetGuarded failed"),
+      expect.any(Error)
+    );
+    errSpy.mockRestore();
   });
 
   it("redisIncrWithTtl returns null when exec() reports an INCR error", async () => {

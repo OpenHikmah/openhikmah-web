@@ -1,9 +1,51 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { createHash } from "node:crypto";
 import { NextRequest } from "next/server";
+
+// A shared in-memory stand-in for the Redis helpers, so two logical "instances"
+// (both driving the one POST handler) see the same result cache + lock. Default
+// redisEnabled() is false — every test above runs the unchanged per-process path.
+const { redisStore, mockRedis } = vi.hoisted(() => {
+  const redisStore = new Map<string, string>();
+  return {
+    redisStore,
+    mockRedis: {
+      redisEnabled: vi.fn(() => false),
+      redisGet: vi.fn(async (k: string) => redisStore.get(k) ?? null),
+      redisSetGuarded: vi.fn(
+        async (
+          k: string,
+          v: string,
+          _ttl: number,
+          guardKey: string,
+          expectedGuardValue: string
+        ): Promise<boolean> => {
+          if (redisStore.get(guardKey) !== expectedGuardValue) return false;
+          redisStore.set(k, v);
+          return true;
+        }
+      ),
+      redisDelIfEqual: vi.fn(async (k: string, expected: string) => {
+        if (redisStore.get(k) === expected) redisStore.delete(k);
+      }),
+      redisSetNx: vi.fn(async (k: string, v: string): Promise<boolean | null> => {
+        if (redisStore.has(k)) return false;
+        redisStore.set(k, v);
+        return true;
+      }),
+    },
+  };
+});
+vi.mock("@/lib/infra/redis", () => mockRedis);
+
 import { POST } from "@/app/api/auth/refresh/route";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
+
+const sha = (s: string) => createHash("sha256").update(s).digest("hex");
+const resultKey = (token: string) => `auth:refresh:${sha(token)}`;
+const lockKey = (token: string) => `${resultKey(token)}:lock`;
 
 function makeReq(refreshToken?: string) {
   return new NextRequest("http://localhost/api/auth/refresh", {
@@ -61,6 +103,22 @@ describe("POST /api/auth/refresh", () => {
     const res = await POST(makeReq("refresh-same-2"));
     const setCookie = res.headers.get("set-cookie") ?? "";
     expect(setCookie).toContain("qf_refresh_token=refresh-same-2");
+  });
+
+  it("treats a 2xx response with no access_token as transient (503, cookie kept, not cached)", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ refresh_token: "r-only" }) });
+
+    const first = await POST(makeReq("refresh-noaccess"));
+    expect(first.status).toBe(503);
+    expect(first.headers.get("set-cookie")).toBeNull();
+
+    // Not cached — a retry hits the endpoint again.
+    const second = await POST(makeReq("refresh-noaccess"));
+    expect(second.status).toBe(503);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("no access_token"));
+    errSpy.mockRestore();
   });
 
   it("returns 401 and clears the cookie on invalid_grant", async () => {
@@ -179,5 +237,300 @@ describe("POST /api/auth/refresh", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    redisStore.clear();
+    mockRedis.redisEnabled.mockReturnValue(true);
+    mockRedis.redisGet.mockClear();
+    mockRedis.redisSetGuarded.mockClear();
+    mockRedis.redisDelIfEqual.mockClear();
+    mockRedis.redisSetNx.mockClear();
+    mockRedis.redisSetNx.mockImplementation(async (k: string, v: string) => {
+      if (redisStore.has(k)) return false;
+      redisStore.set(k, v);
+      return true;
+    });
+    mockRedis.redisGet.mockImplementation(async (k: string) => redisStore.get(k) ?? null);
+    mockRedis.redisSetGuarded.mockImplementation(
+      async (k: string, v: string, _ttl: number, guardKey: string, expectedGuardValue: string) => {
+        if (redisStore.get(guardKey) !== expectedGuardValue) return false;
+        redisStore.set(k, v);
+        return true;
+      }
+    );
+    mockRedis.redisDelIfEqual.mockImplementation(async (k: string, expected: string) => {
+      if (redisStore.get(k) === expected) redisStore.delete(k);
+    });
+  });
+  afterAll(() => mockRedis.redisEnabled.mockReturnValue(false));
+
+  it("replays a result a peer instance already cached, with no upstream call", async () => {
+    redisStore.set(
+      resultKey("tok-peer-cached"),
+      JSON.stringify({ kind: "ok", accessToken: "acc-peer", refreshToken: "ref-peer" })
+    );
+
+    const res = await POST(makeReq("tok-peer-cached"));
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).accessToken).toBe("acc-peer");
+    expect(res.headers.get("set-cookie")).toContain("qf_refresh_token=ref-peer");
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("leads the refresh, publishes the outcome for peers, and releases the lock", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: "acc-lead", refresh_token: "ref-lead" }),
+    });
+
+    const res = await POST(makeReq("tok-lead"));
+
+    expect(res.status).toBe(200);
+    expect(mockRedis.redisSetNx).toHaveBeenCalledWith(lockKey("tok-lead"), expect.any(String), 20);
+    expect(JSON.parse(redisStore.get(resultKey("tok-lead"))!)).toMatchObject({
+      kind: "ok",
+      accessToken: "acc-lead",
+      refreshToken: "ref-lead",
+    });
+    expect(redisStore.has(lockKey("tok-lead"))).toBe(false); // lock released
+  });
+
+  it("waits for the peer's result instead of presenting the token when the lock is held", async () => {
+    vi.useFakeTimers();
+    try {
+      redisStore.set(lockKey("tok-wait"), "peer-nonce"); // a peer holds the lock
+
+      const pending = POST(makeReq("tok-wait"));
+      await vi.advanceTimersByTimeAsync(1); // caller takes the failed lock, enters the poll
+      // The winner publishes its result while we're polling.
+      redisStore.set(
+        resultKey("tok-wait"),
+        JSON.stringify({ kind: "ok", accessToken: "acc-win", refreshToken: "ref-win" })
+      );
+      await vi.advanceTimersByTimeAsync(300);
+      const res = await pending;
+
+      expect(res.status).toBe(200);
+      expect((await res.json()).accessToken).toBe("acc-win");
+      expect(mockFetch).not.toHaveBeenCalled(); // never presented the token ourselves
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("returns a retryable 503 (cookie kept) when the lock is held and no result appears", async () => {
+    vi.useFakeTimers();
+    try {
+      redisStore.set(lockKey("tok-timeout"), "peer-nonce");
+
+      const pending = POST(makeReq("tok-timeout"));
+      await vi.advanceTimersByTimeAsync(6_000); // past POLL_TIMEOUT_MS, lock never clears
+      const res = await pending;
+
+      expect(res.status).toBe(503);
+      expect(res.headers.get("set-cookie")).toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("falls back to a direct upstream call when the distributed lock is unavailable", async () => {
+    mockRedis.redisSetNx.mockResolvedValue(null); // Redis unreachable for the lock
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: "acc-fb", refresh_token: "ref-fb" }),
+    });
+
+    const res = await POST(makeReq("tok-fallback"));
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).accessToken).toBe("acc-fb");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("replays a peer's cached invalid_grant across instances — 401, both cookies cleared, no upstream call", async () => {
+    redisStore.set(resultKey("tok-peer-invalid"), JSON.stringify({ kind: "invalid" }));
+
+    const res = await POST(makeReq("tok-peer-invalid"));
+
+    expect(res.status).toBe(401);
+    const setCookies = res.headers.getSetCookie();
+    expect(setCookies.some((c) => c.startsWith("qf_refresh_token=;"))).toBe(true);
+    expect(setCookies.some((c) => c.startsWith("qf_has_session=;"))).toBe(true);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("ignores a malformed shared entry and leads a fresh refresh", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    redisStore.set(
+      resultKey("tok-malformed"),
+      JSON.stringify({ kind: "ok", accessToken: "x" }) // missing refreshToken
+    );
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: "acc-fresh", refresh_token: "ref-fresh" }),
+    });
+
+    const res = await POST(makeReq("tok-malformed"));
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).accessToken).toBe("acc-fresh");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("unrecognized shared outcome"));
+    errSpy.mockRestore();
+  });
+
+  it("coalesces two concurrent same-token requests into one lock + one upstream call", async () => {
+    let resolveFetch!: (value: unknown) => void;
+    mockFetch.mockImplementationOnce(() => new Promise((resolve) => (resolveFetch = resolve)));
+
+    const p1 = POST(makeReq("tok-coalesce"));
+    const p2 = POST(makeReq("tok-coalesce"));
+    await new Promise((r) => setTimeout(r, 0)); // let the leader reach the upstream call
+    resolveFetch({
+      ok: true,
+      json: async () => ({ access_token: "acc-co", refresh_token: "ref-co" }),
+    });
+    const [r1, r2] = await Promise.all([p1, p2]);
+
+    expect(r1.status).toBe(200);
+    expect(r2.status).toBe(200);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockRedis.redisSetNx).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the lock (does not release) when publishing the result fails", async () => {
+    mockRedis.redisSetGuarded.mockResolvedValue(false); // publish dropped
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: "acc-np", refresh_token: "ref-np" }),
+    });
+
+    const res = await POST(makeReq("tok-nopublish"));
+
+    expect(res.status).toBe(200); // the leader still returns its own outcome
+    expect(mockRedis.redisDelIfEqual).not.toHaveBeenCalledWith(
+      lockKey("tok-nopublish"),
+      expect.anything()
+    );
+    expect(redisStore.has(lockKey("tok-nopublish"))).toBe(true); // lock held to TTL
+  });
+
+  it("does not delete a lock a successor took while it was publishing (compare-and-delete)", async () => {
+    mockRedis.redisSetGuarded.mockImplementation(
+      async (k: string, v: string, _ttl: number, guardKey: string, expectedGuardValue: string) => {
+        redisStore.set(k, v);
+        // Our lease expired mid-publish and a peer grabbed a fresh lock — this
+        // fires AFTER our guard check passed, so the write above still landed;
+        // the point of this test is the release, not the publish (see the
+        // "does not publish over a successor's lock" test for the write itself).
+        if (redisStore.get(guardKey) !== expectedGuardValue) return false;
+        redisStore.set(lockKey("tok-cad"), "successor-nonce");
+        return true;
+      }
+    );
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: "a", refresh_token: "r" }),
+    });
+
+    await POST(makeReq("tok-cad"));
+
+    expect(redisStore.get(lockKey("tok-cad"))).toBe("successor-nonce"); // ours, not deleted
+  });
+
+  it("does not publish over a successor's lock — a late publish after the lease moved on is a no-op", async () => {
+    mockRedis.redisSetGuarded.mockImplementation(
+      async (k: string, v: string, _ttl: number, guardKey: string, expectedGuardValue: string) => {
+        // Simulate the lease expiring and a peer taking a fresh lock right
+        // before our (delayed) publish actually reaches the guard check.
+        redisStore.set(lockKey("tok-late-publish"), "successor-nonce");
+        if (redisStore.get(guardKey) !== expectedGuardValue) return false;
+        redisStore.set(k, v);
+        return true;
+      }
+    );
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: "acc-stale", refresh_token: "ref-stale" }),
+    });
+
+    const res = await POST(makeReq("tok-late-publish"));
+
+    expect(res.status).toBe(200); // the leader still returns its own outcome locally
+    expect(redisStore.get(lockKey("tok-late-publish"))).toBe("successor-nonce"); // untouched
+    expect(redisStore.has(resultKey("tok-late-publish"))).toBe(false); // stale result never published
+  });
+
+  it("a waiter stops early (retryable 503) once the leader releases the lock with no result", async () => {
+    vi.useFakeTimers();
+    try {
+      redisStore.set(lockKey("tok-early"), "peer-nonce");
+      const pending = POST(makeReq("tok-early"));
+      await vi.advanceTimersByTimeAsync(1); // caller takes the failed lock, enters the poll
+      // Peer finished with a transient outcome: lock gone, no result published.
+      redisStore.delete(lockKey("tok-early"));
+      await vi.advanceTimersByTimeAsync(300); // one poll interval, not the full 5s
+      const res = await pending;
+
+      expect(res.status).toBe(503);
+      expect(res.headers.get("set-cookie")).toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("treats a publish that stalls past the publish timeout as unpublished and keeps the lock", async () => {
+    vi.useFakeTimers();
+    try {
+      // The publish never settles — withTimeout() must resolve it to `false`
+      // rather than let the leader's critical section run past its lease.
+      mockRedis.redisSetGuarded.mockImplementation(() => new Promise<boolean>(() => {}));
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "acc-slow", refresh_token: "ref-slow" }),
+      });
+
+      const pending = POST(makeReq("tok-slowpub"));
+      await vi.advanceTimersByTimeAsync(2_500); // past PUBLISH_TIMEOUT_MS (2s)
+      const res = await pending;
+
+      expect(res.status).toBe(200); // leader still returns its own outcome
+      expect((await res.json()).accessToken).toBe("acc-slow");
+      expect(mockRedis.redisDelIfEqual).not.toHaveBeenCalledWith(
+        lockKey("tok-slowpub"),
+        expect.anything()
+      );
+      expect(redisStore.has(lockKey("tok-slowpub"))).toBe(true); // held to TTL
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("logs once and coordinates per-process when redisEnabled() throws (malformed REDIS_URL)", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockRedis.redisEnabled.mockImplementationOnce(() => {
+      throw new Error("bad url");
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: "acc-badurl", refresh_token: "ref-badurl" }),
+    });
+
+    const res = await POST(makeReq("tok-badurl"));
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).accessToken).toBe("acc-badurl");
+    expect(mockFetch).toHaveBeenCalledTimes(1); // direct upstream, no Redis coordination
+    expect(mockRedis.redisSetNx).not.toHaveBeenCalled();
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("REDIS_URL is invalid"));
+    errSpy.mockRestore();
   });
 });

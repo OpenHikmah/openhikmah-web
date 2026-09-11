@@ -1,5 +1,13 @@
+import { createHash, randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { HAS_SESSION_COOKIE_NAME, hasSessionCookieOptions } from "@/lib/auth/session-cookie";
+import {
+  redisDelIfEqual,
+  redisEnabled,
+  redisGet,
+  redisSetGuarded,
+  redisSetNx,
+} from "@/lib/infra/redis";
 
 const COOKIE_NAME = "qf_refresh_token";
 
@@ -31,9 +39,112 @@ type RefreshOutcome =
 // concurrent requests share the in-flight promise, and requests that arrive just
 // afterwards (still holding the old cookie) get the cached result — so Ory only
 // ever sees T used once, and every caller's browser converges onto the new token.
+//
+// The per-process maps below only coalesce within one instance. When Redis is
+// configured this is also backed by a shared result cache + lock keyed on a hash
+// of T, so two instances (or a restart mid-rotation) still present T upstream
+// exactly once. Redis stays optional: with it disabled, or unreachable, this
+// degrades to the per-process behavior.
 const inflight = new Map<string, Promise<RefreshOutcome>>();
 const recent = new Map<string, { outcome: RefreshOutcome; at: number }>();
 const RESULT_TTL_MS = 30_000;
+const RESULT_TTL_SECONDS = RESULT_TTL_MS / 1000;
+// Hard timeout on the upstream token call.
+const UPSTREAM_TIMEOUT_MS = 8_000;
+// Wrapper-level bound so the route can proceed promptly if the Redis publish is
+// slow — NOT what makes a delayed publish safe. A client-side timeout (this one
+// or the Redis client's `commandTimeout`) only rejects the local promise;
+// ioredis cannot cancel a command already sent to the server, so a "timed out"
+// SET can still land afterwards. Correctness comes from `redisSetGuarded`
+// itself: the write is conditioned on the lock still holding this leader's
+// nonce, so a late arrival from an expired lease is a no-op once a successor
+// has taken the lock, not an overwrite of whatever the successor published.
+const PUBLISH_TIMEOUT_MS = 2_000;
+// A crashed leader's lock self-clears after this so the next request can lead.
+// Kept comfortably above the upstream call plus a slow publish/release so a
+// live leader normally finishes inside its own lease — but this is a
+// liveness/latency knob, not a correctness one; see `redisSetGuarded` above.
+const LOCK_TTL_SECONDS = 20;
+// A waiter that can't get the lock polls the shared result cache this long
+// before giving up with a retryable 503 (well under LOCK_TTL_SECONDS).
+const POLL_TIMEOUT_MS = 5_000;
+const POLL_INTERVAL_MS = 250;
+
+// Tokens are secrets — the Redis key is a hash of the token, never the token
+// itself (mirrors lib/auth/social-auth.ts).
+function resultKey(refreshToken: string): string {
+  return `auth:refresh:${createHash("sha256").update(refreshToken).digest("hex")}`;
+}
+function lockKey(refreshToken: string): string {
+  return `${resultKey(refreshToken)}:lock`;
+}
+
+// "ok" and "invalid" are definitive and safe to replay; "transient" must be
+// retried against the live endpoint.
+function isCacheable(outcome: RefreshOutcome): boolean {
+  return outcome.kind === "ok" || outcome.kind === "invalid";
+}
+
+async function readSharedOutcome(refreshToken: string): Promise<RefreshOutcome | null> {
+  const raw = await redisGet(resultKey(refreshToken));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<RefreshOutcome>;
+    if (
+      parsed.kind === "ok" &&
+      typeof parsed.accessToken === "string" &&
+      typeof parsed.refreshToken === "string"
+    ) {
+      return { kind: "ok", accessToken: parsed.accessToken, refreshToken: parsed.refreshToken };
+    }
+    if (parsed.kind === "invalid") return { kind: "invalid" };
+    console.error(
+      "auth/refresh: unrecognized shared outcome shape in Redis — leading a fresh refresh"
+    );
+    return null;
+  } catch {
+    console.error(
+      "auth/refresh: could not parse shared outcome from Redis — leading a fresh refresh"
+    );
+    return null;
+  }
+}
+
+async function pollSharedOutcome(refreshToken: string): Promise<RefreshOutcome | null> {
+  const deadline = Date.now() + POLL_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    const shared = await readSharedOutcome(refreshToken);
+    if (shared) return shared;
+    // The leader released its lock without publishing a result → its outcome was
+    // transient. Stop now and let the caller return a retryable 503 rather than
+    // stalling for the full timeout on a failure everyone will just retry.
+    if ((await redisGet(lockKey(refreshToken))) === null) return null;
+  }
+  return null;
+}
+
+/** Release the lock only if it is still the exact one we took (atomic
+ *  compare-and-delete) — so a leader that overran its TTL can't delete a
+ *  successor's lock. */
+function releaseLock(refreshToken: string, nonce: string): Promise<void> {
+  return redisDelIfEqual(lockKey(refreshToken), nonce);
+}
+
+function rememberLocally(refreshToken: string, outcome: RefreshOutcome): void {
+  if (isCacheable(outcome)) recent.set(refreshToken, { outcome, at: Date.now() });
+}
+
+/** Resolve to `p`'s value, or to `onTimeout` if it hasn't settled in `ms`, so a
+ *  slow Redis publish doesn't hold up the response. The command itself is still
+ *  bounded by the client `commandTimeout`; this is only the wrapper. */
+function withTimeout<T>(p: Promise<T>, ms: number, onTimeout: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(onTimeout), ms);
+  });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
+}
 
 async function callTokenEndpoint(refreshToken: string): Promise<RefreshOutcome> {
   const tokenUrl = `${process.env.QF_AUTH_BASE}/oauth2/token`;
@@ -52,6 +163,7 @@ async function callTokenEndpoint(refreshToken: string): Promise<RefreshOutcome> 
         grant_type: "refresh_token",
         refresh_token: refreshToken,
       }).toString(),
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
 
     if (!res.ok) {
@@ -59,13 +171,25 @@ async function callTokenEndpoint(refreshToken: string): Promise<RefreshOutcome> 
       return body?.error === "invalid_grant" ? { kind: "invalid" } : { kind: "transient" };
     }
 
-    const data = (await res.json()) as { access_token: string; refresh_token?: string };
+    const data = (await res.json().catch(() => null)) as {
+      access_token?: unknown;
+      refresh_token?: unknown;
+    } | null;
+    // Validate the token payload at this system boundary: a 2xx with no usable
+    // access_token must not be cached as an `ok` outcome (a peer would reject
+    // the malformed record and could re-present the token). Treat it as a
+    // transient upstream fault — the lease is freed so a retry can lead, and if
+    // the grant really was consumed the retry surfaces invalid_grant → re-login.
+    if (typeof data?.access_token !== "string" || data.access_token === "") {
+      console.error("auth/refresh: token endpoint returned a 2xx response with no access_token");
+      return { kind: "transient" };
+    }
+    const refreshTokenOut =
+      typeof data.refresh_token === "string" && data.refresh_token !== ""
+        ? data.refresh_token
+        : refreshToken;
     // Re-stamp the existing token if the provider didn't rotate.
-    return {
-      kind: "ok",
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token ?? refreshToken,
-    };
+    return { kind: "ok", accessToken: data.access_token, refreshToken: refreshTokenOut };
   } catch {
     return { kind: "transient" };
   }
@@ -80,19 +204,119 @@ function refresh(refreshToken: string): Promise<RefreshOutcome> {
   const cached = recent.get(refreshToken);
   if (cached) return Promise.resolve(cached.outcome);
 
+  // In-process coalescing (no Redis round-trip for same-instance races). The
+  // get→set must stay synchronous — no await between them.
   const existing = inflight.get(refreshToken);
   if (existing) return existing;
 
-  const pending = callTokenEndpoint(refreshToken)
-    .then((outcome) => {
-      // Cache definitive outcomes; let transient failures be retried immediately.
-      if (outcome.kind !== "transient") recent.set(refreshToken, { outcome, at: Date.now() });
-      return outcome;
-    })
-    .finally(() => inflight.delete(refreshToken));
-
+  const pending = (
+    redisAvailable() ? leadRefreshCoordinated(refreshToken) : leadRefreshLocal(refreshToken)
+  ).finally(() => inflight.delete(refreshToken));
   inflight.set(refreshToken, pending);
   return pending;
+}
+
+let loggedRedisConfigError = false;
+
+/** `redisEnabled()` constructs the client on first call and can throw
+ *  synchronously on a malformed REDIS_URL — never let that 500 the refresh
+ *  endpoint; fall back to the per-process path. Surface it once (per the repo's
+ *  "no silent catch" rule) without logging the URL: a bad REDIS_URL silently
+ *  disabling cross-instance coordination is exactly the kind of failure an
+ *  operator needs to see. */
+function redisAvailable(): boolean {
+  try {
+    return redisEnabled();
+  } catch {
+    if (!loggedRedisConfigError) {
+      loggedRedisConfigError = true;
+      console.error("auth/refresh: REDIS_URL is invalid; coordinating per-process only");
+    }
+    return false;
+  }
+}
+
+/** One upstream call, its definitive outcome remembered per-process. */
+function leadRefreshLocal(refreshToken: string): Promise<RefreshOutcome> {
+  return callTokenEndpoint(refreshToken).then((outcome) => {
+    rememberLocally(refreshToken, outcome);
+    return outcome;
+  });
+}
+
+/**
+ * Perform (or wait out) one refresh for `refreshToken`, coordinating across
+ * instances via Redis:
+ *  - a result another instance already cached is replayed;
+ *  - otherwise take a short Redis lock and call the token endpoint once,
+ *    publishing the definitive outcome for peers;
+ *  - a caller that can't take the lock waits for the winner's result rather than
+ *    presenting the (rotated) token itself, and returns a retryable "transient"
+ *    if none appears in time.
+ * If Redis turns out to be unreachable it falls back to a plain per-process call.
+ */
+async function leadRefreshCoordinated(refreshToken: string): Promise<RefreshOutcome> {
+  const shared = await readSharedOutcome(refreshToken);
+  if (shared) {
+    rememberLocally(refreshToken, shared);
+    return shared;
+  }
+
+  const nonce = randomUUID();
+  const gotLock = await redisSetNx(lockKey(refreshToken), nonce, LOCK_TTL_SECONDS);
+
+  if (gotLock === false) {
+    // A peer instance is refreshing this token. Wait for its result; never call
+    // the endpoint ourselves — that's the double-present that revokes the session.
+    const waited = await pollSharedOutcome(refreshToken);
+    if (waited) {
+      rememberLocally(refreshToken, waited);
+      return waited;
+    }
+    return { kind: "transient" };
+  }
+
+  if (gotLock === true) {
+    const outcome = await callTokenEndpoint(refreshToken);
+    if (isCacheable(outcome)) {
+      // The rotated refresh token + access token are cached here in cleartext for
+      // RESULT_TTL_SECONDS so peer instances can replay them instead of
+      // re-presenting the (now consumed) token. The key is a hash of the incoming
+      // token; the deployment must run Redis with auth + TLS + network isolation
+      // (same trust assumption as lib/auth/social-auth.ts's token cache).
+      // Guarded on the lock still holding OUR nonce (see redisSetGuarded) — a
+      // publish that lands after our lease expired and a successor has taken
+      // the lock is a no-op, never an overwrite of the successor's result.
+      const published = await withTimeout(
+        redisSetGuarded(
+          resultKey(refreshToken),
+          JSON.stringify(outcome),
+          RESULT_TTL_SECONDS,
+          lockKey(refreshToken),
+          nonce
+        ),
+        PUBLISH_TIMEOUT_MS,
+        false
+      );
+      rememberLocally(refreshToken, outcome);
+      // Only release the lock once peers can actually read the result. If the
+      // publish didn't land (or didn't land in time), keep the lock until its
+      // TTL so peers keep getting a retryable 503 rather than re-leading and
+      // presenting the (now consumed) token a second time — by then the local
+      // `recent` cache and any peer that reads the eventually-written result
+      // replay it directly.
+      if (published) await releaseLock(refreshToken, nonce);
+    } else {
+      // transient — the token wasn't successfully consumed, so a retry can lead.
+      await releaseLock(refreshToken, nonce);
+    }
+    return outcome;
+  }
+
+  // gotLock === null → Redis went unreachable between redisAvailable() and here.
+  // Behave as a single instance: the per-process inflight/recent maps still
+  // coalesce this instance; a cross-instance race is the pre-existing latent risk.
+  return leadRefreshLocal(refreshToken);
 }
 
 export async function POST(req: NextRequest) {

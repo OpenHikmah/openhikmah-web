@@ -38,6 +38,12 @@ export function getRedis(): Redis | null {
     // Bound every command so a stalled Redis can't hang a request; on failure
     // the helpers below catch and fall back.
     maxRetriesPerRequest: 2,
+    // Strict per-command deadline: a command that gets no reply in this long
+    // rejects with a timeout error instead of staying pending. Every helper
+    // below catches it and falls back. Kept below the auth refresh lock TTL
+    // (app/api/auth/refresh/route.ts) so a result publish can never land after
+    // the lease has passed to another leader.
+    commandTimeout: 5000,
     // Don't buffer commands while disconnected — fail fast to the fallback path.
     enableOfflineQueue: false,
     connectTimeout: 3000,
@@ -55,6 +61,7 @@ export function getRedis(): Redis | null {
   });
   c.on("ready", () => {
     loggedError = false;
+    loggedLockError = false;
   });
 
   client = c;
@@ -78,15 +85,56 @@ export async function redisGet(key: string): Promise<string | null> {
   }
 }
 
-/** SET a string value with a TTL (seconds); silently no-ops on disable/error. */
-export async function redisSet(key: string, value: string, ttlSeconds: number): Promise<void> {
+/** SET a string value with a TTL (seconds). Returns `true` when the write
+ *  landed, `false` when Redis is disabled or the write errored — callers that
+ *  only cache can ignore it; a caller that must know the value is visible to
+ *  peers (e.g. a lock/result publish) can branch on it. */
+export async function redisSet(key: string, value: string, ttlSeconds: number): Promise<boolean> {
   const r = getRedis();
-  if (!r) return;
+  if (!r) return false;
   try {
     await r.set(key, value, "EX", ttlSeconds);
+    return true;
   } catch {
-    // Best-effort cache write; ignore failures.
+    return false;
   }
+}
+
+/**
+ * SET `key`=`value` only if it does not already exist (NX), with a TTL in
+ * seconds. Returns `true` when this call took the key, `false` when another
+ * holder already has it, and `null` when Redis is disabled or errored — so a
+ * caller using this as a cross-instance lock can tell "someone else is doing it"
+ * (wait) apart from "no distributed lock available" (fall back to local-only),
+ * the same tri-state convention as {@link redisIncrWithTtl}.
+ */
+export async function redisSetNx(
+  key: string,
+  value: string,
+  ttlSeconds: number
+): Promise<boolean | null> {
+  const r = getRedis();
+  if (!r) return null;
+  try {
+    const res = await r.set(key, value, "EX", ttlSeconds, "NX");
+    return res === "OK";
+  } catch (err) {
+    logLockError("redisSetNx", err);
+    return null;
+  }
+}
+
+// One-shot logging for the lock helpers below. A silently-swallowed failure on
+// a lock acquire/release is not "best-effort cache" territory — it can leave a
+// cross-instance lock stuck or let two callers both proceed — so it must surface
+// (per the repo's "no silent catch" rule). Rate-limited to one line until Redis
+// recovers so a sustained outage on a hot path (the refresh endpoint) can't
+// flood the log.
+let loggedLockError = false;
+function logLockError(op: string, err: unknown): void {
+  if (loggedLockError) return;
+  loggedLockError = true;
+  console.error(`Redis ${op} failed, falling back:`, err);
 }
 
 /** DELETE a key; silently no-ops on disable/error. */
@@ -97,6 +145,71 @@ export async function redisDel(key: string): Promise<void> {
     await r.del(key);
   } catch {
     // Best-effort; ignore.
+  }
+}
+
+/**
+ * Atomically DELETE `key` only if its current value equals `expected` (a Lua
+ * compare-and-delete, no check-then-act gap). For releasing a lock so a holder
+ * can only remove its own lease. No-op on disable/error — a stuck lock then
+ * self-clears at its TTL.
+ */
+export async function redisDelIfEqual(key: string, expected: string): Promise<void> {
+  const r = getRedis();
+  if (!r) return;
+  try {
+    await r.eval(
+      "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+      1,
+      key,
+      expected
+    );
+  } catch (err) {
+    // A stuck lock still self-clears at its TTL, but a failed release on a hot
+    // path should not be invisible.
+    logLockError("redisDelIfEqual", err);
+  }
+}
+
+/**
+ * Atomically SET `key`=`value` (with TTL) only if `guardKey` currently equals
+ * `expectedGuardValue` (a Lua compare-and-set, no check-then-act gap).
+ *
+ * This is the safe way to publish a result gated on still holding a lock. A
+ * client-side timeout (e.g. `commandTimeout`) only rejects the LOCAL promise —
+ * ioredis cannot cancel a command already flushed to the server, so a "timed
+ * out" write can still land later. Guarding the write itself means a delayed
+ * publish from a leader whose lease already expired becomes a no-op the moment
+ * a successor has taken the guard key, instead of silently overwriting
+ * whatever the successor published.
+ *
+ * Returns `true` when the write landed, `false` when the guard didn't match,
+ * Redis errored, or Redis is disabled — callers only need to know whether the
+ * value is now visible to peers.
+ */
+export async function redisSetGuarded(
+  key: string,
+  value: string,
+  ttlSeconds: number,
+  guardKey: string,
+  expectedGuardValue: string
+): Promise<boolean> {
+  const r = getRedis();
+  if (!r) return false;
+  try {
+    const res = await r.eval(
+      "if redis.call('get', KEYS[2]) == ARGV[1] then redis.call('set', KEYS[1], ARGV[2], 'EX', ARGV[3]) return 1 else return 0 end",
+      2,
+      key,
+      guardKey,
+      expectedGuardValue,
+      value,
+      ttlSeconds
+    );
+    return res === 1;
+  } catch (err) {
+    logLockError("redisSetGuarded", err);
+    return false;
   }
 }
 
