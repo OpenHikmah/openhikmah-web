@@ -31,6 +31,9 @@
       "eslint --max-warnings=0"
     ]
   },
+  "overrides": {
+    "playwright-core": "1.63.0"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
     "@google/generative-ai": "^0.24.1",
