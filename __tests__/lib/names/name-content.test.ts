@@ -367,17 +367,69 @@ describe("getOrGenerateNameContent", () => {
     expect(out).toEqual(["ok"]);
   });
 
-  it("surfaces a generate() rejection and clears the lock so the next call retries", async () => {
+  it("retries on Gemini when the primary throws, and caches the fallback's result", async () => {
     mockSelect.mockReturnValue(makeSelectChain([])); // miss
-    const generate = vi.fn().mockRejectedValueOnce(new Error("boom")).mockResolvedValue(["ok"]);
+    const ai = await import("@/lib/ai/ai");
+    const providerSpy = vi.spyOn(ai, "resolveProvider").mockResolvedValue("claude");
+    const modelSpy = vi
+      .spyOn(ai, "resolveModel")
+      .mockImplementation(async (_feature, provider) =>
+        provider === "claude" ? "claude-opus-5" : "gemini-3.7-flash"
+      );
+
+    const generate = vi.fn(async (resolved: { provider: string; model: string }) => {
+      if (resolved.provider === "claude") throw new Error("claude overloaded");
+      return ["ok"];
+    });
+
+    const out = await getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr);
+
+    expect(out).toEqual(["ok"]);
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    const values = mockValues.mock.calls[0][0] as Record<string, unknown>;
+    expect(values.model).toBe("gemini-3.7-flash");
+    providerSpy.mockRestore();
+    modelSpy.mockRestore();
+  });
+
+  it("does not retry on Gemini when a throwing primary is already Gemini", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    const ai = await import("@/lib/ai/ai");
+    const providerSpy = vi.spyOn(ai, "resolveProvider").mockResolvedValue("gemini");
+    const modelSpy = vi.spyOn(ai, "resolveModel").mockResolvedValue("gemini-3.7-flash");
+    const generate = vi.fn().mockRejectedValue(new Error("gemini down"));
+
+    await expect(
+      getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr)
+    ).rejects.toThrow("gemini down");
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(mockInsert).not.toHaveBeenCalled();
+    providerSpy.mockRestore();
+    modelSpy.mockRestore();
+  });
+
+  it("surfaces the original error when the primary throws AND the Gemini retry also fails, and clears the lock so the next call retries", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const generate = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockRejectedValueOnce(new Error("gemini down"))
+      .mockResolvedValue(["ok"]);
 
     await expect(
       getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr)
     ).rejects.toThrow("boom");
+    expect(generate).toHaveBeenCalledTimes(2); // primary + fallback attempt
+    expect(errorSpy).toHaveBeenCalledWith("Names: Gemini fallback failed:", expect.any(Error));
+    expect(mockInsert).not.toHaveBeenCalled();
+
     // lock released in finally → fresh call regenerates
     const out = await getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr);
     expect(out).toEqual(["ok"]);
-    expect(generate).toHaveBeenCalledTimes(2);
+    expect(generate).toHaveBeenCalledTimes(3);
+    errorSpy.mockRestore();
   });
 });
 
