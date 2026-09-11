@@ -581,6 +581,32 @@ describe("getOrGenerateVerseReason", () => {
     modelSpy.mockRestore();
   });
 
+  it("retries on Gemini when the primary translation call throws, and persists the fallback's string result", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    const ai = await import("@/lib/ai/ai");
+    const providerSpy = vi.spyOn(ai, "resolveProvider").mockResolvedValue("claude");
+    const modelSpy = vi
+      .spyOn(ai, "resolveModel")
+      .mockImplementation(async (_feature, provider) =>
+        provider === "claude" ? "claude-opus-5" : "gemini-3.7-flash"
+      );
+
+    const generate = vi.fn(async (resolved: { provider: string; model: string }) => {
+      if (resolved.provider === "claude") throw new Error("claude overloaded");
+      return "çeviri";
+    });
+
+    const out = await getOrGenerateVerseReason("ar-rahman", "2:255", "tr", generate);
+
+    expect(out).toBe("çeviri");
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    const values = mockValues.mock.calls[0][0] as Record<string, unknown>;
+    expect(values.model).toBe("gemini-3.7-flash");
+    providerSpy.mockRestore();
+    modelSpy.mockRestore();
+  });
+
   it("when another process wins the insert race, returns the persisted (stored) translation, not the local one", async () => {
     // First select (cache check): miss. Second select (post-conflict re-read,
     // triggered by an empty .returning()): the other writer's stored value.
