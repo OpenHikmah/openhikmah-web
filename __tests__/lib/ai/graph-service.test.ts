@@ -205,6 +205,23 @@ describe("getConnections", () => {
     expect(mockIncr).toHaveBeenCalledWith("gen_persist_failed");
   });
 
+  it("on an insert conflict, falls back to the freshly generated reason when no ACTIVE row exists for it", async () => {
+    // Simulates a retired row occupying the same (fromRef, toRef, kind, locale)
+    // unique key: onConflictDoNothing() discards the insert (empty `returning`),
+    // and the re-read — correctly filtered to status "active" — finds nothing,
+    // so the result must keep the newly generated reason rather than a retired
+    // row's stale one.
+    mockSelect
+      .mockReturnValueOnce(makeSelectChain([])) // initial cache read: miss
+      .mockReturnValueOnce(makeSelectChain([])); // conflict re-read: no active row
+    mockGenerate.mockResolvedValue([result("2:255")]);
+    mockReturning.mockResolvedValue([]); // insert conflicted, nothing won the race
+
+    const out = await getConnections("1:1", "thematic", source);
+
+    expect(out[0]).toMatchObject({ ref: "2:255", reason: "because" });
+  });
+
   it("on a miss that generates nothing, does not write to the DB", async () => {
     mockSelect.mockReturnValue(makeSelectChain([]));
     mockGenerate.mockResolvedValue([]);
