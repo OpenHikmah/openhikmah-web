@@ -35,7 +35,7 @@
     "playwright-core": "1.63.0"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.96.0",
+    "@anthropic-ai/sdk": "^0.124.0",
     "@google/generative-ai": "^0.24.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@next/third-parties": "^16.2.10",
