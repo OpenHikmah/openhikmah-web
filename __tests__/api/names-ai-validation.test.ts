@@ -341,4 +341,18 @@ describe("names AI routes — model output validation", () => {
     const body = await res.json();
     expect(body[0].reason).toBe("Ayat al-Kursi."); // canonical reason preserved, not blanked
   });
+
+  it("verses: a non-empty but junk translation (model refusal) also falls back to the English reason", async () => {
+    withLocale("az");
+    mockVerseFetch();
+    mockCallAI
+      .mockResolvedValueOnce(JSON.stringify([{ ref: "2:255", reason: "Ayat al-Kursi." }]))
+      .mockResolvedValueOnce("I'm sorry, but I can't help with translating religious content.");
+
+    const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body[0].reason).toBe("Ayat al-Kursi.");
+  });
 });
