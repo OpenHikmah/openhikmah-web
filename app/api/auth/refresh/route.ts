@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { HAS_SESSION_COOKIE_NAME, hasSessionCookieOptions } from "@/lib/auth/session-cookie";
+import { incr } from "@/lib/infra/metrics";
 import {
   redisDelIfEqual,
   redisEnabled,
@@ -191,6 +192,11 @@ async function callTokenEndpoint(refreshToken: string): Promise<RefreshOutcome> 
     // Re-stamp the existing token if the provider didn't rotate.
     return { kind: "ok", accessToken: data.access_token, refreshToken: refreshTokenOut };
   } catch {
+    // A network error or the AbortSignal.timeout firing — never log the raw
+    // error, the request URL, or anything derived from `refreshToken`/the
+    // Authorization header (a secret-bearing system boundary); a fixed message
+    // is enough for an operator to see the upstream is failing.
+    console.error("auth/refresh: token endpoint request failed (network error or timeout)");
     return { kind: "transient" };
   }
 }
@@ -299,6 +305,19 @@ async function leadRefreshCoordinated(refreshToken: string): Promise<RefreshOutc
         false
       );
       rememberLocally(refreshToken, outcome);
+      if (!published) {
+        // Not necessarily lost: a "false" here can mean our wrapper gave up
+        // waiting while the write was still in flight (ioredis can't cancel an
+        // already-sent command), so it may still land moments later — and
+        // RESULT_TTL_SECONDS outlives LOCK_TTL_SECONDS, so a peer reading after
+        // our lock expires would still see it. This only surfaces the case
+        // where it never lands at all (a genuine Redis failure): a silent
+        // return here would hide it entirely (no counter, no log), so surface
+        // it per the repo's "no silent catch" rule even though the outcome
+        // below is still correct for this request.
+        console.error("auth/refresh: failed to publish the refresh outcome for peers");
+        incr("auth_refresh_publish_failed");
+      }
       // Only release the lock once peers can actually read the result. If the
       // publish didn't land (or didn't land in time), keep the lock until its
       // TTL so peers keep getting a retryable 503 rather than re-leading and
