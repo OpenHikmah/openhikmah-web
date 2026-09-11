@@ -549,6 +549,64 @@ describe("getConnections — en-canonical localized reasons", () => {
     expect(out.map((c) => c.reason)).toEqual(["native tr"]);
   });
 
+  it("does not treat count-matching but ref-divergent locale rows as complete (a retired-and-replaced en edge)", async () => {
+    // en canonical is now {3:18, 59:22} (an old ref was retired, a new one
+    // added); tr still reflects the old canonical set {2:255, 3:18} — same
+    // COUNT (2) but a different ref set.
+    const trRows = [
+      {
+        fromRef: "1:1",
+        toRef: "2:255",
+        kind: "thematic",
+        reason: "tr A (orphan)",
+        status: "active",
+      },
+      { fromRef: "1:1", toRef: "3:18", kind: "thematic", reason: "tr B", status: "active" },
+    ];
+    const enRows = [
+      { fromRef: "1:1", toRef: "3:18", kind: "thematic", reason: "en B", status: "active" },
+      { fromRef: "1:1", toRef: "59:22", kind: "thematic", reason: "en C", status: "active" },
+    ];
+    mockSelect
+      .mockReturnValueOnce(makeSelectChain(trRows))
+      .mockReturnValue(makeSelectChain(enRows));
+    mockTranslateReason.mockImplementation(async (reason: string) => `TR(${reason})`);
+    mockReturning.mockResolvedValue([{ toRef: "59:22" }]);
+
+    const out = await getConnections("1:1", "thematic", source, { locale: "tr" });
+
+    expect(mockGenerate).not.toHaveBeenCalled(); // en selection already exists
+    // only the genuinely missing canonical ref (59:22) is translated
+    expect(mockTranslateReason).toHaveBeenCalledTimes(1);
+    expect(mockTranslateReason).toHaveBeenCalledWith("en C", "Turkish", RESOLVED);
+    // the orphaned ref (2:255, no longer canonical) is dropped from the result
+    expect(out.map((c) => c.ref)).toEqual(["3:18", "59:22"]);
+    expect(out.map((c) => c.reason)).toEqual(["tr B", "TR(en C)"]);
+  });
+
+  it("serves the existing partial locale rows instead of erroring when a repair is rate-limited", async () => {
+    const trRows = [
+      { fromRef: "1:1", toRef: "2:255", kind: "thematic", reason: "tr A", status: "active" },
+    ];
+    const enRows = [
+      { fromRef: "1:1", toRef: "2:255", kind: "thematic", reason: "en A", status: "active" },
+      { fromRef: "1:1", toRef: "3:18", kind: "thematic", reason: "en B", status: "active" },
+    ];
+    mockSelect
+      .mockReturnValueOnce(makeSelectChain(trRows))
+      .mockReturnValue(makeSelectChain(enRows));
+    mockConsume.mockResolvedValue(false); // client is over budget
+
+    const out = await getConnections("1:1", "thematic", source, {
+      locale: "tr",
+      clientKey: "9.9.9.9",
+    });
+
+    expect(out.map((c) => c.reason)).toEqual(["tr A"]); // served what's cached, not an error
+    expect(mockTranslateReason).not.toHaveBeenCalled();
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
   it("spends the client budget per translation and serves English once it is out", async () => {
     mockSelect.mockReturnValue(makeSelectChain([]));
     mockGenerate.mockResolvedValue([result("2:255"), result("3:18"), result("59:22")]);

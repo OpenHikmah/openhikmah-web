@@ -136,10 +136,10 @@ async function hydrate(
     .filter((c): c is ConnectionResult => c !== null);
 }
 
-/** Raw active cached edges for one cell+locale (not hydrated — callers decide a
- *  hit on the ROW count, so a cell whose target verses transiently fail to
- *  resolve is still a hit, not a re-generation trigger; a non-`en` locale
- *  additionally checks that count against the canonical `en` one). */
+/** Raw active cached edges for one cell+locale (not hydrated — a cell whose
+ *  target verses transiently fail to resolve is still a hit, not a
+ *  re-generation trigger). Ordered by `toRef` so the connection order a reader
+ *  sees is stable across requests and the `en`/locale orderings stay aligned. */
 async function readActiveRows(
   fromRef: string,
   kind: EdgeKind,
@@ -162,6 +162,7 @@ async function readActiveRows(
         ...(excludeRefs.length > 0 ? [notInArray(connections.toRef, excludeRefs)] : [])
       )
     )
+    .orderBy(connections.toRef)
     .limit(200);
 }
 
@@ -180,18 +181,27 @@ export async function getConnections(
   const locale = options.locale ?? "en";
 
   const existing = await readActiveRows(fromRef, kind, locale, excludeRefs);
+  // The canonical `en` rows for the same cell: needed to decide whether a
+  // non-`en` locale is complete, and reused by `generateLocalizedCell` on a
+  // miss so the gate decision and the translation work off one snapshot.
+  const enRows =
+    locale === "en" ? existing : await readActiveRows(fromRef, kind, "en", excludeRefs);
+
   if (locale === "en") {
     if (existing.length > 0) return hydrate(existing, kind);
   } else if (existing.length > 0) {
-    // A non-`en` cell is a hit only when it is as complete as the canonical
-    // English set. A partial locale set — left by a translation that failed or
-    // an exhausted client budget on an earlier request — would otherwise be a
-    // permanent short cache that only the admin backfill could repair; instead
-    // fall through so the miss path translates the rows still missing for this
-    // locale. (`enCount === 0` means there is no canonical set to compare
-    // against — pre-#594 native locale rows — so serve what's there.)
-    const enCount = (await readActiveRows(fromRef, kind, "en", excludeRefs)).length;
-    if (enCount === 0 || existing.length >= enCount) return hydrate(existing, kind);
+    // A non-`en` cell is a hit only when EVERY active canonical `en` ref has an
+    // active row in this locale — ref-by-ref, matching `findTranslationGaps` in
+    // lib/ai/connection-batch.ts. A count compare would let a retired-and-
+    // replaced `en` edge look complete when the ref sets actually differ, and a
+    // partial set (a translation that failed, or an exhausted client budget on
+    // an earlier request) would be a permanent short cache. `enRows` empty means
+    // there is no canonical set to translate against — pre-#594 native locale
+    // rows — so serve what is there.
+    const localeRefs = new Set(existing.map((r) => r.toRef));
+    if (enRows.length === 0 || enRows.every((r) => localeRefs.has(r.toRef))) {
+      return hydrate(existing, kind);
+    }
   }
 
   // Cache miss — this is the expensive path, so rate-limit it (per client, as
@@ -199,7 +209,13 @@ export async function getConnections(
   // unchanged — only the AI call itself is de-duplicated below).
   if (options.clientKey) {
     const allowed = await consume(`gen:${options.clientKey}`);
-    if (!allowed) throw new RateLimitError();
+    if (!allowed) {
+      // An incomplete non-`en` cell we can't repair right now: serve the
+      // (partial) rows we already have rather than erroring — a later request
+      // with budget, or the backfill, finishes the translation.
+      if (locale !== "en" && existing.length > 0) return hydrate(existing, kind);
+      throw new RateLimitError();
+    }
   }
 
   // Resolve the effective provider+model ONCE for this miss (honouring any
@@ -225,6 +241,7 @@ export async function getConnections(
             locale,
             provider,
             model,
+            enRows,
             existing,
             options.clientKey
           ),
@@ -257,12 +274,14 @@ async function generateLocalizedCell(
   locale: Locale,
   provider: Provider,
   model: string,
-  // The rows already active for this locale (read by `getConnections` for its
-  // completeness check) — reused so a repair pass doesn't re-query them.
+  // The canonical `en` rows and the rows already active for this locale — both
+  // already read by `getConnections` for its completeness check — reused here
+  // so the gate decision and the translation work off the same snapshot and a
+  // repair pass doesn't re-query either.
+  enRows: Connection[],
   existingLocaleRows: Connection[],
   clientKey?: string
 ): Promise<CellGenerationResult> {
-  const enRows = await readActiveRows(fromRef, kind, "en", excludeRefs);
   let enPairs: { ref: string; reason: string }[];
   let calledAI = false;
   if (enRows.length > 0) {
@@ -315,7 +334,7 @@ async function generateLocalizedCell(
       // whole response — logged + metered, not swallowed.
       console.error(`connections: live translation into ${locale} failed for ${en.ref}:`, err);
     }
-    if (typeof translated !== "string" || translated.trim() === "") {
+    if (translated.trim() === "") {
       incr("connections_live_translate_failed");
       localized.push({ toRef: en.ref, reason: en.reason });
       continue;
@@ -357,6 +376,9 @@ async function persistTranslatedRows(
     const conflicted = rows.filter((r) => !insertedRefs.has(r.toRef));
     if (conflicted.length === 0) return new Map();
 
+    // Only adopt an ACTIVE conflicting row. A retired/flagged row occupying the
+    // same (fromRef, toRef, kind, locale) key must not be resurrected and served
+    // as if it were the winning translation (matches the admin review status).
     const stored = await db
       .select({ toRef: connections.toRef, reason: connections.reason })
       .from(connections)
@@ -365,6 +387,7 @@ async function persistTranslatedRows(
           eq(connections.fromRef, fromRef),
           eq(connections.kind, kind),
           eq(connections.locale, locale),
+          eq(connections.status, "active"),
           inArray(
             connections.toRef,
             conflicted.map((r) => r.toRef)

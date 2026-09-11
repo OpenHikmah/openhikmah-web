@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 // Real Postgres (Testcontainers) — only the AI call is mocked. The generator
 // uses callAIDetailed; mockCallAI stays the text source so assertions on call
@@ -179,6 +179,42 @@ describe("connection graph (integration, real Postgres)", () => {
     const third = await getConnections("1:1", "thematic", source, { locale: "tr" });
     expect(third.map((c) => c.reason)).toEqual(["tr A", "tr B"]);
     expect(translationCalls).toBe(3);
+  });
+
+  it("a retired locale translation is not resurrected — a repair serves the fresh text without reviving the old row", async () => {
+    await seed("2:255");
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.startsWith("Translate the following sentence")) return "old tr";
+      return JSON.stringify([{ ref: "2:255", reason: "reason A" }]);
+    });
+
+    // Cold tr request: generates en, translates, persists one active tr row.
+    await getConnections("1:1", "thematic", source, { locale: "tr" });
+    let rows = await db.select().from(connections).where(eq(connections.locale, "tr"));
+    expect(rows).toMatchObject([{ toRef: "2:255", reason: "old tr", status: "active" }]);
+
+    // An admin retires the (bad) translation — the English row is untouched.
+    await db
+      .update(connections)
+      .set({ status: "retired" })
+      .where(and(eq(connections.locale, "tr"), eq(connections.toRef, "2:255")));
+
+    // The retired row makes the locale incomplete again (no ACTIVE tr row for
+    // the canonical en ref), so the next request repairs it with a fresh
+    // translation — served in the response, but NOT persisted over the
+    // retired row (the unique key is still held by it).
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.startsWith("Translate the following sentence")) return "new tr";
+      return JSON.stringify([{ ref: "2:255", reason: "reason A" }]);
+    });
+    const repaired = await getConnections("1:1", "thematic", source, { locale: "tr" });
+
+    expect(repaired.map((c) => c.reason)).toEqual(["new tr"]); // fresh text served
+    rows = await db.select().from(connections).where(eq(connections.locale, "tr"));
+    expect(rows).toHaveLength(1); // no new row inserted, the retired one still holds the key
+    expect(rows[0]).toMatchObject({ reason: "old tr", status: "retired" }); // untouched, not resurrected
+    // Only ever generated English once across the whole test.
+    expect(await db.select().from(aiGenerations)).toHaveLength(1);
   });
 
   it("a cold non-en request generates English first, then translates it", async () => {
