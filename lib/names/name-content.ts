@@ -24,12 +24,29 @@ const resolveNamesModel = async (): Promise<ResolvedNamesModel> => {
 
 /**
  * Resolves the primary provider+model, generates once, and — only when the
- * primary is Claude and the result comes back empty (the shape a route's own
- * caught AI failure already takes, see reflection/pairings/verses routes) —
- * retries once against Gemini, whose API key is already provisioned in every
- * deployment (see .env.example) and whose free tier easily absorbs an
- * occasional retry. One-directional (Claude -> Gemini only): a deployment
- * already pointed at Gemini for "names" has nothing to fall back to.
+ * primary is Claude and either the result comes back empty (the shape a
+ * route's own caught AI failure already takes, see reflection/pairings/verses
+ * routes) OR the call throws — retries once against Gemini, whose API key is
+ * already provisioned in every deployment (see .env.example) and whose free
+ * tier easily absorbs an occasional retry. One-directional (Claude -> Gemini
+ * only): a deployment already pointed at Gemini for "names" has nothing to
+ * fall back to, so a throw there re-raises immediately.
+ *
+ * Every current `generate` callback already catches its own `callAI` failure
+ * and returns an empty result rather than throwing, so a throw reaching here
+ * today is never itself a provider error — it's something upstream of the AI
+ * call (e.g. a verse-search/fetch failure in the "verses" generator). Gemini
+ * can't fix that, so the retry there just re-runs the whole callback once
+ * more before re-raising the same error. That's accepted as the cost of one
+ * uniform contract: any future `generate` that lets a genuine provider error
+ * propagate gets the retry it needs, without every callback having to opt in.
+ *
+ * A throw and an empty result are treated the same for *retry* purposes, but
+ * differ in what happens when the retry ALSO fails: an empty primary result
+ * degrades to that (still-valid, just uncached) empty result, same as before
+ * this retry existed. A primary *throw* means there is no valid result to
+ * degrade to, so the fallback's failure re-raises the original primary error
+ * — never silently downgrading a real failure into a fabricated empty success.
  *
  * Returns whichever (result, model) pair actually produced the value, so the
  * persisted `model` column never disagrees with what actually ran.
@@ -39,9 +56,26 @@ async function resolveAndGenerate<T>(
   isEmpty: (value: T) => boolean
 ): Promise<{ result: T; model: string }> {
   const resolved = await resolveNamesModel();
-  const result = await generate(resolved);
-  if (!isEmpty(result) || resolved.provider !== "claude") {
-    return { result, model: resolved.model };
+
+  let result: T | undefined;
+  let threw = false;
+  let primaryError: unknown;
+  try {
+    result = await generate(resolved);
+  } catch (err) {
+    threw = true;
+    primaryError = err;
+    // Logged here (not just on a subsequent fallback failure) so a systematic
+    // primary failure that Gemini happens to paper over still surfaces —
+    // otherwise it would produce no log line at all.
+    console.error(`Names: primary (${resolved.provider}) generation failed:`, err);
+    incr("names_primary_generation_failed");
+  }
+
+  const shouldRetry = resolved.provider === "claude" && (threw || isEmpty(result as T));
+  if (!shouldRetry) {
+    if (threw) throw primaryError;
+    return { result: result as T, model: resolved.model };
   }
 
   try {
@@ -50,11 +84,16 @@ async function resolveAndGenerate<T>(
     if (!isEmpty(fallbackResult)) incr("names_ai_fallback_used");
     return { result: fallbackResult, model: fallbackModel };
   } catch (err) {
-    // A fallback-attempt failure must degrade to the primary's (empty)
-    // result — same as a primary failure already does — never let the retry
-    // surface as an unhandled rejection callers didn't have to handle before.
     console.error("Names: Gemini fallback failed:", err);
-    return { result, model: resolved.model };
+    // The primary threw: there's no valid result to degrade to, so the
+    // original failure must surface — swallowing it here would turn a real
+    // AI failure into a fabricated empty success.
+    if (threw) throw primaryError;
+    // The primary just returned empty: degrade to that (still-valid, just
+    // uncached) result, same as before this retry existed — never let a
+    // fallback-attempt failure surface as an unhandled rejection callers
+    // didn't have to handle before.
+    return { result: result as T, model: resolved.model };
   }
 }
 
