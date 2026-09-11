@@ -26,7 +26,9 @@ import type { EdgeKind } from "@/types/quran";
  *
  * Non-English rows are produced by translating the English reason (mirrors the
  * divine-names name_verse_reasons pattern) — the verse SELECTION is never
- * re-derived per locale.
+ * re-derived per locale. The live path (lib/ai/graph-service.ts
+ * `generateLocalizedCell`) follows the same rule, so both converge on one set
+ * of rows per cell instead of layering mixed-provenance ones.
  *
  * Resumable/idempotent: the work list is recomputed from the DB on every run,
  * and every cell's writes commit as it goes, so a crash or a budget stop loses
@@ -556,7 +558,6 @@ export async function runConnectionBatch(
           cell.kind,
           { arabicText: cell.arabicText, translation: cell.translation },
           excludeRefs,
-          "en",
           opts.provider,
           model,
           { apiKey: opts.apiKey, signal }
