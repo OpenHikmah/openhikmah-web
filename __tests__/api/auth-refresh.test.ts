@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 import { createHash } from "node:crypto";
 import { NextRequest } from "next/server";
+import { counterSnapshot } from "@/lib/infra/metrics";
 
 // A shared in-memory stand-in for the Redis helpers, so two logical "instances"
 // (both driving the one POST handler) see the same result cache + lock. Default
@@ -414,11 +415,12 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
 
   it("keeps the lock (does not release) when publishing the result fails, and surfaces it — not silently", async () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    mockRedis.redisSetGuarded.mockResolvedValue(false); // publish dropped
+    mockRedis.redisSetGuarded.mockResolvedValue(false); // a genuine, resolved failure
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ access_token: "acc-np", refresh_token: "ref-np" }),
     });
+    const before = counterSnapshot().auth_refresh_publish_failed ?? 0;
 
     const res = await POST(makeReq("tok-nopublish"));
 
@@ -431,6 +433,8 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
     expect(errSpy).toHaveBeenCalledWith(
       expect.stringContaining("failed to publish the refresh outcome")
     );
+    // A resolved `false` is a confirmed failure — counted.
+    expect(counterSnapshot().auth_refresh_publish_failed).toBe(before + 1);
     errSpy.mockRestore();
   });
 
@@ -499,16 +503,19 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
     }
   });
 
-  it("treats a publish that stalls past the publish timeout as unpublished and keeps the lock", async () => {
+  it("treats a publish that stalls past the publish timeout as unresolved (not a failure) and keeps the lock", async () => {
     vi.useFakeTimers();
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      // The publish never settles — withTimeout() must resolve it to `false`
-      // rather than let the leader's critical section run past its lease.
+      // The publish never settles — withTimeout() must resolve the wrapper
+      // promptly without treating that as a confirmed `redisSetGuarded`
+      // failure, since the write may still land after this request returns.
       mockRedis.redisSetGuarded.mockImplementation(() => new Promise<boolean>(() => {}));
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ access_token: "acc-slow", refresh_token: "ref-slow" }),
       });
+      const before = counterSnapshot().auth_refresh_publish_failed ?? 0;
 
       const pending = POST(makeReq("tok-slowpub"));
       await vi.advanceTimersByTimeAsync(2_500); // past PUBLISH_TIMEOUT_MS (2s)
@@ -521,7 +528,14 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
         expect.anything()
       );
       expect(redisStore.has(lockKey("tok-slowpub"))).toBe(true); // held to TTL
+      expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("timed out"));
+      expect(errSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("failed to publish the refresh outcome")
+      );
+      // Unresolved, not a confirmed failure — must not be counted as one.
+      expect(counterSnapshot().auth_refresh_publish_failed ?? 0).toBe(before);
     } finally {
+      errSpy.mockRestore();
       vi.useRealTimers();
     }
   });

@@ -61,6 +61,10 @@ const UPSTREAM_TIMEOUT_MS = 8_000;
 // nonce, so a late arrival from an expired lease is a no-op once a successor
 // has taken the lock, not an overwrite of whatever the successor published.
 const PUBLISH_TIMEOUT_MS = 2_000;
+// Distinct from `false` — a timed-out publish is unresolved (it may still land
+// per the comment above), not a confirmed `redisSetGuarded` failure. Keeping
+// the two distinguishable in the caller lets it count only genuine failures.
+const PUBLISH_TIMED_OUT = Symbol("publish-timed-out");
 // A crashed leader's lock self-clears after this so the next request can lead.
 // Kept comfortably above the upstream call plus a slow publish/release so a
 // live leader normally finishes inside its own lease — but this is a
@@ -293,7 +297,7 @@ async function leadRefreshCoordinated(refreshToken: string): Promise<RefreshOutc
       // Guarded on the lock still holding OUR nonce (see redisSetGuarded) — a
       // publish that lands after our lease expired and a successor has taken
       // the lock is a no-op, never an overwrite of the successor's result.
-      const published = await withTimeout(
+      const published = await withTimeout<boolean | typeof PUBLISH_TIMED_OUT>(
         redisSetGuarded(
           resultKey(refreshToken),
           JSON.stringify(outcome),
@@ -302,19 +306,23 @@ async function leadRefreshCoordinated(refreshToken: string): Promise<RefreshOutc
           nonce
         ),
         PUBLISH_TIMEOUT_MS,
-        false
+        PUBLISH_TIMED_OUT
       );
       rememberLocally(refreshToken, outcome);
-      if (!published) {
-        // Not necessarily lost: a "false" here can mean our wrapper gave up
-        // waiting while the write was still in flight (ioredis can't cancel an
-        // already-sent command), so it may still land moments later — and
-        // RESULT_TTL_SECONDS outlives LOCK_TTL_SECONDS, so a peer reading after
-        // our lock expires would still see it. This only surfaces the case
-        // where it never lands at all (a genuine Redis failure): a silent
-        // return here would hide it entirely (no counter, no log), so surface
-        // it per the repo's "no silent catch" rule even though the outcome
-        // below is still correct for this request.
+      if (published === PUBLISH_TIMED_OUT) {
+        // Unresolved, not failed: our wrapper gave up waiting while the write
+        // was still in flight (ioredis can't cancel an already-sent command),
+        // so it may still land moments later — and RESULT_TTL_SECONDS outlives
+        // LOCK_TTL_SECONDS, so a peer reading after our lock expires would
+        // still see it. Log it (visibility into publish latency) but don't
+        // count it as a failure — that would misrepresent a call that may yet
+        // succeed as one that definitely didn't.
+        console.error("auth/refresh: publish to Redis timed out (may still land)");
+      } else if (published === false) {
+        // A genuine `redisSetGuarded` failure: it won't land. A silent return
+        // here would hide it entirely (no counter, no log), so surface it per
+        // the repo's "no silent catch" rule even though the outcome below is
+        // still correct for this request.
         console.error("auth/refresh: failed to publish the refresh outcome for peers");
         incr("auth_refresh_publish_failed");
       }
@@ -324,7 +332,7 @@ async function leadRefreshCoordinated(refreshToken: string): Promise<RefreshOutc
       // presenting the (now consumed) token a second time — by then the local
       // `recent` cache and any peer that reads the eventually-written result
       // replay it directly.
-      if (published) await releaseLock(refreshToken, nonce);
+      if (published === true) await releaseLock(refreshToken, nonce);
     } else {
       // transient — the token wasn't successfully consumed, so a retry can lead.
       await releaseLock(refreshToken, nonce);
