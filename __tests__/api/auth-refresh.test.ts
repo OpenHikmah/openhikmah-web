@@ -136,12 +136,19 @@ describe("POST /api/auth/refresh", () => {
     expect(setCookies.some((c) => c.startsWith("qf_has_session=;"))).toBe(true);
   });
 
-  it("returns 503 and keeps the cookie on a transient upstream failure", async () => {
-    mockFetch.mockRejectedValueOnce(new Error("network error"));
+  it("returns 503 and keeps the cookie on a transient upstream failure, logging a fixed message", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockFetch.mockRejectedValueOnce(new Error("network error: secret-token-in-message"));
 
     const res = await POST(makeReq("refresh-transient-4"));
     expect(res.status).toBe(503);
     expect(res.headers.get("set-cookie")).toBeNull();
+    // A fixed message only — never the raw error, the token, or the URL.
+    expect(errSpy).toHaveBeenCalledWith(
+      "auth/refresh: token endpoint request failed (network error or timeout)"
+    );
+    expect(errSpy.mock.calls.flat().join(" ")).not.toContain("secret-token-in-message");
+    errSpy.mockRestore();
   });
 
   it("returns 503 for a non-invalid_grant error response", async () => {
@@ -405,7 +412,8 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
     expect(mockRedis.redisSetNx).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the lock (does not release) when publishing the result fails", async () => {
+  it("keeps the lock (does not release) when publishing the result fails, and surfaces it — not silently", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     mockRedis.redisSetGuarded.mockResolvedValue(false); // publish dropped
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -420,6 +428,10 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
       expect.anything()
     );
     expect(redisStore.has(lockKey("tok-nopublish"))).toBe(true); // lock held to TTL
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining("failed to publish the refresh outcome")
+    );
+    errSpy.mockRestore();
   });
 
   it("does not delete a lock a successor took while it was publishing (compare-and-delete)", async () => {
