@@ -494,6 +494,7 @@ export async function generateConnectionsForCell(
               eq(connections.fromRef, fromRef),
               eq(connections.kind, kind),
               eq(connections.locale, "en"),
+              eq(connections.status, "active"),
               inArray(
                 connections.toRef,
                 conflicted.map((g) => g.ref)
