@@ -1,8 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { Column, Param, is } from "drizzle-orm";
 import type { Verse, VerseRef, ConnectionResult } from "@/types/quran";
 
+// Real drizzle SQL objects (eq/and/inArray are NOT mocked — see below), so a
+// where(...) condition can be inspected structurally instead of by string
+// matching. Walks the nested queryChunks that `and(...)`/`eq(...)` build and
+// checks whether a `status` column is compared against the exact value.
+function flattenChunks(node: unknown, out: unknown[] = []): unknown[] {
+  const chunks = (node as { queryChunks?: unknown[] } | null)?.queryChunks;
+  if (!Array.isArray(chunks)) {
+    out.push(node);
+    return out;
+  }
+  for (const chunk of chunks) flattenChunks(chunk, out);
+  return out;
+}
+function whereFilters(condition: unknown, column: string, value: unknown): boolean {
+  const flat = flattenChunks(condition);
+  for (let i = 0; i < flat.length; i++) {
+    const chunk = flat[i];
+    if (is(chunk, Column) && chunk.name === column) {
+      const param = flat.slice(i + 1).find((c) => is(c, Param));
+      if (param && is(param, Param)) return param.value === value;
+    }
+  }
+  return false;
+}
+
 // ── DB mock: select() resolves to a configurable result; insert() is chainable ──
-function makeSelectChain(resolveWith: unknown[]) {
+// `resolveWith` can be a plain array, or a function of the captured where(...)
+// condition — the latter lets a test assert on the predicate actually built,
+// not just stub a fixed response regardless of it.
+function makeSelectChain(resolveWith: unknown[] | ((whereArg: unknown) => unknown[])) {
+  let capturedWhere: unknown;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = new Proxy(
     function () {
@@ -11,8 +41,16 @@ function makeSelectChain(resolveWith: unknown[]) {
     {
       get(_t, prop) {
         if (prop === "then")
-          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
-            Promise.resolve(resolveWith).then(res, rej);
+          return (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => {
+            const rows =
+              typeof resolveWith === "function" ? resolveWith(capturedWhere) : resolveWith;
+            return Promise.resolve(rows).then(res, rej);
+          };
+        if (prop === "where")
+          return (arg: unknown) => {
+            capturedWhere = arg;
+            return chain;
+          };
         return () => chain;
       },
       apply() {
@@ -208,18 +246,27 @@ describe("getConnections", () => {
   it("on an insert conflict, falls back to the freshly generated reason when no ACTIVE row exists for it", async () => {
     // Simulates a retired row occupying the same (fromRef, toRef, kind, locale)
     // unique key: onConflictDoNothing() discards the insert (empty `returning`),
-    // and the re-read — correctly filtered to status "active" — finds nothing,
-    // so the result must keep the newly generated reason rather than a retired
-    // row's stale one.
-    mockSelect
-      .mockReturnValueOnce(makeSelectChain([])) // initial cache read: miss
-      .mockReturnValueOnce(makeSelectChain([])); // conflict re-read: no active row
+    // and the re-read must filter on status = "active" so a retired row is
+    // never adopted as if it were the winning generation. The mock actually
+    // inspects the where(...) predicate rather than stubbing a fixed empty
+    // result — so dropping `eq(connections.status, "active")` from the source
+    // re-read would make this test fail, not pass vacuously.
+    const retiredReason = "retired reason — must not be served";
+    mockSelect.mockReturnValueOnce(makeSelectChain([])).mockReturnValue(
+      makeSelectChain(
+        (whereArg) =>
+          whereFilters(whereArg, "status", "active")
+            ? [] // correctly filtered: the retired row is excluded
+            : [{ toRef: "2:255", reason: retiredReason }] // bug: it would be resurrected
+      )
+    );
     mockGenerate.mockResolvedValue([result("2:255")]);
     mockReturning.mockResolvedValue([]); // insert conflicted, nothing won the race
 
     const out = await getConnections("1:1", "thematic", source);
 
     expect(out[0]).toMatchObject({ ref: "2:255", reason: "because" });
+    expect(out[0].reason).not.toBe(retiredReason);
   });
 
   it("on a miss that generates nothing, does not write to the DB", async () => {
