@@ -171,6 +171,48 @@ export async function redisDelIfEqual(key: string, expected: string): Promise<vo
   }
 }
 
+/**
+ * Atomically SET `key`=`value` (with TTL) only if `guardKey` currently equals
+ * `expectedGuardValue` (a Lua compare-and-set, no check-then-act gap).
+ *
+ * This is the safe way to publish a result gated on still holding a lock. A
+ * client-side timeout (e.g. `commandTimeout`) only rejects the LOCAL promise —
+ * ioredis cannot cancel a command already flushed to the server, so a "timed
+ * out" write can still land later. Guarding the write itself means a delayed
+ * publish from a leader whose lease already expired becomes a no-op the moment
+ * a successor has taken the guard key, instead of silently overwriting
+ * whatever the successor published.
+ *
+ * Returns `true` when the write landed, `false` when the guard didn't match,
+ * Redis errored, or Redis is disabled — callers only need to know whether the
+ * value is now visible to peers.
+ */
+export async function redisSetGuarded(
+  key: string,
+  value: string,
+  ttlSeconds: number,
+  guardKey: string,
+  expectedGuardValue: string
+): Promise<boolean> {
+  const r = getRedis();
+  if (!r) return false;
+  try {
+    const res = await r.eval(
+      "if redis.call('get', KEYS[2]) == ARGV[1] then redis.call('set', KEYS[1], ARGV[2], 'EX', ARGV[3]) return 1 else return 0 end",
+      2,
+      key,
+      guardKey,
+      expectedGuardValue,
+      value,
+      ttlSeconds
+    );
+    return res === 1;
+  } catch (err) {
+    logLockError("redisSetGuarded", err);
+    return false;
+  }
+}
+
 /** Publishes `message` on `channel`; silently no-ops on disable/error. Used for
  *  cross-instance cache invalidation (e.g. auth cache flushes). */
 export function redisPublish(channel: string, message: string): void {

@@ -151,6 +151,29 @@ describe("lib/redis — enabled, healthy", () => {
       "nonce-1"
     );
   });
+
+  it("redisSetGuarded writes and returns true when the guard key matches", async () => {
+    behavior.eval.mockResolvedValue(1);
+    const r = await import("@/lib/infra/redis");
+
+    expect(await r.redisSetGuarded("result:k", "payload", 30, "lock:k", "nonce-1")).toBe(true);
+    expect(behavior.eval).toHaveBeenCalledWith(
+      expect.stringContaining("redis.call('set', KEYS[1]"),
+      2,
+      "result:k",
+      "lock:k",
+      "nonce-1",
+      "payload",
+      30
+    );
+  });
+
+  it("redisSetGuarded does not write and returns false when the guard key no longer matches", async () => {
+    behavior.eval.mockResolvedValue(0);
+    const r = await import("@/lib/infra/redis");
+
+    expect(await r.redisSetGuarded("result:k", "payload", 30, "lock:k", "stale-nonce")).toBe(false);
+  });
 });
 
 describe("lib/redis — enabled, but every call errors (fail-open)", () => {
@@ -191,6 +214,19 @@ describe("lib/redis — enabled, but every call errors (fail-open)", () => {
     expect(errSpy).toHaveBeenCalledTimes(1);
     expect(errSpy).toHaveBeenCalledWith(
       expect.stringContaining("Redis redisSetNx failed"),
+      expect.any(Error)
+    );
+    errSpy.mockRestore();
+  });
+
+  it("redisSetGuarded returns false (not a throw) when the guarded eval errors", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    behavior.eval.mockRejectedValue(new Error("down"));
+    const r = await import("@/lib/infra/redis");
+
+    expect(await r.redisSetGuarded("result:k", "v", 30, "lock:k", "n")).toBe(false);
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Redis redisSetGuarded failed"),
       expect.any(Error)
     );
     errSpy.mockRestore();

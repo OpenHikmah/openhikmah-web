@@ -12,10 +12,19 @@ const { redisStore, mockRedis } = vi.hoisted(() => {
     mockRedis: {
       redisEnabled: vi.fn(() => false),
       redisGet: vi.fn(async (k: string) => redisStore.get(k) ?? null),
-      redisSet: vi.fn(async (k: string, v: string): Promise<boolean> => {
-        redisStore.set(k, v);
-        return true;
-      }),
+      redisSetGuarded: vi.fn(
+        async (
+          k: string,
+          v: string,
+          _ttl: number,
+          guardKey: string,
+          expectedGuardValue: string
+        ): Promise<boolean> => {
+          if (redisStore.get(guardKey) !== expectedGuardValue) return false;
+          redisStore.set(k, v);
+          return true;
+        }
+      ),
       redisDelIfEqual: vi.fn(async (k: string, expected: string) => {
         if (redisStore.get(k) === expected) redisStore.delete(k);
       }),
@@ -237,7 +246,7 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
     redisStore.clear();
     mockRedis.redisEnabled.mockReturnValue(true);
     mockRedis.redisGet.mockClear();
-    mockRedis.redisSet.mockClear();
+    mockRedis.redisSetGuarded.mockClear();
     mockRedis.redisDelIfEqual.mockClear();
     mockRedis.redisSetNx.mockClear();
     mockRedis.redisSetNx.mockImplementation(async (k: string, v: string) => {
@@ -246,10 +255,13 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
       return true;
     });
     mockRedis.redisGet.mockImplementation(async (k: string) => redisStore.get(k) ?? null);
-    mockRedis.redisSet.mockImplementation(async (k: string, v: string) => {
-      redisStore.set(k, v);
-      return true;
-    });
+    mockRedis.redisSetGuarded.mockImplementation(
+      async (k: string, v: string, _ttl: number, guardKey: string, expectedGuardValue: string) => {
+        if (redisStore.get(guardKey) !== expectedGuardValue) return false;
+        redisStore.set(k, v);
+        return true;
+      }
+    );
     mockRedis.redisDelIfEqual.mockImplementation(async (k: string, expected: string) => {
       if (redisStore.get(k) === expected) redisStore.delete(k);
     });
@@ -394,7 +406,7 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
   });
 
   it("keeps the lock (does not release) when publishing the result fails", async () => {
-    mockRedis.redisSet.mockResolvedValue(false); // publish dropped
+    mockRedis.redisSetGuarded.mockResolvedValue(false); // publish dropped
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ access_token: "acc-np", refresh_token: "ref-np" }),
@@ -411,12 +423,18 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
   });
 
   it("does not delete a lock a successor took while it was publishing (compare-and-delete)", async () => {
-    mockRedis.redisSet.mockImplementation(async (k: string, v: string) => {
-      redisStore.set(k, v);
-      // Our lease expired mid-publish and a peer grabbed a fresh lock.
-      redisStore.set(lockKey("tok-cad"), "successor-nonce");
-      return true;
-    });
+    mockRedis.redisSetGuarded.mockImplementation(
+      async (k: string, v: string, _ttl: number, guardKey: string, expectedGuardValue: string) => {
+        redisStore.set(k, v);
+        // Our lease expired mid-publish and a peer grabbed a fresh lock — this
+        // fires AFTER our guard check passed, so the write above still landed;
+        // the point of this test is the release, not the publish (see the
+        // "does not publish over a successor's lock" test for the write itself).
+        if (redisStore.get(guardKey) !== expectedGuardValue) return false;
+        redisStore.set(lockKey("tok-cad"), "successor-nonce");
+        return true;
+      }
+    );
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ access_token: "a", refresh_token: "r" }),
@@ -425,6 +443,29 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
     await POST(makeReq("tok-cad"));
 
     expect(redisStore.get(lockKey("tok-cad"))).toBe("successor-nonce"); // ours, not deleted
+  });
+
+  it("does not publish over a successor's lock — a late publish after the lease moved on is a no-op", async () => {
+    mockRedis.redisSetGuarded.mockImplementation(
+      async (k: string, v: string, _ttl: number, guardKey: string, expectedGuardValue: string) => {
+        // Simulate the lease expiring and a peer taking a fresh lock right
+        // before our (delayed) publish actually reaches the guard check.
+        redisStore.set(lockKey("tok-late-publish"), "successor-nonce");
+        if (redisStore.get(guardKey) !== expectedGuardValue) return false;
+        redisStore.set(k, v);
+        return true;
+      }
+    );
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: "acc-stale", refresh_token: "ref-stale" }),
+    });
+
+    const res = await POST(makeReq("tok-late-publish"));
+
+    expect(res.status).toBe(200); // the leader still returns its own outcome locally
+    expect(redisStore.get(lockKey("tok-late-publish"))).toBe("successor-nonce"); // untouched
+    expect(redisStore.has(resultKey("tok-late-publish"))).toBe(false); // stale result never published
   });
 
   it("a waiter stops early (retryable 503) once the leader releases the lock with no result", async () => {
@@ -451,7 +492,7 @@ describe("POST /api/auth/refresh — Redis-coordinated (multi-instance)", () => 
     try {
       // The publish never settles — withTimeout() must resolve it to `false`
       // rather than let the leader's critical section run past its lease.
-      mockRedis.redisSet.mockImplementation(() => new Promise<boolean>(() => {}));
+      mockRedis.redisSetGuarded.mockImplementation(() => new Promise<boolean>(() => {}));
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ access_token: "acc-slow", refresh_token: "ref-slow" }),

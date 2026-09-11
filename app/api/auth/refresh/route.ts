@@ -1,7 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { HAS_SESSION_COOKIE_NAME, hasSessionCookieOptions } from "@/lib/auth/session-cookie";
-import { redisDelIfEqual, redisEnabled, redisGet, redisSet, redisSetNx } from "@/lib/infra/redis";
+import {
+  redisDelIfEqual,
+  redisEnabled,
+  redisGet,
+  redisSetGuarded,
+  redisSetNx,
+} from "@/lib/infra/redis";
 
 const COOKIE_NAME = "qf_refresh_token";
 
@@ -45,15 +51,19 @@ const RESULT_TTL_MS = 30_000;
 const RESULT_TTL_SECONDS = RESULT_TTL_MS / 1000;
 // Hard timeout on the upstream token call.
 const UPSTREAM_TIMEOUT_MS = 8_000;
-// Wrapper-level bound on the leader's result publish — lets the route proceed
-// promptly if the Redis SET is slow. The SET itself is also cancelled at the
-// client `commandTimeout` (lib/infra/redis.ts, 5s), so a slow publish can't
-// still land after the lease has passed to another leader.
+// Wrapper-level bound so the route can proceed promptly if the Redis publish is
+// slow — NOT what makes a delayed publish safe. A client-side timeout (this one
+// or the Redis client's `commandTimeout`) only rejects the local promise;
+// ioredis cannot cancel a command already sent to the server, so a "timed out"
+// SET can still land afterwards. Correctness comes from `redisSetGuarded`
+// itself: the write is conditioned on the lock still holding this leader's
+// nonce, so a late arrival from an expired lease is a no-op once a successor
+// has taken the lock, not an overwrite of whatever the successor published.
 const PUBLISH_TIMEOUT_MS = 2_000;
 // A crashed leader's lock self-clears after this so the next request can lead.
-// Must exceed the whole leader critical section — UPSTREAM_TIMEOUT_MS + the
-// Redis `commandTimeout` for the publish + the same for the release — so a live
-// leader always finishes (or gives up) inside its own lease (8 + 5 + 5 < 20).
+// Kept comfortably above the upstream call plus a slow publish/release so a
+// live leader normally finishes inside its own lease — but this is a
+// liveness/latency knob, not a correctness one; see `redisSetGuarded` above.
 const LOCK_TTL_SECONDS = 20;
 // A waiter that can't get the lock polls the shared result cache this long
 // before giving up with a retryable 503 (well under LOCK_TTL_SECONDS).
@@ -274,8 +284,17 @@ async function leadRefreshCoordinated(refreshToken: string): Promise<RefreshOutc
       // re-presenting the (now consumed) token. The key is a hash of the incoming
       // token; the deployment must run Redis with auth + TLS + network isolation
       // (same trust assumption as lib/auth/social-auth.ts's token cache).
+      // Guarded on the lock still holding OUR nonce (see redisSetGuarded) — a
+      // publish that lands after our lease expired and a successor has taken
+      // the lock is a no-op, never an overwrite of the successor's result.
       const published = await withTimeout(
-        redisSet(resultKey(refreshToken), JSON.stringify(outcome), RESULT_TTL_SECONDS),
+        redisSetGuarded(
+          resultKey(refreshToken),
+          JSON.stringify(outcome),
+          RESULT_TTL_SECONDS,
+          lockKey(refreshToken),
+          nonce
+        ),
         PUBLISH_TIMEOUT_MS,
         false
       );
