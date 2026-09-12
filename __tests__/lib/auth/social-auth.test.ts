@@ -90,6 +90,11 @@ describe("requireUser — JWT signature verification", () => {
     expect("userId" in res && res.userId).toBe(7);
   });
 
+  // These two pin the accepted-risk decision documented in social-auth.ts next
+  // to the aud check (see issue #569): an absent aud is accepted (QF's own
+  // OIDC discovery doc doesn't support aud at all), a present-but-wrong aud
+  // is still rejected. Do not "fix" the first of these by requiring aud — see
+  // the code comment for what would need to be true first.
   it("accepts a token with no aud claim at all (QF's real tokens never carry one)", async () => {
     mockLimit.mockResolvedValue([user]);
     const token = makeJwt({ sub: "qf-sub-123", exp: farFuture }, { noAud: true });

@@ -255,11 +255,29 @@ async function verifiedJwtSub(token: string): Promise<string | null> {
   // Validate audience (aud) — reject cross-client token replay, when the token
   // actually carries an audience claim. QF's Hydra instance does NOT populate
   // `aud` on access tokens (confirmed: claims_supported is just ["sub"] in its
-  // OIDC discovery doc, and real production tokens arrive with no aud claim at
-  // all) — so a claim that's entirely ABSENT can't be evidence of anything and
-  // must not be treated as a rejection. A claim that IS present but doesn't
-  // include our client ID is still rejected: that's the actual cross-client
-  // replay case this check exists for.
+  // OIDC discovery doc — https://oauth2.quran.foundation/.well-known/openid-configuration
+  // — and real production tokens arrive with no aud claim at all) — so a claim
+  // that's entirely ABSENT can't be evidence of anything and must not be
+  // treated as a rejection. A claim that IS present but doesn't include our
+  // client ID is still rejected: that's the actual cross-client replay case
+  // this check exists for.
+  //
+  // ACCEPTED RISK (see issue #569): if QF's Hydra ever mints access tokens for
+  // more than one OAuth client_id off this same issuer, and those tokens
+  // carry no `aud` (as today's do), a token issued to a *different* client
+  // would still pass this check — its RS256 signature verifies against QF's
+  // JWKS and `iss` matches, and an absent `aud` isn't rejected. `sub` from
+  // such a token is only looked up against our `users.qfId` column below
+  // (see requireUser's Stage 1) — `resolveQfIdFromUserinfo` is NOT called as
+  // a secondary check once Stage 1 finds a matching row, so there is no
+  // additional per-request audience validation beyond this one. This is
+  // accepted as the current tradeoff because QF's own discovery doc doesn't
+  // support `aud` at all (not just "sometimes omits" it), so requiring it
+  // would break every login; tightening this would need QF to confirm (a)
+  // whether they ever issue tokens for multiple client_ids from one issuer,
+  // and (b) whether `/userinfo` itself rejects a foreign-client token. Until
+  // then, don't require `aud` here — see __tests__/lib/auth/social-auth.test.ts
+  // for the regression tests pinning this decision.
   const qfClientId = process.env.NEXT_PUBLIC_QF_CLIENT_ID;
   if (qfClientId && payload.aud !== undefined) {
     const audiences: unknown[] = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
