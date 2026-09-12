@@ -19,7 +19,7 @@ import { getQuranEdition, getUiLocale } from "@/lib/i18n/request-prefs";
 import { QURAN_API_LANGUAGE_BY_LOCALE, type Locale } from "@/lib/i18n/config";
 import sanitizeHtml from "sanitize-html";
 
-// Keyword/ref search results vary on the oh_edition cookie.
+// Keyword/ref search results vary on the oh_edition and oh_locale cookies.
 export const dynamic = "force-dynamic";
 
 const MAX_QUERY_LENGTH = 200;
@@ -38,8 +38,63 @@ interface KeywordSearchResult {
   failed?: boolean;
 }
 
-/** Keyword search via the quran.com full-text API. Returns empty (and `failed: true`)
- *  on any failure, rather than treating it identically to a real zero-result search. */
+/** One raw call to quran.com's full-text search API in a given `language`. */
+async function fetchQuranComSearch(
+  q: string,
+  page: number,
+  pageSize: number,
+  edition: string,
+  language: string
+): Promise<KeywordSearchResult> {
+  const url = `https://api.quran.com/api/v4/search?q=${encodeURIComponent(q)}&size=${pageSize}&language=${language}&page=${page}`;
+  const res = await fetch(url, {
+    headers: { Accept: "application/json" },
+    next: { revalidate: 300 },
+  });
+  if (!res.ok) {
+    console.error(`Search API error: ${res.status} ${res.statusText}`);
+    return { results: [], total: 0, failed: true };
+  }
+  const data = await res.json();
+  const rawResults = (data?.search?.results ?? []) as Array<{
+    verse_key?: string;
+    translations?: Array<{ text?: string }>;
+  }>;
+  const results = rawResults
+    .filter((r): r is { verse_key: string; translations?: Array<{ text?: string }> } =>
+      Boolean(r.verse_key && /^\d+:\d+$/.test(r.verse_key))
+    )
+    .map((r) => {
+      const [surahStr] = r.verse_key.split(":");
+      const surahNum = parseInt(surahStr, 10);
+      const [surahName, surahNameArabic] = getSurahName(surahNum);
+      const snippet = sanitizeHtml(r.translations?.[0]?.text ?? "", {
+        allowedTags: [],
+        allowedAttributes: {},
+      }).slice(0, 140);
+      return {
+        ref: r.verse_key as VerseRef,
+        surahName,
+        surahNameArabic,
+        snippet,
+      };
+    });
+  return {
+    results: await hydrate(results, edition),
+    total: data?.search?.total_results ?? results.length,
+  };
+}
+
+/** Keyword search via the quran.com full-text API, matched against the caller's
+ *  UI locale. Returns empty (and `failed: true`) on any failure, rather than
+ *  treating it identically to a real zero-result search.
+ *
+ *  A genuine zero-result search in a non-English locale retries once in
+ *  English: not every English/transliterated query (e.g. "mercy", "sabr")
+ *  has a matching hit in every translation edition quran.com indexes per
+ *  language, and silently showing "nothing matched" for a query that only
+ *  fails to match the *translation* would be a real regression from the
+ *  previous always-English behavior. */
 async function keywordSearch(
   q: string,
   page: number,
@@ -48,44 +103,12 @@ async function keywordSearch(
   uiLocale: Locale
 ): Promise<KeywordSearchResult> {
   try {
-    const lang = QURAN_API_LANGUAGE_BY_LOCALE[uiLocale] ?? "en";
-    const url = `https://api.quran.com/api/v4/search?q=${encodeURIComponent(q)}&size=${pageSize}&language=${lang}&page=${page}`;
-    const res = await fetch(url, {
-      headers: { Accept: "application/json" },
-      next: { revalidate: 300 },
-    });
-    if (!res.ok) {
-      console.error(`Search API error: ${res.status} ${res.statusText}`);
-      return { results: [], total: 0, failed: true };
+    const lang = QURAN_API_LANGUAGE_BY_LOCALE[uiLocale];
+    const result = await fetchQuranComSearch(q, page, pageSize, edition, lang);
+    if (lang !== "en" && !result.failed && result.total === 0) {
+      return fetchQuranComSearch(q, page, pageSize, edition, "en");
     }
-    const data = await res.json();
-    const rawResults = (data?.search?.results ?? []) as Array<{
-      verse_key?: string;
-      translations?: Array<{ text?: string }>;
-    }>;
-    const results = rawResults
-      .filter((r): r is { verse_key: string; translations?: Array<{ text?: string }> } =>
-        Boolean(r.verse_key && /^\d+:\d+$/.test(r.verse_key))
-      )
-      .map((r) => {
-        const [surahStr] = r.verse_key.split(":");
-        const surahNum = parseInt(surahStr, 10);
-        const [surahName, surahNameArabic] = getSurahName(surahNum);
-        const snippet = sanitizeHtml(r.translations?.[0]?.text ?? "", {
-          allowedTags: [],
-          allowedAttributes: {},
-        }).slice(0, 140);
-        return {
-          ref: r.verse_key as VerseRef,
-          surahName,
-          surahNameArabic,
-          snippet,
-        };
-      });
-    return {
-      results: await hydrate(results, edition),
-      total: data?.search?.total_results ?? results.length,
-    };
+    return result;
   } catch (err) {
     console.error("Keyword search error:", err);
     return { results: [], total: 0, failed: true };

@@ -423,17 +423,74 @@ describe("GET /api/search", () => {
     ["ru", "милосердие"],
     ["az", "rəhmət"],
   ])(
-    "passes the caller's UI locale (%s) as quran.com's keyword-search language",
+    "passes the caller's UI locale (%s) and query as quran.com's keyword-search params",
     async (locale, q) => {
       mockGetUiLocale.mockResolvedValue(locale);
-      mockFetch.mockResolvedValueOnce(quranComResponse([]));
+      // Non-English + zero results triggers an English retry (see below) —
+      // return a hit here so only the one, locale-language call happens.
+      mockFetch.mockResolvedValueOnce(
+        quranComResponse([{ verse_key: "1:1", translations: [{ text: "..." }] }])
+      );
       await GET(makeSearchReq(q));
+      expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining(`language=${locale}`),
         expect.anything()
       );
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining(`q=${encodeURIComponent(q)}`),
+        expect.anything()
+      );
     }
   );
+
+  it("hydrates results found under a non-English locale's own language", async () => {
+    mockGetUiLocale.mockResolvedValue("tr");
+    mockGetQuranEdition.mockResolvedValue("tr.diyanet");
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([{ verse_key: "1:3", translations: [{ text: "..." }] }])
+    );
+    mockGetVerses.mockResolvedValueOnce(new Map([["1:3", verse("1:3", "Rahman ve Rahim olan.")]]));
+    const res = await GET(makeSearchReq("merhamet"));
+    const body = await res.json();
+    expect(body.results).toHaveLength(1);
+    expect(body.results[0].translation).toBe("Rahman ve Rahim olan.");
+    expect(mockFetch).toHaveBeenCalledTimes(1); // a real hit — no English retry
+  });
+
+  it("retries once in English when a non-English-locale search genuinely finds nothing", async () => {
+    mockGetUiLocale.mockResolvedValue("tr");
+    mockFetch
+      .mockResolvedValueOnce(quranComResponse([])) // Turkish: zero hits
+      .mockResolvedValueOnce(
+        quranComResponse([{ verse_key: "2:30", translations: [{ text: "mercy" }] }])
+      ); // English retry: a hit
+    const res = await GET(makeSearchReq("mercy"));
+    const body = await res.json();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("language=tr"),
+      expect.anything()
+    );
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("language=en"),
+      expect.anything()
+    );
+    expect(body.results).toHaveLength(1);
+    expect(body.results[0].ref).toBe("2:30");
+  });
+
+  it("does not retry in English when the non-English search itself failed (not just found zero)", async () => {
+    mockGetUiLocale.mockResolvedValue("tr");
+    mockFetch.mockResolvedValueOnce({ ok: false });
+    const res = await GET(makeSearchReq("mercy"));
+    const body = await res.json();
+    expect(mockFetch).toHaveBeenCalledTimes(1); // no retry — this is "search broke", not "nothing matched"
+    expect(body.results).toEqual([]);
+    expect(res.headers.get("x-search-error")).toBe("keyword-unavailable");
+  });
 
   describe("surah-name queries", () => {
     it("returns a matchedSurahs payload with no ayah results for an exact surah-name query", async () => {
