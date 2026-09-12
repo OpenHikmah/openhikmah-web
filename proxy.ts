@@ -10,26 +10,35 @@ const isDev = process.env.NODE_ENV === "development";
  * fresh nonce baked into script-src (see issue #570). Still report-only —
  * enforcing is a separate follow-up once /api/csp-report has been observed
  * clean for a window. 'strict-dynamic' plus the explicit googletagmanager.com
- * host covers both nonce-aware and older browsers; the GA beacon/pixel hosts
- * in connect-src/img-src are the ones actually observed violating in prod
- * console (see issue #570) — img-src's `https://*.google.com` is a best
- * effort for the regional-TLD ad-audience pixel (`google.<tld>/ads/...`),
- * which CSP host-source syntax can't wildcard across TLDs; any remaining
- * regional-TLD reports during the observation window are a known GA gap, not
- * a bug here.
+ * host covers both nonce-aware and older browsers; connect-src's GA hosts are
+ * the ones actually observed violating in prod console (see issue #570).
+ *
+ * img-src deliberately does NOT attempt to allowlist GA's regional-TLD
+ * ad-audience pixel (`google.<tld>/ads/ga-audiences`) — CSP host-source
+ * syntax can only wildcard subdomains (`https://*.google.com`), never TLDs,
+ * so a `*.google.com` entry wouldn't actually match `google.de` etc. anyway,
+ * while needlessly opening img-src to every other google.com subdomain. That
+ * pixel will keep showing as a report-only violation during the observation
+ * window; tracked as a known GA gap, not something this PR can fix with CSP
+ * syntax alone.
  *
  * next.config.ts keeps the original non-nonce'd CSP-Report-Only as the
  * fallback for routes this proxy's matcher excludes (admin, api/*, static
- * assets) — Proxy runs after next.config.ts's `headers()` (see Next's docs),
- * so `.set()` below cleanly replaces that header rather than duplicating it,
- * for every route this proxy actually matches.
+ * assets). Proxy runs after next.config.ts's `headers()` (confirmed via
+ * Next's own source, not just its docs — see resolveRoutes in
+ * node_modules/next/dist/server/lib/router-utils/resolve-routes.js: the
+ * `fsChecker.headers` route is placed before the `middleware` route in the
+ * `routes` array, and both write into the same `resHeaders` object with a
+ * plain `resHeaders[key] = value` assignment, not an array push) — so `.set()`
+ * below cleanly replaces that header rather than duplicating it, for every
+ * route this proxy actually matches.
  */
 function buildCspReportOnly(nonce: string): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://www.googletagmanager.com${isDev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://*.google.com",
+    "img-src 'self' data: blob:",
     "font-src 'self' data:",
     "connect-src 'self' https://analytics.google.com https://stats.g.doubleclick.net",
     "object-src 'none'",
@@ -51,7 +60,13 @@ function buildCspReportOnly(nonce: string): string {
  *
  * Also generates this request's CSP nonce (see buildCspReportOnly above),
  * exposed as an `x-nonce` request header so a Server Component can read it
- * via `(await headers()).get("x-nonce")` — see app/layout.tsx.
+ * via `(await headers()).get("x-nonce")` — see app/layout.tsx. The CSP header
+ * itself is ALSO set on the forwarded request headers (not just the
+ * response) — Next's own renderer reads the CSP off the incoming request to
+ * auto-extract the nonce and apply it to framework-generated inline scripts
+ * (hydration/flight-data payloads), per Next's documented nonce pattern; a
+ * response-only header would leave that auto-injection silently unwired,
+ * which would only surface once script-src is later flipped to enforced.
  */
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const nonce = Buffer.from(randomUUID()).toString("base64");
@@ -69,6 +84,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("Content-Security-Policy-Report-Only", csp);
   const res = NextResponse.next({ request: { headers: requestHeaders } });
   res.headers.set("Content-Security-Policy-Report-Only", csp);
   return res;

@@ -69,6 +69,18 @@ describe("proxy (CSP nonce)", () => {
     expect(res.headers.get("x-middleware-request-x-nonce")).toBe(nonce);
   });
 
+  it("also forwards the CSP header itself on the request, not just the response", async () => {
+    // Next's own renderer reads the CSP off the REQUEST headers to
+    // auto-nonce its framework-generated inline scripts — a response-only
+    // header would leave that wiring silently broken until enforcement.
+    const res = await proxy(req("/"));
+    const responseCsp = res.headers.get("Content-Security-Policy-Report-Only");
+    const forwardedCsp = res.headers.get(
+      "x-middleware-request-content-security-policy-report-only"
+    );
+    expect(forwardedCsp).toBe(responseCsp);
+  });
+
   it("still sets the nonce'd CSP header on the maintenance-mode 503 response", async () => {
     mockGetFlagBoolean.mockResolvedValue(true);
     const res = await proxy(req("/"));
