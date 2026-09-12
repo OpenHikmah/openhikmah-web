@@ -45,6 +45,19 @@ export const VALID_EDITIONS: readonly string[] = [
   "az.mammadaliyev",
 ];
 
+// quran.com's /search `language` query param per locale — spot-checked
+// manually against the live endpoint for all four (en/tr/ru/az) with a
+// representative query and got real hits back for each (see
+// app/api/search/route.ts's keywordSearch, which also retries in English on
+// a genuine zero-result non-English search, since not every English/
+// transliterated query has a matching hit in a non-English translation).
+export const QURAN_API_LANGUAGE_BY_LOCALE: Record<Locale, string> = {
+  en: "en",
+  tr: "tr",
+  ru: "ru",
+  az: "az",
+};
+
 export const LOCALE_COOKIE = "oh_locale";
 export const EDITION_COOKIE = "oh_edition";
 
