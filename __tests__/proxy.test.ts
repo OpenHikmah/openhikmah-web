@@ -37,6 +37,46 @@ describe("proxy (maintenance mode)", () => {
   });
 });
 
+describe("proxy (CSP nonce)", () => {
+  beforeEach(() => {
+    mockGetFlagBoolean.mockResolvedValue(false);
+  });
+
+  it("sets a nonce'd Content-Security-Policy-Report-Only response header", async () => {
+    const res = await proxy(req("/"));
+    const csp = res.headers.get("Content-Security-Policy-Report-Only");
+    expect(csp).toMatch(/script-src 'self' 'nonce-[A-Za-z0-9+/=]+' 'strict-dynamic'/);
+    expect(csp).toContain("https://www.googletagmanager.com");
+    expect(csp).toContain("https://analytics.google.com");
+    expect(csp).toContain("report-uri /api/csp-report");
+  });
+
+  it("uses a fresh nonce on every request", async () => {
+    const csp1 = (await proxy(req("/"))).headers.get("Content-Security-Policy-Report-Only");
+    const csp2 = (await proxy(req("/"))).headers.get("Content-Security-Policy-Report-Only");
+    const nonce = (csp: string | null) => csp?.match(/'nonce-([A-Za-z0-9+/=]+)'/)?.[1];
+    expect(nonce(csp1)).toBeTruthy();
+    expect(nonce(csp1)).not.toBe(nonce(csp2));
+  });
+
+  it("exposes the same nonce on the x-nonce request header forwarded upstream", async () => {
+    const res = await proxy(req("/"));
+    const csp = res.headers.get("Content-Security-Policy-Report-Only");
+    const nonce = csp?.match(/'nonce-([A-Za-z0-9+/=]+)'/)?.[1];
+    // NextResponse.next({ request: { headers } }) surfaces the forwarded
+    // request headers on this special header (Next's own convention) so
+    // tests can assert what would reach the Server Component via headers().
+    expect(res.headers.get("x-middleware-request-x-nonce")).toBe(nonce);
+  });
+
+  it("still sets the nonce'd CSP header on the maintenance-mode 503 response", async () => {
+    mockGetFlagBoolean.mockResolvedValue(true);
+    const res = await proxy(req("/"));
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Content-Security-Policy-Report-Only")).toMatch(/'nonce-/);
+  });
+});
+
 // The admin surface must stay reachable even when maintenance mode is on —
 // a matcher regression here would silently reintroduce a DB round-trip (and
 // its failure mode) on every /admin request, exactly what the operator's
