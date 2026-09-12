@@ -16,5 +16,9 @@ scripts
 !scripts/embed-corpus.mjs
 !scripts/seed-morphology.mjs
 !scripts/seed-translations.mjs
+# TEMPORARY — issue #566 retroactive cleanup (see PR #600). Remove once the
+# one-time cleanup run against production is done.
+!scripts/cleanup-566-ai-content.mjs
+!scripts/audit-566-retroactive.sql
 hosting.md
 plan.md

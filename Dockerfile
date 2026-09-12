@@ -69,6 +69,15 @@ COPY --from=builder --chown=nextjs:nodejs /app/scripts/seed-translations.mjs ./s
 COPY --from=builder --chown=nextjs:nodejs /app/data/morphology ./data/morphology
 COPY --from=deps /app/node_modules/@google/generative-ai ./node_modules/@google/generative-ai
 
+# TEMPORARY — issue #566 retroactive cleanup (see PR #600). cleanup-566-ai-content.mjs
+# only needs `postgres`, already copied above for migrate.mjs. audit-566-retroactive.sql
+# is a plain file (this image has no psql client — install one on the fly with
+# `apk add --no-cache postgresql-client` if you want to run it, or just rely on the
+# .mjs script's own dry-run output). Remove both COPY lines and the scripts themselves
+# once the one-time cleanup run is done.
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/cleanup-566-ai-content.mjs ./scripts/cleanup-566-ai-content.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/audit-566-retroactive.sql ./scripts/audit-566-retroactive.sql
+
 USER nextjs
 EXPOSE 3000
 # Migrations run as a one-shot step in scripts/deploy.sh before this container
