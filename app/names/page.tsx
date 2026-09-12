@@ -10,7 +10,7 @@ import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
 
 export const metadata = {
-  title: "Asma-ul-Husna — Open Hikmah",
+  title: "Asmaul Husna — Open Hikmah",
   description:
     "The 99 Beautiful Names of Allah with Maturidi taxonomy, root morphology, and verse connections.",
 };

@@ -40,7 +40,7 @@ describe("Story opengraph-image", () => {
       expect.objectContaining({ eyebrow: "Open Hikmah" })
     );
     expect(mockRenderOgCard).not.toHaveBeenCalledWith(
-      expect.objectContaining({ eyebrow: "Prophetic Stories" })
+      expect.objectContaining({ eyebrow: "Prophetic Narratives" })
     );
   });
 
@@ -54,7 +54,7 @@ describe("Story opengraph-image", () => {
     await Image({ params: Promise.resolve({ slug: "test-story" }) });
 
     expect(mockRenderOgCard).toHaveBeenCalledWith(
-      expect.objectContaining({ eyebrow: "Prophetic Stories", title: "Test Story" })
+      expect.objectContaining({ eyebrow: "Prophetic Narratives", title: "Test Story" })
     );
   });
 });
