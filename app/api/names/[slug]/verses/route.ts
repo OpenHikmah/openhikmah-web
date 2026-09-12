@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callAI } from "@/lib/ai/ai";
 import { translateReason } from "@/lib/ai/translate";
+import { looksLikeRefusal } from "@/lib/ai/refusal";
 import { getNameBySlug } from "@/lib/names/divine-names";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
@@ -8,6 +9,7 @@ import {
   getOrGenerateNameContent,
   getOrGenerateVerseReason,
   type ResolvedNamesModel,
+  type GenerationContext,
 } from "@/lib/names/name-content";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
@@ -91,7 +93,21 @@ Output format:
 { "surah:ayah": "one sentence", ... }`;
 
   try {
-    const text = await callAI(prompt, { feature: "names", ...resolved });
+    const text = await callAI(prompt, {
+      feature: "names",
+      provider: resolved.provider,
+      model: resolved.model,
+    });
+    if (looksLikeRefusal(text)) {
+      // A refusal here only degrades the per-verse *reason* text (each verse
+      // falls back to its default "Contains a form of ..." reason below) — it
+      // never empties the overall verses result, since the refs themselves
+      // already came from search, not this call. Logged for visibility; not
+      // gated through markRefusal() because there's nothing to gate here.
+      console.error(`Name verses: model returned a refusal for ${transliteration}, not caching`);
+      incr("names_ai_refusal");
+      return new Map();
+    }
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return new Map();
     const obj: unknown = JSON.parse(match[0]);
@@ -113,7 +129,7 @@ async function fallbackAIVerses(
   transliteration: string,
   meaning: string,
   description: string,
-  resolved: ResolvedNamesModel
+  ctx: GenerationContext
 ): Promise<Array<{ ref: string; reason: string }>> {
   const prompt = `You are a classical Islamic scholar (Maturidi/Hanafi tradition).
 
@@ -126,7 +142,21 @@ Return ONLY a JSON array:
 [{ "ref": "surah:ayah", "reason": "one sentence" }, ...]`;
 
   try {
-    const text = await callAI(prompt, { feature: "names", ...resolved });
+    const text = await callAI(prompt, {
+      feature: "names",
+      provider: ctx.provider,
+      model: ctx.model,
+    });
+    if (looksLikeRefusal(text)) {
+      // Unlike buildReasons above, this IS the sole content generator when
+      // search found nothing — an empty result here does gate the overall
+      // verses fallback, so a detected refusal must call markRefusal() to
+      // stop resolveAndGenerate from silently backing it with Gemini.
+      console.error(`Name verses: model returned a refusal for ${transliteration}, not caching`);
+      incr("names_ai_refusal");
+      ctx.markRefusal();
+      return [];
+    }
     const match = text.match(/\[[\s\S]*\]/);
     if (!match) return [];
     const raw: unknown = JSON.parse(match[0]);
@@ -168,7 +198,7 @@ async function getVersesBySlug(
     // requester's locale — see name_verse_reasons below for why.
     "en",
     VERSES_VERSION,
-    async (resolved): Promise<NameVerse[]> => {
+    async (ctx): Promise<NameVerse[]> => {
       // Try actual quran.com search first
       const refs = await searchVerseRefs(name.arabic);
 
@@ -176,7 +206,7 @@ async function getVersesBySlug(
       if (refs.length > 0) {
         const [verseDataResults, reasonMap] = await Promise.all([
           Promise.all(refs.map((ref) => fetchVerseData(ref))),
-          buildReasons(refs, name.transliteration, name.meaning, resolved),
+          buildReasons(refs, name.transliteration, name.meaning, ctx),
         ]);
 
         const verses: NameVerse[] = refs
@@ -200,7 +230,7 @@ async function getVersesBySlug(
         name.transliteration,
         name.meaning,
         name.description,
-        resolved
+        ctx
       );
       if (aiItems.length === 0) return [];
 
@@ -286,8 +316,20 @@ async function getVersesBySlug(
         slug,
         v.ref,
         locale,
-        (resolved) =>
-          translateReason(v.reason, language, { feature: "names", ...resolved }).catch((err) => {
+        (ctx) =>
+          translateReason(
+            v.reason,
+            language,
+            { feature: "names", provider: ctx.provider, model: ctx.model },
+            (reason) => {
+              // A refusal on translating a reason must not be silently backed
+              // by Gemini either — same rationale as reflection/pairings/
+              // fallbackAIVerses above. The other rejection reasons (label
+              // wrapper, English echo, length ratio) are ordinary malformed
+              // output, not a refusal, so they still fall back as before.
+              if (reason === "refusal") ctx.markRefusal();
+            }
+          ).catch((err) => {
             // A provider failure on the translation call must degrade to the
             // English reason (handled just below), never 500 the whole verses
             // response — mirrors the callAI try/catch in reflection/pairings.

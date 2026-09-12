@@ -109,4 +109,40 @@ describe("translateReason", () => {
     await expect(translateReason(EN, "Russian")).resolves.toBe("");
     expect(incrSpy).toHaveBeenCalledWith("translation_rejected_english_echo");
   });
+
+  it("calls onRejected with the specific reason on a refusal", async () => {
+    mockCallAI.mockResolvedValue("I'm sorry, but I can't translate religious content.");
+    const onRejected = vi.fn();
+
+    await translateReason(EN, "Turkish", {}, onRejected);
+
+    expect(onRejected).toHaveBeenCalledWith("refusal");
+  });
+
+  it("calls onRejected with a non-refusal reason for an English echo, not 'refusal'", async () => {
+    mockCallAI.mockResolvedValue(EN);
+    const onRejected = vi.fn();
+
+    await translateReason(EN, "Russian", {}, onRejected);
+
+    expect(onRejected).toHaveBeenCalledWith("english_echo");
+  });
+
+  it("does not call onRejected on a clean, accepted translation", async () => {
+    mockCallAI.mockResolvedValue("Mümin kalbini yakine bırakır.");
+    const onRejected = vi.fn();
+
+    await translateReason(EN, "Turkish", {}, onRejected);
+
+    expect(onRejected).not.toHaveBeenCalled();
+  });
+
+  it("does not call onRejected for an empty model result (not a rejection)", async () => {
+    mockCallAI.mockResolvedValue("   ");
+    const onRejected = vi.fn();
+
+    await translateReason(EN, "Turkish", {}, onRejected);
+
+    expect(onRejected).not.toHaveBeenCalled();
+  });
 });

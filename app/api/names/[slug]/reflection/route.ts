@@ -55,18 +55,20 @@ async function getReflection(
     "reflection",
     locale,
     REFLECTION_VERSION,
-    async (resolved) => {
+    async (ctx) => {
       try {
         const text = await callAI(
           buildPrompt(name.arabic, name.transliteration, name.meaning, name.description, locale),
-          { feature: "names", ...resolved }
+          { feature: "names", provider: ctx.provider, model: ctx.model }
         );
         if (looksLikeRefusal(text)) {
           // A soft refusal / disclaimer is not canonical theology — treat it
           // like an empty result (not cached, retried) rather than version-pin
-          // it as this name's reflection.
+          // it as this name's reflection. markRefusal() also stops
+          // resolveAndGenerate from silently backing this with Gemini.
           console.error(`Reflection: model returned a refusal for ${slug}, not caching`);
           incr("names_ai_refusal");
+          ctx.markRefusal();
           return "";
         }
         return text;

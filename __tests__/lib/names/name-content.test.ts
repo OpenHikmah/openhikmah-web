@@ -90,7 +90,9 @@ describe("getOrGenerateNameContent", () => {
     // The provider+model pair handed to generate() is the one that gets
     // persisted — resolved once, so a config change mid-flight can't split them.
     const passedToGenerate = generate.mock.calls[0][0] as { provider: string; model: string };
-    expect(passedToGenerate).toEqual({ provider: expect.any(String), model: expect.any(String) });
+    expect(passedToGenerate).toEqual(
+      expect.objectContaining({ provider: expect.any(String), model: expect.any(String) })
+    );
     expect(values.model).toBe(passedToGenerate.model);
   });
 
@@ -112,10 +114,12 @@ describe("getOrGenerateNameContent", () => {
     expect(out).toEqual(["gemini", "gemini-3.7-flash"]);
     const values = mockValues.mock.calls[0][0] as Record<string, unknown>;
     expect(values.model).toBe("gemini-3.7-flash");
-    expect(generate.mock.calls[0][0]).toEqual({
-      provider: "gemini",
-      model: "gemini-3.7-flash",
-    });
+    expect(generate.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        provider: "gemini",
+        model: "gemini-3.7-flash",
+      })
+    );
     providerSpy.mockRestore();
     modelSpy.mockRestore();
   });
@@ -193,13 +197,71 @@ describe("getOrGenerateNameContent", () => {
 
     expect(out).toEqual(["a", "b"]);
     expect(generate).toHaveBeenCalledTimes(2);
-    expect(generate.mock.calls[0][0]).toEqual({ provider: "claude", model: "claude-opus-5" });
-    expect(generate.mock.calls[1][0]).toEqual({ provider: "gemini", model: "gemini-3.7-flash" });
+    expect(generate.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ provider: "claude", model: "claude-opus-5" })
+    );
+    expect(generate.mock.calls[1][0]).toEqual(
+      expect.objectContaining({ provider: "gemini", model: "gemini-3.7-flash" })
+    );
     expect(mockInsert).toHaveBeenCalledTimes(1);
     const values = mockValues.mock.calls[0][0] as Record<string, unknown>;
     expect(values.model).toBe("gemini-3.7-flash");
     providerSpy.mockRestore();
     modelSpy.mockRestore();
+  });
+
+  it("logs when falling back to Gemini on an empty (non-thrown) primary result", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    const ai = await import("@/lib/ai/ai");
+    const providerSpy = vi.spyOn(ai, "resolveProvider").mockResolvedValue("claude");
+    const modelSpy = vi
+      .spyOn(ai, "resolveModel")
+      .mockImplementation(async (_feature, provider) =>
+        provider === "claude" ? "claude-opus-5" : "gemini-3.7-flash"
+      );
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const generate = vi.fn(async (resolved: { provider: string; model: string }) =>
+      resolved.provider === "claude" ? [] : ["a"]
+    );
+
+    await getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr);
+
+    // Previously the empty-but-not-thrown path had no log line at all — only
+    // the incr("names_ai_fallback_used") metric, invisible outside /api/metrics.
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Names: primary (claude) returned empty for al-malik/verses, falling back to Gemini"
+    );
+    providerSpy.mockRestore();
+    modelSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it("does not fall back to Gemini when the primary result is a detected refusal", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([])); // miss
+    const ai = await import("@/lib/ai/ai");
+    const providerSpy = vi.spyOn(ai, "resolveProvider").mockResolvedValue("claude");
+    const modelSpy = vi.spyOn(ai, "resolveModel").mockResolvedValue("claude-opus-5");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const generate = vi.fn(async (ctx: { markRefusal: () => void }) => {
+      ctx.markRefusal();
+      return [];
+    });
+
+    const out = await getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr);
+
+    expect(out).toEqual([]);
+    // A refusal must not be silently backed by a different provider — no
+    // second (Gemini) call at all, unlike an ordinary empty result.
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Names: claude refused for al-malik/verses, not falling back to Gemini"
+    );
+    providerSpy.mockRestore();
+    modelSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   it("does not fall back when the primary provider is already Gemini", async () => {
@@ -239,7 +301,10 @@ describe("getOrGenerateNameContent", () => {
     expect(out).toEqual([]);
     expect(generate).toHaveBeenCalledTimes(2);
     expect(mockInsert).not.toHaveBeenCalled();
-    expect(errorSpy).toHaveBeenCalledWith("Names: Gemini fallback failed:", expect.any(Error));
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Names: Gemini fallback failed for al-malik/verses:",
+      expect.any(Error)
+    );
     providerSpy.mockRestore();
     modelSpy.mockRestore();
     errorSpy.mockRestore();
@@ -422,7 +487,10 @@ describe("getOrGenerateNameContent", () => {
       getOrGenerateNameContent("al-malik", "verses", "en", 1, generate, isEmptyArr)
     ).rejects.toThrow("boom");
     expect(generate).toHaveBeenCalledTimes(2); // primary + fallback attempt
-    expect(errorSpy).toHaveBeenCalledWith("Names: Gemini fallback failed:", expect.any(Error));
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Names: Gemini fallback failed for al-malik/verses:",
+      expect.any(Error)
+    );
     expect(mockInsert).not.toHaveBeenCalled();
 
     // lock released in finally → fresh call regenerates

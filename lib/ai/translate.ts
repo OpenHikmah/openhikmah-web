@@ -85,12 +85,17 @@ export function validateTranslation(source: string, translated: string): Transla
  *
  * Returns "" when the model output is empty or fails {@link validateTranslation};
  * every caller already treats "" as "skip, keep the English reason, retry later"
- * rather than persisting it.
+ * rather than persisting it. `onRejected` is called with the specific reason
+ * before that "" is returned — used by callers that route through
+ * `resolveAndGenerate` (see lib/names/name-content.ts) to call `markRefusal()`
+ * on a `"refusal"` rejection, so a Claude refusal on translating a reason isn't
+ * silently backed by Gemini the way a genuinely empty/malformed translation is.
  */
 export async function translateReason(
   reason: string,
   language: string,
-  opts: CallAiOptions = {}
+  opts: CallAiOptions = {},
+  onRejected?: (reason: TranslationRejection) => void
 ): Promise<string> {
   const prompt = `Translate the following sentence into ${language}. Preserve its meaning exactly — do not add, remove, or alter any theological claim, and maintain ${TANZIH_CONSTRAINT}. Return ONLY the translated sentence, with no quotation marks, labels, or explanation.
 
@@ -102,6 +107,7 @@ Sentence: "${reason}"`;
   if (!verdict.ok) {
     console.error(`translateReason: rejected translation into ${language} (${verdict.reason})`);
     incr(`translation_rejected_${verdict.reason}`);
+    onRejected?.(verdict.reason);
     return "";
   }
   return verdict.text;
