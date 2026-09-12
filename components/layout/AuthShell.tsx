@@ -21,7 +21,11 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
       {showContent ? (
         children
       ) : isSessionLoading ? (
-        <div className="flex flex-1 items-center justify-center" role="status" aria-label="Loading">
+        <div
+          className="flex flex-1 items-center justify-center"
+          role="status"
+          aria-label={tCommon("loading")}
+        >
           <Loader2 className="h-5 w-5 animate-spin text-teal" />
         </div>
       ) : (

@@ -7,7 +7,8 @@
     "allSettings": "All settings →",
     "changeLanguage": "Change language",
     "removeBookmark": "Remove bookmark",
-    "bookmarkVerse": "Bookmark verse"
+    "bookmarkVerse": "Bookmark verse",
+    "loading": "Loading"
   },
   "nav": {
     "canvas": "Canvas",
@@ -109,7 +110,31 @@
     "saveWorkspace": "Save workspace",
     "exportAsPng": "Export as PNG",
     "exportAsPdf": "Export as PDF",
-    "more": "More"
+    "more": "More",
+    "contextSidebar": {
+      "tafsirTitle": "Ibn Kathir Tafsir",
+      "loading": "Loading…",
+      "tafsirUnavailable": "Tafsir unavailable.",
+      "myNotes": "My Notes",
+      "signInForNotes": "Sign in to add private notes.",
+      "deleteNote": "Delete note",
+      "deleteFailed": "Delete failed",
+      "addNotePlaceholder": "Add a private note…",
+      "saving": "Saving…",
+      "saveFailedRetry": "Save failed — try again",
+      "save": "Save",
+      "similarVerses": "Similar verses",
+      "noneFound": "None found.",
+      "edgeKindThematic": "Thematic",
+      "edgeKindRoot": "Root word",
+      "edgeKindContrast": "Contrast",
+      "resizePanel": "Resize panel",
+      "verseHeader": "Verse",
+      "connectionHeader": "Connection",
+      "closePanel": "Close panel",
+      "whyConnected": "Why connected"
+    },
+    "loadingCanvas": "Loading canvas…"
   },
   "search": {
     "dialogTitle": "Search Quran Verses",
@@ -229,5 +254,136 @@
   "authGate": {
     "title": "Sign in to continue",
     "body": "You need to be signed in to view this page."
+  },
+  "social": {
+    "page": {
+      "pageTitle": "Social",
+      "tabLeaderboard": "Leaderboard",
+      "tabFriends": "Friends",
+      "tabChallenges": "Challenges",
+      "profileLoadFailed": "Your profile couldn't load. Please sign out and try again.",
+      "backToHome": "Back to home",
+      "couldntLoad": "Couldn't load.",
+      "retry": "Retry",
+      "loadMore": "Load more",
+      "loading": "Loading…",
+      "yourChallenges": "Your challenges",
+      "addFriendsToSeeThemHere": "Add friends to see them here.",
+      "goToFriends": "Go to Friends"
+    },
+    "challengeList": {
+      "ended": "Ended",
+      "daysHoursLeft": "{d}d {h}h left",
+      "hoursMinutesLeft": "{h}h {m}m left",
+      "minutesSecondsLeft": "{m}m {s}s left",
+      "statusActive": "Active",
+      "statusIncoming": "Incoming",
+      "statusPending": "Pending",
+      "statusWon": "Won",
+      "statusDraw": "Draw",
+      "statusLost": "Lost",
+      "statusCancelled": "Cancelled",
+      "statusDeclined": "Declined",
+      "youWon": "You won",
+      "theyWonCaption": "{name} won",
+      "acceptFailedRetry": "Couldn't accept — try again.",
+      "declineFailedRetry": "Couldn't decline — try again.",
+      "cancelFailedRetry": "Couldn't cancel — try again.",
+      "networkErrorTryAgain": "Network error — try again.",
+      "accept": "Accept",
+      "decline": "Decline",
+      "waitingForOpponent": "Waiting for {name}…",
+      "cancel": "Cancel",
+      "noChallengesYet": "No challenges yet.",
+      "pickSuggestionOrChallenge": "Pick a suggestion or challenge a friend above.",
+      "groupNeedsResponse": "Needs your response",
+      "groupActive": "Active",
+      "groupSent": "Sent",
+      "groupPast": "Past",
+      "you": "You",
+      "vs": "vs"
+    },
+    "createChallengeForm": {
+      "newChallenge": "New challenge",
+      "chooseAFriend": "Choose a friend",
+      "chooseAFriendPlaceholder": "Choose a friend…",
+      "clearSuggestion": "Clear suggestion",
+      "duration": "Duration",
+      "versePlaceholderCompact": "Verse (optional)",
+      "versePlaceholderFull": "Verse context (optional, e.g. 2:255)",
+      "send": "Send",
+      "sendChallenge": "Send challenge",
+      "couldNotSendChallenge": "Could not send challenge",
+      "challengeSent": "Challenge sent to @{username}!",
+      "networkErrorPeriod": "Network error. Try again.",
+      "addFriendsFirst": "Add friends first to challenge them.",
+      "fromLabel": "From:"
+    },
+    "addFriendForm": {
+      "searchPlaceholder": "Search by username…",
+      "searching": "Searching…",
+      "noUsersFound": "No users found.",
+      "statusFriends": "Friends",
+      "statusSent": "Sent",
+      "add": "Add",
+      "accept": "Accept",
+      "couldNotSendRequest": "Could not send request",
+      "networkErrorPeriod": "Network error. Try again."
+    },
+    "challengeSuggestions": {
+      "suggested": "Suggested",
+      "use": "Use"
+    },
+    "leaderboardTable": {
+      "addFriendsToSeeLeaderboard": "Add friends to see the leaderboard.",
+      "youSuffix": "(you)"
+    },
+    "friendList": {
+      "noFriendsYet": "No friends yet. Add someone by username above.",
+      "pendingRequests": "Pending requests",
+      "friendsHeader": "Friends",
+      "sentDirection": "sent",
+      "receivedDirection": "received",
+      "acceptRequestAria": "Accept request",
+      "declineRequestAria": "Decline request",
+      "cancelRequestAria": "Cancel request",
+      "clickAgainToConfirm": "Click again to confirm",
+      "removeFriendAria": "Remove friend",
+      "acceptRequestFailed": "Couldn't accept request — try again.",
+      "declineRequestFailed": "Couldn't decline request — try again.",
+      "couldntRemoveTryAgain": "Couldn't remove — try again.",
+      "networkErrorTryAgain": "Network error — try again."
+    }
+  },
+  "mentions": {
+    "pageTitle": "Mentions",
+    "noMentionsYet": "No mentions yet.",
+    "mentionHint": "A friend can tag you with your @username in a verse note.",
+    "couldntMarkRead": "Couldn't mark mentions as read. The unread count may be out of sync.",
+    "couldntLoadMentions": "Couldn't load mentions.",
+    "mentionedYouOn": "mentioned you on",
+    "openInCanvas": "Open in canvas"
+  },
+  "workspaces": {
+    "pageTitle": "Saved Canvases",
+    "noSavedCanvasesYet": "No saved canvases yet.",
+    "buildAndSaveHint": "Build a canvas and click the save icon in the header to save it.",
+    "openCanvas": "Open canvas",
+    "couldntLoadCanvases": "Couldn't load your saved canvases.",
+    "retry": "Retry",
+    "load": "Load",
+    "deleteCanvas": "Delete canvas",
+    "confirmDeleteCanvas": "Confirm delete canvas?",
+    "nodeCount": "{count, plural, one {# verse} other {# verses}}"
+  },
+  "onboarding": {
+    "chooseUsername": "Choose a username",
+    "usernameHint": "This is how friends will find you on the leaderboard.",
+    "usernamePlaceholder": "e.g. ahmed_hikmah",
+    "usernameRules": "3–20 characters: letters, numbers, underscores only",
+    "couldNotSaveUsername": "Could not save username. Try another one.",
+    "networkErrorPleaseRetry": "Network error. Please try again.",
+    "saving": "Saving…",
+    "getStarted": "Get started"
   }
 }

@@ -7,7 +7,8 @@
     "allSettings": "Tüm ayarlar →",
     "changeLanguage": "Dili değiştir",
     "removeBookmark": "Yer imini kaldır",
-    "bookmarkVerse": "Ayeti işaretle"
+    "bookmarkVerse": "Ayeti işaretle",
+    "loading": "Yükleniyor"
   },
   "nav": {
     "canvas": "Kanvas",
@@ -109,7 +110,31 @@
     "saveWorkspace": "Çalışma alanını kaydet",
     "exportAsPng": "PNG olarak dışa aktar",
     "exportAsPdf": "PDF olarak dışa aktar",
-    "more": "Diğer"
+    "more": "Diğer",
+    "contextSidebar": {
+      "tafsirTitle": "İbn Kesir Tefsiri",
+      "loading": "Yükleniyor…",
+      "tafsirUnavailable": "Tefsir mevcut değil.",
+      "myNotes": "Notlarım",
+      "signInForNotes": "Özel not eklemek için giriş yapın.",
+      "deleteNote": "Notu sil",
+      "deleteFailed": "Silme başarısız",
+      "addNotePlaceholder": "Özel bir not ekleyin…",
+      "saving": "Kaydediliyor…",
+      "saveFailedRetry": "Kaydetme başarısız — tekrar deneyin",
+      "save": "Kaydet",
+      "similarVerses": "Benzer ayetler",
+      "noneFound": "Bulunamadı.",
+      "edgeKindThematic": "Tema",
+      "edgeKindRoot": "Kök kelime",
+      "edgeKindContrast": "Karşıtlık",
+      "resizePanel": "Paneli yeniden boyutlandır",
+      "verseHeader": "Ayet",
+      "connectionHeader": "Bağlantı",
+      "closePanel": "Paneli kapat",
+      "whyConnected": "Neden bağlantılı"
+    },
+    "loadingCanvas": "Kanvas yükleniyor…"
   },
   "search": {
     "dialogTitle": "Kur'an Ayetlerinde Ara",
@@ -229,5 +254,136 @@
   "authGate": {
     "title": "Devam etmek için giriş yapın",
     "body": "Bu sayfayı görüntülemek için giriş yapmanız gerekiyor."
+  },
+  "social": {
+    "page": {
+      "pageTitle": "Sosyal",
+      "tabLeaderboard": "Lider Tablosu",
+      "tabFriends": "Arkadaşlar",
+      "tabChallenges": "Meydan Okumalar",
+      "profileLoadFailed": "Profiliniz yüklenemedi. Lütfen çıkış yapıp tekrar deneyin.",
+      "backToHome": "Ana sayfaya dön",
+      "couldntLoad": "Yüklenemedi.",
+      "retry": "Tekrar dene",
+      "loadMore": "Daha fazla yükle",
+      "loading": "Yükleniyor…",
+      "yourChallenges": "Meydan okumalarınız",
+      "addFriendsToSeeThemHere": "Burada görmek için arkadaş ekleyin.",
+      "goToFriends": "Arkadaşlara git"
+    },
+    "challengeList": {
+      "ended": "Sona erdi",
+      "daysHoursLeft": "{d}g {h}s kaldı",
+      "hoursMinutesLeft": "{h}s {m}d kaldı",
+      "minutesSecondsLeft": "{m}d {s}s kaldı",
+      "statusActive": "Aktif",
+      "statusIncoming": "Gelen",
+      "statusPending": "Beklemede",
+      "statusWon": "Kazandı",
+      "statusDraw": "Berabere",
+      "statusLost": "Kaybetti",
+      "statusCancelled": "İptal edildi",
+      "statusDeclined": "Reddedildi",
+      "youWon": "Kazandınız",
+      "theyWonCaption": "{name} kazandı",
+      "acceptFailedRetry": "Kabul edilemedi — tekrar deneyin.",
+      "declineFailedRetry": "Reddedilemedi — tekrar deneyin.",
+      "cancelFailedRetry": "İptal edilemedi — tekrar deneyin.",
+      "networkErrorTryAgain": "Ağ hatası — tekrar deneyin.",
+      "accept": "Kabul et",
+      "decline": "Reddet",
+      "waitingForOpponent": "{name} bekleniyor…",
+      "cancel": "İptal et",
+      "noChallengesYet": "Henüz meydan okuma yok.",
+      "pickSuggestionOrChallenge": "Yukarıdan bir öneri seçin veya bir arkadaşınıza meydan okuyun.",
+      "groupNeedsResponse": "Yanıtınız bekleniyor",
+      "groupActive": "Aktif",
+      "groupSent": "Gönderildi",
+      "groupPast": "Geçmiş",
+      "you": "Siz",
+      "vs": "vs"
+    },
+    "createChallengeForm": {
+      "newChallenge": "Yeni meydan okuma",
+      "chooseAFriend": "Bir arkadaş seçin",
+      "chooseAFriendPlaceholder": "Bir arkadaş seçin…",
+      "clearSuggestion": "Öneriyi temizle",
+      "duration": "Süre",
+      "versePlaceholderCompact": "Ayet (isteğe bağlı)",
+      "versePlaceholderFull": "Ayet bağlamı (isteğe bağlı, örn. 2:255)",
+      "send": "Gönder",
+      "sendChallenge": "Meydan okumayı gönder",
+      "couldNotSendChallenge": "Meydan okuma gönderilemedi",
+      "challengeSent": "Meydan okuma @{username} adlı kullanıcıya gönderildi!",
+      "networkErrorPeriod": "Ağ hatası. Tekrar deneyin.",
+      "addFriendsFirst": "Meydan okumadan önce arkadaş ekleyin.",
+      "fromLabel": "Kaynak:"
+    },
+    "addFriendForm": {
+      "searchPlaceholder": "Kullanıcı adına göre ara…",
+      "searching": "Aranıyor…",
+      "noUsersFound": "Kullanıcı bulunamadı.",
+      "statusFriends": "Arkadaş",
+      "statusSent": "Gönderildi",
+      "add": "Ekle",
+      "accept": "Kabul et",
+      "couldNotSendRequest": "İstek gönderilemedi",
+      "networkErrorPeriod": "Ağ hatası. Tekrar deneyin."
+    },
+    "challengeSuggestions": {
+      "suggested": "Önerilen",
+      "use": "Kullan"
+    },
+    "leaderboardTable": {
+      "addFriendsToSeeLeaderboard": "Lider tablosunu görmek için arkadaş ekleyin.",
+      "youSuffix": "(siz)"
+    },
+    "friendList": {
+      "noFriendsYet": "Henüz arkadaş yok. Yukarıdan kullanıcı adıyla birini ekleyin.",
+      "pendingRequests": "Bekleyen istekler",
+      "friendsHeader": "Arkadaşlar",
+      "sentDirection": "gönderildi",
+      "receivedDirection": "alındı",
+      "acceptRequestAria": "İsteği kabul et",
+      "declineRequestAria": "İsteği reddet",
+      "cancelRequestAria": "İsteği iptal et",
+      "clickAgainToConfirm": "Onaylamak için tekrar tıklayın",
+      "removeFriendAria": "Arkadaşı kaldır",
+      "acceptRequestFailed": "İstek kabul edilemedi — tekrar deneyin.",
+      "declineRequestFailed": "İstek reddedilemedi — tekrar deneyin.",
+      "couldntRemoveTryAgain": "Kaldırılamadı — tekrar deneyin.",
+      "networkErrorTryAgain": "Ağ hatası — tekrar deneyin."
+    }
+  },
+  "mentions": {
+    "pageTitle": "Bahsedilmeler",
+    "noMentionsYet": "Henüz bahsedilme yok.",
+    "mentionHint": "Bir arkadaşınız bir ayet notunda @kullaniciadinizla sizden bahsedebilir.",
+    "couldntMarkRead": "Bahsedilmeler okundu olarak işaretlenemedi. Okunmamış sayısı senkronize olmayabilir.",
+    "couldntLoadMentions": "Bahsedilmeler yüklenemedi.",
+    "mentionedYouOn": "sizden bahsetti:",
+    "openInCanvas": "Kanvasta aç"
+  },
+  "workspaces": {
+    "pageTitle": "Kaydedilmiş Kanvaslar",
+    "noSavedCanvasesYet": "Henüz kaydedilmiş kanvas yok.",
+    "buildAndSaveHint": "Bir kanvas oluşturun ve kaydetmek için üst bilgideki kaydet simgesine tıklayın.",
+    "openCanvas": "Kanvası aç",
+    "couldntLoadCanvases": "Kaydedilmiş kanvaslarınız yüklenemedi.",
+    "retry": "Tekrar dene",
+    "load": "Yükle",
+    "deleteCanvas": "Kanvası sil",
+    "confirmDeleteCanvas": "Kanvası silmeyi onaylıyor musunuz?",
+    "nodeCount": "{count, plural, one {# ayet} other {# ayet}}"
+  },
+  "onboarding": {
+    "chooseUsername": "Kullanıcı adı seçin",
+    "usernameHint": "Arkadaşlarınız sizi lider tablosunda böyle bulacak.",
+    "usernamePlaceholder": "örn. ahmed_hikmah",
+    "usernameRules": "3–20 karakter: yalnızca harf, rakam, alt çizgi",
+    "couldNotSaveUsername": "Kullanıcı adı kaydedilemedi. Başka bir tane deneyin.",
+    "networkErrorPleaseRetry": "Ağ hatası. Lütfen tekrar deneyin.",
+    "saving": "Kaydediliyor…",
+    "getStarted": "Başla"
   }
 }

@@ -1,11 +1,12 @@
-import { render as rtlRender, screen, fireEvent, act } from "@testing-library/react";
+import { screen, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { FriendList } from "@/components/social/FriendList";
 import { TooltipProvider } from "@/components/ui";
 import { useAuthStore } from "@/store/auth";
+import { renderWithIntl } from "../../test-utils/render-with-intl";
 
 function render(ui: React.ReactElement) {
-  return rtlRender(<TooltipProvider>{ui}</TooltipProvider>);
+  return renderWithIntl(<TooltipProvider>{ui}</TooltipProvider>);
 }
 
 function friend(overrides: Partial<Parameters<typeof FriendList>[0]["friends"][number]> = {}) {

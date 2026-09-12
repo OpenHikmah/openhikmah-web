@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import { Header } from "@/components/layout/Header";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
 import { SearchDialog } from "@/components/search/SearchDialog";
@@ -13,17 +14,25 @@ import { useCanvasStore } from "@/store/canvas";
 import { findFreeSlot } from "@/lib/canvas/canvas-layout";
 import type { Verse } from "@/types/quran";
 
+// `next/dynamic`'s `loading` renders as a component (hooks are legal here),
+// but it's outside CanvasPageClient's own render, so it needs its own
+// useTranslations call rather than sharing one from the parent.
+function CanvasLoadingFallback() {
+  const t = useTranslations("canvas");
+  return (
+    <div className="w-full h-full flex items-center justify-center">
+      <div className="text-xs font-mono tracking-wider uppercase text-text-muted">
+        {t("loadingCanvas")}
+      </div>
+    </div>
+  );
+}
+
 const HikmahCanvas = dynamic(
   () => import("@/components/canvas/HikmahCanvas").then((m) => m.HikmahCanvas),
   {
     ssr: false,
-    loading: () => (
-      <div className="w-full h-full flex items-center justify-center">
-        <div className="text-xs font-mono tracking-wider uppercase text-text-muted">
-          Loading canvas…
-        </div>
-      </div>
-    ),
+    loading: () => <CanvasLoadingFallback />,
   }
 );
 

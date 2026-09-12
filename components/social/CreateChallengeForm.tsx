@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/store/auth";
 import { Loader2, Swords, X } from "lucide-react";
 import { Button, Input } from "@/components/ui";
@@ -44,6 +45,7 @@ export function CreateChallengeForm({
   onClearPrefill,
   compact,
 }: Props) {
+  const t = useTranslations("social.createChallengeForm");
   const accessToken = useAuthStore((s) => s.accessToken);
   // Initial values seed from a picked suggestion (the form is remounted via `key`
   // when a new suggestion is chosen, so these initializers re-run).
@@ -77,16 +79,16 @@ export function CreateChallengeForm({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Could not send challenge");
+        setError(data.error ?? t("couldNotSendChallenge"));
         return;
       }
-      setSuccess(`Challenge sent to @${selectedFriend}!`);
+      setSuccess(t("challengeSent", { username: selectedFriend }));
       setSelectedFriend("");
       setVerseRef("");
       onClearPrefill?.();
       onCreated();
     } catch {
-      setError("Network error. Try again.");
+      setError(t("networkErrorPeriod"));
     } finally {
       setSending(false);
     }
@@ -103,7 +105,7 @@ export function CreateChallengeForm({
   if (friends.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-border p-5 text-center text-sm text-text-muted">
-        Add friends first to challenge them.
+        {t("addFriendsFirst")}
       </div>
     );
   }
@@ -111,13 +113,13 @@ export function CreateChallengeForm({
   const prefillChip = prefill?.title && (
     <div className="flex items-center justify-between gap-2 rounded-md border-l-2 border-teal bg-teal/[0.06] px-3 py-1.5">
       <span className="truncate text-xs text-text-secondary">
-        From: <span className="text-teal">{prefill.title}</span>
+        {t("fromLabel")} <span className="text-teal">{prefill.title}</span>
       </span>
       {onClearPrefill && (
         <button
           type="button"
           onClick={onClearPrefill}
-          aria-label="Clear suggestion"
+          aria-label={t("clearSuggestion")}
           className="shrink-0 text-text-muted hover:text-text-primary"
         >
           <X className="h-3.5 w-3.5" />
@@ -147,13 +149,13 @@ export function CreateChallengeForm({
     return (
       <section className="space-y-2">
         <h3 className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">
-          New challenge
+          {t("newChallenge")}
         </h3>
         <div className="space-y-2 rounded-lg border border-border bg-surface p-3">
           {prefillChip}
           <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2">
             <select
-              aria-label="Choose a friend"
+              aria-label={t("chooseAFriend")}
               value={selectedFriend}
               onChange={(e) => {
                 setSelectedFriend(e.target.value);
@@ -166,7 +168,7 @@ export function CreateChallengeForm({
               )}
             >
               <option value="" disabled className="bg-surface">
-                Choose a friend…
+                {t("chooseAFriendPlaceholder")}
               </option>
               {friends.map((f) => (
                 <option key={f.id} value={f.username} className="bg-surface">
@@ -179,7 +181,7 @@ export function CreateChallengeForm({
               type="text"
               value={verseRef}
               onChange={(e) => setVerseRef(e.target.value)}
-              placeholder="Verse (optional)"
+              placeholder={t("versePlaceholderCompact")}
               maxLength={20}
               autoComplete="off"
               spellCheck={false}
@@ -197,7 +199,7 @@ export function CreateChallengeForm({
               ) : (
                 <Swords className="h-3.5 w-3.5" />
               )}
-              Send
+              {t("send")}
             </Button>
           </form>
           {error && <p className="text-xs text-error">{error}</p>}
@@ -210,7 +212,7 @@ export function CreateChallengeForm({
   return (
     <section className="space-y-2">
       <h3 className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">
-        New challenge
+        {t("newChallenge")}
       </h3>
       <form
         onSubmit={handleSubmit}
@@ -219,7 +221,7 @@ export function CreateChallengeForm({
         {prefillChip}
 
         <select
-          aria-label="Choose a friend"
+          aria-label={t("chooseAFriend")}
           value={selectedFriend}
           onChange={(e) => {
             setSelectedFriend(e.target.value);
@@ -232,7 +234,7 @@ export function CreateChallengeForm({
           )}
         >
           <option value="" disabled className="bg-surface">
-            Choose a friend…
+            {t("chooseAFriendPlaceholder")}
           </option>
           {friends.map((f) => (
             <option key={f.id} value={f.username} className="bg-surface">
@@ -243,7 +245,7 @@ export function CreateChallengeForm({
 
         <div className="space-y-1.5">
           <span className="block text-[11px] uppercase tracking-wide text-text-muted">
-            Duration
+            {t("duration")}
           </span>
           <div className="flex gap-2">{durationButtons}</div>
         </div>
@@ -252,7 +254,7 @@ export function CreateChallengeForm({
           type="text"
           value={verseRef}
           onChange={(e) => setVerseRef(e.target.value)}
-          placeholder="Verse context (optional, e.g. 2:255)"
+          placeholder={t("versePlaceholderFull")}
           maxLength={20}
           autoComplete="off"
           spellCheck={false}
@@ -271,7 +273,7 @@ export function CreateChallengeForm({
             ) : (
               <Swords className="h-3.5 w-3.5" />
             )}
-            Send challenge
+            {t("sendChallenge")}
           </Button>
           {error && <p className="text-xs text-error">{error}</p>}
           {success && <p className="text-xs text-teal">{success}</p>}

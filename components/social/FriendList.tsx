@@ -3,6 +3,7 @@
 import { useAuthStore } from "@/store/auth";
 import { Check, X, UserMinus, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Card, IconButton, Tooltip } from "@/components/ui";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
 
@@ -55,6 +56,7 @@ function DestructiveIconButton({
 }
 
 export function FriendList({ friends, onUpdate }: Props) {
+  const t = useTranslations("social.friendList");
   const accessToken = useAuthStore((s) => s.accessToken);
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,12 +78,12 @@ export function FriendList({ friends, onUpdate }: Props) {
         body: JSON.stringify({ action }),
       });
       if (!res.ok) {
-        setError(`Couldn't ${action} request — try again.`);
+        setError(action === "accept" ? t("acceptRequestFailed") : t("declineRequestFailed"));
         return;
       }
       onUpdate();
     } catch {
-      setError("Network error — try again.");
+      setError(t("networkErrorTryAgain"));
     } finally {
       setBusy(null);
     }
@@ -97,12 +99,12 @@ export function FriendList({ friends, onUpdate }: Props) {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (!res.ok) {
-        setError("Couldn't remove — try again.");
+        setError(t("couldntRemoveTryAgain"));
         return;
       }
       onUpdate();
     } catch {
-      setError("Network error — try again.");
+      setError(t("networkErrorTryAgain"));
     } finally {
       setBusy(null);
     }
@@ -111,9 +113,7 @@ export function FriendList({ friends, onUpdate }: Props) {
   const empty = accepted.length === 0 && pending.length === 0;
 
   if (empty) {
-    return (
-      <p className="py-4 text-sm text-text-muted">No friends yet. Add someone by username above.</p>
-    );
+    return <p className="py-4 text-sm text-text-muted">{t("noFriendsYet")}</p>;
   }
 
   return (
@@ -121,7 +121,7 @@ export function FriendList({ friends, onUpdate }: Props) {
       {error && <p className="text-xs text-error">{error}</p>}
       {pending.length > 0 && (
         <div className="space-y-1">
-          <p className="mb-2 font-mono text-xs text-text-muted">Pending requests</p>
+          <p className="mb-2 font-mono text-xs text-text-muted">{t("pendingRequests")}</p>
           {pending.map((f) => (
             <Card
               key={f.id}
@@ -131,29 +131,29 @@ export function FriendList({ friends, onUpdate }: Props) {
               <div className="flex items-center gap-2">
                 <span className="text-sm text-text-primary">{f.friend?.username ?? "—"}</span>
                 <span className="text-xs text-text-muted">
-                  {f.direction === "sent" ? "sent" : "received"}
+                  {f.direction === "sent" ? t("sentDirection") : t("receivedDirection")}
                 </span>
               </div>
               {f.direction === "received" ? (
                 <div className="flex items-center gap-1">
-                  <Tooltip label="Accept">
+                  <Tooltip label={t("acceptRequestAria")}>
                     <IconButton
                       tone="teal"
                       size="xs"
                       onClick={() => patch(f.id, "accept")}
                       disabled={busy === f.id}
-                      aria-label="Accept request"
+                      aria-label={t("acceptRequestAria")}
                     >
                       {busy === f.id ? <Loader2 className="animate-spin" /> : <Check />}
                     </IconButton>
                   </Tooltip>
-                  <Tooltip label="Decline">
+                  <Tooltip label={t("declineRequestAria")}>
                     <IconButton
                       tone="danger"
                       size="xs"
                       onClick={() => patch(f.id, "decline")}
                       disabled={busy === f.id}
-                      aria-label="Decline request"
+                      aria-label={t("declineRequestAria")}
                     >
                       <X />
                     </IconButton>
@@ -165,8 +165,8 @@ export function FriendList({ friends, onUpdate }: Props) {
                   disabled={busy === f.id}
                   busy={busy === f.id}
                   idleIcon={<X />}
-                  label="Cancel request"
-                  confirmLabel="Click again to confirm"
+                  label={t("cancelRequestAria")}
+                  confirmLabel={t("clickAgainToConfirm")}
                 />
               )}
             </Card>
@@ -176,7 +176,7 @@ export function FriendList({ friends, onUpdate }: Props) {
 
       {accepted.length > 0 && (
         <div className="space-y-1">
-          <p className="mb-2 font-mono text-xs text-text-muted">Friends</p>
+          <p className="mb-2 font-mono text-xs text-text-muted">{t("friendsHeader")}</p>
           {accepted.map((f) => (
             <Card
               key={f.id}
@@ -192,8 +192,8 @@ export function FriendList({ friends, onUpdate }: Props) {
                 disabled={busy === f.id}
                 busy={busy === f.id}
                 idleIcon={<UserMinus />}
-                label="Remove friend"
-                confirmLabel="Click again to confirm"
+                label={t("removeFriendAria")}
+                confirmLabel={t("clickAgainToConfirm")}
               />
             </Card>
           ))}

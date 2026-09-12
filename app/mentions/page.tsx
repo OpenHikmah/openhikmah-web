@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AtSign, Network } from "lucide-react";
+import { useTranslations, useFormatter } from "next-intl";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { AuthShell } from "@/components/layout/AuthShell";
@@ -18,6 +19,8 @@ interface Mention {
 }
 
 export default function MentionsPage() {
+  const t = useTranslations("mentions");
+  const format = useFormatter();
   const accessToken = useAuthStore((s) => s.accessToken);
   const setPendingMentionCount = useSocialStore((s) => s.setPendingMentionCount);
 
@@ -77,7 +80,7 @@ export default function MentionsPage() {
       <div className="mx-auto w-full max-w-2xl">
         <div className="mb-8 flex items-center gap-3">
           <AtSign className="h-5 w-5 text-gold" />
-          <h1 className="text-lg font-semibold text-text-primary">Mentions</h1>
+          <h1 className="text-lg font-semibold text-text-primary">{t("pageTitle")}</h1>
           {mentions.length > 0 && (
             <span className="rounded border border-border px-1.5 py-0.5 font-mono text-xs text-text-muted">
               {mentions.length}
@@ -85,14 +88,10 @@ export default function MentionsPage() {
           )}
         </div>
 
-        {markReadError && (
-          <p className="mb-4 text-xs text-error">
-            Couldn&apos;t mark mentions as read. The unread count may be out of sync.
-          </p>
-        )}
+        {markReadError && <p className="mb-4 text-xs text-error">{t("couldntMarkRead")}</p>}
 
         {error ? (
-          <p className="py-10 text-center text-sm text-error">Couldn&apos;t load mentions.</p>
+          <p className="py-10 text-center text-sm text-error">{t("couldntLoadMentions")}</p>
         ) : loading ? (
           <div className="space-y-3">
             {[0, 1, 2].map((i) => (
@@ -105,10 +104,8 @@ export default function MentionsPage() {
         ) : mentions.length === 0 ? (
           <div className="py-20 text-center">
             <AtSign className="mx-auto mb-4 h-8 w-8 text-text-muted/40" />
-            <p className="text-sm text-text-muted">No mentions yet.</p>
-            <p className="mt-1 text-xs text-text-muted">
-              A friend can tag you with @{"{username}"} in a verse note.
-            </p>
+            <p className="text-sm text-text-muted">{t("noMentionsYet")}</p>
+            <p className="mt-1 text-xs text-text-muted">{t("mentionHint")}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -117,15 +114,15 @@ export default function MentionsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-sm text-text-secondary">
                     <span className="font-medium text-text-primary">@{m.mentioningUsername}</span>{" "}
-                    mentioned you on{" "}
+                    {t("mentionedYouOn")}{" "}
                     <span className="rounded border border-gold bg-gold/[0.08] px-1.5 py-0.5 font-mono text-xs text-gold">
                       {m.verseRef}
                     </span>
                   </p>
-                  <Tooltip label="Open in canvas">
+                  <Tooltip label={t("openInCanvas")}>
                     <Link
                       href={`/canvas?verse=${m.verseRef}`}
-                      aria-label="Open in canvas"
+                      aria-label={t("openInCanvas")}
                       className={iconButtonVariants({ tone: "teal", size: "xs" })}
                     >
                       <Network />
@@ -133,7 +130,10 @@ export default function MentionsPage() {
                   </Tooltip>
                 </div>
                 <p className="mt-2 text-xs text-text-muted">
-                  {new Date(m.createdAt).toLocaleString()}
+                  {format.dateTime(new Date(m.createdAt), {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
                 </p>
               </Card>
             ))}

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FolderOpen, Loader2, Trash2, Upload, Network, TriangleAlert } from "lucide-react";
+import { useTranslations, useFormatter } from "next-intl";
 import { useAuthStore } from "@/store/auth";
 import { useCanvasStore, type SavedCanvas } from "@/store/canvas";
 import { Card, IconButton, Tooltip } from "@/components/ui";
@@ -31,6 +32,8 @@ function WorkspaceRow({
   onLoad: (id: number) => void;
   onDelete: (id: number) => void;
 }) {
+  const t = useTranslations("workspaces");
+  const format = useFormatter();
   const { armed: deleteArmed, trigger: triggerDelete } = useArmedConfirm(() => onDelete(ws.id));
 
   return (
@@ -39,14 +42,10 @@ function WorkspaceRow({
         <p className="truncate text-sm font-medium text-text-primary">{ws.name}</p>
         <div className="mt-1 flex items-center gap-3">
           <span className="rounded border border-border px-1.5 py-0.5 font-mono text-xs text-text-muted">
-            {ws.nodeCount} verse{ws.nodeCount === 1 ? "" : "s"}
+            {t("nodeCount", { count: ws.nodeCount })}
           </span>
           <span className="text-xs text-text-muted">
-            {new Date(ws.updatedAt).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            })}
+            {format.dateTime(new Date(ws.updatedAt), { dateStyle: "medium" })}
           </span>
         </div>
       </div>
@@ -62,16 +61,16 @@ function WorkspaceRow({
           ) : (
             <Upload className="h-3.5 w-3.5" />
           )}
-          <span>Load</span>
+          <span>{t("load")}</span>
         </button>
 
-        <Tooltip label={deleteArmed ? "Confirm delete canvas?" : "Delete canvas"}>
+        <Tooltip label={deleteArmed ? t("confirmDeleteCanvas") : t("deleteCanvas")}>
           <IconButton
             tone="danger"
             size="sm"
             onClick={triggerDelete}
             disabled={!!deletingId}
-            aria-label={deleteArmed ? "Confirm delete canvas?" : "Delete canvas"}
+            aria-label={deleteArmed ? t("confirmDeleteCanvas") : t("deleteCanvas")}
           >
             {deletingId === ws.id ? (
               <Loader2 className="animate-spin" />
@@ -88,6 +87,7 @@ function WorkspaceRow({
 }
 
 export default function WorkspacesPage() {
+  const t = useTranslations("workspaces");
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
   const appendWorkspace = useCanvasStore((s) => s.appendWorkspace);
@@ -164,7 +164,7 @@ export default function WorkspacesPage() {
         {/* Page header */}
         <div className="mb-8 flex items-center gap-3">
           <FolderOpen className="h-5 w-5 text-gold" />
-          <h1 className="text-lg font-semibold text-text-primary">Saved Canvases</h1>
+          <h1 className="text-lg font-semibold text-text-primary">{t("pageTitle")}</h1>
           {workspaces.length > 0 && (
             <span className="rounded border border-border px-1.5 py-0.5 font-mono text-xs text-text-muted">
               {workspaces.length}
@@ -179,27 +179,25 @@ export default function WorkspacesPage() {
         ) : loadError ? (
           <div className="py-20 text-center">
             <TriangleAlert className="mx-auto mb-4 h-8 w-8 text-error/60" />
-            <p className="text-sm text-text-muted">Couldn&apos;t load your saved canvases.</p>
+            <p className="text-sm text-text-muted">{t("couldntLoadCanvases")}</p>
             <button
               onClick={() => fetchWorkspaces()}
               className="mt-4 cursor-pointer text-xs text-teal underline"
             >
-              Retry
+              {t("retry")}
             </button>
           </div>
         ) : workspaces.length === 0 ? (
           <div className="py-20 text-center">
             <FolderOpen className="mx-auto mb-4 h-8 w-8 text-text-muted/40" />
-            <p className="text-sm text-text-muted">No saved canvases yet.</p>
-            <p className="mt-1 text-xs text-text-muted">
-              Build a canvas and click the save icon in the header to save it.
-            </p>
+            <p className="text-sm text-text-muted">{t("noSavedCanvasesYet")}</p>
+            <p className="mt-1 text-xs text-text-muted">{t("buildAndSaveHint")}</p>
             <Link
               href="/canvas"
               className="mt-5 inline-flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm text-text-secondary transition-colors hover:border-gold-muted hover:text-gold"
             >
               <Network className="h-3.5 w-3.5" />
-              Open canvas
+              {t("openCanvas")}
             </Link>
           </div>
         ) : (
