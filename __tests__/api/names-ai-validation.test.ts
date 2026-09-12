@@ -357,7 +357,7 @@ describe("names AI routes — model output validation", () => {
     expect(body[0].reason).toBe("Ayat al-Kursi."); // canonical reason preserved, not blanked
   });
 
-  it("verses: a non-empty but junk translation (model refusal) also falls back to the English reason", async () => {
+  it("verses: a non-empty but junk translation (model refusal) also falls back to the English reason, without retrying against Gemini", async () => {
     withLocale("az");
     mockVerseFetch();
     mockCallAI
@@ -369,5 +369,38 @@ describe("names AI routes — model output validation", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body[0].reason).toBe("Ayat al-Kursi.");
+    // fallback-verses selection + the one (refused) translation call — a
+    // refusal on translation must not be silently backed by Gemini either.
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
+  });
+
+  it("verses: a model refusal in the per-verse reason builder (search found results) leaves the default reason, without retrying against Gemini", async () => {
+    mockFetch.mockImplementation(async (url: unknown) => {
+      if (typeof url !== "string") return { ok: false };
+      if (url.includes("api.quran.com/api/v4/search")) {
+        return { ok: true, json: async () => ({ search: { results: [{ verse_key: "2:255" }] } }) };
+      }
+      if (url.includes("ar.alafasy"))
+        return { ok: true, json: async () => ({ data: { text: "AR" } }) };
+      if (url.includes("en.sahih"))
+        return { ok: true, json: async () => ({ data: { text: "EN" } }) };
+      return { ok: false };
+    });
+    mockCallAI.mockResolvedValue("I'm sorry, but I can't help with religious interpretation.");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveLength(1);
+    expect(body[0].ref).toBe("2:255");
+    expect(body[0].reason).toMatch(/^Contains a form of/); // buildReasons' refusal degrades to the default reason
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("returned a refusal"));
+    // A refusal here only degrades the per-verse reason (search already found
+    // the verse), so it doesn't gate the overall verses fallback — but it
+    // still shouldn't itself retry the reason-builder call against Gemini.
+    expect(mockCallAI).toHaveBeenCalledTimes(1);
+    errorSpy.mockRestore();
   });
 });

@@ -317,11 +317,19 @@ async function getVersesBySlug(
         v.ref,
         locale,
         (ctx) =>
-          translateReason(v.reason, language, {
-            feature: "names",
-            provider: ctx.provider,
-            model: ctx.model,
-          }).catch((err) => {
+          translateReason(
+            v.reason,
+            language,
+            { feature: "names", provider: ctx.provider, model: ctx.model },
+            (reason) => {
+              // A refusal on translating a reason must not be silently backed
+              // by Gemini either — same rationale as reflection/pairings/
+              // fallbackAIVerses above. The other rejection reasons (label
+              // wrapper, English echo, length ratio) are ordinary malformed
+              // output, not a refusal, so they still fall back as before.
+              if (reason === "refusal") ctx.markRefusal();
+            }
+          ).catch((err) => {
             // A provider failure on the translation call must degrade to the
             // English reason (handled just below), never 500 the whole verses
             // response — mirrors the callAI try/catch in reflection/pairings.
