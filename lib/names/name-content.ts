@@ -11,6 +11,18 @@ export interface ResolvedNamesModel {
   model: string;
 }
 
+/**
+ * Passed into every `generate` callback alongside the resolved provider+model.
+ * `markRefusal()` is the callback's way of telling `resolveAndGenerate` that an
+ * empty/degraded result came from a *detected refusal* (see lib/ai/refusal.ts)
+ * rather than a generic empty response, a parse failure, or a transient search
+ * miss. See `resolveAndGenerate`'s doc comment for why that distinction gates
+ * the Gemini fallback.
+ */
+export interface GenerationContext extends ResolvedNamesModel {
+  markRefusal: () => void;
+}
+
 // Resolved ONCE per generation and passed as a pinned pair into both the
 // `callAI` request (as provider + model overrides) and the persisted `model`
 // column, so a config change (`ai_provider_names` / `ai_model_names`) mid-flight
@@ -48,28 +60,58 @@ const resolveNamesModel = async (): Promise<ResolvedNamesModel> => {
  * degrade to, so the fallback's failure re-raises the original primary error
  * — never silently downgrading a real failure into a fabricated empty success.
  *
+ * EXCEPT for a detected refusal (`ctx.markRefusal()` — see `GenerationContext`):
+ * an empty result from a refusal is NOT retried against Gemini. A refusal on
+ * borderline theological phrasing is Claude declining to answer; silently
+ * answering it with a different provider instead would defeat the point of
+ * the refusal, and previously this path was indistinguishable from any other
+ * empty result. A refusal still degrades to the same empty/uncached result a
+ * non-refusal empty result would, it just skips the fallback attempt — logged
+ * distinctly (`names_ai_refusal_no_fallback`) from the ordinary fallback path
+ * (`names_ai_fallback_used`) so the two are visible separately on /api/metrics.
+ *
+ * `logLabel` identifies the (slug, kind[, ref]) this call is generating, for
+ * the log lines above — every call site already has this in scope.
+ *
  * Returns whichever (result, model) pair actually produced the value, so the
  * persisted `model` column never disagrees with what actually ran.
  */
 async function resolveAndGenerate<T>(
-  generate: (resolved: ResolvedNamesModel) => Promise<T>,
+  logLabel: string,
+  generate: (ctx: GenerationContext) => Promise<T>,
   isEmpty: (value: T) => boolean
 ): Promise<{ result: T; model: string }> {
   const resolved = await resolveNamesModel();
+
+  let refused = false;
+  const primaryCtx: GenerationContext = {
+    ...resolved,
+    markRefusal: () => {
+      refused = true;
+    },
+  };
 
   let result: T | undefined;
   let threw = false;
   let primaryError: unknown;
   try {
-    result = await generate(resolved);
+    result = await generate(primaryCtx);
   } catch (err) {
     threw = true;
     primaryError = err;
     // Logged here (not just on a subsequent fallback failure) so a systematic
     // primary failure that Gemini happens to paper over still surfaces —
     // otherwise it would produce no log line at all.
-    console.error(`Names: primary (${resolved.provider}) generation failed:`, err);
+    console.error(`Names: primary (${resolved.provider}) generation failed for ${logLabel}:`, err);
     incr("names_primary_generation_failed");
+  }
+
+  if (refused) {
+    console.error(
+      `Names: ${resolved.provider} refused for ${logLabel}, not falling back to Gemini`
+    );
+    incr("names_ai_refusal_no_fallback");
+    return { result: result as T, model: resolved.model };
   }
 
   const shouldRetry = resolved.provider === "claude" && (threw || isEmpty(result as T));
@@ -78,13 +120,27 @@ async function resolveAndGenerate<T>(
     return { result: result as T, model: resolved.model };
   }
 
+  if (!threw) {
+    // The throw case already logged above at catch time — this covers the
+    // "returned empty without throwing" path, which previously had no log
+    // line at all (only the incr("names_ai_fallback_used") below, and only
+    // when the fallback itself succeeds).
+    console.error(
+      `Names: primary (${resolved.provider}) returned empty for ${logLabel}, falling back to Gemini`
+    );
+  }
+
   try {
     const fallbackModel = await resolveModel("names", "gemini");
-    const fallbackResult = await generate({ provider: "gemini", model: fallbackModel });
+    const fallbackResult = await generate({
+      provider: "gemini",
+      model: fallbackModel,
+      markRefusal: () => undefined,
+    });
     if (!isEmpty(fallbackResult)) incr("names_ai_fallback_used");
     return { result: fallbackResult, model: fallbackModel };
   } catch (err) {
-    console.error("Names: Gemini fallback failed:", err);
+    console.error(`Names: Gemini fallback failed for ${logLabel}:`, err);
     // The primary threw: there's no valid result to degrade to, so the
     // original failure must surface — swallowing it here would turn a real
     // AI failure into a fabricated empty success.
@@ -137,7 +193,7 @@ export async function getOrGenerateNameContent<T>(
   kind: NameContentKind,
   locale: Locale,
   version: number,
-  generate: (resolved: ResolvedNamesModel) => Promise<T>,
+  generate: (ctx: GenerationContext) => Promise<T>,
   isEmpty: (value: T) => boolean,
   onBeforeGenerate?: () => Promise<void>
 ): Promise<T> {
@@ -223,10 +279,10 @@ async function generateAndPersist<T>(
   kind: NameContentKind,
   locale: Locale,
   version: number,
-  generate: (resolved: ResolvedNamesModel) => Promise<T>,
+  generate: (ctx: GenerationContext) => Promise<T>,
   isEmpty: (value: T) => boolean
 ): Promise<T> {
-  const { result, model } = await resolveAndGenerate(generate, isEmpty);
+  const { result, model } = await resolveAndGenerate(`${slug}/${kind}`, generate, isEmpty);
 
   if (!isEmpty(result)) {
     const data = JSON.stringify(result);
@@ -263,7 +319,7 @@ export async function getOrGenerateVerseReason(
   slug: string,
   ref: string,
   locale: Locale,
-  generate: (resolved: ResolvedNamesModel) => Promise<string>,
+  generate: (ctx: GenerationContext) => Promise<string>,
   onBeforeGenerate?: () => Promise<void>
 ): Promise<string> {
   const [row] = await db
@@ -287,7 +343,11 @@ export async function getOrGenerateVerseReason(
   if (pending) return pending;
 
   const work = (async () => {
-    const { result: reason, model } = await resolveAndGenerate(generate, (r) => r.trim() === "");
+    const { result: reason, model } = await resolveAndGenerate(
+      `${slug}/verse-reason/${ref}`,
+      generate,
+      (r) => r.trim() === ""
+    );
     if (reason.trim() === "") return reason;
 
     try {

@@ -62,12 +62,13 @@ async function getPairings(
     "pairings",
     locale,
     PAIRINGS_VERSION,
-    async (resolved) => {
+    async (ctx) => {
       let text: string;
       try {
         text = await callAI(buildPrompt(name.transliteration, name.arabic, name.meaning, locale), {
           feature: "names",
-          ...resolved,
+          provider: ctx.provider,
+          model: ctx.model,
         });
       } catch (err) {
         // Not cached (empty result), so the next request retries — mirrors how
@@ -81,8 +82,11 @@ async function getPairings(
       if (looksLikeRefusal(text)) {
         // A soft refusal is not canonical content — treat it like an empty
         // result (not cached, retried), same as the no-JSON-array case below.
+        // markRefusal() also stops resolveAndGenerate from silently backing
+        // this with Gemini.
         console.error(`Pairings: model returned a refusal for ${slug}, not caching`);
         incr("names_ai_refusal");
+        ctx.markRefusal();
         return [];
       }
 

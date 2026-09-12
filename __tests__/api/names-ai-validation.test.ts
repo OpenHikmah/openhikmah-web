@@ -170,6 +170,21 @@ describe("names AI routes — model output validation", () => {
     errorSpy.mockRestore();
   });
 
+  it("verses: a model refusal in the AI-fallback path is not cached and does not retry against Gemini", async () => {
+    mockCallAI.mockResolvedValue("I'm sorry, but I can't help with religious interpretation.");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([]);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("returned a refusal"));
+    // A refusal must not be silently backed by a different provider — only
+    // the one (refused) call happens, no Gemini fallback attempt.
+    expect(mockCallAI).toHaveBeenCalledTimes(1);
+    errorSpy.mockRestore();
+  });
+
   it("verses: AI fallback refs outside real Quran bounds are dropped (no 500)", async () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([
