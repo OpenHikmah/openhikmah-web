@@ -1,9 +1,12 @@
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor, render as rtlRender } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { NextIntlClientProvider } from "next-intl";
 import { ChallengeList, type EnrichedChallenge } from "@/components/social/ChallengeList";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { renderWithIntl as render } from "../../test-utils/render-with-intl";
+import en from "@/messages/en.json";
+import tr from "@/messages/tr.json";
 
 function challenge(overrides: Partial<EnrichedChallenge> = {}): EnrichedChallenge {
   return {
@@ -75,5 +78,38 @@ describe("ChallengeCard PATCH error handling", () => {
     await waitFor(() => {
       expect(onUpdate).toHaveBeenCalled();
     });
+  });
+});
+
+describe("ChallengeCard countdown locale", () => {
+  beforeEach(() => {
+    useAuthStore.setState({ accessToken: "test-token" });
+    useSocialStore.setState({ userId: 1 });
+  });
+
+  it("re-renders the ticking countdown in the new locale after a locale switch, not just on the next endsAt change", () => {
+    const active = challenge({
+      status: "active",
+      endsAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+    });
+
+    const { rerender } = rtlRender(
+      <NextIntlClientProvider locale="en" messages={en}>
+        <ChallengeList challenges={[active]} onUpdate={vi.fn()} />
+      </NextIntlClientProvider>
+    );
+    expect(screen.getByText(/left/)).toBeInTheDocument();
+
+    // Same challenge (same endsAt/id — no remount), locale switched. The
+    // countdown's own effect must re-run on this (see useCountdown's `t` in
+    // its deps) rather than staying frozen in the pre-switch locale.
+    rerender(
+      <NextIntlClientProvider locale="tr" messages={tr}>
+        <ChallengeList challenges={[active]} onUpdate={vi.fn()} />
+      </NextIntlClientProvider>
+    );
+
+    expect(screen.getByText(/kaldı/)).toBeInTheDocument();
+    expect(screen.queryByText(/left/)).not.toBeInTheDocument();
   });
 });

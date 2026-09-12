@@ -66,8 +66,12 @@ function useCountdown(endsAt: string, t: CountdownT): string {
     };
     schedule();
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endsAt]);
+    // `t` is included: next-intl memoizes it on locale, so this only restarts
+    // the schedule on an actual locale switch — without it, a countdown
+    // already ticking would keep rendering in the pre-switch locale (a stale
+    // closure over the old `t`) until endsAt next changed or the component
+    // remounted.
+  }, [endsAt, t]);
   return label;
 }
 
