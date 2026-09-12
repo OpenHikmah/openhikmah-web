@@ -13,10 +13,12 @@ import { MobileNavBar } from "@/components/layout/MobileNavBar";
 import { NameVerses } from "./NameVerses";
 import { NameReflection } from "./NameReflection";
 import { NamePairings, type Pairing } from "./NamePairings";
+import { NameMeta } from "./NameMeta";
 import { getCachedNameContent } from "@/lib/names/name-content";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
 import { REFLECTION_VERSION } from "@/app/api/names/[slug]/reflection/route";
 import { PAIRINGS_VERSION } from "@/app/api/names/[slug]/pairings/route";
+import { META_VERSION } from "@/app/api/names/[slug]/meta/route";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -26,9 +28,17 @@ export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const name = getNameBySlug(slug);
   if (!name) return {};
+  const locale = await getUiLocale();
+  // Cache-only lookup (never generates) — a miss just falls back to the
+  // canonical English description, same as the page body's own fallback.
+  const description =
+    locale === "en"
+      ? name.description
+      : ((await getCachedNameContent<string>(slug, "description", locale, META_VERSION)) ??
+        name.description);
   return {
     title: `${name.transliteration} — Open Hikmah`,
-    description: name.description,
+    description,
   };
 }
 
@@ -63,10 +73,23 @@ export default async function NameDetailPage({ params }: Props) {
   // miss leaves the value undefined and the client components fall back to
   // their existing fetch-and-generate behavior unchanged.
   const locale = await getUiLocale();
-  const [initialReflection, initialPairings] = await Promise.all([
-    getCachedNameContent<string>(slug, "reflection", locale, REFLECTION_VERSION),
-    getCachedNameContent<Pairing[]>(slug, "pairings", locale, PAIRINGS_VERSION),
-  ]);
+  const [initialReflection, initialPairings, initialMeaning, initialDescription] =
+    await Promise.all([
+      getCachedNameContent<string>(slug, "reflection", locale, REFLECTION_VERSION),
+      getCachedNameContent<Pairing[]>(slug, "pairings", locale, PAIRINGS_VERSION),
+      locale === "en"
+        ? Promise.resolve(null)
+        : getCachedNameContent<string>(slug, "meaning", locale, META_VERSION),
+      locale === "en"
+        ? Promise.resolve(null)
+        : getCachedNameContent<string>(slug, "description", locale, META_VERSION),
+    ]);
+  // Only trust the pair when BOTH fields hit the cache — a lone hit would
+  // otherwise render one translated field next to a stale/English other one.
+  const initialMeta =
+    initialMeaning != null && initialDescription != null
+      ? { meaning: initialMeaning, description: initialDescription }
+      : null;
 
   const prevName = DIVINE_NAMES.find((n) => n.id === name.id - 1);
   const nextName = DIVINE_NAMES.find((n) => n.id === name.id + 1);
@@ -96,20 +119,21 @@ export default async function NameDetailPage({ params }: Props) {
 
           <p className="mb-2 font-mono text-xl text-text-primary">{name.transliteration}</p>
 
-          <p className="mb-6 text-lg text-text-secondary">{name.meaning}</p>
-
-          <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
-            <span className={`rounded px-2.5 py-1 text-xs font-medium ${styles.badge}`}>
-              {t(categoryLabelKey)}
-            </span>
-            <span className="rounded border border-border bg-surface-raised px-2.5 py-1 font-mono text-xs text-text-secondary">
-              {t("root", { root: name.root })}
-            </span>
-          </div>
-
-          <p className="mx-auto max-w-xl text-sm leading-relaxed text-text-secondary">
-            {name.description}
-          </p>
+          <NameMeta
+            slug={slug}
+            locale={locale}
+            fallback={{ meaning: name.meaning, description: name.description }}
+            initialMeta={initialMeta}
+          >
+            <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
+              <span className={`rounded px-2.5 py-1 text-xs font-medium ${styles.badge}`}>
+                {t(categoryLabelKey)}
+              </span>
+              <span className="rounded border border-border bg-surface-raised px-2.5 py-1 font-mono text-xs text-text-secondary">
+                {t("root", { root: name.root })}
+              </span>
+            </div>
+          </NameMeta>
         </div>
 
         {/* Reflection + Pairings + Verses.

@@ -439,8 +439,11 @@ export const wordMorphology = pgTable(
 // prompt change force regeneration by bumping the per-kind constant in code.
 
 /** The kinds of AI content cached per name. Single source of truth for the
- *  `name_content.kind` column and the `lib/name-content.ts` helper. */
-export type NameContentKind = "verses" | "reflection" | "pairings";
+ *  `name_content.kind` column and the `lib/name-content.ts` helper.
+ *  "meaning"/"description" are locale-specific *translations* of the
+ *  canonical English `DivineName.meaning`/`.description` (lib/names/divine-names/types.ts)
+ *  — see lib/names/name-meta.ts — never a fresh generation like the other kinds. */
+export type NameContentKind = "verses" | "reflection" | "pairings" | "meaning" | "description";
 
 export const nameContent = pgTable(
   "name_content",

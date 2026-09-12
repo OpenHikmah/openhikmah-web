@@ -51,6 +51,7 @@ import {
   getOrGenerateNameContent,
   getOrGenerateVerseReason,
   getCachedNameContent,
+  getCachedNameContentBulk,
 } from "@/lib/names/name-content";
 
 const isEmptyArr = (v: unknown[]) => v.length === 0;
@@ -569,6 +570,85 @@ describe("getCachedNameContent", () => {
     expect(out).toBeNull();
     expect(errorSpy).toHaveBeenCalled();
     errorSpy.mockRestore();
+  });
+});
+
+describe("getCachedNameContentBulk", () => {
+  beforeEach(() => {
+    mockSelect.mockReset();
+    mockInsert.mockClear();
+  });
+
+  it("returns an empty map without querying when given no slugs", async () => {
+    const out = await getCachedNameContentBulk<string>([], "meaning", "tr", 1);
+    expect(out.size).toBe(0);
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
+
+  it("returns a map keyed by slug for every cache hit at the current version", async () => {
+    mockSelect.mockReturnValue(
+      makeSelectChain([
+        { slug: "al-malik", data: JSON.stringify("Hükümdar"), version: 1 },
+        { slug: "ar-rahman", data: JSON.stringify("Rahman"), version: 1 },
+      ])
+    );
+
+    const out = await getCachedNameContentBulk<string>(
+      ["al-malik", "ar-rahman", "as-salam"],
+      "meaning",
+      "tr",
+      1
+    );
+
+    expect(out.get("al-malik")).toBe("Hükümdar");
+    expect(out.get("ar-rahman")).toBe("Rahman");
+    expect(out.has("as-salam")).toBe(false); // no row for this slug — a plain miss
+  });
+
+  it("excludes a row whose stored version is older than requested", async () => {
+    mockSelect.mockReturnValue(
+      makeSelectChain([{ slug: "al-malik", data: JSON.stringify("stale"), version: 1 }])
+    );
+
+    const out = await getCachedNameContentBulk<string>(["al-malik"], "meaning", "tr", 2);
+
+    expect(out.has("al-malik")).toBe(false);
+  });
+
+  it("skips a corrupt row and logs, without throwing", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockSelect.mockReturnValue(
+      makeSelectChain([{ slug: "al-malik", data: "{not json", version: 1 }])
+    );
+
+    const out = await getCachedNameContentBulk<string>(["al-malik"], "meaning", "tr", 1);
+
+    expect(out.has("al-malik")).toBe(false);
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("returns an empty map and logs (instead of throwing) when the query itself rejects", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockSelect.mockReturnValue({
+      from: () => ({
+        where: () => Promise.reject(new Error("connection refused")),
+      }),
+    });
+
+    const out = await getCachedNameContentBulk<string>(["al-malik"], "meaning", "tr", 1);
+
+    expect(out.size).toBe(0);
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("never calls generate/insert — it is read-only", async () => {
+    mockSelect.mockReturnValue(
+      makeSelectChain([{ slug: "al-malik", data: JSON.stringify("Hükümdar"), version: 1 }])
+    );
+    await getCachedNameContentBulk<string>(["al-malik"], "meaning", "tr", 1);
+    expect(mockInsert).not.toHaveBeenCalled();
   });
 });
 
