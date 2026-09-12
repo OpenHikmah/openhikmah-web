@@ -11,6 +11,21 @@
 -- doesn't support \b as a word boundary the way JS does). Treat matches as
 -- candidates for manual review, not an automatic verdict — false positives are
 -- possible (e.g. a reflection that happens to start with "I" quoting scripture).
+--
+-- Deliberately NOT using \set ON_ERROR_STOP: this script runs 6 independent
+-- checks, and one section hitting a bad row should still let the other 5 run
+-- and report — aborting on the first error would hide everything after it,
+-- which is worse for a one-shot diagnostic than a gap in one section.
+--
+-- name_content.data is unconstrained text. The pairings/verses checks below
+-- guard against valid-JSON-but-wrong-shape rows (jsonb_typeof = 'array') since
+-- the app always writes an array for those kinds — a non-array row would mean
+-- something outside normal app writes touched the table. Genuinely malformed
+-- JSON syntax (not just wrong shape) isn't guarded — Postgres has no cheap
+-- try-cast for jsonb without a custom function, and the actual writer
+-- (cleanup-566-ai-content.mjs) already fails safe on that case: JSON.parse()
+-- throwing there aborts its whole transaction with zero writes, rather than
+-- silently skipping or partially applying anything.
 
 \pset pager off
 
@@ -71,7 +86,12 @@ LIMIT 20;
 
 \echo ''
 \echo '=== 4. name_content (pairings): unresolved name ("") or refusal-looking explanation ==='
-WITH pairing_items AS (
+WITH pairings_shaped AS (
+  SELECT slug, locale, model, updated_at, data::jsonb AS data
+  FROM name_content
+  WHERE kind = 'pairings' AND jsonb_typeof(data::jsonb) = 'array'
+),
+pairing_items AS (
   SELECT
     nc.slug,
     nc.locale,
@@ -80,9 +100,8 @@ WITH pairing_items AS (
     elem ->> 'name' AS name,
     elem ->> 'transliteration' AS transliteration,
     elem ->> 'explanation' AS explanation
-  FROM name_content nc,
-       jsonb_array_elements(nc.data::jsonb) AS elem
-  WHERE nc.kind = 'pairings'
+  FROM pairings_shaped nc,
+       jsonb_array_elements(nc.data) AS elem
 )
 SELECT
   count(*) FILTER (WHERE name IS NULL OR btrim(name) = '') AS unresolved_name_count,
@@ -103,9 +122,12 @@ FROM (
     elem ->> 'name' AS name,
     elem ->> 'transliteration' AS transliteration,
     elem ->> 'explanation' AS explanation
-  FROM name_content nc,
-       jsonb_array_elements(nc.data::jsonb) AS elem
-  WHERE nc.kind = 'pairings'
+  FROM (
+    SELECT slug, locale, model, updated_at, data::jsonb AS data
+    FROM name_content
+    WHERE kind = 'pairings' AND jsonb_typeof(data::jsonb) = 'array'
+  ) nc,
+       jsonb_array_elements(nc.data) AS elem
 ) p
 WHERE name IS NULL OR btrim(name) = ''
    OR btrim(coalesce(explanation, '')) = ''
@@ -115,7 +137,12 @@ LIMIT 20;
 
 \echo ''
 \echo '=== 5. name_content (verses): blank or refusal-looking per-verse reason ==='
-WITH verse_items AS (
+WITH verses_shaped AS (
+  SELECT slug, locale, model, updated_at, data::jsonb AS data
+  FROM name_content
+  WHERE kind = 'verses' AND jsonb_typeof(data::jsonb) = 'array'
+),
+verse_items AS (
   SELECT
     nc.slug,
     nc.locale,
@@ -123,9 +150,8 @@ WITH verse_items AS (
     nc.updated_at,
     elem ->> 'ref' AS ref,
     elem ->> 'reason' AS reason
-  FROM name_content nc,
-       jsonb_array_elements(nc.data::jsonb) AS elem
-  WHERE nc.kind = 'verses'
+  FROM verses_shaped nc,
+       jsonb_array_elements(nc.data) AS elem
 )
 SELECT
   count(*) FILTER (WHERE btrim(coalesce(reason, '')) = '') AS blank_reason_count,
@@ -144,9 +170,12 @@ FROM (
     nc.updated_at,
     elem ->> 'ref' AS ref,
     elem ->> 'reason' AS reason
-  FROM name_content nc,
-       jsonb_array_elements(nc.data::jsonb) AS elem
-  WHERE nc.kind = 'verses'
+  FROM (
+    SELECT slug, locale, model, updated_at, data::jsonb AS data
+    FROM name_content
+    WHERE kind = 'verses' AND jsonb_typeof(data::jsonb) = 'array'
+  ) nc,
+       jsonb_array_elements(nc.data) AS elem
 ) v
 WHERE btrim(coalesce(reason, '')) = ''
    OR reason ~* $re$^\s*(i(['’ ]?a?m)? (sorry|unable|not able)\y|i can(not|['’]t)\y|i (can(not|['’]t)|won['’]t|will not) (help|assist|provide|comply|generate|write)\y|i (must|have to) decline\y|i['’]m not (going to|able to)\y|as an ai\y|as a language model\y|i (apologi[sz]e|cannot in good conscience)\y|unfortunately,? +i)$re$
@@ -185,8 +214,10 @@ WHERE btrim(text) = ''
 UNION ALL
 SELECT 'pairings_unresolved_or_bad', count(*) FROM (
   SELECT elem ->> 'name' AS name, elem ->> 'explanation' AS explanation
-  FROM name_content, jsonb_array_elements(data::jsonb) AS elem
-  WHERE kind = 'pairings'
+  FROM (
+    SELECT data::jsonb AS data FROM name_content
+    WHERE kind = 'pairings' AND jsonb_typeof(data::jsonb) = 'array'
+  ) nc, jsonb_array_elements(nc.data) AS elem
 ) p
 WHERE name IS NULL OR btrim(name) = ''
    OR btrim(coalesce(explanation, '')) = ''
@@ -194,8 +225,10 @@ WHERE name IS NULL OR btrim(name) = ''
 UNION ALL
 SELECT 'verses_blank_or_refusal', count(*) FROM (
   SELECT elem ->> 'reason' AS reason
-  FROM name_content, jsonb_array_elements(data::jsonb) AS elem
-  WHERE kind = 'verses'
+  FROM (
+    SELECT data::jsonb AS data FROM name_content
+    WHERE kind = 'verses' AND jsonb_typeof(data::jsonb) = 'array'
+  ) nc, jsonb_array_elements(nc.data) AS elem
 ) v
 WHERE btrim(coalesce(reason, '')) = ''
    OR reason ~* $re$^\s*(i(['’ ]?a?m)? (sorry|unable|not able)\y|i can(not|['’]t)\y|i (can(not|['’]t)|won['’]t|will not) (help|assist|provide|comply|generate|write)\y|i (must|have to) decline\y|i['’]m not (going to|able to)\y|as an ai\y|as a language model\y|i (apologi[sz]e|cannot in good conscience)\y|unfortunately,? +i)$re$
