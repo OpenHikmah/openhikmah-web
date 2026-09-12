@@ -52,7 +52,7 @@ describe("FlagsPage — AI routing grid", () => {
 
     render(<FlagsPage />);
 
-    const namesModel = await screen.findByLabelText("Names (Asma-ul-Husna) model");
+    const namesModel = await screen.findByLabelText("Names (Asmaul Husna) model");
     expect(within(namesModel).queryByText("gemini-3.7-flash")).toBeTruthy();
     expect(within(namesModel).queryByText("claude-opus-4-7")).toBeNull();
 
@@ -80,7 +80,7 @@ describe("FlagsPage — AI routing grid", () => {
     render(<FlagsPage />);
 
     const namesModel = (await screen.findByLabelText(
-      "Names (Asma-ul-Husna) model"
+      "Names (Asmaul Husna) model"
     )) as HTMLSelectElement;
     expect(namesModel.value).toBe("");
     expect(within(namesModel).getByRole("option", { selected: true }).textContent).toContain(

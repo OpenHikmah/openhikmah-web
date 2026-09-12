@@ -6,6 +6,8 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 const nextConfig: NextConfig = {
   reactCompiler: true,
   output: "standalone",
+  // Minor info-disclosure: don't advertise the framework on every response.
+  poweredByHeader: false,
   // The self-hosted Coolify build container has less memory than CI's runner,
   // and OOM-kills during `next build`'s own "Running TypeScript" pass (no
   // output, non-zero exit) once the project grows past its ceiling. Type

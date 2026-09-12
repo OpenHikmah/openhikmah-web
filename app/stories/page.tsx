@@ -6,7 +6,7 @@ import { listVisibleStories, resolveLocalized } from "@/lib/stories";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
 
 export const metadata = {
-  title: "Prophetic Stories — Open Hikmah",
+  title: "Prophetic Narratives — Open Hikmah",
   description:
     "Curated stories of the Prophets mentioned in the Quran, with verified verse mappings and a direct path to the connection canvas.",
 };

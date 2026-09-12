@@ -16,7 +16,7 @@ import { SELECTABLE_MODELS } from "@/lib/ai/models";
 const AI_ROUTES = [
   { key: "", label: "Default" },
   { key: "_connections", label: "Connections" },
-  { key: "_names", label: "Names (Asma-ul-Husna)" },
+  { key: "_names", label: "Names (Asmaul Husna)" },
 ] as const;
 
 interface Flag {

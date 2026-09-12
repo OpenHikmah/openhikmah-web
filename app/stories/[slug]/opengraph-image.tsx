@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { getVisibleStoryBySlug } from "@/lib/stories";
 import { renderOgCard, clampBody, OG_SIZE, OG_CONTENT_TYPE } from "@/lib/og-card";
 
-export const alt = "Prophetic Stories — Open Hikmah";
+export const alt = "Prophetic Narratives — Open Hikmah";
 export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
 
@@ -31,7 +31,7 @@ export default async function Image({ params }: Props) {
 
   return new ImageResponse(
     renderOgCard({
-      eyebrow: "Prophetic Stories",
+      eyebrow: "Prophetic Narratives",
       title: story.name.en,
       body: clampBody(story.tagline.en),
     }),

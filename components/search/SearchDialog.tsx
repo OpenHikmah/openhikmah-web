@@ -373,7 +373,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
               {selectError && (
                 <div className="px-4 py-3 text-center">
-                  <p className="text-xs text-red-400">{t("somethingWentWrong")}</p>
+                  <p className="text-xs text-error">{t("somethingWentWrong")}</p>
                 </div>
               )}
 
