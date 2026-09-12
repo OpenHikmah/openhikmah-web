@@ -36,6 +36,13 @@ const nextConfig: NextConfig = {
     // below — before flipping script-src enforcement on and risking the
     // OAuth/canvas flows in prod. Flip to `Content-Security-Policy` once that
     // endpoint has been observed clean for a while.
+    //
+    // The Content-Security-Policy-Report-Only value below is a static
+    // fallback only — proxy.ts generates a per-request nonce and overwrites
+    // this header (via `.set()`, not `.append()`) with a nonce'd script-src
+    // for every route its matcher covers (see issue #570). This entry is
+    // what's actually served for the routes that matcher excludes: admin,
+    // api/*, and static assets, none of which need a nonce'd script-src.
     const securityHeaders = [
       { key: "X-Frame-Options", value: "DENY" },
       { key: "X-Content-Type-Options", value: "nosniff" },
