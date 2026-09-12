@@ -8,6 +8,9 @@ import {
 } from "@/lib/names/divine-names";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
+import { getCachedNameContentBulk } from "@/lib/names/name-content";
+import { getUiLocale } from "@/lib/i18n/request-prefs";
+import { META_VERSION } from "@/app/api/names/[slug]/meta/route";
 
 export const metadata = {
   title: "Asmaul Husna — Open Hikmah",
@@ -41,6 +44,22 @@ export default async function NamesPage() {
     cat,
     names: DIVINE_NAMES.filter((n) => n.category === cat),
   }));
+
+  // Read-only, cache-only lookup (never generates) for all 99 names in one
+  // query — a miss per name just falls back to the canonical English meaning
+  // below. Rendering all 99 names at once must not trigger up to 99 AI
+  // generations; translations are populated ahead of time by
+  // scripts/backfill-name-meta.ts or by visiting each name's detail page.
+  const locale = await getUiLocale();
+  const localizedMeanings =
+    locale === "en"
+      ? null
+      : await getCachedNameContentBulk<string>(
+          DIVINE_NAMES.map((n) => n.slug),
+          "meaning",
+          locale,
+          META_VERSION
+        );
 
   return (
     <div className="min-h-screen bg-bg pb-[calc(72px+env(safe-area-inset-bottom))] text-text-primary md:pb-0">
@@ -108,7 +127,9 @@ export default async function NamesPage() {
                       <div className="text-xs text-center font-mono mb-1 text-text-secondary">
                         {name.transliteration}
                       </div>
-                      <div className="text-xs text-center text-text-muted">{name.meaning}</div>
+                      <div className="text-xs text-center text-text-muted">
+                        {localizedMeanings?.get(name.slug) ?? name.meaning}
+                      </div>
                       <div className="mt-2 flex justify-center">
                         <span
                           className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${colors.badge}`}
