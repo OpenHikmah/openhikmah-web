@@ -7,7 +7,8 @@
     "allSettings": "Bütün tənzimləmələr →",
     "changeLanguage": "Dili dəyiş",
     "removeBookmark": "Əlfəcini sil",
-    "bookmarkVerse": "Ayəni əlfəcinlə"
+    "bookmarkVerse": "Ayəni əlfəcinlə",
+    "loading": "Yüklənir"
   },
   "nav": {
     "canvas": "Lövhə",
@@ -109,7 +110,31 @@
     "saveWorkspace": "İş sahəsini yadda saxla",
     "exportAsPng": "PNG kimi ixrac et",
     "exportAsPdf": "PDF kimi ixrac et",
-    "more": "Daha çox"
+    "more": "Daha çox",
+    "contextSidebar": {
+      "tafsirTitle": "İbn Kəsir Təfsiri",
+      "loading": "Yüklənir…",
+      "tafsirUnavailable": "Təfsir mövcud deyil.",
+      "myNotes": "Qeydlərim",
+      "signInForNotes": "Şəxsi qeyd əlavə etmək üçün daxil olun.",
+      "deleteNote": "Qeydi sil",
+      "deleteFailed": "Silinmə uğursuz oldu",
+      "addNotePlaceholder": "Şəxsi qeyd əlavə edin…",
+      "saving": "Yadda saxlanılır…",
+      "saveFailedRetry": "Yadda saxlama uğursuz oldu — yenidən cəhd edin",
+      "save": "Yadda saxla",
+      "similarVerses": "Oxşar ayələr",
+      "noneFound": "Tapılmadı.",
+      "edgeKindThematic": "Mövzu",
+      "edgeKindRoot": "Kök söz",
+      "edgeKindContrast": "Ziddiyyət",
+      "resizePanel": "Paneli ölçüləndir",
+      "verseHeader": "Ayə",
+      "connectionHeader": "Əlaqə",
+      "closePanel": "Paneli bağla",
+      "whyConnected": "Niyə əlaqəlidir"
+    },
+    "loadingCanvas": "Kanvas yüklənir…"
   },
   "search": {
     "dialogTitle": "Quran Ayələrində Axtar",
@@ -229,5 +254,136 @@
   "authGate": {
     "title": "Davam etmək üçün daxil olun",
     "body": "Bu səhifəyə baxmaq üçün daxil olmalısınız."
+  },
+  "social": {
+    "page": {
+      "pageTitle": "Sosial",
+      "tabLeaderboard": "Reytinq",
+      "tabFriends": "Dostlar",
+      "tabChallenges": "Çağırışlar",
+      "profileLoadFailed": "Profiliniz yüklənmədi. Çıxış edib yenidən cəhd edin.",
+      "backToHome": "Ana səhifəyə qayıt",
+      "couldntLoad": "Yüklənmədi.",
+      "retry": "Yenidən cəhd et",
+      "loadMore": "Daha çox yüklə",
+      "loading": "Yüklənir…",
+      "yourChallenges": "Çağırışlarınız",
+      "addFriendsToSeeThemHere": "Burada görmək üçün dost əlavə edin.",
+      "goToFriends": "Dostlara keç"
+    },
+    "challengeList": {
+      "ended": "Bitdi",
+      "daysHoursLeft": "{d}g {h}s qaldı",
+      "hoursMinutesLeft": "{h}s {m}d qaldı",
+      "minutesSecondsLeft": "{m}d {s}s qaldı",
+      "statusActive": "Aktiv",
+      "statusIncoming": "Gələn",
+      "statusPending": "Gözləmədə",
+      "statusWon": "Qazandı",
+      "statusDraw": "Bərabərə",
+      "statusLost": "Uduzdu",
+      "statusCancelled": "Ləğv edildi",
+      "statusDeclined": "Rədd edildi",
+      "youWon": "Siz qazandınız",
+      "theyWonCaption": "{name} qazandı",
+      "acceptFailedRetry": "Qəbul edilmədi — yenidən cəhd edin.",
+      "declineFailedRetry": "Rədd edilmədi — yenidən cəhd edin.",
+      "cancelFailedRetry": "Ləğv edilmədi — yenidən cəhd edin.",
+      "networkErrorTryAgain": "Şəbəkə xətası — yenidən cəhd edin.",
+      "accept": "Qəbul et",
+      "decline": "Rədd et",
+      "waitingForOpponent": "{name} gözlənilir…",
+      "cancel": "Ləğv et",
+      "noChallengesYet": "Hələ çağırış yoxdur.",
+      "pickSuggestionOrChallenge": "Yuxarıdan bir təklif seçin və ya dostunuza çağırış göndərin.",
+      "groupNeedsResponse": "Cavabınız gözlənilir",
+      "groupActive": "Aktiv",
+      "groupSent": "Göndərilib",
+      "groupPast": "Keçmiş",
+      "you": "Siz",
+      "vs": "vs"
+    },
+    "createChallengeForm": {
+      "newChallenge": "Yeni çağırış",
+      "chooseAFriend": "Dost seçin",
+      "chooseAFriendPlaceholder": "Dost seçin…",
+      "clearSuggestion": "Təklifi təmizlə",
+      "duration": "Müddət",
+      "versePlaceholderCompact": "Ayə (istəyə görə)",
+      "versePlaceholderFull": "Ayə konteksti (istəyə görə, məs. 2:255)",
+      "send": "Göndər",
+      "sendChallenge": "Çağırışı göndər",
+      "couldNotSendChallenge": "Çağırış göndərilmədi",
+      "challengeSent": "Çağırış @{username} istifadəçisinə göndərildi!",
+      "networkErrorPeriod": "Şəbəkə xətası. Yenidən cəhd edin.",
+      "addFriendsFirst": "Çağırış göndərmək üçün əvvəlcə dost əlavə edin.",
+      "fromLabel": "Mənbə:"
+    },
+    "addFriendForm": {
+      "searchPlaceholder": "İstifadəçi adına görə axtar…",
+      "searching": "Axtarılır…",
+      "noUsersFound": "İstifadəçi tapılmadı.",
+      "statusFriends": "Dostlar",
+      "statusSent": "Göndərilib",
+      "add": "Əlavə et",
+      "accept": "Qəbul et",
+      "couldNotSendRequest": "Sorğu göndərilmədi",
+      "networkErrorPeriod": "Şəbəkə xətası. Yenidən cəhd edin."
+    },
+    "challengeSuggestions": {
+      "suggested": "Təklif olunan",
+      "use": "İstifadə et"
+    },
+    "leaderboardTable": {
+      "addFriendsToSeeLeaderboard": "Reytinqi görmək üçün dost əlavə edin.",
+      "youSuffix": "(siz)"
+    },
+    "friendList": {
+      "noFriendsYet": "Hələ dost yoxdur. Yuxarıdan istifadəçi adı ilə kimisə əlavə edin.",
+      "pendingRequests": "Gözləyən sorğular",
+      "friendsHeader": "Dostlar",
+      "sentDirection": "göndərilib",
+      "receivedDirection": "alınıb",
+      "acceptRequestAria": "Sorğunu qəbul et",
+      "declineRequestAria": "Sorğunu rədd et",
+      "cancelRequestAria": "Sorğunu ləğv et",
+      "clickAgainToConfirm": "Təsdiqləmək üçün yenidən klikləyin",
+      "removeFriendAria": "Dostu sil",
+      "acceptRequestFailed": "Sorğu qəbul edilmədi — yenidən cəhd edin.",
+      "declineRequestFailed": "Sorğu rədd edilmədi — yenidən cəhd edin.",
+      "couldntRemoveTryAgain": "Silinmədi — yenidən cəhd edin.",
+      "networkErrorTryAgain": "Şəbəkə xətası — yenidən cəhd edin."
+    }
+  },
+  "mentions": {
+    "pageTitle": "Qeyd edilmələr",
+    "noMentionsYet": "Hələ qeyd edilmə yoxdur.",
+    "mentionHint": "Bir dost ayə qeydində sizi @istifadəçiadınızla qeyd edə bilər.",
+    "couldntMarkRead": "Qeyd edilmələr oxunmuş kimi işarələnmədi. Oxunmamış sayı sinxron olmaya bilər.",
+    "couldntLoadMentions": "Qeyd edilmələr yüklənmədi.",
+    "mentionedYouOn": "sizi qeyd etdi:",
+    "openInCanvas": "Kanvasda aç"
+  },
+  "workspaces": {
+    "pageTitle": "Yadda Saxlanmış Kanvaslar",
+    "noSavedCanvasesYet": "Hələ yadda saxlanmış kanvas yoxdur.",
+    "buildAndSaveHint": "Bir kanvas yaradın və yadda saxlamaq üçün başlıqdakı yadda saxla ikonuna klikləyin.",
+    "openCanvas": "Kanvası aç",
+    "couldntLoadCanvases": "Yadda saxlanmış kanvaslarınız yüklənmədi.",
+    "retry": "Yenidən cəhd et",
+    "load": "Yüklə",
+    "deleteCanvas": "Kanvası sil",
+    "confirmDeleteCanvas": "Kanvası silməyi təsdiqləyirsiniz?",
+    "nodeCount": "{count, plural, other {# ayə}}"
+  },
+  "onboarding": {
+    "chooseUsername": "İstifadəçi adı seçin",
+    "usernameHint": "Dostlarınız sizi reytinqdə belə tapacaq.",
+    "usernamePlaceholder": "məs. ahmed_hikmah",
+    "usernameRules": "3–20 simvol: yalnız hərflər, rəqəmlər, alt xətlər",
+    "couldNotSaveUsername": "İstifadəçi adı yadda saxlanmadı. Başqasını sınayın.",
+    "networkErrorPleaseRetry": "Şəbəkə xətası. Yenidən cəhd edin.",
+    "saving": "Yadda saxlanılır…",
+    "getStarted": "Başla"
   }
 }

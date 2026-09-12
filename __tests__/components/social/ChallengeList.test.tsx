@@ -1,8 +1,9 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ChallengeList, type EnrichedChallenge } from "@/components/social/ChallengeList";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
+import { renderWithIntl as render } from "../../test-utils/render-with-intl";
 
 function challenge(overrides: Partial<EnrichedChallenge> = {}): EnrichedChallenge {
   return {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { AddFriendForm } from "@/components/social/AddFriendForm";
@@ -45,6 +46,7 @@ function countIncomingChallenges(list: EnrichedChallenge[], myId: number | null)
 }
 
 export default function SocialPage() {
+  const t = useTranslations("social.page");
   const accessToken = useAuthStore((s) => s.accessToken);
   const userId = useSocialStore((s) => s.userId);
   const username = useSocialStore((s) => s.username);
@@ -197,42 +199,44 @@ export default function SocialPage() {
           </div>
         ) : !userId && profileTimedOut ? (
           <div className="space-y-3 py-20 text-center">
-            <p className="text-sm text-text-secondary">
-              Your profile couldn&apos;t load. Please sign out and try again.
-            </p>
+            <p className="text-sm text-text-secondary">{t("profileLoadFailed")}</p>
             <Link href="/" className="text-xs text-teal underline">
-              Back to home
+              {t("backToHome")}
             </Link>
           </div>
         ) : (
           <>
             {/* Page heading */}
             <div className="mb-6 flex items-center justify-between">
-              <h1 className="text-lg font-medium text-text-primary">Social</h1>
+              <h1 className="text-lg font-medium text-text-primary">{t("pageTitle")}</h1>
               {username && <span className="font-mono text-xs text-text-muted">@{username}</span>}
             </div>
 
             {/* Tab bar */}
             <div className="mb-6 flex divide-x divide-border overflow-hidden rounded-lg border border-border">
-              {(["leaderboard", "friends", "challenges"] as Tab[]).map((t) => (
+              {(["leaderboard", "friends", "challenges"] as Tab[]).map((tabKey) => (
                 <button
-                  key={t}
-                  onClick={() => setTab(t)}
+                  key={tabKey}
+                  onClick={() => setTab(tabKey)}
                   className={`flex min-h-[44px] flex-1 cursor-pointer items-center justify-center gap-1.5 px-1 py-2 text-[13px] font-medium capitalize transition-colors ${
-                    tab === t
+                    tab === tabKey
                       ? "bg-surface-raised text-text-primary"
                       : "text-text-muted hover:text-text-secondary"
                   }`}
                 >
-                  {t === "leaderboard" ? (
+                  {tabKey === "leaderboard" ? (
                     <Trophy className="h-4 w-4" />
-                  ) : t === "friends" ? (
+                  ) : tabKey === "friends" ? (
                     <Users className="h-4 w-4" />
                   ) : (
                     <Swords className="h-4 w-4" />
                   )}
-                  {t === "leaderboard" ? "Leaderboard" : t === "friends" ? "Friends" : "Challenges"}
-                  {t === "challenges" && pendingChallengeCount > 0 && (
+                  {tabKey === "leaderboard"
+                    ? t("tabLeaderboard")
+                    : tabKey === "friends"
+                      ? t("tabFriends")
+                      : t("tabChallenges")}
+                  {tabKey === "challenges" && pendingChallengeCount > 0 && (
                     <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-semibold text-ink">
                       {pendingChallengeCount}
                     </span>
@@ -243,7 +247,7 @@ export default function SocialPage() {
 
             {loadError && !loadingFriends && !loadingLeaderboard && !loadingChallenges && (
               <p className="mb-3 text-center text-xs text-error">
-                Couldn&apos;t load.{" "}
+                {t("couldntLoad")}{" "}
                 <button
                   onClick={() => {
                     fetchFriends();
@@ -253,7 +257,7 @@ export default function SocialPage() {
                   }}
                   className="cursor-pointer underline"
                 >
-                  Retry
+                  {t("retry")}
                 </button>
               </p>
             )}
@@ -286,7 +290,7 @@ export default function SocialPage() {
                           disabled={loadingMoreFriends}
                           className="cursor-pointer text-xs text-teal underline disabled:cursor-wait disabled:opacity-50"
                         >
-                          {loadingMoreFriends ? "Loading…" : "Load more"}
+                          {loadingMoreFriends ? t("loading") : t("loadMore")}
                         </button>
                       </div>
                     )}
@@ -311,7 +315,7 @@ export default function SocialPage() {
                 />
                 <section className="space-y-2">
                   <h3 className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">
-                    Your challenges
+                    {t("yourChallenges")}
                   </h3>
                   {loadingChallenges ? (
                     <div className="flex justify-center py-4">
@@ -344,18 +348,18 @@ export default function SocialPage() {
                       disabled={loadingMoreLeaderboard}
                       className="cursor-pointer text-xs text-teal underline disabled:cursor-wait disabled:opacity-50"
                     >
-                      {loadingMoreLeaderboard ? "Loading…" : "Load more"}
+                      {loadingMoreLeaderboard ? t("loading") : t("loadMore")}
                     </button>
                   </div>
                 )}
                 {!loadingLeaderboard && leaderboard.length <= 1 && (
                   <p className="text-center text-xs text-text-muted">
-                    Add friends to see them here.{" "}
+                    {t("addFriendsToSeeThemHere")}{" "}
                     <button
                       onClick={() => setTab("friends")}
                       className="cursor-pointer text-teal underline"
                     >
-                      Go to Friends
+                      {t("goToFriends")}
                     </button>
                   </p>
                 )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { Sparkles, ArrowRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export interface Suggestion {
   id: number;
@@ -20,13 +21,14 @@ interface Props {
  * the create form below. Renders nothing when there are no active suggestions.
  */
 export function ChallengeSuggestions({ suggestions, onPick }: Props) {
+  const t = useTranslations("social.challengeSuggestions");
   if (suggestions.length === 0) return null;
 
   return (
     <section className="space-y-2">
       <h3 className="flex items-center gap-1.5 px-0.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">
         <Sparkles className="h-3.5 w-3.5 text-teal" />
-        Suggested
+        {t("suggested")}
       </h3>
       <div className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1">
         {suggestions.map((s) => (
@@ -55,7 +57,7 @@ export function ChallengeSuggestions({ suggestions, onPick }: Props) {
                 <span />
               )}
               <span className="flex items-center gap-0.5 text-[11px] font-medium text-text-secondary transition-colors group-hover:text-teal">
-                Use <ArrowRight className="h-3 w-3" />
+                {t("use")} <ArrowRight className="h-3 w-3" />
               </span>
             </div>
           </button>

@@ -7,7 +7,8 @@
     "allSettings": "Все настройки →",
     "changeLanguage": "Изменить язык",
     "removeBookmark": "Удалить закладку",
-    "bookmarkVerse": "Добавить в закладки"
+    "bookmarkVerse": "Добавить в закладки",
+    "loading": "Загрузка"
   },
   "nav": {
     "canvas": "Холст",
@@ -109,7 +110,31 @@
     "saveWorkspace": "Сохранить рабочее пространство",
     "exportAsPng": "Экспортировать как PNG",
     "exportAsPdf": "Экспортировать как PDF",
-    "more": "Ещё"
+    "more": "Ещё",
+    "contextSidebar": {
+      "tafsirTitle": "Тафсир Ибн Касира",
+      "loading": "Загрузка…",
+      "tafsirUnavailable": "Тафсир недоступен.",
+      "myNotes": "Мои заметки",
+      "signInForNotes": "Войдите, чтобы добавлять личные заметки.",
+      "deleteNote": "Удалить заметку",
+      "deleteFailed": "Не удалось удалить",
+      "addNotePlaceholder": "Добавьте личную заметку…",
+      "saving": "Сохранение…",
+      "saveFailedRetry": "Не удалось сохранить — повторите попытку",
+      "save": "Сохранить",
+      "similarVerses": "Похожие аяты",
+      "noneFound": "Ничего не найдено.",
+      "edgeKindThematic": "Тема",
+      "edgeKindRoot": "Корень слова",
+      "edgeKindContrast": "Контраст",
+      "resizePanel": "Изменить размер панели",
+      "verseHeader": "Аят",
+      "connectionHeader": "Связь",
+      "closePanel": "Закрыть панель",
+      "whyConnected": "Почему связаны"
+    },
+    "loadingCanvas": "Загрузка холста…"
   },
   "search": {
     "dialogTitle": "Поиск аятов Корана",
@@ -229,5 +254,136 @@
   "authGate": {
     "title": "Войдите, чтобы продолжить",
     "body": "Чтобы просмотреть эту страницу, необходимо войти в систему."
+  },
+  "social": {
+    "page": {
+      "pageTitle": "Сообщество",
+      "tabLeaderboard": "Рейтинг",
+      "tabFriends": "Друзья",
+      "tabChallenges": "Испытания",
+      "profileLoadFailed": "Не удалось загрузить профиль. Выйдите и попробуйте снова.",
+      "backToHome": "На главную",
+      "couldntLoad": "Не удалось загрузить.",
+      "retry": "Повторить",
+      "loadMore": "Загрузить ещё",
+      "loading": "Загрузка…",
+      "yourChallenges": "Ваши испытания",
+      "addFriendsToSeeThemHere": "Добавьте друзей, чтобы увидеть их здесь.",
+      "goToFriends": "К друзьям"
+    },
+    "challengeList": {
+      "ended": "Завершено",
+      "daysHoursLeft": "Осталось {d} дн. {h} ч.",
+      "hoursMinutesLeft": "Осталось {h} ч. {m} мин.",
+      "minutesSecondsLeft": "Осталось {m} мин. {s} сек.",
+      "statusActive": "Активно",
+      "statusIncoming": "Входящее",
+      "statusPending": "Ожидание",
+      "statusWon": "Победа",
+      "statusDraw": "Ничья",
+      "statusLost": "Поражение",
+      "statusCancelled": "Отменено",
+      "statusDeclined": "Отклонено",
+      "youWon": "Вы выиграли",
+      "theyWonCaption": "{name} выиграл(а)",
+      "acceptFailedRetry": "Не удалось принять — попробуйте снова.",
+      "declineFailedRetry": "Не удалось отклонить — попробуйте снова.",
+      "cancelFailedRetry": "Не удалось отменить — попробуйте снова.",
+      "networkErrorTryAgain": "Ошибка сети — попробуйте снова.",
+      "accept": "Принять",
+      "decline": "Отклонить",
+      "waitingForOpponent": "Ожидание {name}…",
+      "cancel": "Отменить",
+      "noChallengesYet": "Пока нет испытаний.",
+      "pickSuggestionOrChallenge": "Выберите предложение или бросьте вызов другу выше.",
+      "groupNeedsResponse": "Требует вашего ответа",
+      "groupActive": "Активные",
+      "groupSent": "Отправленные",
+      "groupPast": "Прошедшие",
+      "you": "Вы",
+      "vs": "vs"
+    },
+    "createChallengeForm": {
+      "newChallenge": "Новое испытание",
+      "chooseAFriend": "Выберите друга",
+      "chooseAFriendPlaceholder": "Выберите друга…",
+      "clearSuggestion": "Очистить предложение",
+      "duration": "Продолжительность",
+      "versePlaceholderCompact": "Аят (необязательно)",
+      "versePlaceholderFull": "Контекст аята (необязательно, напр. 2:255)",
+      "send": "Отправить",
+      "sendChallenge": "Отправить испытание",
+      "couldNotSendChallenge": "Не удалось отправить испытание",
+      "challengeSent": "Испытание отправлено @{username}!",
+      "networkErrorPeriod": "Ошибка сети. Попробуйте снова.",
+      "addFriendsFirst": "Сначала добавьте друзей, чтобы бросить им вызов.",
+      "fromLabel": "Из:"
+    },
+    "addFriendForm": {
+      "searchPlaceholder": "Поиск по имени пользователя…",
+      "searching": "Поиск…",
+      "noUsersFound": "Пользователи не найдены.",
+      "statusFriends": "Друзья",
+      "statusSent": "Отправлено",
+      "add": "Добавить",
+      "accept": "Принять",
+      "couldNotSendRequest": "Не удалось отправить запрос",
+      "networkErrorPeriod": "Ошибка сети. Попробуйте снова."
+    },
+    "challengeSuggestions": {
+      "suggested": "Предложенное",
+      "use": "Использовать"
+    },
+    "leaderboardTable": {
+      "addFriendsToSeeLeaderboard": "Добавьте друзей, чтобы увидеть рейтинг.",
+      "youSuffix": "(вы)"
+    },
+    "friendList": {
+      "noFriendsYet": "Пока нет друзей. Добавьте кого-нибудь по имени пользователя выше.",
+      "pendingRequests": "Ожидающие запросы",
+      "friendsHeader": "Друзья",
+      "sentDirection": "отправлено",
+      "receivedDirection": "получено",
+      "acceptRequestAria": "Принять запрос",
+      "declineRequestAria": "Отклонить запрос",
+      "cancelRequestAria": "Отменить запрос",
+      "clickAgainToConfirm": "Нажмите ещё раз для подтверждения",
+      "removeFriendAria": "Удалить друга",
+      "acceptRequestFailed": "Не удалось принять запрос — попробуйте снова.",
+      "declineRequestFailed": "Не удалось отклонить запрос — попробуйте снова.",
+      "couldntRemoveTryAgain": "Не удалось удалить — попробуйте снова.",
+      "networkErrorTryAgain": "Ошибка сети — попробуйте снова."
+    }
+  },
+  "mentions": {
+    "pageTitle": "Упоминания",
+    "noMentionsYet": "Пока нет упоминаний.",
+    "mentionHint": "Друг может упомянуть вас по @имени_пользователя в заметке к аяту.",
+    "couldntMarkRead": "Не удалось отметить упоминания как прочитанные. Счётчик непрочитанных может быть неточным.",
+    "couldntLoadMentions": "Не удалось загрузить упоминания.",
+    "mentionedYouOn": "упомянул(а) вас в",
+    "openInCanvas": "Открыть на холсте"
+  },
+  "workspaces": {
+    "pageTitle": "Сохранённые холсты",
+    "noSavedCanvasesYet": "Пока нет сохранённых холстов.",
+    "buildAndSaveHint": "Создайте холст и нажмите значок сохранения в шапке, чтобы сохранить его.",
+    "openCanvas": "Открыть холст",
+    "couldntLoadCanvases": "Не удалось загрузить сохранённые холсты.",
+    "retry": "Повторить",
+    "load": "Загрузить",
+    "deleteCanvas": "Удалить холст",
+    "confirmDeleteCanvas": "Подтвердить удаление холста?",
+    "nodeCount": "{count, plural, one {# аят} few {# аята} many {# аятов} other {# аята}}"
+  },
+  "onboarding": {
+    "chooseUsername": "Выберите имя пользователя",
+    "usernameHint": "Так друзья найдут вас в рейтинге.",
+    "usernamePlaceholder": "напр. ahmed_hikmah",
+    "usernameRules": "3–20 символов: только буквы, цифры, подчёркивания",
+    "couldNotSaveUsername": "Не удалось сохранить имя пользователя. Попробуйте другое.",
+    "networkErrorPleaseRetry": "Ошибка сети. Пожалуйста, попробуйте снова.",
+    "saving": "Сохранение…",
+    "getStarted": "Начать"
   }
 }

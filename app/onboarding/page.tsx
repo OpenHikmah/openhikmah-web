@@ -18,6 +18,7 @@ export default function OnboardingPage() {
   const { signIn, signingIn } = useSignIn();
   const t = useTranslations("authGate");
   const tCommon = useTranslations("common");
+  const tOnboarding = useTranslations("onboarding");
 
   const [username, setUsername] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +29,7 @@ export default function OnboardingPage() {
       <div
         className="flex min-h-screen items-center justify-center bg-bg"
         role="status"
-        aria-label="Loading"
+        aria-label={tCommon("loading")}
       >
         <Loader2 className="h-5 w-5 animate-spin text-teal" />
       </div>
@@ -79,14 +80,14 @@ export default function OnboardingPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? "Could not save username. Try another one.");
+        setError(data.error ?? tOnboarding("couldNotSaveUsername"));
         return;
       }
 
       setProfile({ userId: data.id, username: data.username });
       router.replace("/");
     } catch {
-      setError("Network error. Please try again.");
+      setError(tOnboarding("networkErrorPleaseRetry"));
     } finally {
       setSaving(false);
     }
@@ -100,10 +101,10 @@ export default function OnboardingPage() {
             <BookOpen className="h-5 w-5 text-gold" />
           </div>
           <div className="space-y-1 text-center">
-            <h1 className="text-base font-medium text-text-primary">Choose a username</h1>
-            <p className="text-xs text-text-muted">
-              This is how friends will find you on the leaderboard.
-            </p>
+            <h1 className="text-base font-medium text-text-primary">
+              {tOnboarding("chooseUsername")}
+            </h1>
+            <p className="text-xs text-text-muted">{tOnboarding("usernameHint")}</p>
           </div>
         </div>
 
@@ -116,16 +117,14 @@ export default function OnboardingPage() {
                 setUsername(e.target.value);
                 setError(null);
               }}
-              placeholder="e.g. ahmed_hikmah"
+              placeholder={tOnboarding("usernamePlaceholder")}
               maxLength={20}
               autoFocus
               autoComplete="off"
               spellCheck={false}
               className={cn(error && "border-error")}
             />
-            <p className="text-xs text-text-muted">
-              3–20 characters: letters, numbers, underscores only
-            </p>
+            <p className="text-xs text-text-muted">{tOnboarding("usernameRules")}</p>
             {error && <p className="text-xs text-error">{error}</p>}
           </div>
 
@@ -135,7 +134,7 @@ export default function OnboardingPage() {
             className="flex w-full cursor-pointer items-center justify-center gap-2 rounded bg-teal py-2 text-sm font-medium text-text-primary transition-[filter] duration-[120ms] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-            {saving ? "Saving…" : "Get started"}
+            {saving ? tOnboarding("saving") : tOnboarding("getStarted")}
           </button>
         </form>
       </Card>

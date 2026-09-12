@@ -60,6 +60,23 @@ test.describe("language switching", () => {
     expect(cookies.find((c) => c.name === "oh_locale")?.value).toBe("tr");
     await expect(page.locator("html")).toHaveAttribute("lang", "tr");
   });
+
+  test("an authed surface renders translated copy once the locale is switched (issue #571)", async ({
+    authenticatedPage: page,
+  }) => {
+    await page.goto("/search");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByRole("button", { name: /change language/i }).click();
+    await page.getByRole("button", { name: "Türkçe" }).click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "tr");
+
+    // /workspaces' page title is not gated behind a loading state, unlike
+    // /social's (which only renders its heading once userId resolves) — a
+    // stable target for this check.
+    await page.goto("/workspaces");
+    await expect(page.getByRole("heading", { name: "Kaydedilmiş Kanvaslar" })).toBeVisible();
+  });
 });
 
 test.describe("mobile bottom nav", () => {

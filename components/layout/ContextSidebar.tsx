@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useCanvasStore } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import { useState, useEffect, useRef } from "react";
@@ -13,6 +14,7 @@ import { InteractiveArabic } from "@/components/morphology/InteractiveArabic";
 import type { TafsirBlock } from "@/lib/quran/tafsir";
 
 function TafsirSection({ surah, ayah }: { surah: number; ayah: number }) {
+  const t = useTranslations("canvas.contextSidebar");
   const [open, setOpen] = useState(false);
   const [blocks, setBlocks] = useState<TafsirBlock[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -42,15 +44,15 @@ function TafsirSection({ surah, ayah }: { surah: number; ayah: number }) {
         onClick={handleOpen}
         className="flex w-full cursor-pointer items-center justify-between px-3 py-2 text-text-secondary"
       >
-        <span className="text-xs font-medium">Ibn Kathir Tafsir</span>
+        <span className="text-xs font-medium">{t("tafsirTitle")}</span>
         {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
       </button>
       {open && (
         <div className="space-y-2 px-3 pb-3">
           {loading ? (
-            <p className="text-xs text-text-muted">Loading…</p>
+            <p className="text-xs text-text-muted">{t("loading")}</p>
           ) : !blocks?.length ? (
-            <p className="text-xs text-text-muted">Tafsir unavailable.</p>
+            <p className="text-xs text-text-muted">{t("tafsirUnavailable")}</p>
           ) : (
             blocks.map((b, i) =>
               b.arabic ? (
@@ -75,6 +77,7 @@ function TafsirSection({ surah, ayah }: { surah: number; ayah: number }) {
 }
 
 function NotesSection({ verseRef }: { verseRef: string }) {
+  const t = useTranslations("canvas.contextSidebar");
   const accessToken = useAuthStore((s) => s.accessToken);
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState<{ id: number; note: string; createdAt: string }[]>([]);
@@ -185,25 +188,25 @@ function NotesSection({ verseRef }: { verseRef: string }) {
         onClick={() => setOpen((o) => !o)}
         className="flex w-full cursor-pointer items-center justify-between px-3 py-2 text-text-secondary"
       >
-        <span className="text-xs font-medium">My Notes</span>
+        <span className="text-xs font-medium">{t("myNotes")}</span>
         {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
       </button>
 
       {open && (
         <div className="space-y-2 px-3 pb-3">
           {!accessToken ? (
-            <p className="text-xs text-text-muted">Sign in to add private notes.</p>
+            <p className="text-xs text-text-muted">{t("signInForNotes")}</p>
           ) : (
             <>
               {notes.map((n) => (
                 <div key={n.id} className="flex items-start gap-2 rounded border border-border p-2">
                   <p className="flex-1 text-xs leading-relaxed text-text-secondary">{n.note}</p>
                   {deleteErrorId === n.id && (
-                    <span className="shrink-0 text-xs text-error">Delete failed</span>
+                    <span className="shrink-0 text-xs text-error">{t("deleteFailed")}</span>
                   )}
                   <button
                     onClick={() => remove(n.id)}
-                    aria-label="Delete note"
+                    aria-label={t("deleteNote")}
                     className={`shrink-0 cursor-pointer transition-colors hover:text-text-secondary ${
                       deleteErrorId === n.id ? "text-error" : "text-text-muted"
                     }`}
@@ -215,8 +218,8 @@ function NotesSection({ verseRef }: { verseRef: string }) {
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder="Add a private note…"
-                aria-label="Add a private note"
+                placeholder={t("addNotePlaceholder")}
+                aria-label={t("addNotePlaceholder")}
                 rows={2}
                 className="w-full resize-none rounded border border-border bg-transparent px-2.5 py-2 text-xs text-text-primary transition-colors focus:border-gold-muted"
               />
@@ -227,7 +230,7 @@ function NotesSection({ verseRef }: { verseRef: string }) {
                   saveError ? "border-error text-error" : "border-teal text-teal"
                 }`}
               >
-                {saving ? "Saving…" : saveError ? "Save failed — try again" : "Save"}
+                {saving ? t("saving") : saveError ? t("saveFailedRetry") : t("save")}
               </button>
             </>
           )}
@@ -238,6 +241,7 @@ function NotesSection({ verseRef }: { verseRef: string }) {
 }
 
 function SimilarSection({ surah, ayah }: { surah: number; ayah: number }) {
+  const t = useTranslations("canvas.contextSidebar");
   const [open, setOpen] = useState(false);
   const [refs, setRefs] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -267,15 +271,15 @@ function SimilarSection({ surah, ayah }: { surah: number; ayah: number }) {
         onClick={handleOpen}
         className="flex w-full cursor-pointer items-center justify-between px-3 py-2 text-text-secondary"
       >
-        <span className="text-xs font-medium">Similar verses</span>
+        <span className="text-xs font-medium">{t("similarVerses")}</span>
         {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
       </button>
       {open && (
         <div className="px-3 pb-3">
           {loading ? (
-            <p className="text-xs text-text-muted">Loading…</p>
+            <p className="text-xs text-text-muted">{t("loading")}</p>
           ) : !refs?.length ? (
-            <p className="text-xs text-text-muted">None found.</p>
+            <p className="text-xs text-text-muted">{t("noneFound")}</p>
           ) : (
             <div className="flex flex-wrap gap-1.5">
               {refs.map((ref) => (
@@ -295,12 +299,6 @@ function SimilarSection({ surah, ayah }: { surah: number; ayah: number }) {
   );
 }
 
-const KIND_LABEL: Record<EdgeKind, string> = {
-  thematic: "Thematic",
-  root: "Root word",
-  contrast: "Contrast",
-};
-
 // Edge-kind accent as palette class sets (teal / gold / contrast), replacing the
 // old inline colour-string + hex-alpha concatenation.
 const KIND_BADGE: Record<EdgeKind, string> = {
@@ -310,6 +308,12 @@ const KIND_BADGE: Record<EdgeKind, string> = {
 };
 
 export function ContextSidebar() {
+  const t = useTranslations("canvas.contextSidebar");
+  const KIND_LABEL: Record<EdgeKind, string> = {
+    thematic: t("edgeKindThematic"),
+    root: t("edgeKindRoot"),
+    contrast: t("edgeKindContrast"),
+  };
   const sidebarContent = useCanvasStore((s) => s.sidebarContent);
   const setSidebarContent = useCanvasStore((s) => s.setSidebarContent);
   const { width, onHandlePointerDown, isResizing } = useSidebarResize();
@@ -340,7 +344,7 @@ export function ContextSidebar() {
             <div
               role="separator"
               aria-orientation="vertical"
-              aria-label="Resize panel"
+              aria-label={t("resizePanel")}
               onPointerDown={onHandlePointerDown}
               className={`absolute left-0 top-0 h-full w-1.5 -translate-x-1/2 cursor-col-resize transition-colors ${
                 isResizing ? "bg-gold-muted/60" : "hover:bg-gold-muted/40"
@@ -350,11 +354,11 @@ export function ContextSidebar() {
           {/* Header */}
           <div className="flex h-10 shrink-0 items-center justify-between border-b border-border px-4">
             <span className="text-xs text-text-muted">
-              {sidebarContent.type === "node" ? "Verse" : "Connection"}
+              {sidebarContent.type === "node" ? t("verseHeader") : t("connectionHeader")}
             </span>
             <button
               onClick={() => setSidebarContent(null)}
-              aria-label="Close panel"
+              aria-label={t("closePanel")}
               className="-mr-1.5 grid h-9 w-9 place-items-center rounded text-text-muted transition-colors hover:bg-white/5 sm:mr-0 sm:h-6 sm:w-6"
             >
               <X className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
@@ -428,7 +432,7 @@ export function ContextSidebar() {
 
                 {/* Reason */}
                 <Card variant="raised" className="rounded-md p-3">
-                  <p className="mb-1.5 text-xs text-text-muted">Why connected</p>
+                  <p className="mb-1.5 text-xs text-text-muted">{t("whyConnected")}</p>
                   <p className="text-xs leading-relaxed text-text-primary">
                     {sidebarContent.reason}
                   </p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { Flame, Crown } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 interface LeaderboardEntry {
@@ -18,8 +19,9 @@ interface Props {
 }
 
 export function LeaderboardTable({ entries }: Props) {
+  const t = useTranslations("social.leaderboardTable");
   if (entries.length === 0) {
-    return <p className="py-4 text-sm text-text-muted">Add friends to see the leaderboard.</p>;
+    return <p className="py-4 text-sm text-text-muted">{t("addFriendsToSeeLeaderboard")}</p>;
   }
 
   return (
@@ -54,7 +56,9 @@ export function LeaderboardTable({ entries }: Props) {
             {entry.displayName && (
               <span className="ml-1.5 font-mono text-xs text-text-muted">@{entry.username}</span>
             )}
-            {entry.isYou && <span className="ml-1.5 text-xs text-text-muted">(you)</span>}
+            {entry.isYou && (
+              <span className="ml-1.5 text-xs text-text-muted">{t("youSuffix")}</span>
+            )}
           </div>
 
           {/* Streak */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/store/auth";
 import { Loader2, UserPlus, Check, Clock } from "lucide-react";
 import { Input, Card } from "@/components/ui";
@@ -18,6 +19,7 @@ interface SearchResult {
 }
 
 export function AddFriendForm({ onAdded }: Props) {
+  const t = useTranslations("social.addFriendForm");
   const accessToken = useAuthStore((s) => s.accessToken);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -64,7 +66,7 @@ export function AddFriendForm({ onAdded }: Props) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error ?? "Could not send request");
+        setError(data.error ?? t("couldNotSendRequest"));
         return;
       }
       // Reflect the new state locally; mutual requests come back accepted.
@@ -72,7 +74,7 @@ export function AddFriendForm({ onAdded }: Props) {
       setResults((prev) => prev.map((r) => (r.id === user.id ? { ...r, status: newStatus } : r)));
       onAdded();
     } catch {
-      setError("Network error. Try again.");
+      setError(t("networkErrorPeriod"));
     } finally {
       setSendingId(null);
     }
@@ -87,7 +89,7 @@ export function AddFriendForm({ onAdded }: Props) {
           setQuery(e.target.value);
           setError(null);
         }}
-        placeholder="Search by username…"
+        placeholder={t("searchPlaceholder")}
         maxLength={20}
         autoComplete="off"
         spellCheck={false}
@@ -99,9 +101,9 @@ export function AddFriendForm({ onAdded }: Props) {
       {query.trim() && (
         <div className="space-y-1">
           {searching && results.length === 0 ? (
-            <p className="px-1 py-1 text-xs text-text-muted">Searching…</p>
+            <p className="px-1 py-1 text-xs text-text-muted">{t("searching")}</p>
           ) : results.length === 0 ? (
-            <p className="px-1 py-1 text-xs text-text-muted">No users found.</p>
+            <p className="px-1 py-1 text-xs text-text-muted">{t("noUsersFound")}</p>
           ) : (
             results.map((u) => (
               <Card
@@ -133,17 +135,18 @@ function FriendAction({
   sending: boolean;
   onClick: () => void;
 }) {
+  const t = useTranslations("social.addFriendForm");
   if (status === "accepted") {
     return (
       <span className="flex items-center gap-1 text-xs text-text-muted">
-        <Check className="h-3.5 w-3.5" /> Friends
+        <Check className="h-3.5 w-3.5" /> {t("statusFriends")}
       </span>
     );
   }
   if (status === "pending_sent") {
     return (
       <span className="flex items-center gap-1 text-xs text-text-muted">
-        <Clock className="h-3.5 w-3.5" /> Sent
+        <Clock className="h-3.5 w-3.5" /> {t("statusSent")}
       </span>
     );
   }
@@ -160,7 +163,7 @@ function FriendAction({
       ) : (
         <UserPlus className="h-3.5 w-3.5" />
       )}
-      {status === "pending_received" ? "Accept" : "Add"}
+      {status === "pending_received" ? t("accept") : t("add")}
     </button>
   );
 }
