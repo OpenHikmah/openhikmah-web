@@ -16,6 +16,7 @@ import {
 import { clientKey } from "@/lib/infra/http";
 import { logSearchQuery } from "@/lib/infra/search-log";
 import { getQuranEdition, getUiLocale } from "@/lib/i18n/request-prefs";
+import { QURAN_API_LANGUAGE_BY_LOCALE, type Locale } from "@/lib/i18n/config";
 import sanitizeHtml from "sanitize-html";
 
 // Keyword/ref search results vary on the oh_edition cookie.
@@ -43,10 +44,12 @@ async function keywordSearch(
   q: string,
   page: number,
   pageSize: number,
-  edition: string
+  edition: string,
+  uiLocale: Locale
 ): Promise<KeywordSearchResult> {
   try {
-    const url = `https://api.quran.com/api/v4/search?q=${encodeURIComponent(q)}&size=${pageSize}&language=en&page=${page}`;
+    const lang = QURAN_API_LANGUAGE_BY_LOCALE[uiLocale] ?? "en";
+    const url = `https://api.quran.com/api/v4/search?q=${encodeURIComponent(q)}&size=${pageSize}&language=${lang}&page=${page}`;
     const res = await fetch(url, {
       headers: { Accept: "application/json" },
       next: { revalidate: 300 },
@@ -233,7 +236,7 @@ export async function GET(req: NextRequest) {
   // or fallback notice. A miss (unseeded embeddings, quota, rate limit) is simply
   // an empty `related`, invisible to the user.
   const [{ results, total, failed }, semanticMatches] = await Promise.all([
-    keywordSearch(q, page, pageSize, edition),
+    keywordSearch(q, page, pageSize, edition, uiLocale),
     page === 1 ? relatedByMeaning(req, q, edition) : Promise.resolve([]),
   ]);
 

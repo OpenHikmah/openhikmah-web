@@ -409,6 +409,32 @@ describe("GET /api/search", () => {
     expect(mockGetVerses).toHaveBeenCalledWith(["2:30"], "az.mammadaliyev");
   });
 
+  it("defaults to language=en for quran.com's keyword search when the UI locale is English", async () => {
+    mockFetch.mockResolvedValueOnce(quranComResponse([]));
+    await GET(makeSearchReq("mercy"));
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("language=en"),
+      expect.anything()
+    );
+  });
+
+  it.each([
+    ["tr", "merhamet"],
+    ["ru", "милосердие"],
+    ["az", "rəhmət"],
+  ])(
+    "passes the caller's UI locale (%s) as quran.com's keyword-search language",
+    async (locale, q) => {
+      mockGetUiLocale.mockResolvedValue(locale);
+      mockFetch.mockResolvedValueOnce(quranComResponse([]));
+      await GET(makeSearchReq(q));
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining(`language=${locale}`),
+        expect.anything()
+      );
+    }
+  );
+
   describe("surah-name queries", () => {
     it("returns a matchedSurahs payload with no ayah results for an exact surah-name query", async () => {
       const res = await GET(makeSearchReq("kahf"));
