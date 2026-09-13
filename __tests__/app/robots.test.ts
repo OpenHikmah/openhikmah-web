@@ -22,6 +22,7 @@ describe("robots", () => {
         "/social",
         "/mentions",
         "/workspaces",
+        "/onboarding",
       ])
     );
   });

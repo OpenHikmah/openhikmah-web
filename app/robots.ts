@@ -14,6 +14,7 @@ export default function robots(): MetadataRoute.Robots {
         "/social",
         "/mentions",
         "/workspaces",
+        "/onboarding",
       ],
     },
     sitemap: "https://openhikmah.com/sitemap.xml",
