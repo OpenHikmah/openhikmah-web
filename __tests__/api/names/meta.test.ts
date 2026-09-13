@@ -23,19 +23,20 @@ function makeSelectChain(resolveWith: unknown[]) {
   return chain;
 }
 
-const { mockConsume, mockCallAI, mockCookies } = vi.hoisted(() => ({
+const { mockConsume, mockCallAI, mockCookies, mockSelect } = vi.hoisted(() => ({
   mockConsume: vi.fn(),
   mockCallAI: vi.fn(),
   mockCookies: vi.fn(async () => ({
     get: (_name: string) => undefined as { value: string } | undefined,
   })),
+  mockSelect: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({ cookies: mockCookies }));
 
 vi.mock("@/lib/infra/db", () => ({
   db: {
-    select: () => makeSelectChain([]), // durable cache always misses
+    select: mockSelect,
     insert: () => ({
       values: () => ({
         onConflictDoUpdate: async () => undefined,
@@ -76,6 +77,7 @@ describe("GET /api/names/[slug]/meta", () => {
     mockConsume.mockReset().mockResolvedValue(true);
     mockCallAI.mockReset();
     mockCookies.mockReset().mockResolvedValue({ get: () => undefined }); // "en" default
+    mockSelect.mockReset().mockReturnValue(makeSelectChain([])); // durable cache misses by default
   });
 
   it("returns 404 for an unknown slug", async () => {
@@ -179,5 +181,38 @@ describe("GET /api/names/[slug]/meta", () => {
     mockConsume.mockResolvedValue(false);
     const res = await getMeta(req("al-malik"), params("al-malik"));
     expect(res.status).toBe(429);
+  });
+
+  it("does not call the AI for either field once the shared rate-limit charge is rejected", async () => {
+    // Regression test: the shared charge is memoized as the in-flight PROMISE,
+    // not a boolean set before the await resolves — a boolean would let the
+    // second (concurrent) field slip past a charge that's about to reject.
+    withLocale("tr");
+    mockConsume.mockResolvedValue(false);
+    mockCallAI.mockResolvedValue("çeviri");
+
+    const res = await getMeta(req("al-malik"), params("al-malik"));
+
+    expect(res.status).toBe(429);
+    expect(mockCallAI).not.toHaveBeenCalled();
+    const genCalls = mockConsume.mock.calls.filter(([key]) => String(key).startsWith("names-gen:"));
+    expect(genCalls).toHaveLength(1); // one shared charge, not one per field
+  });
+
+  it("reads a durable cache hit for both fields without calling the AI or charging the rate limit", async () => {
+    // Both fields' selects are indistinguishable to this mock (meaning/description
+    // resolve concurrently, so asserting per-field values by call order would be
+    // flaky) — return the same cached string for either and check both fields got it.
+    withLocale("tr");
+    mockSelect.mockReturnValue(makeSelectChain([{ data: JSON.stringify("çeviri"), version: 1 }]));
+
+    const res = await getMeta(req("al-malik"), params("al-malik"));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.meaning).toBe("çeviri");
+    expect(body.description).toBe("çeviri");
+    expect(mockCallAI).not.toHaveBeenCalled();
+    expect(mockConsume).not.toHaveBeenCalled();
   });
 });

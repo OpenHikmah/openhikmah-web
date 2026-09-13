@@ -10,7 +10,7 @@ import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
 import { getCachedNameContentBulk } from "@/lib/names/name-content";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
-import { META_VERSION } from "@/app/api/names/[slug]/meta/route";
+import { META_VERSION } from "@/lib/names/name-meta";
 
 export const metadata = {
   title: "Asmaul Husna — Open Hikmah",

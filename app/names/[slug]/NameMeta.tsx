@@ -33,8 +33,10 @@ export function NameMeta({ slug, locale, fallback, initialMeta, children }: Prop
       .then((data: Meta) => {
         if (!cancelled && data.meaning && data.description) setMeta(data);
       })
-      .catch(() => {
-        // Silent — the canonical English fallback below is already showing.
+      .catch((err) => {
+        // Not surfaced to the user — the canonical English fallback below is
+        // already showing — but logged so a persistent failure isn't invisible.
+        console.error(`NameMeta: fetch failed for ${slug}:`, err);
       });
     return () => {
       cancelled = true;

@@ -8,6 +8,16 @@ export const META_VERSION = 1;
 
 export type NameMetaField = "meaning" | "description";
 
+// translateReason's default length-ratio guard (lib/ai/translate.ts) is
+// calibrated for a one-sentence "reason", not a 2-4 word epithet — the
+// shortest `meaning` values ("The One", "The Firm") can legitimately expand
+// well past the default 3x ratio once rendered as a fuller phrase in tr/ru/az,
+// so a stricter default would silently reject good translations as junk (that
+// mistake is invisible: it just degrades to the English fallback). Widened
+// only for `meaning`; `description` is already sentence-shaped and keeps the
+// default.
+const MEANING_MAX_LENGTH_RATIO = 8;
+
 /**
  * Returns the localized text for a divine name's `meaning` or `description`
  * (lib/names/divine-names/types.ts), translating — never re-deriving — the
@@ -48,7 +58,8 @@ export async function getLocalizedNameField(
           // A refusal must not be silently backed by Gemini either — same
           // rationale as the verses route's per-verse reason translation.
           if (reason === "refusal") ctx.markRefusal();
-        }
+        },
+        field === "meaning" ? { maxLengthRatio: MEANING_MAX_LENGTH_RATIO } : undefined
       ).catch((err) => {
         console.error(`Name meta: translation call failed for ${slug}/${field}/${locale}:`, err);
         incr("names_ai_call_error");

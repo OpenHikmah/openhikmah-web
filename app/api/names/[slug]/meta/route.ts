@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getNameBySlug } from "@/lib/names/divine-names";
-import { getLocalizedNameField, META_VERSION } from "@/lib/names/name-meta";
+import { getLocalizedNameField } from "@/lib/names/name-meta";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
-
-export { META_VERSION };
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -19,12 +17,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 
     // One shared rate-limit charge for both fields, not one per field —
     // mirrors the verses route's shared per-request translation charge.
-    let rateLimitChecked = false;
-    const onBeforeGenerateOnce = async () => {
-      if (rateLimitChecked) return;
-      rateLimitChecked = true;
-      if (!(await consume(`names-gen:${clientKey(req)}`))) throw new RateLimitError();
-    };
+    // Memoizing the in-flight PROMISE (not a boolean set before the await)
+    // matters: both fields call this concurrently, so a boolean flag set
+    // synchronously before `consume()` resolves would let the second field
+    // race past a charge that's about to come back rejected.
+    let charge: Promise<void> | undefined;
+    const onBeforeGenerateOnce = () =>
+      (charge ??= consume(`names-gen:${clientKey(req)}`).then((allowed) => {
+        if (!allowed) throw new RateLimitError();
+      }));
 
     const [meaning, description] = await Promise.all([
       getLocalizedNameField(slug, "meaning", name.meaning, locale, onBeforeGenerateOnce),

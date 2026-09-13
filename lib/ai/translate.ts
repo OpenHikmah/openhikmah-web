@@ -47,8 +47,20 @@ function normalizeForEcho(s: string): string {
  * `looksLikeRefusal` is English-anchored, so a refusal phrased in the target
  * language is not caught here — the english-echo and length-ratio checks are the
  * backstop for that case, and native-language refusal screening is a follow-up.
+ *
+ * `maxLengthRatio` overrides {@link MAX_LENGTH_RATIO} for sources this check
+ * wasn't calibrated for — a short noun-phrase epithet (e.g. a divine name's
+ * "meaning", "The Sovereign") can legitimately expand far more than 3x when
+ * rendered as a single word/compound in tr/ru/az, where the default ratio
+ * would reject a perfectly good translation as junk. The min-ratio floor is
+ * unaffected (it already only applies at `MIN_SOURCE_LEN_FOR_MIN_RATIO`+ chars,
+ * so it never engages for these short sources).
  */
-export function validateTranslation(source: string, translated: string): TranslationVerdict {
+export function validateTranslation(
+  source: string,
+  translated: string,
+  opts: { maxLengthRatio?: number } = {}
+): TranslationVerdict {
   const hadLabel = LABEL_PREFIX.test(translated);
   const stripped = translated.replace(LABEL_PREFIX, "").trim();
 
@@ -62,9 +74,10 @@ export function validateTranslation(source: string, translated: string): Transla
     return { ok: false, reason: "english_echo" };
   }
 
+  const maxLengthRatio = opts.maxLengthRatio ?? MAX_LENGTH_RATIO;
   const ratio = stripped.length / Math.max(src.length, 1);
   if (
-    ratio > MAX_LENGTH_RATIO ||
+    ratio > maxLengthRatio ||
     (src.length >= MIN_SOURCE_LEN_FOR_MIN_RATIO && ratio < MIN_LENGTH_RATIO)
   ) {
     return { ok: false, reason: "length_ratio" };
@@ -95,7 +108,8 @@ export async function translateReason(
   reason: string,
   language: string,
   opts: CallAiOptions = {},
-  onRejected?: (reason: TranslationRejection) => void
+  onRejected?: (reason: TranslationRejection) => void,
+  validationOpts?: { maxLengthRatio?: number }
 ): Promise<string> {
   const prompt = `Translate the following sentence into ${language}. Preserve its meaning exactly — do not add, remove, or alter any theological claim, and maintain ${TANZIH_CONSTRAINT}. Return ONLY the translated sentence, with no quotation marks, labels, or explanation.
 
@@ -103,7 +117,7 @@ Sentence: "${reason}"`;
   const translated = (await callAI(prompt, opts)).trim();
   if (translated === "") return "";
 
-  const verdict = validateTranslation(reason, translated);
+  const verdict = validateTranslation(reason, translated, validationOpts);
   if (!verdict.ok) {
     console.error(`translateReason: rejected translation into ${language} (${verdict.reason})`);
     incr(`translation_rejected_${verdict.reason}`);

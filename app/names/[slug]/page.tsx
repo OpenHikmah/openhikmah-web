@@ -18,7 +18,7 @@ import { getCachedNameContent } from "@/lib/names/name-content";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
 import { REFLECTION_VERSION } from "@/app/api/names/[slug]/reflection/route";
 import { PAIRINGS_VERSION } from "@/app/api/names/[slug]/pairings/route";
-import { META_VERSION } from "@/app/api/names/[slug]/meta/route";
+import { META_VERSION } from "@/lib/names/name-meta";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -119,7 +119,13 @@ export default async function NameDetailPage({ params }: Props) {
 
           <p className="mb-2 font-mono text-xl text-text-primary">{name.transliteration}</p>
 
+          {/* key={slug}: without it, a prev/next client-side nav updates this
+              component's props instead of remounting it, so its useState-seeded
+              translation would keep showing the OLD name's meaning/description
+              (same bleed class as the key={slug} below, and PR #553's names-
+              remount bug). */}
           <NameMeta
+            key={slug}
             slug={slug}
             locale={locale}
             fallback={{ meaning: name.meaning, description: name.description }}
