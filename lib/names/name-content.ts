@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { nameContent, nameVerseReasons, type NameContentKind } from "@/lib/infra/db/schema";
 import { resolveModel, resolveProvider, type Provider } from "@/lib/ai/ai";
@@ -272,6 +272,51 @@ export async function getCachedNameContent<T>(
     console.error(`Corrupt name_content row for ${slug}/${kind}/${locale}:`, err);
     return null;
   }
+}
+
+/**
+ * Read-only, read-many cache lookup across `slugs` for one `(kind, locale)` at
+ * the current `version` — one query instead of one per slug. Used by the
+ * /names grid, which needs a translated `meaning` for up to all 99 names on a
+ * single render and must never trigger 99 AI generations to do it (a miss is
+ * just absent from the returned map; callers fall back to the canonical
+ * English string, same as `getCachedNameContent`'s single-slug contract).
+ */
+export async function getCachedNameContentBulk<T>(
+  slugs: string[],
+  kind: NameContentKind,
+  locale: Locale,
+  version: number
+): Promise<Map<string, T>> {
+  const out = new Map<string, T>();
+  if (slugs.length === 0) return out;
+
+  let rows: Array<{ slug: string; data: string; version: number }>;
+  try {
+    rows = await db
+      .select({ slug: nameContent.slug, data: nameContent.data, version: nameContent.version })
+      .from(nameContent)
+      .where(
+        and(
+          inArray(nameContent.slug, slugs),
+          eq(nameContent.kind, kind),
+          eq(nameContent.locale, locale)
+        )
+      );
+  } catch (err) {
+    console.error(`Failed to bulk-read name_content for ${kind}/${locale}:`, err);
+    return out;
+  }
+
+  for (const row of rows) {
+    if (row.version !== version) continue;
+    try {
+      out.set(row.slug, JSON.parse(row.data) as T);
+    } catch (err) {
+      console.error(`Corrupt name_content row for ${row.slug}/${kind}/${locale}:`, err);
+    }
+  }
+  return out;
 }
 
 async function generateAndPersist<T>(
