@@ -5,6 +5,10 @@ import { SURAH_NAMES } from "@/lib/quran/surah-names";
 
 const BASE_URL = "https://openhikmah.com";
 
+// listVisibleStories() hits Postgres for hidden-story flags; force-dynamic keeps
+// that a request-time call instead of failing the production build (no DB there).
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const stories = await listVisibleStories();
 
