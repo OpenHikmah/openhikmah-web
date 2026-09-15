@@ -1,6 +1,5 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -328,140 +327,148 @@ export function ContextSidebar() {
     return () => mql.removeEventListener("change", handler);
   }, []);
 
+  // Keep the last content rendered through the 150ms close transition, then
+  // unmount — a CSS stand-in for AnimatePresence's exit-before-unmount.
+  const SLIDE_DURATION_MS = 150;
+  const open = sidebarContent !== null;
+  const [renderedContent, setRenderedContent] = useState(sidebarContent);
+  const [prevSidebarContent, setPrevSidebarContent] = useState(sidebarContent);
+  if (sidebarContent !== prevSidebarContent) {
+    setPrevSidebarContent(sidebarContent);
+    if (sidebarContent) setRenderedContent(sidebarContent);
+  }
+
+  useEffect(() => {
+    if (open) return;
+    const timeout = setTimeout(() => setRenderedContent(null), SLIDE_DURATION_MS);
+    return () => clearTimeout(timeout);
+  }, [open]);
+
+  if (!renderedContent) return null;
+
   return (
-    <AnimatePresence>
-      {sidebarContent && (
-        <motion.aside
-          key="sidebar"
-          initial={{ x: "100%", opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: "100%", opacity: 0 }}
-          transition={{ duration: 0.15, ease: "easeOut" }}
-          style={isDesktop ? { width } : undefined}
-          className="pointer-events-auto absolute top-0 right-0 z-40 flex h-full w-full flex-col border-l border-border bg-surface"
-        >
-          {isDesktop && (
-            <div
-              role="separator"
-              aria-orientation="vertical"
-              aria-label={t("resizePanel")}
-              onPointerDown={onHandlePointerDown}
-              className={`absolute left-0 top-0 h-full w-1.5 -translate-x-1/2 cursor-col-resize transition-colors ${
-                isResizing ? "bg-gold-muted/60" : "hover:bg-gold-muted/40"
-              }`}
-            />
-          )}
-          {/* Header */}
-          <div className="flex h-10 shrink-0 items-center justify-between border-b border-border px-4">
-            <span className="text-xs text-text-muted">
-              {sidebarContent.type === "node" ? t("verseHeader") : t("connectionHeader")}
-            </span>
-            <button
-              onClick={() => setSidebarContent(null)}
-              aria-label={t("closePanel")}
-              className="-mr-1.5 grid h-9 w-9 place-items-center rounded text-text-muted transition-colors hover:bg-white/5 sm:mr-0 sm:h-6 sm:w-6"
-            >
-              <X className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
-            </button>
-          </div>
-
-          <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-            {sidebarContent.type === "node" && (
-              <>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-xs text-text-secondary">
-                    {sidebarContent.verse.surahName}
-                  </span>
-                  <span className="shrink-0 rounded border border-gold bg-gold/[0.08] px-1.5 py-0.5 font-mono text-xs text-gold">
-                    {sidebarContent.verse.ref}
-                  </span>
-                </div>
-
-                <InteractiveArabic
-                  key={`arabic-${sidebarContent.verse.ref}`}
-                  verse={sidebarContent.verse}
-                />
-
-                <p className="text-sm leading-relaxed text-text-secondary">
-                  {sidebarContent.verse.translation}
-                </p>
-
-                <TafsirSection
-                  key={`tafsir-${sidebarContent.verse.ref}`}
-                  surah={sidebarContent.verse.surah}
-                  ayah={sidebarContent.verse.ayah}
-                />
-
-                <NotesSection
-                  key={`notes-${sidebarContent.verse.ref}`}
-                  verseRef={sidebarContent.verse.ref}
-                />
-                <SimilarSection
-                  key={`similar-${sidebarContent.verse.ref}`}
-                  surah={sidebarContent.verse.surah}
-                  ayah={sidebarContent.verse.ayah}
-                />
-              </>
-            )}
-
-            {sidebarContent.type === "edge" && (
-              <>
-                {/* Kind badge */}
-                <span
-                  className={`inline-flex items-center rounded border px-2 py-0.5 text-xs ${KIND_BADGE[sidebarContent.kind]}`}
-                >
-                  {KIND_LABEL[sidebarContent.kind]}
-                </span>
-
-                {/* From verse */}
-                <Card variant="raised" className="space-y-1 rounded-md p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-text-muted">
-                      {sidebarContent.fromVerse.surahName}
-                    </span>
-                    <span className="font-mono text-xs text-text-muted">
-                      {sidebarContent.fromVerse.ref}
-                    </span>
-                  </div>
-                  <p className="text-xs leading-relaxed text-text-secondary">
-                    {sidebarContent.fromVerse.translation.length > 100
-                      ? `${sidebarContent.fromVerse.translation.slice(0, 100)}…`
-                      : sidebarContent.fromVerse.translation}
-                  </p>
-                </Card>
-
-                {/* Reason */}
-                <Card variant="raised" className="rounded-md p-3">
-                  <p className="mb-1.5 text-xs text-text-muted">{t("whyConnected")}</p>
-                  <p className="text-xs leading-relaxed text-text-primary">
-                    {sidebarContent.reason}
-                  </p>
-                </Card>
-
-                {/* To verse */}
-                <Card variant="raised" className="space-y-2 rounded-md p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-text-muted">
-                      {sidebarContent.toVerse.surahName}
-                    </span>
-                    <span className="font-mono text-xs text-text-muted">
-                      {sidebarContent.toVerse.ref}
-                    </span>
-                  </div>
-                  <p className="font-arabic text-right text-sm leading-loose text-text-primary">
-                    {sidebarContent.toVerse.arabicText}
-                  </p>
-                  <p className="text-xs leading-relaxed text-text-secondary">
-                    {sidebarContent.toVerse.translation.length > 100
-                      ? `${sidebarContent.toVerse.translation.slice(0, 100)}…`
-                      : sidebarContent.toVerse.translation}
-                  </p>
-                </Card>
-              </>
-            )}
-          </div>
-        </motion.aside>
+    <aside
+      style={isDesktop ? { width } : undefined}
+      className={`pointer-events-auto absolute top-0 right-0 z-40 flex h-full w-full flex-col border-l border-border bg-surface transition-all duration-150 ease-out ${
+        open ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
+      }`}
+    >
+      {isDesktop && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t("resizePanel")}
+          onPointerDown={onHandlePointerDown}
+          className={`absolute left-0 top-0 h-full w-1.5 -translate-x-1/2 cursor-col-resize transition-colors ${
+            isResizing ? "bg-gold-muted/60" : "hover:bg-gold-muted/40"
+          }`}
+        />
       )}
-    </AnimatePresence>
+      {/* Header */}
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border px-4">
+        <span className="text-xs text-text-muted">
+          {renderedContent.type === "node" ? t("verseHeader") : t("connectionHeader")}
+        </span>
+        <button
+          onClick={() => setSidebarContent(null)}
+          aria-label={t("closePanel")}
+          className="-mr-1.5 grid h-9 w-9 place-items-center rounded text-text-muted transition-colors hover:bg-white/5 sm:mr-0 sm:h-6 sm:w-6"
+        >
+          <X className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+        </button>
+      </div>
+
+      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+        {renderedContent.type === "node" && (
+          <>
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-xs text-text-secondary">
+                {renderedContent.verse.surahName}
+              </span>
+              <span className="shrink-0 rounded border border-gold bg-gold/[0.08] px-1.5 py-0.5 font-mono text-xs text-gold">
+                {renderedContent.verse.ref}
+              </span>
+            </div>
+
+            <InteractiveArabic
+              key={`arabic-${renderedContent.verse.ref}`}
+              verse={renderedContent.verse}
+            />
+
+            <p className="text-sm leading-relaxed text-text-secondary">
+              {renderedContent.verse.translation}
+            </p>
+
+            <TafsirSection
+              key={`tafsir-${renderedContent.verse.ref}`}
+              surah={renderedContent.verse.surah}
+              ayah={renderedContent.verse.ayah}
+            />
+
+            <NotesSection
+              key={`notes-${renderedContent.verse.ref}`}
+              verseRef={renderedContent.verse.ref}
+            />
+            <SimilarSection
+              key={`similar-${renderedContent.verse.ref}`}
+              surah={renderedContent.verse.surah}
+              ayah={renderedContent.verse.ayah}
+            />
+          </>
+        )}
+
+        {renderedContent.type === "edge" && (
+          <>
+            {/* Kind badge */}
+            <span
+              className={`inline-flex items-center rounded border px-2 py-0.5 text-xs ${KIND_BADGE[renderedContent.kind]}`}
+            >
+              {KIND_LABEL[renderedContent.kind]}
+            </span>
+
+            {/* From verse */}
+            <Card variant="raised" className="space-y-1 rounded-md p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-text-muted">
+                  {renderedContent.fromVerse.surahName}
+                </span>
+                <span className="font-mono text-xs text-text-muted">
+                  {renderedContent.fromVerse.ref}
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed text-text-secondary">
+                {renderedContent.fromVerse.translation.length > 100
+                  ? `${renderedContent.fromVerse.translation.slice(0, 100)}…`
+                  : renderedContent.fromVerse.translation}
+              </p>
+            </Card>
+
+            {/* Reason */}
+            <Card variant="raised" className="rounded-md p-3">
+              <p className="mb-1.5 text-xs text-text-muted">{t("whyConnected")}</p>
+              <p className="text-xs leading-relaxed text-text-primary">{renderedContent.reason}</p>
+            </Card>
+
+            {/* To verse */}
+            <Card variant="raised" className="space-y-2 rounded-md p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-text-muted">{renderedContent.toVerse.surahName}</span>
+                <span className="font-mono text-xs text-text-muted">
+                  {renderedContent.toVerse.ref}
+                </span>
+              </div>
+              <p className="font-arabic text-right text-sm leading-loose text-text-primary">
+                {renderedContent.toVerse.arabicText}
+              </p>
+              <p className="text-xs leading-relaxed text-text-secondary">
+                {renderedContent.toVerse.translation.length > 100
+                  ? `${renderedContent.toVerse.translation.slice(0, 100)}…`
+                  : renderedContent.toVerse.translation}
+              </p>
+            </Card>
+          </>
+        )}
+      </div>
+    </aside>
   );
 }

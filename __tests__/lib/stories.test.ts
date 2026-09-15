@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { STORIES, getStoryBySlug, listStories, resolveLocalized } from "@/lib/stories";
+import { STORIES, getStoryBySlug, resolveLocalized } from "@/lib/stories";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { getNameBySlug } from "@/lib/names/divine-names";
 
@@ -99,12 +99,6 @@ describe("getStoryBySlug", () => {
 
   it("returns undefined for an unknown slug", () => {
     expect(getStoryBySlug("not-a-real-prophet")).toBeUndefined();
-  });
-});
-
-describe("listStories", () => {
-  it("returns all stories", () => {
-    expect(listStories()).toHaveLength(STORIES.length);
   });
 });
 
