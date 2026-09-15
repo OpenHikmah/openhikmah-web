@@ -68,4 +68,4 @@ export function invalidateFlagCache(key?: string): void {
 // Re-exported for callers that previously imported these from this module.
 // They live in ./feature-flag-keys (no `db` import) so client components can
 // import them without pulling the server-only postgres client into the bundle.
-export { validateFlagType, KNOWN_OPERATIONAL_FLAG_KEYS } from "./feature-flag-keys";
+export { validateFlagType } from "./feature-flag-keys";

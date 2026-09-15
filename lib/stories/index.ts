@@ -59,10 +59,6 @@ export function getStoryBySlug(slug: string): Story | undefined {
   return STORIES.find((s) => s.slug === slug);
 }
 
-export function listStories(): Story[] {
-  return STORIES;
-}
-
 /** `STORIES` minus anything an admin has flagged hidden — what production shows. */
 export async function listVisibleStories(): Promise<Story[]> {
   const hidden = await getHiddenSlugs();
