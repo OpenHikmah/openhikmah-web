@@ -17,7 +17,6 @@ import { clientKey } from "@/lib/infra/http";
 import { logSearchQuery } from "@/lib/infra/search-log";
 import { getQuranEdition, getUiLocale } from "@/lib/i18n/request-prefs";
 import { QURAN_API_LANGUAGE_BY_LOCALE, type Locale } from "@/lib/i18n/config";
-import sanitizeHtml from "sanitize-html";
 
 // Keyword/ref search results vary on the oh_edition and oh_locale cookies.
 export const dynamic = "force-dynamic";
@@ -28,6 +27,12 @@ const RELATED_RESULT_CAP = 5;
 // request from holding up the (otherwise fast) keyword response it runs
 // alongside in Promise.all.
 const RELATED_TIMEOUT_MS = 4000;
+
+function stripHtml(text: string): string {
+  // Strip angle brackets directly so partial/unterminated tags (e.g. "<script")
+  // cannot survive sanitization.
+  return text.replace(/[<>]/g, "");
+}
 
 interface KeywordSearchResult {
   results: SearchResult[];
@@ -68,10 +73,7 @@ async function fetchQuranComSearch(
       const [surahStr] = r.verse_key.split(":");
       const surahNum = parseInt(surahStr, 10);
       const [surahName, surahNameArabic] = getSurahName(surahNum);
-      const snippet = sanitizeHtml(r.translations?.[0]?.text ?? "", {
-        allowedTags: [],
-        allowedAttributes: {},
-      }).slice(0, 140);
+      const snippet = stripHtml(r.translations?.[0]?.text ?? "").slice(0, 140);
       return {
         ref: r.verse_key as VerseRef,
         surahName,

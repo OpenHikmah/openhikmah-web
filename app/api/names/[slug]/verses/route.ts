@@ -17,7 +17,6 @@ import { incr } from "@/lib/infra/metrics";
 import { getUiLocale, getQuranEdition } from "@/lib/i18n/request-prefs";
 import { LOCALE_LANGUAGE_NAME, DEFAULT_EDITION_BY_LOCALE, type Locale } from "@/lib/i18n/config";
 import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
-import sanitizeHtml from "sanitize-html";
 import type { VerseRef } from "@/types/quran";
 
 // Bump to force regeneration after a prompt/search change.
@@ -179,7 +178,7 @@ Return ONLY a JSON array:
 }
 
 function stripHtml(text: string): string {
-  return sanitizeHtml(text, { allowedTags: [], allowedAttributes: {} });
+  return text.replace(/<[^>]*>/g, "");
 }
 
 async function getVersesBySlug(

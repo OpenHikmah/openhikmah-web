@@ -226,10 +226,6 @@ interface RunningJob {
 // process but not across restarts (the DB row is what persists that).
 let running: RunningJob | null = null;
 
-export function currentlyRunningJobId(): JobDefinition["id"] | null {
-  return running?.jobId ?? null;
-}
-
 /** Cooperatively stops the running job. Only `inProcess` jobs (currently just
  *  `backfill-connections`) watch the abort signal; the batch loop checks it
  *  between cells and records a `cancelled` run via `finishRun`. Throws when
