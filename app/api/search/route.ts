@@ -29,9 +29,9 @@ const RELATED_RESULT_CAP = 5;
 const RELATED_TIMEOUT_MS = 4000;
 
 function stripHtml(text: string): string {
-  // A single well-formed-tag pass leaves unclosed tags intact (e.g. "<script
-  // src=x" has no ">" to match) — strip any leftover angle brackets after.
-  return text.replace(/<[^>]*>/g, "").replace(/[<>]/g, "");
+  // Strip angle brackets directly so partial/unterminated tags (e.g. "<script")
+  // cannot survive sanitization.
+  return text.replace(/[<>]/g, "");
 }
 
 interface KeywordSearchResult {
