@@ -67,24 +67,11 @@ function loadAndPlay(verse: AudioVerse, onEnded: () => void) {
   return a.play();
 }
 
-export const useAudioStore = create<AudioStore>((set, get) => ({
-  currentRef: null,
-  currentSurahName: null,
-  isPlaying: false,
-  isLoading: false,
-  queue: [],
-  queueIndex: 0,
-
-  playVerse: (verse) => {
+export const useAudioStore = create<AudioStore>((set, get) => {
+  // Shared by every method that starts a track: loads it, then resolves/rejects
+  // against the generation token captured at call time (see `playGen` above).
+  const startTrack = (verse: AudioVerse) => {
     const token = ++playGen;
-    set({
-      currentRef: verse.ref,
-      currentSurahName: verse.surahName,
-      isPlaying: true,
-      isLoading: true,
-      queue: [verse],
-      queueIndex: 0,
-    });
     loadAndPlay(verse, () => get()._onEnded())
       .then(() => {
         if (token === playGen) set({ isLoading: false });
@@ -92,103 +79,103 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
       .catch(() => {
         if (token === playGen) set({ isPlaying: false, isLoading: false });
       });
-  },
+  };
 
-  playGraph: (verses) => {
-    if (verses.length === 0) return;
-    const first = verses[0];
-    const token = ++playGen;
-    set({
-      currentRef: first.ref,
-      currentSurahName: first.surahName,
-      isPlaying: true,
-      isLoading: true,
-      queue: verses,
-      queueIndex: 0,
-    });
-    loadAndPlay(first, () => get()._onEnded())
-      .then(() => {
-        if (token === playGen) set({ isLoading: false });
-      })
-      .catch(() => {
-        if (token === playGen) set({ isPlaying: false, isLoading: false });
+  return {
+    currentRef: null,
+    currentSurahName: null,
+    isPlaying: false,
+    isLoading: false,
+    queue: [],
+    queueIndex: 0,
+
+    playVerse: (verse) => {
+      set({
+        currentRef: verse.ref,
+        currentSurahName: verse.surahName,
+        isPlaying: true,
+        isLoading: true,
+        queue: [verse],
+        queueIndex: 0,
       });
-  },
+      startTrack(verse);
+    },
 
-  pause: () => {
-    if (_audio) _audio.pause();
-    set({ isPlaying: false });
-  },
-
-  resume: () => {
-    if (!_audio) return;
-    _audio
-      .play()
-      .then(() => set({ isPlaying: true }))
-      .catch(() => {});
-  },
-
-  stop: () => {
-    if (_audio) {
-      _audio.pause();
-      _audio.src = "";
-    }
-    set({
-      currentRef: null,
-      currentSurahName: null,
-      isPlaying: false,
-      isLoading: false,
-      queue: [],
-      queueIndex: 0,
-    });
-  },
-
-  next: () => {
-    const { queue, queueIndex } = get();
-    const nextIdx = queueIndex + 1;
-    if (nextIdx >= queue.length) {
-      get().stop();
-      return;
-    }
-    const verse = queue[nextIdx];
-    const token = ++playGen;
-    set({
-      currentRef: verse.ref,
-      currentSurahName: verse.surahName,
-      queueIndex: nextIdx,
-      isLoading: true,
-    });
-    loadAndPlay(verse, () => get()._onEnded())
-      .then(() => {
-        if (token === playGen) set({ isLoading: false });
-      })
-      .catch(() => {
-        if (token === playGen) set({ isPlaying: false, isLoading: false });
+    playGraph: (verses) => {
+      if (verses.length === 0) return;
+      const first = verses[0];
+      set({
+        currentRef: first.ref,
+        currentSurahName: first.surahName,
+        isPlaying: true,
+        isLoading: true,
+        queue: verses,
+        queueIndex: 0,
       });
-  },
+      startTrack(first);
+    },
 
-  prev: () => {
-    const { queue, queueIndex } = get();
-    const prevIdx = queueIndex - 1;
-    if (prevIdx < 0) return;
-    const verse = queue[prevIdx];
-    const token = ++playGen;
-    set({
-      currentRef: verse.ref,
-      currentSurahName: verse.surahName,
-      queueIndex: prevIdx,
-      isLoading: true,
-    });
-    loadAndPlay(verse, () => get()._onEnded())
-      .then(() => {
-        if (token === playGen) set({ isLoading: false });
-      })
-      .catch(() => {
-        if (token === playGen) set({ isPlaying: false, isLoading: false });
+    pause: () => {
+      if (_audio) _audio.pause();
+      set({ isPlaying: false });
+    },
+
+    resume: () => {
+      if (!_audio) return;
+      _audio
+        .play()
+        .then(() => set({ isPlaying: true }))
+        .catch(() => {});
+    },
+
+    stop: () => {
+      if (_audio) {
+        _audio.pause();
+        _audio.src = "";
+      }
+      set({
+        currentRef: null,
+        currentSurahName: null,
+        isPlaying: false,
+        isLoading: false,
+        queue: [],
+        queueIndex: 0,
       });
-  },
+    },
 
-  _onEnded: () => {
-    get().next();
-  },
-}));
+    next: () => {
+      const { queue, queueIndex } = get();
+      const nextIdx = queueIndex + 1;
+      if (nextIdx >= queue.length) {
+        get().stop();
+        return;
+      }
+      const verse = queue[nextIdx];
+      set({
+        currentRef: verse.ref,
+        currentSurahName: verse.surahName,
+        queueIndex: nextIdx,
+        isLoading: true,
+      });
+      startTrack(verse);
+    },
+
+    prev: () => {
+      const { queue, queueIndex } = get();
+      const prevIdx = queueIndex - 1;
+      if (prevIdx < 0) return;
+      const verse = queue[prevIdx];
+      set({
+        currentRef: verse.ref,
+        currentSurahName: verse.surahName,
+        queueIndex: prevIdx,
+        isLoading: true,
+      });
+      startTrack(verse);
+    },
+
+    _onEnded: () => {
+      get().next();
+    },
+  };
+});
