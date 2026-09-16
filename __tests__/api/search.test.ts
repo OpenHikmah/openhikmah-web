@@ -215,6 +215,24 @@ describe("GET /api/search", () => {
     expect(body.results[0].snippet).toContain("Alif");
   });
 
+  it("strips unclosed tags that a single well-formed-tag pass would miss", async () => {
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([
+        {
+          verse_key: "3:1",
+          translations: [{ text: "<script src=x Alif" }],
+        },
+      ])
+    );
+
+    const req = makeSearchReq("alif");
+    const res = await GET(req);
+    const body = await res.json();
+    expect(body.results[0].snippet).not.toContain("<");
+    expect(body.results[0].snippet).not.toContain(">");
+    expect(body.results[0].snippet).toContain("Alif");
+  });
+
   it("filters out results without valid verse_key", async () => {
     mockFetch.mockResolvedValueOnce(
       quranComResponse([
