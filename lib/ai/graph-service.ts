@@ -511,7 +511,11 @@ export async function generateConnectionsForCell(
       const conflicted = generated.filter((g) => !insertedRefs.has(g.ref));
       if (conflicted.length > 0) {
         const persisted = await db
-          .select({ toRef: connections.toRef, reason: connections.reason })
+          .select({
+            toRef: connections.toRef,
+            reason: connections.reason,
+            confidence: connections.confidence,
+          })
           .from(connections)
           .where(
             and(
@@ -525,12 +529,14 @@ export async function generateConnectionsForCell(
               )
             )
           );
-        const reasonByRef = new Map(persisted.map((r) => [r.toRef, r.reason]));
+        const persistedByRef = new Map(persisted.map((r) => [r.toRef, r]));
         return {
           calledAI,
           results: generated.map((g) => {
-            const persistedReason = reasonByRef.get(g.ref);
-            return persistedReason !== undefined ? { ...g, reason: persistedReason } : g;
+            const winner = persistedByRef.get(g.ref);
+            return winner !== undefined
+              ? { ...g, reason: winner.reason, confidence: winner.confidence ?? undefined }
+              : g;
           }),
         };
       }

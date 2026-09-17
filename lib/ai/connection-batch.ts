@@ -581,9 +581,13 @@ export async function runConnectionBatch(
         // NB: an unparseable model response (refusal, prose, truncated JSON)
         // throws ConnectionParseError out of generateConnectionsForCell before
         // this point, so it's handled as a cell failure in the catch below and
-        // never reaches the exhausted branch. Only a *well-formed* empty
-        // selection lands here with results.length === 0.
-        if (opts.mode === "topup" && excludeRefs.length > 0 && results.length === 0) {
+        // never reaches the exhausted branch. `!calledAI` (see its docstring in
+        // graph-service.ts) is the genuine-exhaustion signal: the candidate pool
+        // was empty, so no LLM call was made. A well-formed empty selection with
+        // candidates present (quality gate / verification rejected everything)
+        // still has calledAI === true and must NOT be recorded as exhausted —
+        // that pool isn't actually empty and deserves a future retry.
+        if (opts.mode === "topup" && excludeRefs.length > 0 && !calledAI) {
           // Grounded pool is genuinely empty for this cell — record it so no
           // future run pays for it again.
           await upsertCoverage(cell.fromRef, cell.kind, {
