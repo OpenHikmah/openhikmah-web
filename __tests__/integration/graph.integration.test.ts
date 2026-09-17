@@ -69,32 +69,36 @@ describe("connection graph (integration, real Postgres)", () => {
     await seed("3:18");
     mockCallAI.mockResolvedValue(
       JSON.stringify([
-        { ref: "2:255", reason: "throne verse" },
-        { ref: "3:18", reason: "witness of oneness" },
+        { ref: "2:255", reason: "This verse describes the throne and vast divine knowledge." },
+        { ref: "3:18", reason: "Both verses bear witness to the absolute oneness of God." },
       ])
     );
 
     // First call — cache miss.
     const first = await getConnections("1:1", "thematic", source);
     expect(first).toHaveLength(2);
-    expect(mockCallAI).toHaveBeenCalledTimes(1);
+    // One generation call + one batched verification call over both survivors.
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
     expect(await db.select().from(connections)).toHaveLength(2);
-    expect(await db.select().from(aiGenerations)).toHaveLength(1);
+    expect(await db.select().from(aiGenerations)).toHaveLength(2);
 
     // Second identical call — cache hit, NO new AI call.
     const second = await getConnections("1:1", "thematic", source);
     expect(second).toHaveLength(2);
-    expect(second[0]).toMatchObject({ ref: "2:255", reason: "throne verse" });
-    expect(mockCallAI).toHaveBeenCalledTimes(1);
-    expect(await db.select().from(aiGenerations)).toHaveLength(1);
+    expect(second[0]).toMatchObject({
+      ref: "2:255",
+      reason: "This verse describes the throne and vast divine knowledge.",
+    });
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
+    expect(await db.select().from(aiGenerations)).toHaveLength(2);
   });
 
   it("drops a hallucinated ref that is not in the corpus", async () => {
     await seed("2:255"); // 9:999 intentionally NOT seeded
     mockCallAI.mockResolvedValue(
       JSON.stringify([
-        { ref: "2:255", reason: "real" },
-        { ref: "9:999", reason: "hallucinated" },
+        { ref: "2:255", reason: "A genuinely grounded and well-formed connection here." },
+        { ref: "9:999", reason: "A hallucinated reference that does not exist at all." },
       ])
     );
 
@@ -106,30 +110,37 @@ describe("connection graph (integration, real Postgres)", () => {
   it("a non-en request translates the canonical English selection, never re-derives it", async () => {
     await seed("2:255");
     mockCallAI.mockImplementation(async (prompt: string) => {
-      if (prompt.startsWith("Translate the following sentence")) return "ayet-el kürsi";
-      return JSON.stringify([{ ref: "2:255", reason: "throne verse" }]);
+      if (prompt.startsWith("Translate the following sentence"))
+        return "ayet-el kürsi ve Allah'ın büyük ilmi";
+      return JSON.stringify([
+        { ref: "2:255", reason: "This verse describes the throne and vast divine knowledge." },
+      ]);
     });
 
     const en = await getConnections("1:1", "thematic", source, { locale: "en" });
-    expect(en[0]).toMatchObject({ ref: "2:255", reason: "throne verse" });
-    expect(mockCallAI).toHaveBeenCalledTimes(1); // one generation
+    expect(en[0]).toMatchObject({
+      ref: "2:255",
+      reason: "This verse describes the throne and vast divine knowledge.",
+    });
+    // One generation call + one batched verification call over the survivor.
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
 
     // Turkish: same verse selection, reason translated — one extra call, NO regeneration.
     const tr = await getConnections("1:1", "thematic", source, { locale: "tr" });
-    expect(tr[0]).toMatchObject({ ref: "2:255", reason: "ayet-el kürsi" });
-    expect(mockCallAI).toHaveBeenCalledTimes(2);
+    expect(tr[0]).toMatchObject({ ref: "2:255", reason: "ayet-el kürsi ve Allah'ın büyük ilmi" });
+    expect(mockCallAI).toHaveBeenCalledTimes(3);
     const rows = await db.select().from(connections);
     expect(rows).toHaveLength(2); // en + tr, same toRef
     expect(rows.filter((r) => r.locale === "tr").map((r) => r.toRef)).toEqual(["2:255"]);
 
     // Both locales now cached — no further AI calls.
     expect((await getConnections("1:1", "thematic", source, { locale: "en" }))[0]).toMatchObject({
-      reason: "throne verse",
+      reason: "This verse describes the throne and vast divine knowledge.",
     });
     expect((await getConnections("1:1", "thematic", source, { locale: "tr" }))[0]).toMatchObject({
-      reason: "ayet-el kürsi",
+      reason: "ayet-el kürsi ve Allah'ın büyük ilmi",
     });
-    expect(mockCallAI).toHaveBeenCalledTimes(2);
+    expect(mockCallAI).toHaveBeenCalledTimes(3);
   });
 
   it("a partial locale cache is repaired on the next request — only the missing ref is re-translated", async () => {
@@ -137,25 +148,29 @@ describe("connection graph (integration, real Postgres)", () => {
     await seed("3:18");
     let attemptsForA = 0;
     let translationCalls = 0;
+    const REASON_A = "reason A: mercy and forgiveness are shown throughout this passage.";
+    const REASON_B = "reason B: a contrast between hardship and ease is drawn here clearly.";
+    const TR_A = "tr A: translated mercy passage text here";
+    const TR_B = "tr B: translated hardship passage text here";
     mockCallAI.mockImplementation(async (prompt: string) => {
       if (prompt.startsWith("Translate the following sentence")) {
         translationCalls++;
         if (prompt.includes("reason A")) {
           // First attempt for A fails (empty → English fallback, not persisted);
           // a later attempt succeeds.
-          return attemptsForA++ === 0 ? "" : "tr A";
+          return attemptsForA++ === 0 ? "" : TR_A;
         }
-        return "tr B";
+        return TR_B;
       }
       return JSON.stringify([
-        { ref: "2:255", reason: "reason A" },
-        { ref: "3:18", reason: "reason B" },
+        { ref: "2:255", reason: REASON_A },
+        { ref: "3:18", reason: REASON_B },
       ]);
     });
 
     // Cold tr request: en generated, B translates, A fails → only B persisted for tr.
     const first = await getConnections("1:1", "thematic", source, { locale: "tr" });
-    expect(first.map((c) => c.reason)).toEqual(["reason A", "tr B"]);
+    expect(first.map((c) => c.reason)).toEqual([REASON_A, TR_B]);
     let rows = await db.select().from(connections);
     expect(rows.filter((r) => r.locale === "tr").map((r) => r.toRef)).toEqual(["3:18"]);
     expect(translationCalls).toBe(2);
@@ -163,7 +178,7 @@ describe("connection graph (integration, real Postgres)", () => {
     // Next tr request: 1 tr row < 2 en rows → not a hit. It re-translates ONLY A
     // (B is reused from cache) and does NOT regenerate the English selection.
     const second = await getConnections("1:1", "thematic", source, { locale: "tr" });
-    expect(second.map((c) => c.reason)).toEqual(["tr A", "tr B"]);
+    expect(second.map((c) => c.reason)).toEqual([TR_A, TR_B]);
     expect(translationCalls).toBe(3); // just the one retry for A
     rows = await db.select().from(connections);
     expect(
@@ -172,26 +187,30 @@ describe("connection graph (integration, real Postgres)", () => {
         .map((r) => r.toRef)
         .sort()
     ).toEqual(["2:255", "3:18"]);
-    // One English generation total across both requests.
-    expect(await db.select().from(aiGenerations)).toHaveLength(1);
+    // One English generation + one batched verification call, total across both
+    // requests (the English selection is only ever derived once).
+    expect(await db.select().from(aiGenerations)).toHaveLength(2);
 
     // Now complete: a third tr request is a pure cache hit.
     const third = await getConnections("1:1", "thematic", source, { locale: "tr" });
-    expect(third.map((c) => c.reason)).toEqual(["tr A", "tr B"]);
+    expect(third.map((c) => c.reason)).toEqual([TR_A, TR_B]);
     expect(translationCalls).toBe(3);
   });
 
   it("a retired locale translation is not resurrected — a repair serves the fresh text without reviving the old row", async () => {
     await seed("2:255");
+    const REASON_A = "reason A: mercy and forgiveness are shown throughout this passage.";
+    const OLD_TR = "old translated reason text here";
+    const NEW_TR = "new translated reason text here";
     mockCallAI.mockImplementation(async (prompt: string) => {
-      if (prompt.startsWith("Translate the following sentence")) return "old tr";
-      return JSON.stringify([{ ref: "2:255", reason: "reason A" }]);
+      if (prompt.startsWith("Translate the following sentence")) return OLD_TR;
+      return JSON.stringify([{ ref: "2:255", reason: REASON_A }]);
     });
 
     // Cold tr request: generates en, translates, persists one active tr row.
     await getConnections("1:1", "thematic", source, { locale: "tr" });
     let rows = await db.select().from(connections).where(eq(connections.locale, "tr"));
-    expect(rows).toMatchObject([{ toRef: "2:255", reason: "old tr", status: "active" }]);
+    expect(rows).toMatchObject([{ toRef: "2:255", reason: OLD_TR, status: "active" }]);
 
     // An admin retires the (bad) translation — the English row is untouched.
     await db
@@ -204,38 +223,46 @@ describe("connection graph (integration, real Postgres)", () => {
     // translation — served in the response, but NOT persisted over the
     // retired row (the unique key is still held by it).
     mockCallAI.mockImplementation(async (prompt: string) => {
-      if (prompt.startsWith("Translate the following sentence")) return "new tr";
-      return JSON.stringify([{ ref: "2:255", reason: "reason A" }]);
+      if (prompt.startsWith("Translate the following sentence")) return NEW_TR;
+      return JSON.stringify([{ ref: "2:255", reason: REASON_A }]);
     });
     const repaired = await getConnections("1:1", "thematic", source, { locale: "tr" });
 
-    expect(repaired.map((c) => c.reason)).toEqual(["new tr"]); // fresh text served
+    expect(repaired.map((c) => c.reason)).toEqual([NEW_TR]); // fresh text served
     rows = await db.select().from(connections).where(eq(connections.locale, "tr"));
     expect(rows).toHaveLength(1); // no new row inserted, the retired one still holds the key
-    expect(rows[0]).toMatchObject({ reason: "old tr", status: "retired" }); // untouched, not resurrected
-    // Only ever generated English once across the whole test.
-    expect(await db.select().from(aiGenerations)).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ reason: OLD_TR, status: "retired" }); // untouched, not resurrected
+    // One English generation + one batched verification call, only ever once
+    // across the whole test.
+    expect(await db.select().from(aiGenerations)).toHaveLength(2);
   });
 
   it("a cold non-en request generates English first, then translates it", async () => {
     await seed("2:255");
+    const WITNESS_REASON = "Both verses bear witness to the absolute oneness of God.";
+    const RU_TRANSLATION = "witness of oneness translated into Russian for this test (ru)";
     mockCallAI.mockImplementation(async (prompt: string) => {
-      if (prompt.startsWith("Translate the following sentence")) return "witness of oneness (ru)";
-      return JSON.stringify([{ ref: "2:255", reason: "witness of oneness" }]);
+      if (prompt.startsWith("Translate the following sentence")) return RU_TRANSLATION;
+      return JSON.stringify([{ ref: "2:255", reason: WITNESS_REASON }]);
     });
 
     const ru = await getConnections("1:1", "thematic", source, { locale: "ru" });
 
-    expect(ru[0]).toMatchObject({ ref: "2:255", reason: "witness of oneness (ru)" });
-    expect(mockCallAI).toHaveBeenCalledTimes(2); // 1 English generation + 1 translation
+    expect(ru[0]).toMatchObject({ ref: "2:255", reason: RU_TRANSLATION });
+    // 1 English generation + 1 batched verification call + 1 translation.
+    expect(mockCallAI).toHaveBeenCalledTimes(3);
     const rows = await db.select().from(connections);
     expect(rows.map((r) => r.locale).sort()).toEqual(["en", "ru"]);
-    expect(rows.find((r) => r.locale === "en")?.reason).toBe("witness of oneness");
+    expect(rows.find((r) => r.locale === "en")?.reason).toBe(WITNESS_REASON);
   });
 
   it("persists a concrete model id even when no provider is passed (resolves the flag)", async () => {
     await seed("2:255");
-    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "throne verse" }]));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        { ref: "2:255", reason: "This verse describes the throne and vast divine knowledge." },
+      ])
+    );
 
     await getConnections("1:1", "thematic", source);
 
@@ -247,7 +274,9 @@ describe("connection graph (integration, real Postgres)", () => {
 
   it("single-flight does not coalesce concurrent generations for different providers", async () => {
     await seed("2:255");
-    const response = JSON.stringify([{ ref: "2:255", reason: "throne verse" }]);
+    const response = JSON.stringify([
+      { ref: "2:255", reason: "This verse describes the throne and vast divine knowledge." },
+    ]);
 
     // Deterministic overlap: pin the first call at the AI boundary (after its
     // DB read + inFlight.set) until the second call has run to completion, so
@@ -289,7 +318,8 @@ describe("connection graph (integration, real Postgres)", () => {
 
     expect(a).toHaveLength(1);
     expect(b).toHaveLength(1);
-    expect(mockCallAI).toHaveBeenCalledTimes(2);
+    // 2 requests × (1 generation + 1 batched verification call) each.
+    expect(mockCallAI).toHaveBeenCalledTimes(4);
   });
 
   it("the unique index dedupes duplicate edges", async () => {
