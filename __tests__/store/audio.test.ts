@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useAudioStore, type AudioVerse } from "@/store/audio";
+import { usePreferencesStore } from "@/store/preferences";
+import { DEFAULT_RECITER } from "@/lib/quran/audio";
 
 const verseA: AudioVerse = { ref: "2:255", surah: 2, ayah: 255, surahName: "Al-Baqarah" };
 const verseB: AudioVerse = { ref: "1:1", surah: 1, ayah: 1, surahName: "Al-Fatiha" };
@@ -15,7 +17,12 @@ let pendingPlays: Array<{ resolve: () => void; reject: (e: unknown) => void }>;
 // and reused for the whole file — capture it via a constructor spy so tests
 // can dispatch real `error`/`ended` events on it directly, the same way a
 // browser would, rather than reaching into the store's private closures.
+// `store/audio.ts` also constructs a second, hidden `Audio` for verse
+// prefetching (`_prefetchAudio`) — both are singletons, each constructed
+// once for the whole file and reused (`.src` reassigned) on every later
+// call, so capture each by construction order rather than per-test.
 let capturedAudioEl: HTMLAudioElement | null = null;
+let capturedPrefetchEl: HTMLAudioElement | null = null;
 const RealAudio = window.Audio;
 
 beforeEach(() => {
@@ -29,11 +36,13 @@ beforeEach(() => {
   window.HTMLMediaElement.prototype.pause = vi.fn();
   window.HTMLMediaElement.prototype.load = vi.fn();
   // Re-installed each test (restored by afterEach's restoreAllMocks) — but
-  // store/audio.ts's module-level `_audio` is only ever constructed once for
-  // the whole file, so `capturedAudioEl` naturally stays set after that.
+  // store/audio.ts's module-level `_audio`/`_prefetchAudio` are each only
+  // ever constructed once for the whole file, so the captured refs naturally
+  // stay set after that.
   vi.spyOn(window, "Audio").mockImplementation(function (...args: unknown[]) {
     const el = new (RealAudio as unknown as new (...a: unknown[]) => HTMLAudioElement)(...args);
-    capturedAudioEl = el;
+    if (!capturedAudioEl) capturedAudioEl = el;
+    else if (!capturedPrefetchEl) capturedPrefetchEl = el;
     return el;
   } as unknown as typeof Audio);
 
@@ -45,6 +54,7 @@ beforeEach(() => {
     queue: [],
     queueIndex: 0,
   });
+  usePreferencesStore.setState({ reciter: DEFAULT_RECITER });
 });
 
 afterEach(() => {
@@ -279,31 +289,47 @@ describe("audio store", () => {
       vi.spyOn(console, "error").mockImplementation(() => {});
     });
 
+    // Every load failure is now retried a couple of times (with backoff)
+    // before falling back to the old skip/stop behavior — repeatedly fail
+    // the same track until retries are exhausted, matching the worst case a
+    // real CDN blip would produce.
+    async function exhaustRetries() {
+      for (let i = 0; i < 3; i++) {
+        capturedAudioEl!.dispatchEvent(new Event("error"));
+        await vi.advanceTimersByTimeAsync(600);
+        const last = pendingPlays[pendingPlays.length - 1];
+        last?.resolve();
+        await vi.advanceTimersByTimeAsync(0);
+      }
+    }
+
     it("advances to the next track instead of freezing the queue", async () => {
+      vi.useFakeTimers();
       useAudioStore.getState().playGraph([verseA, verseB, verseC]);
       pendingPlays[0].resolve();
-      await Promise.resolve();
-      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(0);
       expect(useAudioStore.getState().currentRef).toBe("2:255");
 
       // Simulate the CDN failing to serve verseA's audio — the browser fires
       // `error` on the element, never `ended`.
-      capturedAudioEl!.dispatchEvent(new Event("error"));
+      await exhaustRetries();
       expect(useAudioStore.getState().currentRef).toBe("1:1");
       expect(useAudioStore.getState().queueIndex).toBe(1);
+      vi.useRealTimers();
     });
 
     it("stops cleanly (rather than looping) when a single playVerse() track fails", async () => {
+      vi.useFakeTimers();
       useAudioStore.getState().playVerse(verseA);
       pendingPlays[0].resolve();
-      await Promise.resolve();
-      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(0);
 
-      capturedAudioEl!.dispatchEvent(new Event("error"));
+      await exhaustRetries();
       const s = useAudioStore.getState();
       expect(s.currentRef).toBeNull();
       expect(s.isPlaying).toBe(false);
       expect(s.queue).toEqual([]);
+      vi.useRealTimers();
     });
 
     it("stops cleanly instead of autoplaying the next track when the user had paused", async () => {
@@ -325,6 +351,94 @@ describe("audio store", () => {
       expect(s.isPlaying).toBe(false);
       expect(s.currentRef).toBeNull();
       expect(s.queue).toEqual([]);
+    });
+
+    it("retries a failed load before giving up, instead of skipping immediately", async () => {
+      vi.useFakeTimers();
+      useAudioStore.getState().playGraph([verseA, verseB]);
+      pendingPlays[0].resolve();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(useAudioStore.getState().currentRef).toBe("2:255");
+
+      // First failure: still verseA, retry scheduled instead of advancing.
+      capturedAudioEl!.dispatchEvent(new Event("error"));
+      expect(useAudioStore.getState().currentRef).toBe("2:255");
+      expect(useAudioStore.getState().queueIndex).toBe(0);
+
+      // Retry fires after the backoff delay and fails again — still verseA
+      // (one retry left).
+      await vi.advanceTimersByTimeAsync(600);
+      pendingPlays[1].resolve();
+      await vi.advanceTimersByTimeAsync(0);
+      capturedAudioEl!.dispatchEvent(new Event("error"));
+      expect(useAudioStore.getState().currentRef).toBe("2:255");
+
+      // Final retry also fails — retries exhausted, now it advances.
+      await vi.advanceTimersByTimeAsync(600);
+      pendingPlays[2].resolve();
+      await vi.advanceTimersByTimeAsync(0);
+      capturedAudioEl!.dispatchEvent(new Event("error"));
+      expect(useAudioStore.getState().currentRef).toBe("1:1");
+      expect(useAudioStore.getState().queueIndex).toBe(1);
+
+      vi.useRealTimers();
+    });
+  });
+
+  describe("changing reciter mid-playback", () => {
+    it("restarts the currently playing verse under the new reciter", async () => {
+      useAudioStore.getState().playGraph([verseA, verseB]);
+      pendingPlays[0].resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(useAudioStore.getState().currentRef).toBe("2:255");
+      const playCallsBefore = pendingPlays.length;
+
+      usePreferencesStore.getState().setReciter("ar.husary");
+
+      // Same verse, restarted — a new play() call, queue position unchanged.
+      expect(pendingPlays.length).toBe(playCallsBefore + 1);
+      expect(useAudioStore.getState()).toMatchObject({
+        currentRef: "2:255",
+        queueIndex: 0,
+        isLoading: true,
+      });
+    });
+
+    it("does not restart a paused track", async () => {
+      useAudioStore.getState().playGraph([verseA, verseB]);
+      pendingPlays[0].resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      useAudioStore.getState().pause();
+      const playCallsBefore = pendingPlays.length;
+
+      usePreferencesStore.getState().setReciter("ar.husary");
+
+      expect(pendingPlays.length).toBe(playCallsBefore); // no new play() call
+    });
+
+    it("does nothing when nothing is queued", () => {
+      expect(() => usePreferencesStore.getState().setReciter("ar.husary")).not.toThrow();
+      expect(useAudioStore.getState().currentRef).toBeNull();
+    });
+  });
+
+  describe("verse audio prefetching", () => {
+    it("prefetches the next verse's audio URL once the current track starts", () => {
+      useAudioStore.getState().playGraph([verseA, verseB, verseC]);
+      expect(capturedPrefetchEl).not.toBeNull();
+      expect(capturedPrefetchEl!.src).toContain("/ar.alafasy/");
+      // verseB is 1:1 -> global ayah 1
+      expect(capturedPrefetchEl!.src).toContain("/1.mp3");
+    });
+
+    it("does not prefetch past the end of the queue", () => {
+      useAudioStore.getState().playGraph([verseA, verseB]);
+      const srcAfterFirst = capturedPrefetchEl?.src;
+
+      useAudioStore.getState().playVerse(verseC); // single-item queue, no next verse to prefetch
+      expect(capturedPrefetchEl?.src).toBe(srcAfterFirst); // unchanged, no prefetch attempted
     });
   });
 });
