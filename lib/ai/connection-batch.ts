@@ -493,10 +493,13 @@ export async function runConnectionBatch(
   const callCost = perCallCost(opts.provider, model);
 
   // Shared spend guard. `spend()` is called before EVERY LLM request (one
-  // generation + one per locale translation per cell); it debits the counters
-  // only when both ceilings still allow the *upcoming* call, and records which
-  // ceiling stopped the run otherwise. Rejecting when the next call would cross
-  // a ceiling (not merely when it already has) keeps a run from overspending
+  // generation + one per locale translation per cell, plus one more if
+  // connection-generator's post-gate verification pass runs — see the
+  // `spendBudget` callback passed into generateConnectionsForCell below); it
+  // debits the counters only when both ceilings still allow the *upcoming*
+  // call, and records which ceiling stopped the run otherwise. Rejecting when
+  // the next call would cross a ceiling (not merely when it already has) keeps
+  // a run from overspending
   // `maxCostUsd` by one call. This is also what keeps a multi-locale cell from
   // overshooting `maxCalls`.
   const wouldExceedBudget = () =>
@@ -560,7 +563,7 @@ export async function runConnectionBatch(
           excludeRefs,
           opts.provider,
           model,
-          { apiKey: opts.apiKey, signal }
+          { apiKey: opts.apiKey, signal, spendBudget: () => budget.spend(), pacer }
         );
         if (!calledAI) {
           // No grounding data / drained pool — no request was actually made, so

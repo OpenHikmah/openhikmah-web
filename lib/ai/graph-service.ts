@@ -426,9 +426,32 @@ export async function generateConnectionsForCell(
   excludeRefs: string[] = [],
   provider: Provider,
   model: string,
-  gen: { apiKey?: string; signal?: AbortSignal } = {}
+  gen: {
+    apiKey?: string;
+    signal?: AbortSignal;
+    spendBudget?: () => boolean;
+    pacer?: { waitTurn: () => Promise<void>; noteRequest: () => void };
+  } = {}
 ): Promise<CellGenerationResult> {
-  const genOpts = [{ provider, model, apiKey: gen.apiKey, signal: gen.signal }] as const;
+  // Only worth fetching on a "get more" request: on a true first-time miss
+  // (excludeRefs empty) there cannot be any other active row for this cell —
+  // if there were, getConnections would have already served it as a hit — so
+  // skip the query rather than pay for it on the common path.
+  const existingReasons =
+    excludeRefs.length > 0
+      ? (await readActiveRows(fromRef, kind, "en", [])).map((r) => r.reason)
+      : undefined;
+  const genOpts = [
+    {
+      provider,
+      model,
+      apiKey: gen.apiKey,
+      signal: gen.signal,
+      existingReasons,
+      spendBudget: gen.spendBudget,
+      pacer: gen.pacer,
+    },
+  ] as const;
   const candidates = await discoverCandidates(fromRef, kind, undefined, excludeRefs);
   const calledAI = candidates.length > 0 || excludeRefs.length === 0;
   // The legacy ungrounded path has no notion of excludeRefs — it would just
@@ -473,6 +496,7 @@ export async function generateConnectionsForCell(
             reason: g.reason,
             model,
             locale: "en",
+            confidence: g.confidence ?? null,
           }))
         )
         .onConflictDoNothing()

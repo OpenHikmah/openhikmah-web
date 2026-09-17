@@ -217,6 +217,69 @@ describe("getConnections", () => {
     expect(out).toHaveLength(2);
   });
 
+  it("persists the model-reported confidence on each inserted row", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockGenerate.mockResolvedValue([{ ...result("2:255"), confidence: 82 }]);
+
+    await getConnections("1:1", "thematic", source);
+
+    const persisted = mockValues.mock.calls[0][0] as Array<Record<string, unknown>>;
+    expect(persisted[0]).toMatchObject({ toRef: "2:255", confidence: 82 });
+  });
+
+  it("persists null confidence when the model didn't report one", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockGenerate.mockResolvedValue([result("2:255")]); // no confidence field
+
+    await getConnections("1:1", "thematic", source);
+
+    const persisted = mockValues.mock.calls[0][0] as Array<Record<string, unknown>>;
+    expect(persisted[0]).toMatchObject({ toRef: "2:255", confidence: null });
+  });
+
+  it("fetches and threads existing active reasons into generation on a 'get more' request", async () => {
+    mockSelect
+      .mockReturnValueOnce(makeSelectChain([])) // getConnections existing-rows read (miss)
+      .mockReturnValueOnce(
+        makeSelectChain([
+          {
+            fromRef: "1:1",
+            toRef: "9:1",
+            kind: "thematic",
+            reason: "prior reason",
+            status: "active",
+          },
+        ])
+      ) // generateConnectionsForCell's existingReasons read
+      .mockReturnValue(makeSelectChain([])); // any further reads
+    mockDiscover.mockResolvedValue(["2:255"]);
+    mockGenerateGrounded.mockResolvedValue([result("2:255")]);
+
+    await getConnections("1:1", "thematic", source, { excludeRefs: ["9:1"] });
+
+    expect(mockGenerateGrounded).toHaveBeenCalledWith(
+      "1:1",
+      SOURCE_ARABIC,
+      "tr",
+      "thematic",
+      ["2:255"],
+      "en",
+      { ...RESOLVED, existingReasons: ["prior reason"] }
+    );
+  });
+
+  it("does NOT query for existing reasons on a true first-time miss (nothing could exist yet)", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockGenerate.mockResolvedValue([result("2:255")]);
+    mockReturning.mockResolvedValue([{ toRef: "2:255" }]); // insert wins its row, no conflict re-read
+
+    await getConnections("1:1", "thematic", source);
+
+    // Only the getConnections cache-read select — generateConnectionsForCell
+    // must not issue a second select when excludeRefs is empty.
+    expect(mockSelect).toHaveBeenCalledTimes(1);
+  });
+
   it("threads an explicit provider+model override through to generation", async () => {
     mockSelect.mockReturnValue(makeSelectChain([])); // miss
     mockGenerate.mockResolvedValue([result("2:255")]);
