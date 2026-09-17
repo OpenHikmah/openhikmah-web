@@ -75,10 +75,11 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     // Legacy generation returns a JSON array of refs; translation returns a
     // single localized sentence.
     mockCallAI.mockImplementation(async (prompt: string) => {
-      if (prompt.startsWith("Translate the following sentence")) return "localized reason";
+      if (prompt.startsWith("Translate the following sentence"))
+        return "localized reason text for testing purposes";
       return JSON.stringify([
-        { ref: "2:255", reason: "throne verse" },
-        { ref: "3:18", reason: "witness of oneness" },
+        { ref: "2:255", reason: "This verse describes the throne and vast divine knowledge." },
+        { ref: "3:18", reason: "Both verses bear witness to the absolute oneness of God." },
       ]);
     });
 
@@ -111,7 +112,7 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
         sql`${connections.locale} = 'tr' and ${connections.fromRef} = '1:1' and ${connections.kind} = 'thematic'`
       );
     expect(trRows.length).toBe(2);
-    expect(trRows[0].reason).toBe("localized reason");
+    expect(trRows[0].reason).toBe("localized reason text for testing purposes");
     expect(enRows.map((r) => r.toRef).sort()).toEqual(trRows.map((r) => r.toRef).sort());
     expect(trRows.every((r) => r.reviewedAt === null)).toBe(true);
 
@@ -141,8 +142,8 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
       if (prompt.startsWith("Translate the following sentence"))
         return "I'm sorry, but I can't help with that.";
       return JSON.stringify([
-        { ref: "2:255", reason: "throne verse" },
-        { ref: "3:18", reason: "witness of oneness" },
+        { ref: "2:255", reason: "This verse describes the throne and vast divine knowledge." },
+        { ref: "3:18", reason: "Both verses bear witness to the absolute oneness of God." },
       ]);
     });
 
@@ -161,7 +162,8 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     // regeneration of the English rows.
     mockCallAI.mockReset();
     mockCallAI.mockImplementation(async (prompt: string) => {
-      if (prompt.startsWith("Translate the following sentence")) return "localized reason";
+      if (prompt.startsWith("Translate the following sentence"))
+        return "localized reason text for testing purposes";
       throw new Error("unexpected generation call — English rows already exist");
     });
     const pass2 = await runConnectionBatch(
@@ -174,13 +176,17 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
       .from(connections)
       .where(sql`${connections.locale} = 'tr'`);
     expect(trAfterPass2.length).toBeGreaterThan(0);
-    expect(trAfterPass2.every((r) => r.reason === "localized reason")).toBe(true);
+    expect(
+      trAfterPass2.every((r) => r.reason === "localized reason text for testing purposes")
+    ).toBe(true);
   });
 
   it("stops immediately with reason 'cancelled' when the signal is already aborted", async () => {
     await seed("1:1");
     await seed("2:255");
-    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([{ ref: "2:255", reason: "A well-formed placeholder reason for this test." }])
+    );
 
     const summary = await runConnectionBatch(
       { mode: "baseline", provider: "claude", locales: [], maxCalls: 500, maxCostUsd: 100 },
@@ -234,7 +240,9 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
 
   it("spend guard: stops at maxCalls and commits completed work", async () => {
     for (const r of ["1:1", "1:2", "1:3", "2:1"]) await seed(r);
-    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:1", reason: "x" }]));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([{ ref: "2:1", reason: "A well-formed placeholder reason for this test." }])
+    );
 
     const summary = await runConnectionBatch(
       { mode: "baseline", provider: "claude", locales: [], maxCalls: 1, maxCostUsd: 100 },
@@ -272,10 +280,11 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     await seed("2:255");
     await seed("3:18");
     mockCallAI.mockImplementation(async (prompt: string) => {
-      if (prompt.startsWith("Translate the following sentence")) return "localized reason";
+      if (prompt.startsWith("Translate the following sentence"))
+        return "localized reason text for testing purposes";
       return JSON.stringify([
-        { ref: "2:255", reason: "throne verse" },
-        { ref: "3:18", reason: "witness of oneness" },
+        { ref: "2:255", reason: "This verse describes the throne and vast divine knowledge." },
+        { ref: "3:18", reason: "Both verses bear witness to the absolute oneness of God." },
       ]);
     });
 
@@ -386,8 +395,8 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     // so after pass 1 every cell has English coverage (self-refs are filtered).
     mockCallAI.mockResolvedValue(
       JSON.stringify([
-        { ref: "1:1", reason: "en reason" },
-        { ref: "2:255", reason: "en reason" },
+        { ref: "1:1", reason: "A well-formed reason connecting these two verses directly." },
+        { ref: "2:255", reason: "A well-formed reason connecting these two verses directly." },
       ])
     );
 
@@ -413,7 +422,7 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
           `unexpected generation call in translate-only pass: ${prompt.slice(0, 40)}`
         );
       }
-      return "localized";
+      return "localized text for testing purposes";
     });
     const pass2 = await runConnectionBatch(
       { mode: "baseline", provider: "gemini", locales: ["tr"], maxCalls: 500, maxCostUsd: 100 },
@@ -466,10 +475,11 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     // real requests — i.e. (requests - 1) — with no double-delay across the
     // generation → first-translation boundary.
     mockCallAI.mockImplementation(async (prompt: string) => {
-      if (prompt.startsWith("Translate the following sentence")) return "localized";
+      if (prompt.startsWith("Translate the following sentence"))
+        return "localized text for testing purposes";
       return JSON.stringify([
-        { ref: "1:1", reason: "en reason" },
-        { ref: "2:255", reason: "en reason" },
+        { ref: "1:1", reason: "A well-formed reason connecting these two verses directly." },
+        { ref: "2:255", reason: "A well-formed reason connecting these two verses directly." },
       ]);
     });
 
@@ -494,7 +504,9 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
 
   it("callDelayMs: a paced run still completes", async () => {
     await seed("1:1");
-    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([{ ref: "2:255", reason: "A well-formed placeholder reason for this test." }])
+    );
     await seed("2:255");
 
     const summary = await runConnectionBatch(
@@ -514,7 +526,9 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
 
   it("resumability: a second run picks up cells the budget-stopped run did not reach", async () => {
     for (const r of ["1:1", "1:2", "2:1"]) await seed(r);
-    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:1", reason: "x" }]));
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([{ ref: "2:1", reason: "A well-formed placeholder reason for this test." }])
+    );
 
     await runConnectionBatch(
       { mode: "baseline", provider: "claude", locales: [], maxCalls: 2, maxCostUsd: 100 },

@@ -493,10 +493,13 @@ export async function runConnectionBatch(
   const callCost = perCallCost(opts.provider, model);
 
   // Shared spend guard. `spend()` is called before EVERY LLM request (one
-  // generation + one per locale translation per cell); it debits the counters
-  // only when both ceilings still allow the *upcoming* call, and records which
-  // ceiling stopped the run otherwise. Rejecting when the next call would cross
-  // a ceiling (not merely when it already has) keeps a run from overspending
+  // generation + one per locale translation per cell, plus one more if
+  // connection-generator's post-gate verification pass runs — see the
+  // `spendBudget` callback passed into generateConnectionsForCell below); it
+  // debits the counters only when both ceilings still allow the *upcoming*
+  // call, and records which ceiling stopped the run otherwise. Rejecting when
+  // the next call would cross a ceiling (not merely when it already has) keeps
+  // a run from overspending
   // `maxCostUsd` by one call. This is also what keeps a multi-locale cell from
   // overshooting `maxCalls`.
   const wouldExceedBudget = () =>
@@ -560,7 +563,7 @@ export async function runConnectionBatch(
           excludeRefs,
           opts.provider,
           model,
-          { apiKey: opts.apiKey, signal }
+          { apiKey: opts.apiKey, signal, spendBudget: () => budget.spend(), pacer }
         );
         if (!calledAI) {
           // No grounding data / drained pool — no request was actually made, so
@@ -578,9 +581,13 @@ export async function runConnectionBatch(
         // NB: an unparseable model response (refusal, prose, truncated JSON)
         // throws ConnectionParseError out of generateConnectionsForCell before
         // this point, so it's handled as a cell failure in the catch below and
-        // never reaches the exhausted branch. Only a *well-formed* empty
-        // selection lands here with results.length === 0.
-        if (opts.mode === "topup" && excludeRefs.length > 0 && results.length === 0) {
+        // never reaches the exhausted branch. `!calledAI` (see its docstring in
+        // graph-service.ts) is the genuine-exhaustion signal: the candidate pool
+        // was empty, so no LLM call was made. A well-formed empty selection with
+        // candidates present (quality gate / verification rejected everything)
+        // still has calledAI === true and must NOT be recorded as exhausted —
+        // that pool isn't actually empty and deserves a future retry.
+        if (opts.mode === "topup" && excludeRefs.length > 0 && !calledAI) {
           // Grounded pool is genuinely empty for this cell — record it so no
           // future run pays for it again.
           await upsertCoverage(cell.fromRef, cell.kind, {

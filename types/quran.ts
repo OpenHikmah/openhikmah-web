@@ -32,6 +32,10 @@ export interface ConnectionResult {
   surahNameArabic: string;
   reason: string;
   kind: EdgeKind;
+  /** Model-reported certainty (0-100) that this is a genuine connection, when
+   *  the model supplied one. Absent for responses generated before this field
+   *  existed (e.g. an admin's DB-stored prompt override that predates it). */
+  confidence?: number;
 }
 
 export interface SearchResult {

@@ -90,15 +90,20 @@ describe("generateConnections", () => {
   it("returns hydrated connections from the AI response", async () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([
-        { ref: "2:255", reason: "Throne verse." },
-        { ref: "3:18", reason: "Witness of oneness." },
-        { ref: "112:1", reason: "Pure tawhid." },
+        { ref: "2:255", reason: "Describes God's throne and encompassing knowledge." },
+        { ref: "3:18", reason: "Both verses bear witness to the oneness of God." },
+        { ref: "112:1", reason: "Both affirm the pure, absolute oneness of God." },
       ])
     );
     const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
-    expect(mockCallAI).toHaveBeenCalledTimes(1);
+    // One generation call, one verification call over the 3 survivors.
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
     expect(out).toHaveLength(3);
-    expect(out[0]).toMatchObject({ ref: "2:255", reason: "Throne verse.", kind: "thematic" });
+    expect(out[0]).toMatchObject({
+      ref: "2:255",
+      reason: "Describes God's throne and encompassing knowledge.",
+      kind: "thematic",
+    });
   });
 
   it("logs exactly one ai_generations row per generation", async () => {
@@ -110,8 +115,8 @@ describe("generateConnections", () => {
   it("drops references not in the local corpus (hallucinated)", async () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([
-        { ref: "2:255", reason: "real" },
-        { ref: "9:999", reason: "fake" },
+        { ref: "2:255", reason: "A genuinely grounded thematic connection." },
+        { ref: "9:999", reason: "A hallucinated reference that does not exist." },
       ])
     );
     mockGetVerses.mockImplementation(
@@ -124,10 +129,10 @@ describe("generateConnections", () => {
   it("drops syntactically invalid refs and the source ref itself", async () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([
-        { ref: "1:1", reason: "self" },
-        { ref: "999:1", reason: "out of bounds" },
-        { ref: "garbage", reason: "malformed" },
-        { ref: "2:255", reason: "valid" },
+        { ref: "1:1", reason: "This is the source verse itself, must be dropped." },
+        { ref: "999:1", reason: "This reference is out of bounds for any surah." },
+        { ref: "garbage", reason: "This reference is malformed and unparseable." },
+        { ref: "2:255", reason: "A genuine contrast between hardship and ease." },
       ])
     );
     const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "contrast");
@@ -170,7 +175,7 @@ describe("generateConnections", () => {
   it("drops entries with a blank reason but keeps the well-formed ones", async () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([
-        { ref: "2:255", reason: "A grounded explanation." },
+        { ref: "2:255", reason: "A fully grounded theological explanation here." },
         { ref: "3:18", reason: "" },
       ])
     );
@@ -187,10 +192,10 @@ describe("generateConnections", () => {
   it("caps at 3 connections even if the model returns more", async () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([
-        { ref: "2:1", reason: "a" },
-        { ref: "2:2", reason: "b" },
-        { ref: "2:3", reason: "c" },
-        { ref: "2:4", reason: "d" },
+        { ref: "2:1", reason: "Shares the theme of guidance for the righteous." },
+        { ref: "2:2", reason: "Shares the theme of certainty in the unseen." },
+        { ref: "2:3", reason: "Shares the theme of establishing regular prayer." },
+        { ref: "2:4", reason: "Shares the theme of belief in prior revelation." },
       ])
     );
     const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
@@ -257,6 +262,164 @@ Return ONLY a valid JSON array of { "ref": "surah:ayah", "reason": "..." }.`,
   });
 });
 
+describe("generateConnections — content quality gate", () => {
+  beforeEach(() => {
+    mockCallAI.mockReset();
+    mockCallAIDetailed.mockReset().mockImplementation(defaultDetailed);
+    insertedRows.length = 0;
+    mockInsert.mockClear();
+    mockGetVerses.mockReset();
+    mockGetVerses.mockImplementation(
+      async (refs: string[]) => new Map(refs.map((r) => [r, verse(r)]))
+    );
+  });
+
+  it("rejects a reason that is too short to be a real justification", async () => {
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "ok" }]));
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+    expect(out).toEqual([]);
+  });
+
+  it("rejects a reason with Tashbih-adjacent phrasing even if otherwise well-formed", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        { ref: "2:255", reason: "This verse shows God literally has a physical body." },
+      ])
+    );
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+    expect(out).toEqual([]);
+  });
+
+  it("rejects a reason that mostly just restates the candidate verse's translation", async () => {
+    mockGetVerses.mockImplementation(
+      async (refs: string[]) =>
+        new Map(
+          refs.map((r) => [
+            r,
+            {
+              ...verse(r),
+              translation:
+                "Allah is the light of the heavens and the earth, a parable of His light.",
+            },
+          ])
+        )
+    );
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        {
+          ref: "2:255",
+          reason: "Allah is the light of the heavens and the earth, a parable of His light.",
+        },
+      ])
+    );
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+    expect(out).toEqual([]);
+  });
+
+  it("rejects a candidate whose model-reported confidence is below the threshold", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        {
+          ref: "2:255",
+          reason: "A plausible but genuinely uncertain thematic link here.",
+          confidence: 10,
+        },
+      ])
+    );
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+    expect(out).toEqual([]);
+  });
+
+  it("keeps a candidate when confidence is absent — not threshold-checked", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([{ ref: "2:255", reason: "A well-formed connection with no confidence." }])
+    );
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+    expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+  });
+
+  it("rejects a candidate whose reason is redundant with an already-active connection", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        {
+          ref: "2:255",
+          reason: "God's mercy and forgiveness extend to every sincere repentant.",
+        },
+      ])
+    );
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", "en", {
+      existingReasons: ["God's mercy and forgiveness extend to every sincere repentant soul."],
+    });
+    expect(out).toEqual([]);
+  });
+
+  it("drops a candidate the verification pass flags invalid, keeps the rest", async () => {
+    mockCallAIDetailed
+      .mockResolvedValueOnce({
+        text: JSON.stringify([
+          { ref: "2:255", reason: "A genuinely strong thematic connection here." },
+          { ref: "3:18", reason: "A weaker but structurally well-formed connection." },
+        ]),
+        usage: { inputTokens: 100, outputTokens: 20 },
+        provider: "claude" as const,
+        model: "claude-opus-4-7",
+      })
+      .mockResolvedValueOnce({
+        text: JSON.stringify([
+          { ref: "2:255", valid: true },
+          { ref: "3:18", valid: false },
+        ]),
+        usage: { inputTokens: 50, outputTokens: 10 },
+        provider: "claude" as const,
+        model: "claude-opus-4-7",
+      });
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+    expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+    expect(mockCallAIDetailed).toHaveBeenCalledTimes(2);
+  });
+
+  it("skips verification (no extra call) when the batch job's budget is exhausted", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([{ ref: "2:255", reason: "A well-formed connection worth persisting." }])
+    );
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", "en", {
+      spendBudget: () => false,
+    });
+    expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+    expect(mockCallAIDetailed).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails open — keeps candidates when the verification response can't be parsed", async () => {
+    mockCallAIDetailed
+      .mockResolvedValueOnce({
+        text: JSON.stringify([
+          { ref: "2:255", reason: "A well-formed connection worth persisting." },
+        ]),
+        usage: { inputTokens: 100, outputTokens: 20 },
+        provider: "claude" as const,
+        model: "claude-opus-4-7",
+      })
+      .mockResolvedValueOnce({
+        text: "I refuse to review this.",
+        usage: null,
+        provider: "claude" as const,
+        model: "claude-opus-4-7",
+      });
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+    expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+  });
+
+  it("skips verification entirely (no call, no spend) when nothing survives the gate", async () => {
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "too short" }]));
+    const spendBudget = vi.fn(() => true);
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", "en", {
+      spendBudget,
+    });
+    expect(out).toEqual([]);
+    expect(spendBudget).not.toHaveBeenCalled();
+  });
+});
+
 describe("generateGroundedConnections", () => {
   beforeEach(() => {
     mockCallAI.mockReset();
@@ -273,8 +436,8 @@ describe("generateGroundedConnections", () => {
   it("selects and articulates from the provided candidates", async () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([
-        { ref: "2:255", reason: "throne verse" },
-        { ref: "3:18", reason: "witness of oneness" },
+        { ref: "2:255", reason: "Describes the throne verse and God's knowledge." },
+        { ref: "3:18", reason: "Both verses bear witness to the oneness of God." },
       ])
     );
     const out = await generateGroundedConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", [
@@ -283,14 +446,17 @@ describe("generateGroundedConnections", () => {
       "112:1",
     ]);
     expect(out.map((c) => c.ref)).toEqual(["2:255", "3:18"]);
-    expect(out[0]).toMatchObject({ reason: "throne verse", kind: "thematic" });
+    expect(out[0]).toMatchObject({
+      reason: "Describes the throne verse and God's knowledge.",
+      kind: "thematic",
+    });
   });
 
   it("rejects any ref the model returns that was not in the candidate set", async () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([
-        { ref: "2:255", reason: "in set" },
-        { ref: "9:99", reason: "NOT a candidate — must be dropped" },
+        { ref: "2:255", reason: "This candidate genuinely is in the offered set." },
+        { ref: "9:99", reason: "NOT a candidate — must be dropped regardless of text." },
       ])
     );
     const out = await generateGroundedConnections("1:1", SOURCE_AR, SOURCE_TR, "root", [
@@ -303,8 +469,8 @@ describe("generateGroundedConnections", () => {
   it("never returns the source verse even if the model picks it", async () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([
-        { ref: "1:1", reason: "self" },
-        { ref: "2:255", reason: "valid" },
+        { ref: "1:1", reason: "This is the source verse itself, must be dropped." },
+        { ref: "2:255", reason: "A genuinely valid contrasting connection here." },
       ])
     );
     const out = await generateGroundedConnections("1:1", SOURCE_AR, SOURCE_TR, "contrast", [
