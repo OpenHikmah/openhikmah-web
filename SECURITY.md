@@ -32,7 +32,6 @@ The following are **in scope**:
 
 The following are **out of scope**:
 
-- Denial-of-service via excessive AI expansion calls (rate limiting is a roadmap item)
 - Theoretical vulnerabilities with no practical exploit path
 - Issues in third-party services (Quran Foundation API, alquran.cloud, Anthropic)
 
@@ -43,6 +42,7 @@ The following are **out of scope**:
 - **Server-side secret handling** — `QF_CLIENT_SECRET` and `ANTHROPIC_API_KEY` are only accessed in server-side API routes, never exposed to the client bundle
 - **Input validation** — All user-supplied verse refs are validated against `/^\d+:\d+$/` before being used in external API URLs
 - **HTML sanitization** — Search snippets from api.quran.com are passed through `sanitize-html` before rendering
+- **AI-generation rate limiting** — every endpoint that can trigger a new LLM call on a cache miss (`/api/connections`, `/api/names/[slug]/{meta,pairings,reflection,verses}`) charges a per-client budget via `consume()`/`rateLimitOrNull()` (`lib/infra/rate-limit.ts`, `AI_GEN_LIMIT`/`AI_GEN_WINDOW_SECONDS`, default 20/60s) before the AI call, returning 429 on denial without generating
 
 ## Responsible Disclosure
 
