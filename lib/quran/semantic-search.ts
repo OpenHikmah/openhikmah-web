@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { cosineDistance, desc, eq, notInArray, sql, type SQL } from "drizzle-orm";
+import { cosineDistance, eq, notInArray, type SQL } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { verseEmbeddings } from "@/lib/infra/db/schema";
 import { embed } from "@/lib/ai/ai";
@@ -59,15 +59,22 @@ async function nearest(
   limit: number,
   excludeRefs: string[] = []
 ): Promise<Array<{ ref: string; similarity: number }>> {
-  const similarity = sql<number>`1 - (${cosineDistance(verseEmbeddings.embedding, queryVec)})`;
+  // Order by the raw cosineDistance expression (ascending — nearest first),
+  // not a derived `1 - distance` alias. pgvector's HNSW index (built with
+  // vector_cosine_ops) is only recognized by the planner when the indexed
+  // operator (`<=>`) appears directly in ORDER BY; wrapping it in arithmetic
+  // hides that from the planner and forces a full sequential scan with a
+  // per-row distance computation instead of an index scan.
+  const distance = cosineDistance(verseEmbeddings.embedding, queryVec);
   const where: SQL | undefined =
     excludeRefs.length > 0 ? notInArray(verseEmbeddings.ref, excludeRefs) : undefined;
-  return db
-    .select({ ref: verseEmbeddings.ref, similarity })
+  const rows = await db
+    .select({ ref: verseEmbeddings.ref, distance })
     .from(verseEmbeddings)
     .where(where)
-    .orderBy(desc(similarity))
+    .orderBy(distance)
     .limit(limit);
+  return rows.map((r) => ({ ref: r.ref, similarity: 1 - Number(r.distance) }));
 }
 
 async function hydrate(
