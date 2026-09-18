@@ -33,7 +33,10 @@ const nextConfig: NextConfig = {
     // nonce'd Content-Security-Policy for every route its matcher covers
     // (the whole public app surface — see issue #125, building on the nonce
     // infra from #570). The static value below is only the fallback for
-    // routes that matcher excludes: admin, api/*, and static assets.
+    // routes that matcher excludes: admin, a handful of specific api/*
+    // subpaths (auth, health, metrics, csp-report, admin — see proxy.ts's
+    // `config.matcher`; most other api/* routes ARE matched by the proxy and
+    // get the enforced, nonce'd CSP instead), and static assets.
     //
     // This fallback stays Content-Security-Policy-Report-Only, NOT enforced:
     // unlike the nonce'd path, this script-src has no nonce, and testing

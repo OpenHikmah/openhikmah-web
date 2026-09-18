@@ -19,19 +19,23 @@ const isDev = process.env.NODE_ENV === "development";
  * restructuring of the canvas renderer. script-src is the directive that
  * actually stops injected-script XSS; unsafe-inline styles are a much lower
  * severity residual risk (no code execution) and are the accepted tradeoff
- * here, same as documented in next.config.ts's fallback CSP.
+ * here.
  *
  * img-src deliberately does NOT attempt to allowlist GA's regional-TLD
  * ad-audience pixel (`google.<tld>/ads/ga-audiences`) — CSP host-source
  * syntax can only wildcard subdomains (`https://*.google.com`), never TLDs,
  * so a `*.google.com` entry wouldn't actually match `google.de` etc. anyway,
- * while needlessly opening img-src to every other google.com subdomain. That
- * pixel will keep showing as a violation report; tracked as a known GA gap,
- * not something this PR can fix with CSP syntax alone.
+ * while needlessly opening img-src to every other google.com subdomain. Now
+ * that this CSP is enforced (not just report-only), that pixel request is
+ * actually blocked, not merely reported; tracked as a known GA gap, not
+ * something this PR can fix with CSP syntax alone.
  *
- * next.config.ts keeps the original non-nonce'd enforced CSP as the fallback
- * for routes this proxy's matcher excludes (admin, api/*, static assets).
- * Proxy runs after next.config.ts's `headers()` (confirmed via Next's own
+ * next.config.ts keeps its own no-nonce fallback CSP report-only (see its
+ * `headers()` comment) for the routes this proxy's matcher excludes: admin,
+ * a handful of specific api/* subpaths (auth, health, metrics, csp-report,
+ * admin — see `config.matcher` below; most other api/* routes ARE matched
+ * here and do get this enforced, nonce'd CSP), and static assets. Proxy runs
+ * after next.config.ts's `headers()` (confirmed via Next's own
  * source, not just its docs — see resolveRoutes in
  * node_modules/next/dist/server/lib/router-utils/resolve-routes.js: the
  * `fsChecker.headers` route is placed before the `middleware` route in the
@@ -65,7 +69,7 @@ function buildCsp(nonce: string): string {
  * health/metrics endpoints so an operator can always reach the flag to turn
  * maintenance back off.
  *
- * Also generates this request's CSP nonce (see buildCspReportOnly above),
+ * Also generates this request's CSP nonce (see buildCsp above),
  * exposed as an `x-nonce` request header so a Server Component can read it
  * via `(await headers()).get("x-nonce")` — see app/layout.tsx. The CSP header
  * itself is ALSO set on the forwarded request headers (not just the
