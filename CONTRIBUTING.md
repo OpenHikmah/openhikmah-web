@@ -97,7 +97,7 @@ These are now defined canonically in [`AGENTS.md`](AGENTS.md) at the repo root (
 
 ## Claude Code Skills
 
-`.agents/skills/` is the source of truth for this repo's [Claude Code](https://claude.com/claude-code) skills; a `SessionStart` hook (`.claude/settings.json`) syncs them into `.claude/skills/` on session start. Edit skills under `.agents/skills/`, never `.claude/skills/` directly — hand edits there are overwritten on the next sync.
+`.agents/skills/` is the source of truth for this repo's [Claude Code](https://claude.com/claude-code) skills; a `SessionStart` hook (`.claude/settings.json`) copies its `.md` files into `.claude/skills/` (gitignored, local-only) on session start, overwriting any file that still exists there. Edit skills under `.agents/skills/`, never `.claude/skills/` directly — hand edits there are silently overwritten on the next sync. Note the hook only copies forward — it never deletes: removing a skill from `.agents/skills/` (as this PR does) leaves the old copy under `.claude/skills/` until you delete it yourself (`rm -rf .claude/skills/<name>`), though a fresh clone/session on another machine is unaffected since it starts from an empty `.claude/skills/`.
 
 None of these are OpenHikmah-domain-specific (Quran data, canvas/workspace, social) — they're general-purpose coding-agent workflows:
 
