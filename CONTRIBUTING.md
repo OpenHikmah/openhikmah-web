@@ -8,6 +8,7 @@ Thank you for your interest in contributing. Open Hikmah is a theological sensem
 - [Branch and Commit Conventions](#branch-and-commit-conventions)
 - [Running Tests](#running-tests)
 - [Code Style and Theological Standards](#code-style-and-theological-standards)
+- [Claude Code Skills](#claude-code-skills)
 - [Submitting a Pull Request](#submitting-a-pull-request)
 - [Reporting Bugs](#reporting-bugs)
 - [Feature Requests](#feature-requests)
@@ -91,6 +92,30 @@ CI runs automatically on every push via GitHub Actions (`.github/workflows/ci.ym
 ## Code Style and Theological Standards
 
 These are now defined canonically in [`AGENTS.md`](AGENTS.md) at the repo root (the shared guide for both AI coding agents and human contributors) — see its "Code Style" and "Theological Standards" sections. Read it before opening a PR that touches source code, AI prompts, divine-name data, or verse connections.
+
+---
+
+## Claude Code Skills
+
+`.agents/skills/` is the source of truth for this repo's [Claude Code](https://claude.com/claude-code) skills; a `SessionStart` hook (`.claude/settings.json`) copies its `.md` files into `.claude/skills/` (gitignored, local-only) on session start, overwriting any file that still exists there. Edit skills under `.agents/skills/`, never `.claude/skills/` directly — hand edits there are silently overwritten on the next sync. Note the hook only copies forward — it never deletes: removing a skill from `.agents/skills/` (as this PR does) leaves the old copy under `.claude/skills/` until you delete it yourself (`rm -rf .claude/skills/<name>`), though a fresh clone/session on another machine is unaffected since it starts from an empty `.claude/skills/`.
+
+None of these are OpenHikmah-domain-specific (Quran data, canvas/workspace, social) — they're general-purpose coding-agent workflows:
+
+| Skill                  | Use it for                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| `code-review`          | `/code-review` — AI-powered PR review via CodeRabbit                            |
+| `security-review`      | `/security-review` — OWASP-style vulnerability review (injection, auth, crypto) |
+| `systematic-debugging` | Structured root-cause debugging before proposing a fix                          |
+| `karpathy-guidelines`  | Avoiding overcomplication — surgical changes, verifiable success criteria       |
+| `git-commit`           | `/commit` — Conventional Commits message generation and staging                 |
+| `runtime-debug`        | Diagnosing bundle-size/module-resolution regressions in the Next.js runtime     |
+| `shadcn-ui`            | shadcn/ui component discovery, installation, and customization                  |
+| `frontend-design`      | General UI/UX polish for components and pages, avoiding generic AI aesthetics   |
+| `emil-design-eng`      | Component/animation micro-detail polish (Emil Kowalski's design philosophy)     |
+
+A prior audit (#130) removed nine other frontend-"taste" skills (`brandkit`, `design-taste-frontend`, `gpt-taste`, `high-end-visual-design`, `imagegen-frontend-web`, `redesign-existing-projects`, `stitch-design-taste`, `uncodixfy`, `web-design-guidelines`) that all overlapped with `frontend-design`'s "make it look premium, not generic" scope without adding distinct value.
+
+**Note:** `.claude/skills/impeccable` also exists locally but is not sourced from `.agents/skills/` — it's a separately-installed plugin skill, outside this sync mechanism, and isn't documented here.
 
 ---
 
