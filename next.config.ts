@@ -29,20 +29,25 @@ const nextConfig: NextConfig = {
   // edge. The extension-anchored source only matches asset files — never HTML
   // routes (which have no extension) or API routes — so pages are never cached.
   async headers() {
-    // Baseline security headers on every response. CSP starts in report-only
-    // mode: the app uses inline `style={{...}}` throughout the canvas UI (so
-    // style-src needs 'unsafe-inline' regardless), and we want a monitoring
-    // window against real traffic — via the /api/csp-report endpoint wired
-    // below — before flipping script-src enforcement on and risking the
-    // OAuth/canvas flows in prod. Flip to `Content-Security-Policy` once that
-    // endpoint has been observed clean for a while.
+    // Baseline security headers on every response. proxy.ts enforces a
+    // nonce'd Content-Security-Policy for every route its matcher covers
+    // (the whole public app surface — see issue #125, building on the nonce
+    // infra from #570). The static value below is only the fallback for
+    // routes that matcher excludes: admin, api/*, and static assets.
     //
-    // The Content-Security-Policy-Report-Only value below is a static
-    // fallback only — proxy.ts generates a per-request nonce and overwrites
-    // this header (via `.set()`, not `.append()`) with a nonce'd script-src
-    // for every route its matcher covers (see issue #570). This entry is
-    // what's actually served for the routes that matcher excludes: admin,
-    // api/*, and static assets, none of which need a nonce'd script-src.
+    // This fallback stays Content-Security-Policy-Report-Only, NOT enforced:
+    // unlike the nonce'd path, this script-src has no nonce, and testing
+    // against a real production build (`next build` + standalone server)
+    // showed /admin — a real server-rendered React page, not just JSON/static
+    // assets — breaks hard under enforcement here. Next's own
+    // framework-injected inline scripts (hydration/flight-data payloads) and
+    // the GTM script tag both get blocked with only `script-src 'self'` and
+    // no nonce, which visibly errors the admin panel out. Fixing that
+    // properly means giving admin its own nonce (routing it through the
+    // proxy, which currently excludes it deliberately for the
+    // maintenance-mode DB-flag escape hatch) — out of scope here since
+    // AGENTS.md calls out app/api/admin/ as a high-risk surface that
+    // shouldn't be broken silently by a security PR. Tracked as a follow-up.
     const securityHeaders = [
       { key: "X-Frame-Options", value: "DENY" },
       { key: "X-Content-Type-Options", value: "nosniff" },
