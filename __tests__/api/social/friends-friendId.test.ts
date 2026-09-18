@@ -243,14 +243,15 @@ describe("DELETE /api/social/friends/[friendId]", () => {
   it("the requester can remove the friendship", async () => {
     const requester = makeUser({ id: 1 });
     authedAs(requester);
-    mockSelect.mockReturnValue(makeDbChain([{ id: 1 }]));
+    mockDelete.mockReturnValue(makeDbChain([{ id: 1 }]));
 
     const res = await DELETE(deleteReq(), params());
 
     expect(res.status).toBe(200);
     expect(mockDelete).toHaveBeenCalled();
-    // Lookup must be OR'd across both requesterId and addresseeId — this
-    // inspects the actual predicate built, not just the mocked return value.
+    expect(mockSelect).not.toHaveBeenCalled();
+    // The owner predicate is folded directly into the DELETE (no separate
+    // SELECT check) — OR'd across both requesterId and addresseeId.
     expect(whereJSON(whereCalls[0])).toContain('"requester_id"');
     expect(whereJSON(whereCalls[0])).toContain('"addressee_id"');
   });
@@ -258,7 +259,7 @@ describe("DELETE /api/social/friends/[friendId]", () => {
   it("the addressee can also remove the friendship", async () => {
     const addressee = makeUser({ id: 2 });
     authedAs(addressee);
-    mockSelect.mockReturnValue(makeDbChain([{ id: 1 }]));
+    mockDelete.mockReturnValue(makeDbChain([{ id: 1 }]));
 
     const res = await DELETE(deleteReq(), params());
 
@@ -268,18 +269,17 @@ describe("DELETE /api/social/friends/[friendId]", () => {
   });
 
   it("rejects an unrelated third party trying to remove someone else's friendship", async () => {
-    // A real DB would return no row here because this user's id matches
-    // neither requesterId nor addresseeId — simulate that via an empty mock
-    // result, then separately assert the route actually queried by both
-    // columns OR'd together, scoped to this user's id (99).
+    // A real DB would delete zero rows because this user's id matches
+    // neither requesterId nor addresseeId — simulate that via an empty
+    // .returning() result, then separately assert the DELETE's own WHERE
+    // queried by both columns OR'd together, scoped to this user's id (99).
     const outsider = makeUser({ id: 99 });
     authedAs(outsider);
-    mockSelect.mockReturnValue(makeDbChain([]));
+    mockDelete.mockReturnValue(makeDbChain([]));
 
     const res = await DELETE(deleteReq(), params());
 
     expect(res.status).toBe(404);
-    expect(mockDelete).not.toHaveBeenCalled();
     expect(whereJSON(whereCalls[0])).toContain('"requester_id"');
     expect(whereJSON(whereCalls[0])).toContain('"addressee_id"');
     expect(whereJSON(whereCalls[0])).toContain("99");

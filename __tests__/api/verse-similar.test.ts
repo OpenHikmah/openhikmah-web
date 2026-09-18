@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const { mockSimilarVerses } = vi.hoisted(() => ({ mockSimilarVerses: vi.fn() }));
 vi.mock("@/lib/quran/semantic-search", () => ({ similarVerses: mockSimilarVerses }));
+
+const { mockRateLimitOrNull } = vi.hoisted(() => ({
+  mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
+}));
+vi.mock("@/lib/infra/rate-limit", () => ({ rateLimitOrNull: mockRateLimitOrNull }));
 
 import { GET } from "@/app/api/verse/[surah]/[ayah]/similar/route";
 
@@ -34,7 +39,19 @@ function match(ref: string) {
 }
 
 describe("GET /api/verse/[surah]/[ayah]/similar", () => {
-  beforeEach(() => mockSimilarVerses.mockReset());
+  beforeEach(() => {
+    mockSimilarVerses.mockReset();
+    mockRateLimitOrNull.mockReset().mockResolvedValue(null);
+  });
+
+  it("returns 429 when the rate limiter reports over-limit, without calling similarVerses", async () => {
+    mockRateLimitOrNull.mockResolvedValue(
+      NextResponse.json({ error: "Too many requests" }, { status: 429 })
+    );
+    const res = await call("1", "1");
+    expect(res.status).toBe(429);
+    expect(mockSimilarVerses).not.toHaveBeenCalled();
+  });
 
   it("returns similar verses for a valid ref", async () => {
     mockSimilarVerses.mockResolvedValueOnce([match("2:255"), match("3:18")]);

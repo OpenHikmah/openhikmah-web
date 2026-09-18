@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clientKey } from "@/lib/infra/http";
+import { clientKey, parsePgSerialId } from "@/lib/infra/http";
 
 function reqWithHeaders(headers: Record<string, string>): Request {
   return new Request("https://example.com", { headers });
@@ -37,5 +37,36 @@ describe("clientKey", () => {
     const req1 = reqWithHeaders({ "x-forwarded-for": "9.9.9.1, 203.0.113.9" });
     const req2 = reqWithHeaders({ "x-forwarded-for": "9.9.9.2, 203.0.113.9" });
     expect(clientKey(req1)).toBe(clientKey(req2));
+  });
+});
+
+describe("parsePgSerialId", () => {
+  it("accepts a normal positive integer string", () => {
+    expect(parsePgSerialId("42")).toBe(42);
+  });
+
+  it("rejects non-numeric input", () => {
+    expect(parsePgSerialId("not-a-number")).toBeNull();
+  });
+
+  it("rejects zero and negative numbers", () => {
+    expect(parsePgSerialId("0")).toBeNull();
+    expect(parsePgSerialId("-1")).toBeNull();
+  });
+
+  it("rejects a value beyond Postgres int4 range instead of letting it hit the db", () => {
+    expect(parsePgSerialId("9".repeat(20))).toBeNull();
+  });
+
+  it("accepts the exact int4 upper bound", () => {
+    expect(parsePgSerialId("2147483647")).toBe(2147483647);
+  });
+
+  it("rejects one past the int4 upper bound", () => {
+    expect(parsePgSerialId("2147483648")).toBeNull();
+  });
+
+  it("rejects a fractional value", () => {
+    expect(parsePgSerialId("1.5")).toBeNull();
   });
 });

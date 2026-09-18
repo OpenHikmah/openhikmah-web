@@ -3,6 +3,7 @@ import { and, eq, or } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { friendships } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
+import { parsePgSerialId } from "@/lib/infra/http";
 
 export async function PATCH(
   req: NextRequest,
@@ -12,8 +13,8 @@ export async function PATCH(
   if (authed instanceof NextResponse) return authed;
 
   const { friendId } = await params;
-  const friendshipId = parseInt(friendId, 10);
-  if (!friendshipId) {
+  const friendshipId = parsePgSerialId(friendId);
+  if (friendshipId === null) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
@@ -88,30 +89,29 @@ export async function DELETE(
   if (authed instanceof NextResponse) return authed;
 
   const { friendId } = await params;
-  const friendshipId = parseInt(friendId, 10);
-  if (!friendshipId) {
+  const friendshipId = parsePgSerialId(friendId);
+  if (friendshipId === null) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
   const { userId } = authed;
 
-  // Either party can remove the friendship
-  const [row] = await db
-    .select({ id: friendships.id })
-    .from(friendships)
+  // Either party can remove the friendship. Fold the owner predicate into the
+  // DELETE itself rather than a separate SELECT-then-DELETE — closes the
+  // TOCTOU window between the check and the mutation.
+  const deleted = await db
+    .delete(friendships)
     .where(
       and(
         eq(friendships.id, friendshipId),
         or(eq(friendships.requesterId, userId), eq(friendships.addresseeId, userId))
       )
     )
-    .limit(1);
+    .returning({ id: friendships.id });
 
-  if (!row) {
+  if (deleted.length === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-
-  await db.delete(friendships).where(eq(friendships.id, friendshipId));
 
   return NextResponse.json({ ok: true });
 }
