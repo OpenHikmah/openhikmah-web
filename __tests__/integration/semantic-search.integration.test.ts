@@ -10,8 +10,9 @@ vi.stubGlobal(
   vi.fn(async () => ({ ok: false }))
 );
 
+import { cosineDistance } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
-import { verses } from "@/lib/infra/db/schema";
+import { verses, verseEmbeddings } from "@/lib/infra/db/schema";
 import { searchByMeaning, similarVerses, semanticCandidates } from "@/lib/quran/semantic-search";
 
 const DIM = 768;
@@ -92,5 +93,25 @@ describe("semantic search (integration, real pgvector)", () => {
   it("similarVerses excludes additional refs already surfaced to the caller", async () => {
     const out = await similarVerses("1:1", 5, ["2:2"]);
     expect(out.map((m) => m.verse.ref)).toEqual(["3:3"]);
+  });
+});
+
+describe("semantic search nearest-neighbor query plan (issue #105)", () => {
+  // With this few rows, Postgres's planner normally prefers a Seq Scan
+  // regardless of index compatibility (it's cheaper at this size) — that
+  // would mask a query-shape regression, not confirm one. `enable_seqscan =
+  // off` only heavily penalizes Seq Scan's cost, it doesn't forbid it: if no
+  // index matches the ORDER BY expression, Postgres still falls back to Seq
+  // Scan (+ an explicit Sort) despite the penalty, which is exactly the
+  // signal this test is checking for.
+  it("orders by the raw cosineDistance expression, which the HNSW index can satisfy directly", async () => {
+    await db.execute(sql`SET LOCAL enable_seqscan = off`);
+    const distance = cosineDistance(verseEmbeddings.embedding, vec(1, 0));
+    const plan = await db.execute(
+      sql`EXPLAIN ${db.select({ ref: verseEmbeddings.ref, distance }).from(verseEmbeddings).orderBy(distance).limit(5)}`
+    );
+    const planText = plan.map((row) => Object.values(row)[0]).join("\n");
+    expect(planText).toContain("Index Scan using verse_embeddings_hnsw_idx");
+    expect(planText).not.toContain("Seq Scan");
   });
 });
