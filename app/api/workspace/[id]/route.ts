@@ -3,14 +3,15 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { savedWorkspaces } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
+import { parsePgSerialId } from "@/lib/infra/http";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 
   const { id } = await params;
-  const wsId = parseInt(id, 10);
-  if (isNaN(wsId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  const wsId = parsePgSerialId(id);
+  if (wsId === null) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
   const [row] = await db
     .select({ data: savedWorkspaces.data })
@@ -32,8 +33,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (authed instanceof NextResponse) return authed;
 
   const { id } = await params;
-  const wsId = parseInt(id, 10);
-  if (isNaN(wsId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  const wsId = parsePgSerialId(id);
+  if (wsId === null) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
   const deleted = await db
     .delete(savedWorkspaces)

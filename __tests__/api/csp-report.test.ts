@@ -1,5 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { NextRequest } from "next/server";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest, NextResponse } from "next/server";
+
+const { mockRateLimitOrNull } = vi.hoisted(() => ({
+  mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
+}));
+vi.mock("@/lib/infra/rate-limit", () => ({ rateLimitOrNull: mockRateLimitOrNull }));
+
 import { POST } from "@/app/api/csp-report/route";
 
 const MAX_BODY_BYTES = 32 * 1024;
@@ -25,6 +31,18 @@ function reqWithSpoofedLength(body: string, declaredLength: number) {
 }
 
 describe("POST /api/csp-report", () => {
+  beforeEach(() => mockRateLimitOrNull.mockReset().mockResolvedValue(null));
+
+  it("returns 429 when the rate limiter reports over-limit", async () => {
+    mockRateLimitOrNull.mockResolvedValue(
+      NextResponse.json({ error: "Too many requests" }, { status: 429 })
+    );
+    const res = await POST(
+      reqWithBody(JSON.stringify({ "csp-report": { "violated-directive": "script-src" } }))
+    );
+    expect(res.status).toBe(429);
+  });
+
   it("accepts a well-formed legacy csp-report", async () => {
     const res = await POST(
       reqWithBody(JSON.stringify({ "csp-report": { "violated-directive": "script-src" } }))

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { similarVerses } from "@/lib/quran/semantic-search";
 import { isValidRef } from "@/lib/quran/quran-corpus";
+import { clientKey } from "@/lib/infra/http";
+import { rateLimitOrNull } from "@/lib/infra/rate-limit";
+
+// Public, unauthenticated route running a pgvector HNSW query per request —
+// rate limit per-IP like its siblings (tafsir, search).
+const SIMILAR_LIMIT = 60;
+const SIMILAR_WINDOW_SECONDS = 60;
 
 /**
  * Verses semantically nearest to a given verse (by embedding similarity).
@@ -8,9 +15,17 @@ import { isValidRef } from "@/lib/quran/quran-corpus";
  * so callers can treat "no similar verses" and "feature unavailable" uniformly.
  */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ surah: string; ayah: string }> }
 ) {
+  const limited = await rateLimitOrNull(
+    `similar:${clientKey(req)}`,
+    "Too many requests",
+    SIMILAR_LIMIT,
+    SIMILAR_WINDOW_SECONDS
+  );
+  if (limited) return limited;
+
   const { surah, ayah } = await params;
   // Raw segments, not parseInt'd — lets isValidRef reject non-canonical spellings
   // ("02:255", "2abc:1") instead of silently normalizing them.

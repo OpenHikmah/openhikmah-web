@@ -503,6 +503,15 @@ describe("PATCH /api/social/challenges/[id]", () => {
     expect(body.status).toBe("active");
   });
 
+  it("returns 500 instead of throwing when the db errors", async () => {
+    authedAs(makeUser({ id: 2 }));
+    mockSelect.mockReturnValue(makeDbChain(Promise.reject(new Error("db unavailable"))));
+    const res = await PATCH(makePatchReq("1", { action: "accept" }), {
+      params: Promise.resolve({ id: "1" }),
+    });
+    expect(res.status).toBe(500);
+  });
+
   it("returns 200 and updates to declined on decline", async () => {
     authedAs(makeUser({ id: 2 }));
     mockSelect.mockReturnValue(makeDbChain([makeChallenge({ status: "pending" })]));

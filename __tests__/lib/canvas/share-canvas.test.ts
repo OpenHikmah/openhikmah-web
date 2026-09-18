@@ -51,6 +51,18 @@ describe("isValidNode", () => {
     expect(isValidNode(nodeWith({ ref: "1:1", surahName: "x", translation: 1 }))).toBe(false);
   });
 
+  it("rejects a field longer than the 2000-char cap", () => {
+    const tooLong = "a".repeat(2001);
+    expect(isValidNode(nodeWith({ ref: tooLong, surahName: "x", translation: "y" }))).toBe(false);
+    expect(isValidNode(nodeWith({ ref: "1:1", surahName: tooLong, translation: "y" }))).toBe(false);
+    expect(isValidNode(nodeWith({ ref: "1:1", surahName: "x", translation: tooLong }))).toBe(false);
+  });
+
+  it("accepts a field right at the 2000-char cap", () => {
+    const atCap = "a".repeat(2000);
+    expect(isValidNode(nodeWith({ ref: atCap, surahName: "x", translation: "y" }))).toBe(true);
+  });
+
   it("ignores extra/unexpected fields and validates only ref/surahName/translation", () => {
     // A `__proto__` key from JSON.parse is just an own data property, not the
     // object's actual prototype — this asserts isValidNode doesn't get tripped

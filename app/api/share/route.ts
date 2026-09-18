@@ -7,6 +7,7 @@ import { rateLimitOrNull } from "@/lib/infra/rate-limit";
 import { isValidNode } from "@/lib/canvas/share-canvas";
 
 const MAX_BYTES = 512 * 1024; // 512 KB
+const MAX_NODES = 500;
 const RATE_LIMIT = 10;
 const WINDOW_SECONDS = 60 * 60; // 1 hour
 const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -38,6 +39,7 @@ export async function POST(req: Request) {
     (body as { v?: unknown }).v !== 1 ||
     !Array.isArray((body as { nodes?: unknown }).nodes) ||
     (body as { nodes: unknown[] }).nodes.length === 0 ||
+    (body as { nodes: unknown[] }).nodes.length > MAX_NODES ||
     !(body as { nodes: unknown[] }).nodes.every(isValidNode)
   ) {
     return NextResponse.json({ error: "Invalid canvas" }, { status: 400 });

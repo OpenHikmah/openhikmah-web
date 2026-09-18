@@ -93,6 +93,18 @@ export function safeParse(s: string): unknown {
   }
 }
 
+/**
+ * Parses a route param expected to be a Postgres `serial`/`int4` primary key.
+ * Returns `null` for anything that isn't a positive integer in int4 range —
+ * `parseInt` alone lets an out-of-range value like `"9".repeat(20)` reach
+ * `eq(table.id, …)` and 500 on Postgres's "integer out of range" instead of
+ * cleanly 400ing.
+ */
+export function parsePgSerialId(raw: string): number | null {
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 1 && n <= 2147483647 ? n : null;
+}
+
 /** Postgres unique-violation, possibly wrapped by the driver under `cause`. */
 export function isUniqueViolation(err: unknown): boolean {
   const code =

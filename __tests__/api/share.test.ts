@@ -107,6 +107,19 @@ describe("POST /api/share", () => {
     expect(res.status).toBe(429);
     expect(mockInsert).not.toHaveBeenCalled();
   });
+
+  it("returns 400 when the node count exceeds the 500-node cap", async () => {
+    const nodes = Array.from({ length: 501 }, () => ({ verse: validVerse }));
+    const res = await POST(postReq({ v: 1, nodes }));
+    expect(res.status).toBe(400);
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("accepts exactly 500 nodes", async () => {
+    const nodes = Array.from({ length: 500 }, () => ({ verse: validVerse }));
+    const res = await POST(postReq({ v: 1, nodes }));
+    expect(res.status).toBe(200);
+  });
 });
 
 describe("GET /api/share/[id]", () => {
