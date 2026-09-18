@@ -34,7 +34,7 @@ export function CallbackClient({ code, state, error }: Props) {
     const expectedState = sessionStorage.getItem("pkce_state");
     const nonce = sessionStorage.getItem("pkce_nonce");
 
-    if (!codeVerifier || !expectedState) {
+    if (!codeVerifier || !expectedState || !nonce) {
       setFailReason("Session expired — please try signing in again.");
       sessionStorage.removeItem("pkce_code_verifier");
       sessionStorage.removeItem("pkce_state");
