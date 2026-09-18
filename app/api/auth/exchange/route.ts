@@ -59,8 +59,8 @@ export async function POST(req: NextRequest) {
 
   const { code, codeVerifier } = body;
   const nonce = typeof body.nonce === "string" ? body.nonce : undefined;
-  if (!code || !codeVerifier) {
-    return NextResponse.json({ error: "Missing code or codeVerifier" }, { status: 400 });
+  if (!code || !codeVerifier || !nonce) {
+    return NextResponse.json({ error: "Missing code, codeVerifier, or nonce" }, { status: 400 });
   }
 
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/callback`;
@@ -104,16 +104,14 @@ export async function POST(req: NextRequest) {
 
     // Verify the OIDC nonce round-trip: the value minted at sign-in start must
     // come back inside the id_token, binding this token response to the
-    // authorize request that initiated it. Fail closed — we always request the
-    // `openid` scope, so a compliant server always returns an id_token; a
-    // missing or undecodable one is as anomalous as a mismatched nonce, and
-    // continuing would silently skip the check entirely.
-    if (nonce) {
-      const claims = typeof data.id_token === "string" ? decodeJwtPayload(data.id_token) : null;
-      if (!claims || claims.nonce !== nonce) {
-        console.error("Auth exchange: id_token nonce verification failed — rejecting sign-in.");
-        return NextResponse.json({ error: "Nonce verification failed" }, { status: 400 });
-      }
+    // authorize request that initiated it. Fail closed — the nonce is required
+    // above, we always request the `openid` scope, so a compliant server always
+    // returns an id_token; a missing or undecodable one is as anomalous as a
+    // mismatched nonce.
+    const claims = typeof data.id_token === "string" ? decodeJwtPayload(data.id_token) : null;
+    if (!claims || claims.nonce !== nonce) {
+      console.error("Auth exchange: id_token nonce verification failed — rejecting sign-in.");
+      return NextResponse.json({ error: "Nonce verification failed" }, { status: 400 });
     }
 
     const accessToken = data.access_token;

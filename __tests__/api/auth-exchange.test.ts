@@ -52,20 +52,34 @@ describe("POST /api/auth/exchange", () => {
   });
 
   it("returns 400 when codeVerifier is missing", async () => {
-    const res = await POST(makeReq({ code: "auth-code" }));
+    const res = await POST(makeReq({ code: "auth-code", nonce: "n" }));
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 when nonce is missing", async () => {
+    const res = await POST(makeReq({ code: "auth-code", codeVerifier: "verifier" }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/nonce/i);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it("returns accessToken in body and sets refresh token as HttpOnly cookie", async () => {
+    const b64url = (s: string) =>
+      Buffer.from(s).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+    const idToken = `${b64url(JSON.stringify({ alg: "RS256" }))}.${b64url(
+      JSON.stringify({ nonce: "n" })
+    )}.sig`;
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         access_token: "access-123",
         refresh_token: "refresh-456",
+        id_token: idToken,
       }),
     });
 
-    const res = await POST(makeReq({ code: "auth-code", codeVerifier: "verifier" }));
+    const res = await POST(makeReq({ code: "auth-code", codeVerifier: "verifier", nonce: "n" }));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.accessToken).toBe("access-123");
@@ -80,12 +94,17 @@ describe("POST /api/auth/exchange", () => {
   });
 
   it("does not set cookie when server provides no refresh token", async () => {
+    const b64url = (s: string) =>
+      Buffer.from(s).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+    const idToken = `${b64url(JSON.stringify({ alg: "RS256" }))}.${b64url(
+      JSON.stringify({ nonce: "n" })
+    )}.sig`;
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ access_token: "access-123" }),
+      json: async () => ({ access_token: "access-123", id_token: idToken }),
     });
 
-    const res = await POST(makeReq({ code: "auth-code", codeVerifier: "verifier" }));
+    const res = await POST(makeReq({ code: "auth-code", codeVerifier: "verifier", nonce: "n" }));
     const body = await res.json();
     expect(body.accessToken).toBe("access-123");
     expect(res.headers.get("set-cookie")).toBeNull();
@@ -101,7 +120,7 @@ describe("POST /api/auth/exchange", () => {
       };
     });
 
-    await POST(makeReq({ code: "my-code", codeVerifier: "my-verifier" }));
+    await POST(makeReq({ code: "my-code", codeVerifier: "my-verifier", nonce: "n" }));
     expect(capturedBody!.get("grant_type")).toBe("authorization_code");
     expect(capturedBody!.get("code")).toBe("my-code");
     expect(capturedBody!.get("code_verifier")).toBe("my-verifier");
@@ -193,17 +212,10 @@ describe("POST /api/auth/exchange", () => {
       expect(res.headers.get("set-cookie")).toBeNull();
     });
 
-    it("skips the check when the client sends no nonce (legacy in-flight sign-ins)", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          access_token: "access-123",
-          id_token: fakeIdToken({ nonce: "whatever" }),
-        }),
-      });
-
+    it("rejects the exchange outright when the client sends no nonce", async () => {
       const res = await POST(makeReq({ code: "auth-code", codeVerifier: "verifier" }));
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(400);
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 
@@ -214,13 +226,13 @@ describe("POST /api/auth/exchange", () => {
       text: async () => "invalid_grant",
     });
 
-    const res = await POST(makeReq({ code: "bad-code", codeVerifier: "verifier" }));
+    const res = await POST(makeReq({ code: "bad-code", codeVerifier: "verifier", nonce: "n" }));
     expect(res.status).toBe(400);
   });
 
   it("returns 500 when fetch throws", async () => {
     mockFetch.mockRejectedValueOnce(new Error("network error"));
-    const res = await POST(makeReq({ code: "code", codeVerifier: "verifier" }));
+    const res = await POST(makeReq({ code: "code", codeVerifier: "verifier", nonce: "n" }));
     expect(res.status).toBe(500);
   });
 });
