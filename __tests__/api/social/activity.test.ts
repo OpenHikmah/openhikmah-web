@@ -35,35 +35,48 @@ function makeDbChain(resolveWith: unknown = undefined) {
 }
 
 // Use vi.hoisted so mock fns are defined before vi.mock factories run
-const { mockInsert, mockUpdate, mockTxSelect, mockTransaction, mockRateLimitOrNull, mockConsume } =
-  vi.hoisted(() => {
-    const insert = vi.fn(() => makeDbChain());
-    const update = vi.fn(() => makeDbChain());
-    const txSelect = vi.fn(() => makeDbChain([]));
-    // The route does insert + streak read/compute/write inside a
-    // db.transaction(async (tx) => ...) — the tx object exposes the same
-    // insert/update/select surface, reusing the same mocks so existing test
-    // expectations (mockInsert/mockUpdate called, etc.) still hold.
-    const transaction = vi.fn(async (cb: (tx: unknown) => unknown) =>
-      cb({ insert, update, select: txSelect })
-    );
-    return {
-      mockInsert: insert,
-      mockUpdate: update,
-      mockTxSelect: txSelect,
-      mockTransaction: transaction,
-      mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
-      // Defaults to "allowed" — tests exercising the tz-anchor-move limiter
-      // override this per case.
-      mockConsume: vi.fn(async (): Promise<boolean> => true),
-    };
-  });
+const {
+  mockInsert,
+  mockUpdate,
+  mockDbSelect,
+  mockTxSelect,
+  mockTransaction,
+  mockRateLimitOrNull,
+  mockConsume,
+} = vi.hoisted(() => {
+  const insert = vi.fn(() => makeDbChain());
+  const update = vi.fn(() => makeDbChain());
+  const txSelect = vi.fn(() => makeDbChain([]));
+  // The route now reads the user's current anchor with a plain (unlocked)
+  // db.select() *before* opening the transaction (so the tz-anchor-move
+  // limiter's I/O never runs while holding the row lock) — separate from
+  // the locked re-read inside the transaction below.
+  const dbSelect = vi.fn(() => makeDbChain([]));
+  // The route does insert + streak read/compute/write inside a
+  // db.transaction(async (tx) => ...) — the tx object exposes the same
+  // insert/update/select surface, reusing the same mocks so existing test
+  // expectations (mockInsert/mockUpdate called, etc.) still hold.
+  const transaction = vi.fn(async (cb: (tx: unknown) => unknown) =>
+    cb({ insert, update, select: txSelect })
+  );
+  return {
+    mockInsert: insert,
+    mockUpdate: update,
+    mockDbSelect: dbSelect,
+    mockTxSelect: txSelect,
+    mockTransaction: transaction,
+    mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
+    // Defaults to "allowed" — tests exercising the tz-anchor-move limiter
+    // override this per case.
+    mockConsume: vi.fn(async (): Promise<boolean> => true),
+  };
+});
 
 vi.mock("@/lib/infra/db", () => ({
   db: {
     insert: mockInsert,
     update: mockUpdate,
-    select: vi.fn(() => makeDbChain([])),
+    select: mockDbSelect,
     transaction: mockTransaction,
   },
 }));
@@ -111,9 +124,13 @@ function makeUser(overrides: Partial<User> = {}): User {
 
 function authedAs(user: User) {
   vi.mocked(requireUser).mockResolvedValue({ userId: user.id, user });
-  // The route re-reads the user row inside the transaction (row lock) instead
-  // of trusting the cached `authed.user` snapshot — keep the two in sync for
-  // tests that don't care about the staleness race itself.
+  // The route reads the user's current anchor via a plain db.select() before
+  // the transaction, then re-reads the full row inside the transaction (row
+  // lock) instead of trusting the cached `authed.user` snapshot — keep all
+  // three in sync for tests that don't care about the staleness race itself.
+  mockDbSelect.mockReturnValue(
+    makeDbChain([{ timezoneOffsetMinutes: user.timezoneOffsetMinutes }])
+  );
   mockTxSelect.mockReturnValue(makeDbChain([user]));
 }
 
@@ -142,6 +159,7 @@ describe("POST /api/social/activity", () => {
     vi.mocked(requireUser).mockReset();
     mockInsert.mockReturnValue(makeDbChain());
     mockUpdate.mockReturnValue(makeDbChain());
+    mockDbSelect.mockReturnValue(makeDbChain([]));
     mockTxSelect.mockReturnValue(makeDbChain([]));
     mockTransaction.mockClear();
     mockInsert.mockClear();

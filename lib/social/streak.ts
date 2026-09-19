@@ -2,10 +2,15 @@
  * Streak helpers. A streak is "alive" only while the user's last activity was
  * their local today or local yesterday. The day boundary is the user's own
  * calendar day, not UTC: `activityDate` / `lastActivityDate` are the local
- * `YYYY-MM-DD` the client reported (see `app/api/social/activity` POST), and
- * every reader decays a stale streak against the same local calendar using the
- * user's stored `timezoneOffsetMinutes` (null → UTC, for rows written before the
- * offset was ever recorded).
+ * `YYYY-MM-DD` resolved by `app/api/social/activity`'s POST handler from a
+ * *vetted* offset, not simply whatever the client sent that request — that
+ * route trust-anchors the client's `tz_offset_minutes` (first sight or a
+ * small drift is trusted immediately; a bigger jump is rate-limited to once
+ * per window; see issue #563) before resolving the day. Every reader decays
+ * a stale streak against the same local calendar using the user's stored
+ * `timezoneOffsetMinutes` — which is that same vetted anchor, not a
+ * freely-client-updatable value — falling back to UTC (null) for rows
+ * written before an offset was ever recorded.
  *
  * Because the stored `currentStreak` is reset lazily (only on the user's next
  * activity), a broken streak stays stale in the DB — so every place that *reads*
