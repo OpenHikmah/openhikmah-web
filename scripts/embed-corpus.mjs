@@ -88,9 +88,10 @@ try {
   if (CHECK_ONLY) {
     const [{ total }] = await sql`SELECT count(*)::int AS total FROM verses`;
     const [{ embedded }] = await sql`
-      SELECT count(DISTINCT ref)::int AS embedded
-      FROM verse_embeddings
-      WHERE model = ${EMBEDDING_MODEL}
+      SELECT count(DISTINCT v.ref)::int AS embedded
+      FROM verses v
+      JOIN verse_embeddings e ON e.ref = v.ref
+      WHERE e.model = ${EMBEDDING_MODEL}
     `;
     const missing = total - embedded;
     console.log(`Corpus: ${total} verses.`);
