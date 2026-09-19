@@ -35,8 +35,8 @@ function makeDbChain(resolveWith: unknown = undefined) {
 }
 
 // Use vi.hoisted so mock fns are defined before vi.mock factories run
-const { mockInsert, mockUpdate, mockTxSelect, mockTransaction, mockRateLimitOrNull } = vi.hoisted(
-  () => {
+const { mockInsert, mockUpdate, mockTxSelect, mockTransaction, mockRateLimitOrNull, mockConsume } =
+  vi.hoisted(() => {
     const insert = vi.fn(() => makeDbChain());
     const update = vi.fn(() => makeDbChain());
     const txSelect = vi.fn(() => makeDbChain([]));
@@ -53,9 +53,11 @@ const { mockInsert, mockUpdate, mockTxSelect, mockTransaction, mockRateLimitOrNu
       mockTxSelect: txSelect,
       mockTransaction: transaction,
       mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
+      // Defaults to "allowed" — tests exercising the tz-anchor-move limiter
+      // override this per case.
+      mockConsume: vi.fn(async (): Promise<boolean> => true),
     };
-  }
-);
+  });
 
 vi.mock("@/lib/infra/db", () => ({
   db: {
@@ -67,6 +69,7 @@ vi.mock("@/lib/infra/db", () => ({
 }));
 vi.mock("@/lib/infra/rate-limit", () => ({
   rateLimitOrNull: mockRateLimitOrNull,
+  consume: mockConsume,
   MUTATION_WINDOW_SECONDS: 600,
 }));
 
@@ -141,8 +144,12 @@ describe("POST /api/social/activity", () => {
     mockUpdate.mockReturnValue(makeDbChain());
     mockTxSelect.mockReturnValue(makeDbChain([]));
     mockTransaction.mockClear();
+    mockInsert.mockClear();
+    mockUpdate.mockClear();
     mockRateLimitOrNull.mockReset();
     mockRateLimitOrNull.mockResolvedValue(null);
+    mockConsume.mockReset();
+    mockConsume.mockResolvedValue(true);
   });
 
   it("returns 401 when requireUser returns 401 response", async () => {
@@ -389,6 +396,79 @@ describe("POST /api/social/activity", () => {
     authedAs(makeUser({ currentStreak: 1, lastActivityDate: yesterdayStr() }));
     const res = await POST(makeReq({ type: "verse_added", tz_offset_minutes: 99999 }));
     expect(res.status).toBe(400);
+  });
+
+  describe("timezone anchor (issue #563)", () => {
+    it("trusts a first-ever offset immediately, no rate-limit check", async () => {
+      authedAs(
+        makeUser({
+          currentStreak: 1,
+          lastActivityDate: yesterdayStr(),
+          timezoneOffsetMinutes: null,
+        })
+      );
+      const res = await POST(makeReq({ type: "verse_added", tz_offset_minutes: 480 }));
+      expect(res.status).toBe(200);
+      expect(mockConsume).not.toHaveBeenCalled();
+    });
+
+    it("accepts a small drift from the existing anchor (DST) without consuming the move limiter", async () => {
+      authedAs(
+        makeUser({ currentStreak: 1, lastActivityDate: yesterdayStr(), timezoneOffsetMinutes: 180 })
+      );
+      // 60 minutes off the anchor — within the DST drift window.
+      const res = await POST(makeReq({ type: "verse_added", tz_offset_minutes: 240 }));
+      expect(res.status).toBe(200);
+      expect(mockConsume).not.toHaveBeenCalled();
+    });
+
+    it("rate-limits a large offset jump (genuine relocation) via the anchor-move limiter", async () => {
+      authedAs(
+        makeUser({ currentStreak: 1, lastActivityDate: yesterdayStr(), timezoneOffsetMinutes: 0 })
+      );
+      // 300 minutes off the anchor — well beyond DST, claims a relocation.
+      const res = await POST(makeReq({ type: "verse_added", tz_offset_minutes: 300 }));
+      expect(res.status).toBe(200);
+      expect(mockConsume).toHaveBeenCalledWith(
+        expect.stringMatching(/^tz-anchor:/),
+        1,
+        expect.any(Number)
+      );
+    });
+
+    it("rejects a large offset jump once the anchor-move limiter denies it — closes the flip-every-request exploit", async () => {
+      authedAs(
+        makeUser({ currentStreak: 1, lastActivityDate: yesterdayStr(), timezoneOffsetMinutes: 0 })
+      );
+      mockConsume.mockResolvedValue(false);
+      const res = await POST(makeReq({ type: "verse_added", tz_offset_minutes: 300 }));
+      expect(res.status).toBe(400);
+      // Rejected before any streak/offset write — verify no update was applied.
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it("a genuine relocation still succeeds once the anchor-move limiter allows it", async () => {
+      authedAs(
+        makeUser({ currentStreak: 4, lastActivityDate: yesterdayStr(), timezoneOffsetMinutes: 0 })
+      );
+      mockConsume.mockResolvedValue(true);
+      let captured: Record<string, unknown> | undefined;
+      mockUpdate.mockImplementation(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const c: any = {
+          set: (v: Record<string, unknown>) => {
+            captured = v;
+            return c;
+          },
+          where: () => c,
+          then: (r: (v: unknown) => unknown) => Promise.resolve(undefined).then(r),
+        };
+        return c;
+      });
+      const res = await POST(makeReq({ type: "verse_added", tz_offset_minutes: 300 }));
+      expect(res.status).toBe(200);
+      expect(captured?.timezoneOffsetMinutes).toBe(300);
+    });
   });
 });
 
