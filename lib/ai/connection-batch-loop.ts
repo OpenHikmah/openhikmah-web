@@ -23,7 +23,11 @@ import type { Locale } from "@/lib/i18n/config";
  *     network, malformed responses tripping fail-fast) — do NOT rotate, the
  *     same fault would hit every key
  *
- * Per-minute 429s never reach here: `callGemini` waits them out and retries.
+ * `callGemini` waits out and retries an ordinary per-minute 429, but a
+ * sustained one that survives all those retries surfaces here as a
+ * `GeminiRateLimitError` — that also rotates to the next key (issue #567 C1),
+ * same as quota-daily/key-invalid, rather than counting toward the non-quota
+ * "error" fail-fast path as if the provider itself were down.
  */
 
 export interface LoopOptions {
@@ -54,6 +58,9 @@ export interface LoopSummary {
   keysExhausted: string[];
   /** Labels of keys that turned out to be invalid / revoked this run. */
   keysInvalid: string[];
+  /** Labels of keys rotated away from after a sustained per-minute 429 (issue
+   *  #567 C1) — not necessarily out for the day, just rate-limited right now. */
+  keysRateLimited: string[];
   cellsProcessed: number;
   callsUsed: number;
   costUsd: number;
@@ -107,6 +114,7 @@ export async function runConnectionBatchLoop(
     keysUsed: 0,
     keysExhausted: [],
     keysInvalid: [],
+    keysRateLimited: [],
     cellsProcessed: 0,
     callsUsed: 0,
     costUsd: 0,
@@ -190,6 +198,15 @@ export async function runConnectionBatchLoop(
           rotate = true;
           break;
 
+        case "rate-limited":
+          // A sustained per-minute 429 that survived callGemini's own retries
+          // — not necessarily out for the day, but rotate rather than fail
+          // fast as if the provider itself were down (issue #567 C1).
+          agg.keysRateLimited.push(label);
+          hooks.onProgress(`[loop] key ${k + 1}/${n} (${label}) rate-limited — rotating`);
+          rotate = true;
+          break;
+
         case "cancelled":
           agg.stoppedReason = "cancelled";
           return finish(agg, hooks);
@@ -253,16 +270,20 @@ export async function runConnectionBatchLoop(
     }
   }
 
-  // Fell out of the key loop → every key rotated (daily quota and/or invalid).
-  if (agg.keysInvalid.length === n) {
-    // Every selected key is invalid/blocked — nothing the loop can do.
+  // Fell out of the key loop → every key rotated (daily quota, invalid, and/or
+  // rate-limited).
+  if (agg.keysExhausted.length === 0) {
+    // No key ever confirmed a real daily-quota hit — every rotation was
+    // invalid/rate-limited, so labeling this "all-keys-daily" would be wrong.
     agg.stoppedReason = "error";
-    agg.error = `all ${n} selected key(s) are invalid/blocked`;
+    agg.error = `all ${n} selected key(s) are invalid or rate-limited (none hit a daily quota)`;
     hooks.onProgress(`[loop] ${agg.error} — stopping the loop`);
     return finish(agg, hooks);
   }
   agg.stoppedReason = "all-keys-daily";
-  hooks.onProgress(`[loop] all ${n} selected key(s) exhausted or invalid — stopping`);
+  hooks.onProgress(
+    `[loop] all ${n} selected key(s) exhausted, invalid, or rate-limited — stopping`
+  );
   return finish(agg, hooks);
 }
 
@@ -272,7 +293,8 @@ function finish(agg: LoopSummary, hooks: BatchHooks): LoopSummary {
       `${agg.callsUsed} calls | $${agg.costUsd.toFixed(2)} | ` +
       `gen=${agg.generated} xlt=${agg.translated} exh=${agg.exhausted} fail=${agg.cellsFailed}` +
       (agg.keysExhausted.length ? ` | exhausted: ${agg.keysExhausted.join(", ")}` : "") +
-      (agg.keysInvalid.length ? ` | invalid: ${agg.keysInvalid.join(", ")}` : "")
+      (agg.keysInvalid.length ? ` | invalid: ${agg.keysInvalid.join(", ")}` : "") +
+      (agg.keysRateLimited.length ? ` | rate-limited: ${agg.keysRateLimited.join(", ")}` : "")
   );
   return agg;
 }

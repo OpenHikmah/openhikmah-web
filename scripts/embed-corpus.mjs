@@ -72,7 +72,27 @@ async function embedBatch(texts) {
       );
     }
     const data = await res.json();
-    return (data.embeddings ?? []).map((e) => e.values);
+    const embeddings = data.embeddings ?? [];
+    // A short/partial batch response (or a vector with the wrong dimension)
+    // must stop the run cleanly, the same way a rate-limit cap does — not
+    // crash mid-batch on `vectors[j].join(",")` with an opaque TypeError
+    // (issue #567 C4). Mirrors embedViaRest's validation in lib/ai/ai.ts.
+    if (embeddings.length !== texts.length) {
+      console.log(
+        `Embedding response missing embeddings: expected ${texts.length}, got ${embeddings.length}.`
+      );
+      return null;
+    }
+    for (let i = 0; i < embeddings.length; i++) {
+      const values = embeddings[i]?.values;
+      if (!values || values.length !== OUTPUT_DIM) {
+        console.log(
+          `Embedding ${i} has invalid shape: expected ${OUTPUT_DIM} dims, got ${values?.length ?? 0}.`
+        );
+        return null;
+      }
+    }
+    return embeddings.map((e) => e.values);
   }
 }
 
@@ -100,10 +120,9 @@ try {
     const vectors = await embedBatch(batch.map((r) => r.translation));
 
     if (vectors === null) {
-      console.log(
-        `Stopped at ${done}/${pending.length} — rate limit needs a long wait ` +
-          `(likely a daily quota). Re-run later to resume (idempotent), or enable billing.`
-      );
+      // embedBatch already logged the specific reason (a rate-limit wait
+      // beyond MAX_RATE_WAIT_S, or a malformed response — issue #567 C4).
+      console.log(`Stopped at ${done}/${pending.length}. Re-run later to resume (idempotent).`);
       break;
     }
 

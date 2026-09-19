@@ -451,8 +451,8 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     expect(pass3.translated).toBe(0);
   });
 
-  it("per-minute retries exhausted: treated as an ordinary cell failure", async () => {
-    await seed("1:1");
+  it("per-minute retries exhausted: ends the pass 'rate-limited' so the loop rotates, not a fail-fast error (issue #567 C1)", async () => {
+    for (const r of ["1:1", "2:255", "3:18"]) await seed(r);
     mockCallAI.mockRejectedValue(
       new GeminiRateLimitError({ cls: "per-minute", status: 429, raw: "PerMinute" }, 6)
     );
@@ -462,9 +462,14 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
       hooks
     );
 
-    expect(summary.stoppedReason).toBe("error");
-    expect(summary.cellsFailed).toBe(3);
+    expect(summary.stoppedReason).toBe("rate-limited");
     expect(summary.generated).toBe(0);
+    expect(summary.cellsFailed).toBe(0);
+    // Stops at the first cell — no fail-fast draining of the work list, same
+    // as the quota-daily/key-invalid clean-stop paths above.
+    expect(summary.cellsProcessed).toBe(0);
+    expect((await db.select().from(connections)).length).toBe(0);
+    expect((await db.select().from(connectionCoverage)).length).toBe(0);
   });
 
   it("callDelayMs: exactly one delay between consecutive real LLM requests", async () => {

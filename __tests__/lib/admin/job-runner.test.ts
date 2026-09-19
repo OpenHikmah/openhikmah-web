@@ -463,6 +463,30 @@ describe("startJob — backfill-connections loop mode", () => {
     );
   });
 
+  it("dedupes selected keys by value, keeping the first label (issue #567 C3)", async () => {
+    // GEMINI_API3 secretly holds the same value as GEMINI_API1 — a pool
+    // misconfiguration that must not make the loop "rotate" between two
+    // labels that are really the same key/quota.
+    process.env.GEMINI_API3 = "key-1";
+    try {
+      mockRunConnectionBatchLoop.mockReturnValueOnce(new Promise(() => {}));
+      await startJob("backfill-connections", "qf-admin", {
+        ...base,
+        keys: ["GEMINI_API1", "GEMINI_API3", "GEMINI_API2"],
+      });
+      expect(mockRunConnectionBatchLoop).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKeys: ["key-1", "key-2"],
+          apiKeyLabels: ["GEMINI_API1", "GEMINI_API2"],
+        }),
+        expect.anything(),
+        expect.any(AbortSignal)
+      );
+    } finally {
+      delete process.env.GEMINI_API3;
+    }
+  });
+
   it("does not require GEMINI_API_KEY for loop mode", async () => {
     const prev = process.env.GEMINI_API_KEY;
     delete process.env.GEMINI_API_KEY;

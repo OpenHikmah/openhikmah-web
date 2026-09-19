@@ -6,7 +6,11 @@ import { ConnectionParseError } from "@/lib/ai/connection-generator";
 import { translateReason } from "@/lib/ai/translate";
 import { estimateCostUsd } from "@/lib/ai/ai-cost";
 import { resolveModel, type Provider } from "@/lib/ai/ai";
-import { GeminiDailyQuotaError, GeminiKeyInvalidError } from "@/lib/ai/gemini-errors";
+import {
+  GeminiDailyQuotaError,
+  GeminiKeyInvalidError,
+  GeminiRateLimitError,
+} from "@/lib/ai/gemini-errors";
 import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
 import { incr } from "@/lib/infra/metrics";
 import { interruptibleSleep } from "@/lib/infra/sleep";
@@ -58,7 +62,13 @@ export type StoppedReason =
   | "quota-daily"
   /** The active Gemini key is invalid / revoked. Same handling as `quota-daily`
    *  — the outer loop rotates to the next key. */
-  | "key-invalid";
+  | "key-invalid"
+  /** A per-minute 429 on the active key survived `callGemini`'s own retry
+   *  loop (see `PER_MINUTE_MAX_RETRIES` in gemini-errors.ts) — the key isn't
+   *  necessarily out for the day, but it's clearly rate-limited right now, so
+   *  the outer loop rotates to the next key rather than treating this as a
+   *  fatal "the provider is down" failure (issue #567 C1). */
+  | "rate-limited";
 
 export interface BatchOptions {
   mode: BatchMode;
@@ -405,13 +415,19 @@ async function translateCellReasons(
         })
         .onConflictDoNothing()
         .returning({ toRef: connections.toRef });
-      if (rows.length > 0) inserted++;
+      if (rows.length > 0) {
+        inserted++;
 
-      // Cost/audit visibility for translation spend (tokens not tracked here).
-      try {
-        await db.insert(aiGenerations).values({ fromRef, kind, model, promptVersion: null });
-      } catch (err) {
-        console.error("connection-batch: ai_generations log failed:", err);
+        // Cost/audit visibility for translation spend (tokens not tracked
+        // here). Only when a row was actually written — onConflictDoNothing
+        // means the AI call still happened, but logging here regardless would
+        // over-count spend/audit against rows never actually written (issue
+        // #567 C2).
+        try {
+          await db.insert(aiGenerations).values({ fromRef, kind, model, promptVersion: null });
+        } catch (err) {
+          console.error("connection-batch: ai_generations log failed:", err);
+        }
       }
     }
   }
@@ -644,6 +660,22 @@ export async function runConnectionBatch(
         summary.lastError = err.message;
         hooks.onProgress(
           `[${opts.mode}] active key invalid/blocked at ${cell.fromRef} ${cell.kind} — ending pass to rotate`
+        );
+        break;
+      }
+      if (err instanceof GeminiRateLimitError) {
+        // A sustained per-minute 429 that survived callGemini's own retries.
+        // Per AGENTS.md, per-minute 429s are waited out and retried, and only
+        // a per-day quota exhaustion should advance to the next key — but a
+        // key this rate-limited is still worth rotating away from rather than
+        // burning consecutiveFailures toward FAIL_FAST_THRESHOLD and ending
+        // the whole run as if the provider were down (issue #567 C1).
+        // Deliberately does NOT touch cellsFailed / consecutiveFailures /
+        // coverage lastError, same as the quota-daily/key-invalid branches.
+        summary.stoppedReason = "rate-limited";
+        summary.lastError = err.message;
+        hooks.onProgress(
+          `[${opts.mode}] active key rate-limited at ${cell.fromRef} ${cell.kind} — ending pass to rotate`
         );
         break;
       }
