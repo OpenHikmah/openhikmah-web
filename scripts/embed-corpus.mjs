@@ -8,6 +8,11 @@
  *   DATABASE_URL=... GEMINI_API_KEY=... node scripts/embed-corpus.mjs
  *
  * Embeddings are always Gemini (Anthropic has none) regardless of AI_PROVIDER.
+ *
+ * `--check` reports coverage (total verses vs. embedded for the current model)
+ * without calling the embedding API — no GEMINI_API_KEY needed for this mode.
+ *
+ *   DATABASE_URL=... node scripts/embed-corpus.mjs --check
  */
 import postgres from "postgres";
 
@@ -18,12 +23,13 @@ import postgres from "postgres";
 const EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL ?? "gemini-embedding-001";
 const OUTPUT_DIM = 768;
 const BATCH = Number(process.env.EMBED_BATCH ?? 100);
+const CHECK_ONLY = process.argv.includes("--check");
 
 if (!process.env.DATABASE_URL) {
   console.error("DATABASE_URL is not set");
   process.exit(1);
 }
-if (!process.env.GEMINI_API_KEY) {
+if (!CHECK_ONLY && !process.env.GEMINI_API_KEY) {
   console.error("GEMINI_API_KEY is not set (required to embed the corpus)");
   process.exit(1);
 }
@@ -79,51 +85,69 @@ async function embedBatch(texts) {
 const sql = postgres(process.env.DATABASE_URL, { max: 1 });
 
 try {
-  // Resume: only embed verses missing an embedding for the current model.
-  const pending = await sql`
-    SELECT v.ref, v.translation
-    FROM verses v
-    LEFT JOIN verse_embeddings e
-      ON e.ref = v.ref AND e.model = ${EMBEDDING_MODEL}
-    WHERE e.ref IS NULL
-    ORDER BY v.surah, v.ayah
-  `;
+  if (CHECK_ONLY) {
+    const [{ total }] = await sql`SELECT count(*)::int AS total FROM verses`;
+    const [{ embedded }] = await sql`
+      SELECT count(DISTINCT ref)::int AS embedded
+      FROM verse_embeddings
+      WHERE model = ${EMBEDDING_MODEL}
+    `;
+    const missing = total - embedded;
+    console.log(`Corpus: ${total} verses.`);
+    console.log(`Embedded with ${EMBEDDING_MODEL}: ${embedded}/${total}.`);
+    console.log(
+      missing === 0
+        ? "Coverage complete — every verse has a current-model embedding."
+        : `Missing: ${missing} verse(s) — re-run without --check to fill the gap (resumable).`
+    );
+    process.exitCode = missing === 0 ? 0 : 1;
+  } else {
+    // Resume: only embed verses missing an embedding for the current model.
+    const pending = await sql`
+      SELECT v.ref, v.translation
+      FROM verses v
+      LEFT JOIN verse_embeddings e
+        ON e.ref = v.ref AND e.model = ${EMBEDDING_MODEL}
+      WHERE e.ref IS NULL
+      ORDER BY v.surah, v.ayah
+    `;
 
-  console.log(`${pending.length} verses to embed with ${EMBEDDING_MODEL}.`);
-  if (pending.length === 0) {
-    console.log("Nothing to do — corpus already embedded.");
-  }
-
-  let done = 0;
-  for (let i = 0; i < pending.length; i += BATCH) {
-    const batch = pending.slice(i, i + BATCH);
-    const vectors = await embedBatch(batch.map((r) => r.translation));
-
-    if (vectors === null) {
-      console.log(
-        `Stopped at ${done}/${pending.length} — rate limit needs a long wait ` +
-          `(likely a daily quota). Re-run later to resume (idempotent), or enable billing.`
-      );
-      break;
+    console.log(`${pending.length} verses to embed with ${EMBEDDING_MODEL}.`);
+    if (pending.length === 0) {
+      console.log("Nothing to do — corpus already embedded.");
     }
 
-    for (let j = 0; j < batch.length; j++) {
-      const vec = `[${vectors[j].join(",")}]`;
-      await sql`
-        INSERT INTO verse_embeddings (ref, embedding, model)
-        VALUES (${batch[j].ref}, ${vec}::vector, ${EMBEDDING_MODEL})
-        ON CONFLICT (ref) DO UPDATE SET
-          embedding = EXCLUDED.embedding,
-          model = EXCLUDED.model
-      `;
+    let done = 0;
+    for (let i = 0; i < pending.length; i += BATCH) {
+      const batch = pending.slice(i, i + BATCH);
+      const vectors = await embedBatch(batch.map((r) => r.translation));
+
+      if (vectors === null) {
+        console.log(
+          `Stopped at ${done}/${pending.length} — rate limit needs a long wait ` +
+            `(likely a daily quota). Re-run later to resume (idempotent), or enable billing.`
+        );
+        break;
+      }
+
+      for (let j = 0; j < batch.length; j++) {
+        const vec = `[${vectors[j].join(",")}]`;
+        await sql`
+          INSERT INTO verse_embeddings (ref, embedding, model)
+          VALUES (${batch[j].ref}, ${vec}::vector, ${EMBEDDING_MODEL})
+          ON CONFLICT (ref) DO UPDATE SET
+            embedding = EXCLUDED.embedding,
+            model = EXCLUDED.model
+        `;
+      }
+
+      done += batch.length;
+      console.log(`Embedded ${done}/${pending.length}`);
     }
 
-    done += batch.length;
-    console.log(`Embedded ${done}/${pending.length}`);
+    const [{ count }] = await sql`SELECT count(*)::int AS count FROM verse_embeddings`;
+    console.log(`Done. verse_embeddings table now holds ${count} rows.`);
   }
-
-  const [{ count }] = await sql`SELECT count(*)::int AS count FROM verse_embeddings`;
-  console.log(`Done. verse_embeddings table now holds ${count} rows.`);
 } finally {
   await sql.end();
 }
