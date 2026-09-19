@@ -154,14 +154,29 @@ function parseBackfillParams(raw: Record<string, unknown>): ParsedBackfill {
       }
     }
 
+    // Dedupe by VALUE, not just name: `keyLabels` is already unique by env-var
+    // name, but two pool slots (e.g. GEMINI_API1/GEMINI_API3) can hold the same
+    // underlying secret. Rotating to a "different" key that shares state with
+    // the one just exhausted immediately re-hits the same per-day quota
+    // instead of actually spreading load (issue #567 C3) — keep the first
+    // label seen for each distinct value.
+    const seenValues = new Set<string>();
+    const dedupedLabels: string[] = [];
+    for (const name of keyLabels) {
+      const value = process.env[name] as string;
+      if (seenValues.has(value)) continue;
+      seenValues.add(value);
+      dedupedLabels.push(name);
+    }
+
     return {
       kind: "loop",
       opts: {
         mode,
         model: model as string | undefined,
         locales,
-        apiKeys: keyLabels.map((name) => process.env[name] as string),
-        apiKeyLabels: keyLabels,
+        apiKeys: dedupedLabels.map((name) => process.env[name] as string),
+        apiKeyLabels: dedupedLabels,
         callDelayMs,
         maxCalls: optionalPositiveInt(raw.maxCalls, "maxCalls"),
         maxCostUsd: optionalPositiveNumber(raw.maxCostUsd, "maxCostUsd"),
