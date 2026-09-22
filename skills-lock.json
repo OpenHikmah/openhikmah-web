@@ -25,12 +25,6 @@
       "skillPath": "skills/git-commit/SKILL.md",
       "computedHash": "2607fc60629b82b257136dd2a7a373f0a4466c0b49df7746d845d59313c99b21"
     },
-    "impeccable": {
-      "source": "pbakaus/impeccable",
-      "sourceType": "github",
-      "skillPath": ".agents/skills/impeccable/SKILL.md",
-      "computedHash": "07ce95e6f31ae532691f044f1ab389fb87701be74800303435cf47beb1dda190"
-    },
     "karpathy-guidelines": {
       "source": "szkocot/andrej-karpathy-skills",
       "sourceType": "github",
@@ -48,6 +42,12 @@
       "sourceType": "github",
       "skillPath": "skills/security-review/SKILL.md",
       "computedHash": "ec9792f5fd065e020c48ab5a57707c83435c286c449ba98dfa726d7b1842c868"
+    },
+    "shadcn-ui": {
+      "source": "google-labs-code/stitch-skills",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn-ui/SKILL.md",
+      "computedHash": "2ddfe599ac2ba631ca019f7b6e37ee5df9cd34f83fc016f6ea9d4ba5bbfa0304"
     },
     "systematic-debugging": {
       "source": "obra/superpowers",
