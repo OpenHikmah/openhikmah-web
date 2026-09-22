@@ -170,6 +170,10 @@ export const useAudioStore = create<AudioStore>((set, get) => {
     },
 
     stop: () => {
+      // Clearing src fires `error` on the element; bumping the generation makes
+      // that handler (and any pending retry) stale, otherwise its
+      // "paused → stop()" branch re-enters stop() in an endless loop.
+      ++playGen;
       if (_audio) {
         _audio.pause();
         _audio.src = "";

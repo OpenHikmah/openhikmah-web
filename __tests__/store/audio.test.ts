@@ -353,6 +353,23 @@ describe("audio store", () => {
       expect(s.queue).toEqual([]);
     });
 
+    it("ignores the error fired by stop() clearing src (no stop → error → stop loop)", async () => {
+      useAudioStore.getState().playVerse(verseA);
+      pendingPlays[0].resolve();
+      await Promise.resolve();
+
+      const realStop = useAudioStore.getState().stop;
+      realStop();
+      const reentered = vi.fn();
+      useAudioStore.setState({ stop: reentered });
+      // Browsers fire `error` when src is set to "" — jsdom doesn't, so simulate it.
+      capturedAudioEl!.dispatchEvent(new Event("error"));
+
+      expect(reentered).not.toHaveBeenCalled();
+      expect(console.error).not.toHaveBeenCalled();
+      useAudioStore.setState({ stop: realStop });
+    });
+
     it("retries a failed load before giving up, instead of skipping immediately", async () => {
       vi.useFakeTimers();
       useAudioStore.getState().playGraph([verseA, verseB]);
