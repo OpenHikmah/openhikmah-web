@@ -42,18 +42,21 @@ describe("proxy (CSP nonce)", () => {
     mockGetFlagBoolean.mockResolvedValue(false);
   });
 
-  it("sets a nonce'd Content-Security-Policy-Report-Only response header", async () => {
+  it("sets a nonce'd Content-Security-Policy response header", async () => {
     const res = await proxy(req("/"));
-    const csp = res.headers.get("Content-Security-Policy-Report-Only");
+    const csp = res.headers.get("Content-Security-Policy");
     expect(csp).toMatch(/script-src 'self' 'nonce-[A-Za-z0-9+/=]+' 'strict-dynamic'/);
     expect(csp).toContain("https://www.googletagmanager.com");
     expect(csp).toContain("https://analytics.google.com");
     expect(csp).toContain("report-uri /api/csp-report");
+    // Regression: reciter audio (lib/quran/audio.ts) is served from this CDN —
+    // no media-src means default-src 'self', which enforcement blocks.
+    expect(csp).toContain("media-src 'self' https://cdn.islamic.network");
   });
 
   it("uses a fresh nonce on every request", async () => {
-    const csp1 = (await proxy(req("/"))).headers.get("Content-Security-Policy-Report-Only");
-    const csp2 = (await proxy(req("/"))).headers.get("Content-Security-Policy-Report-Only");
+    const csp1 = (await proxy(req("/"))).headers.get("Content-Security-Policy");
+    const csp2 = (await proxy(req("/"))).headers.get("Content-Security-Policy");
     const nonce = (csp: string | null) => csp?.match(/'nonce-([A-Za-z0-9+/=]+)'/)?.[1];
     expect(nonce(csp1)).toBeTruthy();
     expect(nonce(csp1)).not.toBe(nonce(csp2));
@@ -61,7 +64,7 @@ describe("proxy (CSP nonce)", () => {
 
   it("exposes the same nonce on the x-nonce request header forwarded upstream", async () => {
     const res = await proxy(req("/"));
-    const csp = res.headers.get("Content-Security-Policy-Report-Only");
+    const csp = res.headers.get("Content-Security-Policy");
     const nonce = csp?.match(/'nonce-([A-Za-z0-9+/=]+)'/)?.[1];
     // NextResponse.next({ request: { headers } }) surfaces the forwarded
     // request headers on this special header (Next's own convention) so
@@ -71,13 +74,10 @@ describe("proxy (CSP nonce)", () => {
 
   it("also forwards the CSP header itself on the request, not just the response", async () => {
     // Next's own renderer reads the CSP off the REQUEST headers to
-    // auto-nonce its framework-generated inline scripts — a response-only
-    // header would leave that wiring silently broken until enforcement.
+    // auto-nonce its framework-generated inline scripts.
     const res = await proxy(req("/"));
-    const responseCsp = res.headers.get("Content-Security-Policy-Report-Only");
-    const forwardedCsp = res.headers.get(
-      "x-middleware-request-content-security-policy-report-only"
-    );
+    const responseCsp = res.headers.get("Content-Security-Policy");
+    const forwardedCsp = res.headers.get("x-middleware-request-content-security-policy");
     expect(forwardedCsp).toBe(responseCsp);
   });
 
@@ -85,7 +85,7 @@ describe("proxy (CSP nonce)", () => {
     mockGetFlagBoolean.mockResolvedValue(true);
     const res = await proxy(req("/"));
     expect(res.status).toBe(503);
-    expect(res.headers.get("Content-Security-Policy-Report-Only")).toMatch(/'nonce-/);
+    expect(res.headers.get("Content-Security-Policy")).toMatch(/'nonce-/);
   });
 });
 
