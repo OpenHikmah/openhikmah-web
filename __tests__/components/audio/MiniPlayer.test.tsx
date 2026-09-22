@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MiniPlayer } from "@/components/audio/MiniPlayer";
 import { useAudioStore, type AudioVerse } from "@/store/audio";
 
@@ -49,5 +49,55 @@ describe("MiniPlayer", () => {
     const el = screen.getByText("2:255").closest("div.fixed");
     expect(el).toHaveClass("bottom-4");
     expect(el).not.toHaveClass("max-md:bottom-[calc(58px+env(safe-area-inset-bottom)+16px)]");
+  });
+
+  describe("Space key", () => {
+    const pause = vi.fn();
+    const resume = vi.fn();
+
+    beforeEach(() => {
+      pause.mockReset();
+      resume.mockReset();
+      mockMobileNavVisible.mockReturnValue(false);
+    });
+
+    it("pauses while playing", () => {
+      seedPlaying();
+      useAudioStore.setState({ pause, resume });
+      render(<MiniPlayer />);
+      fireEvent.keyDown(document.body, { code: "Space", key: " " });
+      expect(pause).toHaveBeenCalledOnce();
+      expect(resume).not.toHaveBeenCalled();
+    });
+
+    it("resumes while paused", () => {
+      seedPlaying();
+      useAudioStore.setState({ isPlaying: false, pause, resume });
+      render(<MiniPlayer />);
+      fireEvent.keyDown(document.body, { code: "Space", key: " " });
+      expect(resume).toHaveBeenCalledOnce();
+      expect(pause).not.toHaveBeenCalled();
+    });
+
+    it("ignores Space typed into an input", () => {
+      seedPlaying();
+      useAudioStore.setState({ pause, resume });
+      render(
+        <>
+          <input aria-label="search" />
+          <MiniPlayer />
+        </>
+      );
+      fireEvent.keyDown(screen.getByLabelText("search"), { code: "Space", key: " " });
+      expect(pause).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when no track is loaded", () => {
+      useAudioStore.setState({ currentRef: null, pause, resume });
+      render(<MiniPlayer />);
+      fireEvent.keyDown(document.body, { code: "Space", key: " " });
+      expect(pause).not.toHaveBeenCalled();
+      expect(resume).not.toHaveBeenCalled();
+    });
   });
 });
