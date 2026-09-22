@@ -49,6 +49,9 @@ describe("proxy (CSP nonce)", () => {
     expect(csp).toContain("https://www.googletagmanager.com");
     expect(csp).toContain("https://analytics.google.com");
     expect(csp).toContain("report-uri /api/csp-report");
+    // Regression: reciter audio (lib/quran/audio.ts) is served from this CDN —
+    // no media-src means default-src 'self', which enforcement blocks.
+    expect(csp).toContain("media-src 'self' https://cdn.islamic.network");
   });
 
   it("uses a fresh nonce on every request", async () => {

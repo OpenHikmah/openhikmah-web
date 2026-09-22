@@ -21,6 +21,11 @@ const isDev = process.env.NODE_ENV === "development";
  * severity residual risk (no code execution) and are the accepted tradeoff
  * here.
  *
+ * media-src allowlists cdn.islamic.network — reciter audio playback
+ * (lib/quran/audio.ts) is a real feature that broke under enforcement without
+ * this: with no media-src, CSP falls back to default-src 'self', which
+ * report-only never blocked but enforcement does.
+ *
  * img-src deliberately does NOT attempt to allowlist GA's regional-TLD
  * ad-audience pixel (`google.<tld>/ads/ga-audiences`) — CSP host-source
  * syntax can only wildcard subdomains (`https://*.google.com`), never TLDs,
@@ -51,6 +56,7 @@ function buildCsp(nonce: string): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
+    "media-src 'self' https://cdn.islamic.network",
     "connect-src 'self' https://analytics.google.com https://stats.g.doubleclick.net",
     "object-src 'none'",
     "frame-ancestors 'none'",
