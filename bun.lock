@@ -34,7 +34,7 @@
         "@axe-core/playwright": "^4.13.0",
         "@next/env": "16.3.0",
         "@playwright/test": "^1.63.0",
-        "@size-limit/file": "^13.0.1",
+        "@size-limit/file": "^14.0.0",
         "@tailwindcss/postcss": "^4",
         "@testcontainers/postgresql": "^12.1.0",
         "@testing-library/jest-dom": "^7.0.1",
@@ -494,7 +494,7 @@
 
     "@schummar/icu-type-parser": ["@schummar/icu-type-parser@1.21.5", "", {}, "sha512-bXHSaW5jRTmke9Vd0h5P7BtWZG9Znqb8gSDxZnxaGSJnGwPLDPfS+3g0BKzeWqzgZPsIVZkM7m2tbo18cm5HBw=="],
 
-    "@size-limit/file": ["@size-limit/file@13.0.1", "", { "peerDependencies": { "size-limit": "13.0.1" } }, "sha512-qdbGUxRAjym5gnkYEjsNsdOfmkDUvDX06FLhLGUxQ0oJtIWDd2lsOmTMwh5JuAV1XmJCplbqpMJ2b5eIhHl7Lg=="],
+    "@size-limit/file": ["@size-limit/file@14.0.0", "", { "peerDependencies": { "size-limit": "14.0.0" } }, "sha512-CzlXGYuzt+vZM70NxPwi5uFyYHhORrdpDCJtcH+G57oeUPrgnqdUhDoP4jRxa6i2HNBM5Htatw5X5TcDZ8uBWQ=="],
 
     "@stablelib/base64": ["@stablelib/base64@1.0.1", "", {}, "sha512-1bnPQqSxSuc3Ii6MhBysoWCg58j97aUjuCSZrGSmDxNqtytIi0k8utUenAwTZN4V5mXXYGsVUI9zeBqy+jBOSQ=="],
 
