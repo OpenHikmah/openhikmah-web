@@ -1,10 +1,14 @@
 "use client";
 
+import { useEffect } from "react";
 import { useAudioStore } from "@/store/audio";
 import { Play, Pause, SkipBack, SkipForward, X, Loader2, Volume2 } from "lucide-react";
 import { IconButton } from "@/components/ui";
 import { useMobileNavVisible } from "@/hooks/useMobileNavVisible";
 import { cn } from "@/lib/utils";
+
+const SPACE_PASSTHROUGH =
+  "input, textarea, select, button, a, [role=button], [contenteditable=true], .react-flow";
 
 export function MiniPlayer() {
   const {
@@ -21,6 +25,24 @@ export function MiniPlayer() {
     prev,
   } = useAudioStore();
   const mobileNavVisible = useMobileNavVisible();
+
+  useEffect(() => {
+    if (!currentRef) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      // Leave Space its native meaning: typing, activating a focused control,
+      // and React Flow's hold-Space-to-pan on the canvas.
+      const target = e.target as HTMLElement;
+      if (target.closest(SPACE_PASSTHROUGH)) return;
+      e.preventDefault();
+      const s = useAudioStore.getState();
+      if (s.isLoading) return;
+      if (s.isPlaying) s.pause();
+      else s.resume();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [currentRef]);
 
   if (!currentRef) return null;
 
