@@ -26,7 +26,8 @@
     "ecc": {
       "source": {
         "source": "git",
-        "url": "https://github.com/affaan-m/ECC.git"
+        "url": "https://github.com/affaan-m/ECC.git",
+        "ref": "bf70150eb2df8070024e5bdf08e4aa08959e2735"
       }
     }
   }
