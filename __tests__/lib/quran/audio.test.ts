@@ -14,6 +14,12 @@ describe("getAudioUrl", () => {
     );
   });
 
+  it("uses the reciter's own CDN bitrate (Abdul Basit is not hosted at 128)", () => {
+    expect(getAudioUrl(1, 1, "ar.abdulbasitmurattal")).toBe(
+      "https://cdn.islamic.network/quran/audio/64/ar.abdulbasitmurattal/1.mp3"
+    );
+  });
+
   it("falls back to the default reciter for an unknown/unsafe value", () => {
     expect(getAudioUrl(1, 1, "../../etc/passwd")).toBe(
       `https://cdn.islamic.network/quran/audio/128/${DEFAULT_RECITER}/1.mp3`

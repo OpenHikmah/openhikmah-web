@@ -25,26 +25,28 @@ export function getGlobalAyahNumber(surah: number, ayah: number): number {
 export const DEFAULT_RECITER = "ar.alafasy";
 
 /** Reciter slugs recognized by the Islamic Network CDN, whitelisted so an
- *  unvalidated preference value can never be interpolated into the URL. */
+ *  unvalidated preference value can never be interpolated into the URL.
+ *  The CDN doesn't host every reciter at every bitrate (e.g. Abdul Basit
+ *  Murattal 403s at 128), so each reciter carries a bitrate it's served at. */
 export const RECITERS = [
-  { id: "ar.alafasy", label: "Mishary Alafasy" },
-  { id: "ar.abdulbasitmurattal", label: "Abdul Basit (Murattal)" },
-  { id: "ar.husary", label: "Mahmoud Al-Husary" },
-  { id: "ar.minshawi", label: "Mohamed Al-Minshawi" },
+  { id: "ar.alafasy", label: "Mishary Alafasy", bitrate: 128 },
+  { id: "ar.abdulbasitmurattal", label: "Abdul Basit (Murattal)", bitrate: 64 },
+  { id: "ar.husary", label: "Mahmoud Al-Husary", bitrate: 128 },
+  { id: "ar.minshawi", label: "Mohamed Al-Minshawi", bitrate: 128 },
 ] as const;
 
-const RECITER_IDS = new Set<string>(RECITERS.map((r) => r.id));
+const RECITER_BITRATES = new Map<string, number>(RECITERS.map((r) => [r.id, r.bitrate]));
 
 export function isValidReciter(reciter: string): boolean {
-  return RECITER_IDS.has(reciter);
+  return RECITER_BITRATES.has(reciter);
 }
 
-/** 128kbps MP3 from the Islamic Network CDN, per reciter. */
 export function getAudioUrl(
   surah: number,
   ayah: number,
   reciter: string = DEFAULT_RECITER
 ): string {
   const safeReciter = isValidReciter(reciter) ? reciter : DEFAULT_RECITER;
-  return `https://cdn.islamic.network/quran/audio/128/${safeReciter}/${getGlobalAyahNumber(surah, ayah)}.mp3`;
+  const bitrate = RECITER_BITRATES.get(safeReciter);
+  return `https://cdn.islamic.network/quran/audio/${bitrate}/${safeReciter}/${getGlobalAyahNumber(surah, ayah)}.mp3`;
 }
