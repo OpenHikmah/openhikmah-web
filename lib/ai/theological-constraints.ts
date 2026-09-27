@@ -27,3 +27,14 @@ export const TASHBIH_PHRASES: RegExp[] = [
   /\btakes? (on |the )?(a |the )?(human|physical) (form|shape)\b/i,
   /\bhas (a |the )?(shape|appearance) of\b/i,
 ];
+
+/**
+ * The shared backstop every AI-generation call site runs on its output before
+ * caching or serving it (connections, divine-names reflection/pairings/verses,
+ * translated reasons). English-only: the patterns can't see a violation
+ * phrased in another language, so content generated directly in tr/ru/az is
+ * still covered only by the prompt-side TANZIH_CONSTRAINT.
+ */
+export function containsTashbih(text: string): boolean {
+  return TASHBIH_PHRASES.some((re) => re.test(text));
+}

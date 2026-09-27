@@ -7,7 +7,7 @@ import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
 import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
-import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
+import { TANZIH_CONSTRAINT, containsTashbih } from "@/lib/ai/theological-constraints";
 import { incr } from "@/lib/infra/metrics";
 
 // Bump to force regeneration after a prompt change. Exported so page.tsx can
@@ -124,6 +124,11 @@ async function getPairings(
       return items
         .slice(0, 3)
         .map((p): Pairing | null => {
+          if (containsTashbih(p.explanation)) {
+            console.error(`Pairings: dropping Tashbih-phrased explanation for ${slug}`);
+            incr("names_rejected_tashbih");
+            return null;
+          }
           const match = DIVINE_NAMES.find(
             (n) =>
               n.transliteration.toLowerCase() === p.transliteration.toLowerCase() ||

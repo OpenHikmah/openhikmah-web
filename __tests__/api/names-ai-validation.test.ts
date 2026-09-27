@@ -403,4 +403,87 @@ describe("names AI routes — model output validation", () => {
     expect(mockCallAI).toHaveBeenCalledTimes(1);
     errorSpy.mockRestore();
   });
+  it("reflection: Tashbih phrasing is rejected (not cached) and retried against Gemini", async () => {
+    mockCallAI.mockResolvedValue("This shows God literally has a physical body.");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ reflection: "" });
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Tashbih phrasing"));
+    // Unlike a refusal, a Tashbih hit is a bad answer, so the Gemini retry runs.
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
+    errorSpy.mockRestore();
+  });
+
+  it("pairings: a Tashbih-phrased explanation is dropped, clean ones kept", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        {
+          transliteration: "Ar-Rahīm",
+          arabic: "الرَّحِيم",
+          explanation: "Balances universal grace with mercy specific to the believers.",
+        },
+        {
+          transliteration: "Al-Malik",
+          arabic: "الْمَلِك",
+          explanation: "This shows God literally has a physical body.",
+        },
+      ])
+    );
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.map((p: { transliteration: string }) => p.transliteration)).toEqual(["Ar-Rahīm"]);
+    errorSpy.mockRestore();
+  });
+
+  it("verses: a Tashbih-phrased AI-fallback reason drops that verse", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([{ ref: "2:255", reason: "This shows God literally has a physical body." }])
+    );
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([]);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Tashbih-phrased"));
+    errorSpy.mockRestore();
+  });
+
+  it("verses: a Tashbih-phrased per-verse reason falls back to the default reason", async () => {
+    mockFetch.mockImplementation(async (url: unknown) => {
+      if (typeof url !== "string") return { ok: false };
+      if (url.includes("api.quran.com/api/v4/search")) {
+        return { ok: true, json: async () => ({ search: { results: [{ verse_key: "2:255" }] } }) };
+      }
+      if (url.includes("ar.alafasy"))
+        return {
+          ok: true,
+          json: async () => ({ data: { text: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ" } }),
+        };
+      if (url.includes("en.sahih"))
+        return {
+          ok: true,
+          json: async () => ({ data: { text: "Allah - there is no deity except Him." } }),
+        };
+      return { ok: false };
+    });
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({ "2:255": "This shows God literally has a physical body." })
+    );
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+    const body = await res.json();
+    expect(body).toHaveLength(1);
+    expect(body[0].reason).toMatch(/^Contains a form of/);
+    errorSpy.mockRestore();
+  });
 });

@@ -1,6 +1,6 @@
 import { callAIDetailed, type Provider } from "@/lib/ai/ai";
 import { getPrompt, renderTemplate } from "@/lib/ai/prompt-registry";
-import { TANZIH_CONSTRAINT, TASHBIH_PHRASES } from "@/lib/ai/theological-constraints";
+import { TANZIH_CONSTRAINT, containsTashbih } from "@/lib/ai/theological-constraints";
 import { db } from "@/lib/infra/db";
 import { aiGenerations } from "@/lib/infra/db/schema";
 import { isValidRef, getVerses } from "@/lib/quran/quran-corpus";
@@ -105,7 +105,7 @@ function passesContentHeuristics(
     incr("connection_rejected_too_short");
     return false;
   }
-  if (TASHBIH_PHRASES.some((re) => re.test(reason))) {
+  if (containsTashbih(reason)) {
     incr("connection_rejected_tashbih");
     return false;
   }

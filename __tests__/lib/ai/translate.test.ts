@@ -12,6 +12,13 @@ import * as metrics from "@/lib/infra/metrics";
 const EN = "The believer rests the heart in certainty of Allah's subtle awareness.";
 
 describe("validateTranslation", () => {
+  it("rejects output carrying English Tashbih phrasing", () => {
+    expect(validateTranslation(EN, "Mümin bilir ki Allah literally has a physical body.")).toEqual({
+      ok: false,
+      reason: "tashbih",
+    });
+  });
+
   it("accepts a plausible localized sentence", () => {
     const v = validateTranslation(EN, "Mümin, kalbini Allah'ın latif ilminin yakinine bırakır.");
     expect(v).toEqual({
