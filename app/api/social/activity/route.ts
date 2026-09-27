@@ -34,7 +34,29 @@ const ANCHOR_DRIFT_MINUTES = 60;
 const ANCHOR_MOVE_LIMIT = 1;
 const ANCHOR_MOVE_WINDOW_SECONDS = 20 * 60 * 60;
 
-class TzAnchorRateLimitedError extends Error {}
+function isWithinDrift(offset: number, anchor: number): boolean {
+  return Math.abs(offset - anchor) <= ANCHOR_DRIFT_MINUTES;
+}
+
+/**
+ * Which offset to trust, decided against the *locked* anchor. First sight or
+ * in-drift (DST) is trusted outright; a bigger jump only when this request
+ * already spent an anchor-move limiter token on it. A request that looked
+ * in-drift against the pre-tx snapshot but is a jump against the locked
+ * anchor (a concurrent request moved it) has no token, so it falls back to
+ * the locked anchor and persists nothing.
+ */
+function decideOffset(
+  requested: number | null,
+  anchor: number | null,
+  jumpAllowed: boolean
+): { trustedOffset: number | null; persistOffset: boolean } {
+  if (requested === null) return { trustedOffset: anchor, persistOffset: false };
+  if (anchor === null || isWithinDrift(requested, anchor) || jumpAllowed) {
+    return { trustedOffset: requested, persistOffset: requested !== anchor };
+  }
+  return { trustedOffset: anchor, persistOffset: false };
+}
 
 export async function POST(req: NextRequest) {
   const authed = await requireUser(req);
@@ -81,64 +103,46 @@ export async function POST(req: NextRequest) {
   const activityType = body.type;
   const verseRef = body.verse_ref ?? null;
   const requestedOffset = tzOffsetMinutes;
+  const localDate = body.local_date;
 
   const { userId } = authed;
 
-  // Decide which offset to trust *before* opening the row-locking
-  // transaction below. A genuine-relocation jump needs consume()'s own I/O
-  // (Redis, or a Postgres write on its fallback path against the same pool
-  // the transaction below draws from) — running that while already holding
-  // a `FOR UPDATE` lock on this row would hold the lock (and a second pooled
-  // connection) open for an external round trip, risking pool contention
-  // under concurrent activity pings. A first-sight/in-drift anchor read here
-  // uses a plain, unlocked snapshot; the narrow race where a concurrent
-  // request moves the anchor between this read and the locked one below is
-  // self-correcting on the next request and doesn't let an attacker exceed
-  // the once-per-window anchor-move budget, since consume() itself is what
-  // enforces that, not this snapshot.
-  let trustedOffset: number | null = null;
-  let persistOffset = false;
-  try {
-    const [currentUser] = await db
-      .select({ timezoneOffsetMinutes: users.timezoneOffsetMinutes })
-      .from(users)
-      .where(eq(users.id, userId));
-    const anchor = currentUser?.timezoneOffsetMinutes ?? null;
-    trustedOffset = anchor;
-
-    // Trust the requested offset outright only on first sight or within a
-    // small drift of the existing anchor (DST). A bigger jump claims a
-    // genuine relocation — rate-limit how often the anchor itself can move
-    // so a client can't flip its offset every request to walk the "local
-    // today" boundary back and forth (see issue #563).
-    if (requestedOffset !== null) {
-      if (anchor === null || Math.abs(requestedOffset - anchor) <= ANCHOR_DRIFT_MINUTES) {
-        trustedOffset = requestedOffset;
-        persistOffset = anchor === null || requestedOffset !== anchor;
-      } else {
+  // A >ANCHOR_DRIFT_MINUTES jump claims a genuine relocation and must pass
+  // the anchor-move limiter. consume() does external I/O (Redis, or a
+  // Postgres write on its fallback path against the same pool the
+  // transaction below draws from), so it runs here, against a plain unlocked
+  // snapshot, rather than while holding the row lock. The snapshot only
+  // decides whether to spend a limiter token; the actual trust decision is
+  // re-made inside the transaction against the locked row (see
+  // decideOffset), so concurrent requests can't each validate against an
+  // anchor that's about to change (issue #633).
+  let jumpAllowed = false;
+  if (requestedOffset !== null) {
+    try {
+      const [currentUser] = await db
+        .select({ timezoneOffsetMinutes: users.timezoneOffsetMinutes })
+        .from(users)
+        .where(eq(users.id, userId));
+      const snapshotAnchor = currentUser?.timezoneOffsetMinutes ?? null;
+      if (snapshotAnchor !== null && !isWithinDrift(requestedOffset, snapshotAnchor)) {
         const allowed = await consume(
           `tz-anchor:${userId}`,
           ANCHOR_MOVE_LIMIT,
           ANCHOR_MOVE_WINDOW_SECONDS
         );
-        if (!allowed) throw new TzAnchorRateLimitedError();
-        trustedOffset = requestedOffset;
-        persistOffset = true;
+        if (!allowed) {
+          return NextResponse.json(
+            { error: "Timezone changed too recently — please try again later." },
+            { status: 400 }
+          );
+        }
+        jumpAllowed = true;
       }
+    } catch (err) {
+      console.error("social/activity POST anchor-check error:", err);
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
-  } catch (err) {
-    if (err instanceof TzAnchorRateLimitedError) {
-      return NextResponse.json(
-        { error: "Timezone changed too recently — please try again later." },
-        { status: 400 }
-      );
-    }
-    console.error("social/activity POST anchor-check error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  const today = resolveActivityDate(body.local_date, trustedOffset);
-  const yesterday = today === todayUTC() ? yesterdayUTC() : previousDay(today);
 
   try {
     // Insert + streak read/compute/write run in one transaction: the activity
@@ -147,17 +151,27 @@ export async function POST(req: NextRequest) {
     // without updating the streak), and the user row is re-read with a row
     // lock here rather than trusting `authed.user` — that snapshot can be
     // cached, so two concurrent POSTs computing `newStreak` from the same
-    // stale value would otherwise silently lose one of the increments.
+    // stale value would otherwise silently lose one of the increments. The
+    // lock is taken first so the offset decision, the activity date, and the
+    // writes all derive from the same locked anchor.
     const result = await db.transaction(async (tx) => {
+      const [freshUser] = await tx.select().from(users).where(eq(users.id, userId)).for("update");
+      if (!freshUser) throw new Error("user row missing during activity write");
+
+      const { trustedOffset, persistOffset } = decideOffset(
+        requestedOffset,
+        freshUser.timezoneOffsetMinutes,
+        jumpAllowed
+      );
+      const today = resolveActivityDate(localDate, trustedOffset);
+      const yesterday = today === todayUTC() ? yesterdayUTC() : previousDay(today);
+
       await tx.insert(activityLog).values({
         userId,
         activityType,
         verseRef,
         activityDate: today,
       });
-
-      const [freshUser] = await tx.select().from(users).where(eq(users.id, userId)).for("update");
-      if (!freshUser) throw new Error("user row missing during activity write");
 
       const lastDate = freshUser.lastActivityDate; // "YYYY-MM-DD" or null
       let newStreak = freshUser.currentStreak;
@@ -201,7 +215,7 @@ export async function POST(req: NextRequest) {
       }
 
       const streakBroken = isNewDay && lastDate !== null && lastDate !== yesterday;
-      return { newStreak, newLongest, isNewDay, streakBroken, didWrite };
+      return { newStreak, newLongest, isNewDay, streakBroken, didWrite, today };
     });
 
     if (result.didWrite) {
@@ -219,7 +233,7 @@ export async function POST(req: NextRequest) {
       longestStreak: result.newLongest,
       isNewDay: result.isNewDay,
       streakBroken: result.streakBroken,
-      activityDate: today,
+      activityDate: result.today,
     });
   } catch (err) {
     console.error("social/activity POST db error:", err);

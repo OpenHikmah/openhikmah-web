@@ -416,6 +416,99 @@ describe("POST /api/social/activity", () => {
     expect(res.status).toBe(400);
   });
 
+  describe("timezone anchor under concurrency (issue #633)", () => {
+    function captureUpdate() {
+      const sets: Record<string, unknown>[] = [];
+      mockUpdate.mockImplementation(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const c: any = {
+          set: (v: Record<string, unknown>) => {
+            sets.push(v);
+            return c;
+          },
+          where: () => c,
+          then: (r: (v: unknown) => unknown) => Promise.resolve(undefined).then(r),
+        };
+        return c;
+      });
+      return sets;
+    }
+
+    it("re-validates a drift against the locked anchor: a concurrent move turns it into an unconsumed jump, so it falls back to the locked anchor and persists nothing", async () => {
+      // Pre-tx snapshot anchor 0 (request -50 looks like in-drift), but a
+      // concurrent request already committed +50 by the time we lock the row:
+      // -50 is now 100 min off the anchor with no limiter token spent.
+      const user = makeUser({
+        currentStreak: 1,
+        lastActivityDate: yesterdayStr(),
+        timezoneOffsetMinutes: 0,
+      });
+      authedAs(user);
+      mockTxSelect.mockReturnValue(makeDbChain([{ ...user, timezoneOffsetMinutes: 50 }]));
+      const sets = captureUpdate();
+
+      const res = await POST(makeReq({ type: "verse_added", tz_offset_minutes: -50 }));
+
+      expect(res.status).toBe(200);
+      expect(mockConsume).not.toHaveBeenCalled();
+      expect(sets).toHaveLength(1);
+      expect(sets[0]).not.toHaveProperty("timezoneOffsetMinutes");
+    });
+
+    it("still trusts a drift that stays in-drift against the locked anchor", async () => {
+      const user = makeUser({
+        currentStreak: 1,
+        lastActivityDate: yesterdayStr(),
+        timezoneOffsetMinutes: 0,
+      });
+      authedAs(user);
+      mockTxSelect.mockReturnValue(makeDbChain([{ ...user, timezoneOffsetMinutes: 30 }]));
+      const sets = captureUpdate();
+
+      await POST(makeReq({ type: "verse_added", tz_offset_minutes: 60 }));
+
+      expect(sets[0]?.timezoneOffsetMinutes).toBe(60);
+    });
+
+    it("a limiter-approved jump is still trusted even if the locked anchor moved", async () => {
+      const user = makeUser({
+        currentStreak: 1,
+        lastActivityDate: yesterdayStr(),
+        timezoneOffsetMinutes: 0,
+      });
+      authedAs(user);
+      mockTxSelect.mockReturnValue(makeDbChain([{ ...user, timezoneOffsetMinutes: 50 }]));
+      const sets = captureUpdate();
+
+      await POST(makeReq({ type: "verse_added", tz_offset_minutes: 300 }));
+
+      expect(mockConsume).toHaveBeenCalledTimes(1);
+      expect(sets[0]?.timezoneOffsetMinutes).toBe(300);
+    });
+
+    it("buckets the activity date by the locked anchor when the request's offset is not trusted", async () => {
+      // Snapshot -700 makes request -720 look in-drift, but the locked anchor is
+      // +840: 26h apart, so the two local days always differ. The insert must
+      // use the locked anchor's day, not the untrusted request's.
+      const user = makeUser({
+        currentStreak: 1,
+        lastActivityDate: null,
+        timezoneOffsetMinutes: -700,
+      });
+      authedAs(user);
+      mockTxSelect.mockReturnValue(makeDbChain([{ ...user, timezoneOffsetMinutes: 840 }]));
+      captureUpdate();
+
+      const expected = new Date(Date.now() + 840 * 60_000).toISOString().slice(0, 10);
+      const res = await POST(
+        makeReq({ type: "verse_added", tz_offset_minutes: -720, local_date: expected })
+      );
+
+      const body = await res.json();
+      expect(body.activityDate).toBe(expected);
+    });
+  });
+
   describe("timezone anchor (issue #563)", () => {
     it("trusts a first-ever offset immediately, no rate-limit check", async () => {
       authedAs(
