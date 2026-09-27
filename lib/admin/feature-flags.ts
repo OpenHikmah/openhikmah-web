@@ -26,8 +26,8 @@ async function readFlag(key: string): Promise<unknown> {
     try {
       value = JSON.parse(row.value);
     } catch (err) {
-      // Parsed once per cache fill, so this logs at most once per TTL per key
-      // instead of on every hot-path read.
+      // Parsed once per cache fill, so this logs once per TTL per key (plus any
+      // concurrent cold reads racing the fill) instead of on every hot-path read.
       console.error(`Feature flag "${key}" has a corrupt stored value, using fallback:`, err);
       incr("feature_flag_corrupt");
     }
