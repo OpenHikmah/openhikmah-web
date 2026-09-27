@@ -9,7 +9,12 @@ import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
 import type { ConnectionResult, EdgeKind, Verse } from "@/types/quran";
 
 /**
- * The ONLY module that calls the AI. Two paths:
+ * Generates and verifies verse connections. Not the only AI call site: the
+ * divine-names routes (app/api/names/[slug]/{reflection,pairings,verses}) and
+ * lib/ai/translate.ts call `callAI` directly. Every call site embeds
+ * `TANZIH_CONSTRAINT` from lib/ai/theological-constraints.ts in its own
+ * prompt — that file, not this one, is the shared theological enforcement
+ * point. Two paths here:
  *
  *   - generateGroundedConnections — the preferred "AI articulates" half of the
  *     separation of powers. Receives REAL candidate verses discovered from
