@@ -108,3 +108,32 @@ describe("getFlagBoolean", () => {
     expect(await getFlagBoolean("maintenance_mode", false)).toBe(false);
   });
 });
+
+describe("corrupt stored value", () => {
+  function corruptRow() {
+    return [{ key: "k", value: "{not json", updatedBy: null, updatedAt: new Date() }];
+  }
+
+  it("falls back for every getter and logs the corruption", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockSelect.mockReturnValue(makeDbChain(corruptRow()));
+    expect(await getFlagString("ai_provider", "claude")).toBe("claude");
+    invalidateFlagCache();
+    expect(await getFlagNumber("mutation_limit", 60)).toBe(60);
+    invalidateFlagCache();
+    expect(await getFlagBoolean("maintenance_mode", false)).toBe(false);
+    expect(err).toHaveBeenCalledTimes(3);
+    expect(err.mock.calls[0][0]).toContain('"ai_provider"');
+    err.mockRestore();
+  });
+
+  it("logs once per cache fill, not on every read", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockSelect.mockReturnValue(makeDbChain(corruptRow()));
+    await getFlagBoolean("maintenance_mode", false);
+    await getFlagBoolean("maintenance_mode", false);
+    await getFlagBoolean("maintenance_mode", false);
+    expect(err).toHaveBeenCalledTimes(1);
+    err.mockRestore();
+  });
+});

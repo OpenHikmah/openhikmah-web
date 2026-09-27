@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { featureFlags } from "@/lib/infra/db/schema";
+import { incr } from "@/lib/infra/metrics";
 
 /**
  * Reads runtime-tunable settings from the `feature_flags` table, falling back
@@ -11,52 +12,46 @@ import { featureFlags } from "@/lib/infra/db/schema";
  */
 
 const CACHE_TTL_MS = 30_000;
-const cache = new Map<string, { value: string | null; expiresAt: number }>();
+// `undefined` = no row, or a row whose value isn't valid JSON (JSON.parse never
+// yields undefined, so it can't collide with a real stored value).
+const cache = new Map<string, { value: unknown; expiresAt: number }>();
 
-async function readFlag(key: string): Promise<string | null> {
+async function readFlag(key: string): Promise<unknown> {
   const cached = cache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
 
   const [row] = await db.select().from(featureFlags).where(eq(featureFlags.key, key)).limit(1);
-  const value = row?.value ?? null;
+  let value: unknown;
+  if (row) {
+    try {
+      value = JSON.parse(row.value);
+    } catch (err) {
+      // Parsed once per cache fill, so this logs at most once per TTL per key
+      // instead of on every hot-path read.
+      console.error(`Feature flag "${key}" has a corrupt stored value, using fallback:`, err);
+      incr("feature_flag_corrupt");
+    }
+  }
   cache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
   return value;
 }
 
 /** Reads a string-valued flag (stored as a JSON string), or `fallback` if unset/invalid. */
 export async function getFlagString(key: string, fallback: string): Promise<string> {
-  const raw = await readFlag(key);
-  if (raw === null) return fallback;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return typeof parsed === "string" ? parsed : fallback;
-  } catch {
-    return fallback;
-  }
+  const value = await readFlag(key);
+  return typeof value === "string" ? value : fallback;
 }
 
 /** Reads a number-valued flag (stored as JSON), or `fallback` if unset/invalid/non-positive. */
 export async function getFlagNumber(key: string, fallback: number): Promise<number> {
-  const raw = await readFlag(key);
-  if (raw === null) return fallback;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return typeof parsed === "number" && Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-  } catch {
-    return fallback;
-  }
+  const value = await readFlag(key);
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 /** Reads a boolean-valued flag (stored as JSON), or `fallback` if unset/invalid. */
 export async function getFlagBoolean(key: string, fallback: boolean): Promise<boolean> {
-  const raw = await readFlag(key);
-  if (raw === null) return fallback;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return typeof parsed === "boolean" ? parsed : fallback;
-  } catch {
-    return fallback;
-  }
+  const value = await readFlag(key);
+  return typeof value === "boolean" ? value : fallback;
 }
 
 /** Drops the cached lookup for `key`, or all keys if omitted — call after writing a flag. */
