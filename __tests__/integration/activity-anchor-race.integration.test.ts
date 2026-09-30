@@ -64,6 +64,8 @@ describe("POST /api/social/activity tz anchor race (issue #633, real Postgres)",
     });
     await lockAcquired;
 
+    const plus50Day = () => new Date(Date.now() + 50 * 60_000).toISOString().slice(0, 10);
+    const dayBefore = plus50Day();
     // -50 is in-drift against the snapshot (0) but a 100-min jump against the
     // +50 it will see once it gets the lock.
     const pending = POST(
@@ -84,9 +86,10 @@ describe("POST /api/social/activity tz anchor race (issue #633, real Postgres)",
     const [after] = await db.select().from(users).where(eq(users.id, user.id));
     expect(after.timezoneOffsetMinutes).toBe(50);
 
-    const expectedDay = new Date(Date.now() + 50 * 60_000).toISOString().slice(0, 10);
+    // The +50 local day can roll over while the request waits on the lock.
+    const dayAfter = plus50Day();
     const [logged] = await db.select().from(activityLog).where(eq(activityLog.userId, user.id));
-    expect(logged.activityDate).toBe(expectedDay);
-    expect((await res.json()).activityDate).toBe(expectedDay);
+    expect([dayBefore, dayAfter]).toContain(logged.activityDate);
+    expect((await res.json()).activityDate).toBe(logged.activityDate);
   });
 });
