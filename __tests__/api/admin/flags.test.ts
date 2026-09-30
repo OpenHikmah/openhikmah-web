@@ -192,6 +192,21 @@ describe("PUT /api/admin/flags", () => {
     expect(res.status).toBe(200);
   });
 
+  it("rejects a non-positive number, which getFlagNumber would silently ignore", async () => {
+    const insertCallsBefore = mockInsert.mock.calls.length;
+    expect((await PUT(put({ key: "mutation_limit", value: 0 }))).status).toBe(400);
+    const res = await PUT(put({ key: "ai_gen_window_seconds", value: -5 }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/positive number/);
+    expect(mockInsert.mock.calls.length).toBe(insertCallsBefore);
+  });
+
+  it("validates the admin mutation rate-limit keys as numbers", async () => {
+    expect((await PUT(put({ key: "admin_mutation_limit", value: "20" }))).status).toBe(400);
+    expect((await PUT(put({ key: "admin_mutation_window_seconds", value: 0 }))).status).toBe(400);
+    expect((await PUT(put({ key: "admin_mutation_limit", value: 20 }))).status).toBe(200);
+  });
+
   it("validates the per-feature provider keys as strings", async () => {
     expect((await PUT(put({ key: "ai_provider_connections", value: 3 }))).status).toBe(400);
     expect((await PUT(put({ key: "ai_provider_names", value: "gemini" }))).status).toBe(200);
