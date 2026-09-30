@@ -16,7 +16,7 @@ import { clientKey } from "@/lib/infra/http";
 import { incr } from "@/lib/infra/metrics";
 import { getUiLocale, getQuranEdition } from "@/lib/i18n/request-prefs";
 import { LOCALE_LANGUAGE_NAME, DEFAULT_EDITION_BY_LOCALE, type Locale } from "@/lib/i18n/config";
-import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
+import { TANZIH_CONSTRAINT, containsTashbih } from "@/lib/ai/theological-constraints";
 import type { VerseRef } from "@/types/quran";
 
 // Bump to force regeneration after a prompt/search change.
@@ -112,7 +112,14 @@ Output format:
     const obj: unknown = JSON.parse(match[0]);
     if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return new Map();
     return new Map(
-      Object.entries(obj).filter((e): e is [string, string] => typeof e[1] === "string")
+      Object.entries(obj).filter((e): e is [string, string] => {
+        if (typeof e[1] !== "string") return false;
+        if (!containsTashbih(e[1])) return true;
+        // Dropped reasons fall back to the default "Contains a form of ..." text.
+        console.error(`Name verses: dropping Tashbih-phrased reason for ${e[0]}`);
+        incr("names_rejected_tashbih");
+        return false;
+      })
     );
   } catch (err) {
     // Reasons are best-effort (a default reason is used per verse if missing) —
@@ -161,14 +168,21 @@ Return ONLY a JSON array:
     const raw: unknown = JSON.parse(match[0]);
     // The model proposes refs from memory here — validate shape AND that each
     // ref is a real Quran reference before anything downstream touches it.
-    return (Array.isArray(raw) ? raw : []).filter(
-      (item): item is { ref: string; reason: string } =>
-        typeof item === "object" &&
-        item !== null &&
-        typeof (item as Record<string, unknown>).ref === "string" &&
-        isValidRef((item as Record<string, unknown>).ref as string) &&
-        typeof (item as Record<string, unknown>).reason === "string"
-    );
+    return (Array.isArray(raw) ? raw : [])
+      .filter(
+        (item): item is { ref: string; reason: string } =>
+          typeof item === "object" &&
+          item !== null &&
+          typeof (item as Record<string, unknown>).ref === "string" &&
+          isValidRef((item as Record<string, unknown>).ref as string) &&
+          typeof (item as Record<string, unknown>).reason === "string"
+      )
+      .filter((item) => {
+        if (!containsTashbih(item.reason)) return true;
+        console.error(`Name verses: dropping Tashbih-phrased AI-fallback reason for ${item.ref}`);
+        incr("names_rejected_tashbih");
+        return false;
+      });
   } catch (err) {
     // Empty result is not cached (it retries), but log the parse failure so a
     // broken prompt surfaces instead of silently re-invoking the AI forever.

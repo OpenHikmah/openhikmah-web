@@ -7,7 +7,7 @@ import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
 import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
-import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
+import { TANZIH_CONSTRAINT, containsTashbih } from "@/lib/ai/theological-constraints";
 import { incr } from "@/lib/infra/metrics";
 
 // Bump to force regeneration after a prompt change. Exported so page.tsx can
@@ -69,6 +69,13 @@ async function getReflection(
           console.error(`Reflection: model returned a refusal for ${slug}, not caching`);
           incr("names_ai_refusal");
           ctx.markRefusal();
+          return "";
+        }
+        if (containsTashbih(text)) {
+          // Not markRefusal(): the model answered, just unacceptably, so a
+          // Gemini retry is a legitimate second attempt. Empty = not cached.
+          console.error(`Reflection: Tashbih phrasing in AI output for ${slug}, not caching`);
+          incr("names_rejected_tashbih");
           return "";
         }
         return text;

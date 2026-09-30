@@ -1,6 +1,6 @@
 import { callAI, type CallAiOptions } from "@/lib/ai/ai";
 import { looksLikeRefusal } from "@/lib/ai/refusal";
-import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
+import { TANZIH_CONSTRAINT, containsTashbih } from "@/lib/ai/theological-constraints";
 import { incr } from "@/lib/infra/metrics";
 
 /**
@@ -25,7 +25,8 @@ const MIN_SOURCE_LEN_FOR_MIN_RATIO = 25;
 const LABEL_PREFIX =
   /^\s*(?:sure[,!.]?\s+)?(?:here(?:['’]s| is)[^:]*:|(?:[a-z]+ )?translation:|translated(?: sentence| text| (?:in)?to [a-z]+)?:)\s*/i;
 
-export type TranslationRejection = "label_prefix" | "refusal" | "english_echo" | "length_ratio";
+export type TranslationRejection =
+  "label_prefix" | "refusal" | "tashbih" | "english_echo" | "length_ratio";
 
 export type TranslationVerdict =
   { ok: true; text: string } | { ok: false; reason: TranslationRejection };
@@ -66,6 +67,9 @@ export function validateTranslation(
 
   if (stripped === "") return { ok: false, reason: "label_prefix" };
   if (looksLikeRefusal(stripped)) return { ok: false, reason: "refusal" };
+  // English-only patterns (see containsTashbih) — this catches English leaking
+  // into the output, not a violation phrased in the target language.
+  if (containsTashbih(stripped)) return { ok: false, reason: "tashbih" };
 
   const src = source.trim();
   if (normalizeForEcho(stripped) === normalizeForEcho(src)) {
