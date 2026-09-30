@@ -23,6 +23,8 @@ const KNOWN_FLAG_TYPES: Record<string, FlagType> = {
   ai_gen_window_seconds: "number",
   mutation_limit: "number",
   mutation_window_seconds: "number",
+  admin_mutation_limit: "number",
+  admin_mutation_window_seconds: "number",
 };
 
 /** Exported so the admin UI can warn before deleting a key with real runtime effect. */
@@ -42,7 +44,10 @@ export function validateFlagType(key: string, value: unknown): string | null {
   const expected = KNOWN_FLAG_TYPES[key];
   if (!expected) return null;
   if (expected === "number") {
-    return typeof value === "number" && Number.isFinite(value) ? null : `"${key}" must be a number`;
+    // Matches getFlagNumber's read-side rule, which ignores anything non-positive.
+    return typeof value === "number" && Number.isFinite(value) && value > 0
+      ? null
+      : `"${key}" must be a positive number`;
   }
   return typeof value === expected ? null : `"${key}" must be a ${expected}`;
 }
