@@ -1,10 +1,7 @@
 import { ImageResponse } from "next/og";
-import { db } from "@/lib/infra/db";
-import { sharedCanvases } from "@/lib/infra/db/schema";
-import { eq } from "drizzle-orm";
 import { renderOgCard, clampBody, OG_SIZE, OG_CONTENT_TYPE } from "@/lib/og-card";
-import { isValidNode } from "@/lib/canvas/share-canvas";
-import type { SavedCanvas } from "@/store/canvas";
+import { loadSharePayload } from "@/lib/canvas/share-hydrate";
+import { resolveVerse } from "@/lib/quran/verse-resolver";
 
 export const alt = "Shared canvas — Open Hikmah";
 export const size = OG_SIZE;
@@ -33,34 +30,21 @@ export default async function Image({ params }: { params: Promise<{ id: string }
     return fallback();
   }
 
-  const rows = await db
-    .select()
-    .from(sharedCanvases)
-    .where(eq(sharedCanvases.id, id))
-    .limit(1)
-    .catch(() => []);
+  const loaded = await loadSharePayload(id).catch(() => null);
+  if (loaded?.status !== "ok") return fallback();
 
-  if (!rows[0]) return fallback();
-
-  let canvas: SavedCanvas;
-  try {
-    canvas = JSON.parse(rows[0].data) as SavedCanvas;
-  } catch (err) {
-    console.error("share opengraph-image parse error:", err);
-    return fallback();
-  }
-  if (!canvas?.nodes?.length) return fallback();
-
-  const first = canvas.nodes[0];
-  const count = canvas.nodes.length;
-  if (!isValidNode(first)) return fallback();
+  // Text comes from the corpus, never from the stored row, so the card cached
+  // for a year can't carry client-supplied content.
+  const count = loaded.payload.nodes.length;
+  const first = await resolveVerse(loaded.payload.nodes[0].ref).catch(() => null);
+  if (!first) return fallback();
 
   return new ImageResponse(
     renderOgCard({
       eyebrow: `${count} verse${count === 1 ? "" : "s"}`,
-      refPill: first.verse.ref,
-      title: first.verse.surahName,
-      body: clampBody(first.verse.translation),
+      refPill: first.ref,
+      title: first.surahName,
+      body: clampBody(first.translation),
     }),
     { ...OG_SIZE, headers: HIT_CACHE }
   );

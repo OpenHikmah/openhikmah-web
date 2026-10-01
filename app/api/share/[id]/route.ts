@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/infra/db";
-import { sharedCanvases } from "@/lib/infra/db/schema";
-import { eq } from "drizzle-orm";
 import { clientKey } from "@/lib/infra/http";
 import { rateLimitOrNull } from "@/lib/infra/rate-limit";
+import { hydrateSharePayload, loadSharePayload } from "@/lib/canvas/share-hydrate";
 
 // Public, unauthenticated route over a UUID keyspace — rate limit per-IP to
 // bound both DB load and brute-force ID guessing, matching POST /api/share.
@@ -26,20 +24,21 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   try {
-    const rows = await db.select().from(sharedCanvases).where(eq(sharedCanvases.id, id)).limit(1);
-
-    if (rows.length === 0) {
+    const loaded = await loadSharePayload(id);
+    if (loaded.status === "missing") {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-
-    try {
-      return NextResponse.json(JSON.parse(rows[0].data));
-    } catch (err) {
-      console.error("share GET parse error:", err);
+    if (loaded.status === "corrupt") {
       return NextResponse.json({ error: "Corrupted canvas data" }, { status: 500 });
     }
+
+    const canvas = await hydrateSharePayload(loaded.payload);
+    if (!canvas) {
+      return NextResponse.json({ error: "Could not load verses" }, { status: 500 });
+    }
+    return NextResponse.json(canvas);
   } catch (err) {
-    console.error("share GET db error:", err);
+    console.error("share GET error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
