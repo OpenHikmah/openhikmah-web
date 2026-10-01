@@ -52,12 +52,16 @@ export function useActivityTracker() {
     prevEdgeCount.current = edgeCount;
 
     if (nodeAdded || edgeAdded) {
-      const input: ActivityInput = nodeAdded
-        ? {
-            type: "verse_added",
-            verseRef: (nodes[nodes.length - 1]?.data as { ref?: string })?.ref ?? null,
-          }
-        : { type: "connection_made" };
+      // Expansion adds a node and its edge in one render, so both events must
+      // fire from a single change — otherwise connection_made never lands.
+      const inputs: ActivityInput[] = [];
+      if (nodeAdded) {
+        inputs.push({
+          type: "verse_added",
+          verseRef: (nodes[nodes.length - 1]?.data as { ref?: string })?.ref ?? null,
+        });
+      }
+      if (edgeAdded) inputs.push({ type: "connection_made" });
 
       if (accessToken) {
         // Token and a new add can land in the same render batch — drain whatever
@@ -66,10 +70,10 @@ export function useActivityTracker() {
         const buffered = pending.current;
         pending.current = [];
         buffered.forEach(deliver);
-        deliver(input);
+        inputs.forEach(deliver);
         void flushQueue(accessToken);
       } else {
-        pending.current.push(input);
+        pending.current.push(...inputs);
       }
       return;
     }

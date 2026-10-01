@@ -11,12 +11,17 @@ import {
   localDateFromOffset,
 } from "@/lib/social/streak";
 import { resolveActivityDate } from "@/lib/social/activity-date";
+import { isValidRef } from "@/lib/quran/quran-corpus";
 import { rateLimitOrNull, consume, MUTATION_WINDOW_SECONDS } from "@/lib/infra/rate-limit";
 
 // Activity pings fire on ordinary reading (each verse/connection), so a genuinely
 // engaged session can log far more than a typical "create a row" mutation —
 // budget this route separately and higher than MUTATION_LIMIT.
 const ACTIVITY_LIMIT = 300;
+
+// Longest real ref is "114:6"; hadith_read carries a free-form id, so only verse_added is
+// held to a canonical ref.
+const MAX_VERSE_REF_LENGTH = 32;
 
 const VALID_TYPES = new Set(["verse_added", "connection_made", "hadith_read"]);
 
@@ -101,6 +106,15 @@ export async function POST(req: NextRequest) {
   // survive into the transaction closure below (TS can't prove `body` is
   // unmutated by the time the closure runs).
   const activityType = body.type;
+  if (
+    body.verse_ref !== undefined &&
+    body.verse_ref !== null &&
+    (typeof body.verse_ref !== "string" ||
+      body.verse_ref.length > MAX_VERSE_REF_LENGTH ||
+      (body.type === "verse_added" && !isValidRef(body.verse_ref)))
+  ) {
+    return NextResponse.json({ error: "Invalid verse_ref" }, { status: 400 });
+  }
   const verseRef = body.verse_ref ?? null;
   const requestedOffset = tzOffsetMinutes;
   const localDate = body.local_date;
@@ -179,7 +193,10 @@ export async function POST(req: NextRequest) {
       let isNewDay = false;
       let didWrite = false;
 
-      if (lastDate === today) {
+      // `lastDate > today` happens when the anchor moved west (or the UTC
+      // fallback applied) after a later-dated write; counting it as a new day
+      // would reset the streak to 1, so treat it as already counted.
+      if (lastDate !== null && lastDate >= today) {
         // Already counted today — no streak change. Still persist a
         // legitimate anchor set/move (see above) so later offset-only reads
         // (GET /me, leaderboard) decay against the user's current timezone.
