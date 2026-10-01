@@ -109,6 +109,13 @@ const EDGE_COLOR: Record<EdgeKind, string> = {
   contrast: "var(--color-contrast-edge)",
 };
 
+// Reason-label text is 10px on a dark surface, where the thematic teal fails WCAG
+// AA contrast; --color-teal-bright is the token for exactly that case.
+const EDGE_TEXT_COLOR: Record<EdgeKind, string> = {
+  ...EDGE_COLOR,
+  thematic: "var(--color-teal-bright)",
+};
+
 /** A horizontal-ease cubic bezier between two scene-% points. */
 function edgePath(from: { x: number; y: number }, to: { x: number; y: number }): string {
   const cx = (from.x + to.x) / 2;
@@ -245,7 +252,7 @@ export function CanvasPreview({ className }: { className?: string }) {
           style={{
             left: `${e.lx}%`,
             top: `${e.ly}%`,
-            color: EDGE_COLOR[e.kind],
+            color: EDGE_TEXT_COLOR[e.kind],
             borderColor: EDGE_COLOR[e.kind],
           }}
         >
