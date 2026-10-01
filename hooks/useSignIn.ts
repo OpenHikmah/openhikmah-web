@@ -16,7 +16,10 @@ export function useSignIn() {
     if (signingIn) return;
     setSigningIn(true);
     try {
-      const { url, codeVerifier, state, nonce } = await buildAuthUrl();
+      const res = await fetch("/api/auth/start", { method: "POST" });
+      if (!res.ok) throw new Error(`/api/auth/start failed (${res.status})`);
+      const { state, nonce } = (await res.json()) as { state: string; nonce: string };
+      const { url, codeVerifier } = await buildAuthUrl({ state, nonce });
       sessionStorage.setItem("pkce_code_verifier", codeVerifier);
       sessionStorage.setItem("pkce_state", state);
       sessionStorage.setItem("pkce_nonce", nonce);

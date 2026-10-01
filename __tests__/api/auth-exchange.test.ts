@@ -11,12 +11,33 @@ import { POST } from "@/app/api/auth/exchange/route";
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
-function makeReq(body: object) {
+// Defaults to a well-formed request: a `state` in the body and a
+// qf_oauth_state cookie matching the body's state + nonce, as
+// /api/auth/start would have issued. `cookie` overrides the cookie value
+// (null = no cookie at all).
+function makeReq(body: Record<string, unknown>, cookie?: string | null) {
+  const withState = { state: "test-state", ...body };
+  const cookieValue =
+    cookie === undefined ? `${String(withState.state)}:${String(body.nonce)}` : cookie;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (cookieValue !== null) headers.cookie = `qf_oauth_state=${cookieValue}`;
   return new NextRequest("http://localhost/api/auth/exchange", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    headers,
+    body: JSON.stringify(withState),
   });
+}
+
+function expectNoSessionCookies(res: Response) {
+  const setCookies = res.headers.getSetCookie();
+  expect(setCookies.some((c) => c.startsWith("qf_refresh_token="))).toBe(false);
+  expect(setCookies.some((c) => c.startsWith("qf_has_session="))).toBe(false);
+}
+
+function expectStateCookieCleared(res: Response) {
+  const setCookie = res.headers.get("set-cookie") ?? "";
+  expect(setCookie).toMatch(/qf_oauth_state=;/);
+  expect(setCookie).toMatch(/Max-Age=0/i);
 }
 
 describe("POST /api/auth/exchange", () => {
@@ -107,7 +128,72 @@ describe("POST /api/auth/exchange", () => {
     const res = await POST(makeReq({ code: "auth-code", codeVerifier: "verifier", nonce: "n" }));
     const body = await res.json();
     expect(body.accessToken).toBe("access-123");
-    expect(res.headers.get("set-cookie")).toBeNull();
+    const setCookies = res.headers.getSetCookie();
+    expect(setCookies.some((c) => c.startsWith("qf_refresh_token="))).toBe(false);
+    expect(setCookies.some((c) => c.startsWith("qf_has_session="))).toBe(false);
+    expectStateCookieCleared(res);
+  });
+
+  // Issue #636: state/nonce must match the HttpOnly cookie /api/auth/start set
+  // in this browser, checked before the code is sent to the token endpoint.
+  describe("server-side state binding", () => {
+    it("rejects a request with no state in the body", async () => {
+      const req = new NextRequest("http://localhost/api/auth/exchange", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie: "qf_oauth_state=s:n" },
+        body: JSON.stringify({ code: "c", codeVerifier: "v", nonce: "n" }),
+      });
+      const res = await POST(req);
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toMatch(/state/i);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("rejects when the state cookie is missing (e.g. a login-CSRF from another browser)", async () => {
+      const res = await POST(makeReq({ code: "c", codeVerifier: "v", nonce: "n" }, null));
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toBe("State verification failed");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("rejects a state that differs from the cookie", async () => {
+      const res = await POST(
+        makeReq(
+          { code: "c", codeVerifier: "v", state: "attacker-state", nonce: "n" },
+          "victim-state:n"
+        )
+      );
+      expect(res.status).toBe(400);
+      expect(mockFetch).not.toHaveBeenCalled();
+      expectStateCookieCleared(res);
+    });
+
+    it("rejects a nonce that differs from the cookie, even with a matching state", async () => {
+      const res = await POST(
+        makeReq(
+          { code: "c", codeVerifier: "v", state: "s", nonce: "attacker-nonce" },
+          "s:victim-nonce"
+        )
+      );
+      expect(res.status).toBe(400);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("rejects a malformed cookie value", async () => {
+      const res = await POST(
+        makeReq({ code: "c", codeVerifier: "v", state: "s", nonce: "n" }, "s")
+      );
+      expect(res.status).toBe(400);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("clears the state cookie on a failed token exchange so it can't be replayed", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 400, text: async () => "bad" });
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const res = await POST(makeReq({ code: "c", codeVerifier: "v", nonce: "n" }));
+      expect(res.status).toBe(400);
+      expectStateCookieCleared(res);
+    });
   });
 
   it("sends correct grant_type and code to token endpoint", async () => {
@@ -164,7 +250,7 @@ describe("POST /api/auth/exchange", () => {
         makeReq({ code: "auth-code", codeVerifier: "verifier", nonce: "expected-nonce" })
       );
       expect(res.status).toBe(400);
-      expect(res.headers.get("set-cookie")).toBeNull();
+      expectNoSessionCookies(res);
     });
 
     it("rejects an undecodable id_token with 400 when a nonce was provided", async () => {
@@ -192,7 +278,7 @@ describe("POST /api/auth/exchange", () => {
         makeReq({ code: "auth-code", codeVerifier: "verifier", nonce: "expected-nonce" })
       );
       expect(res.status).toBe(400);
-      expect(res.headers.get("set-cookie")).toBeNull();
+      expectNoSessionCookies(res);
     });
 
     it("fails closed on a non-string id_token", async () => {
@@ -209,7 +295,7 @@ describe("POST /api/auth/exchange", () => {
         makeReq({ code: "auth-code", codeVerifier: "verifier", nonce: "expected-nonce" })
       );
       expect(res.status).toBe(400);
-      expect(res.headers.get("set-cookie")).toBeNull();
+      expectNoSessionCookies(res);
     });
 
     it("rejects the exchange outright when the client sends no nonce", async () => {

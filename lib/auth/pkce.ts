@@ -40,17 +40,17 @@ async function sha256Base64url(input: string): Promise<string> {
     .replace(/=/g, "");
 }
 
-export async function buildAuthUrl(): Promise<{
+/**
+ * `state` and `nonce` come from /api/auth/start, which also binds them to this
+ * browser in an HttpOnly cookie (see lib/auth/oauth-state-cookie.ts). The QF
+ * OIDC server requires `nonce` when the openid scope is requested.
+ */
+export async function buildAuthUrl({ state, nonce }: { state: string; nonce: string }): Promise<{
   url: string;
   codeVerifier: string;
-  state: string;
-  nonce: string;
 }> {
   const codeVerifier = randomString(128);
   const codeChallenge = await sha256Base64url(codeVerifier);
-  const state = randomString(32);
-  // nonce is required by the QF OIDC server when requesting the openid scope
-  const nonce = randomString(32);
 
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/callback`;
 
@@ -71,7 +71,5 @@ export async function buildAuthUrl(): Promise<{
   return {
     url: `${authBase}${authorizePath}?${params.toString()}`,
     codeVerifier,
-    state,
-    nonce,
   };
 }

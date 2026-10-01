@@ -58,7 +58,12 @@ describe("CallbackClient — PKCE session-storage guard", () => {
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/auth/exchange",
       expect.objectContaining({
-        body: JSON.stringify({ code: "auth-code", codeVerifier: "verifier", nonce: "nonce-abc" }),
+        body: JSON.stringify({
+          code: "auth-code",
+          codeVerifier: "verifier",
+          state: "state-123",
+          nonce: "nonce-abc",
+        }),
       })
     );
   });

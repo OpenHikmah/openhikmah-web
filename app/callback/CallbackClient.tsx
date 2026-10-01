@@ -57,7 +57,7 @@ export function CallbackClient({ code, state, error }: Props) {
     fetch("/api/auth/exchange", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, codeVerifier, nonce: nonce ?? undefined }),
+      body: JSON.stringify({ code, codeVerifier, state, nonce }),
     })
       .then(async (res) => {
         if (!res.ok) {
