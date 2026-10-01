@@ -96,7 +96,8 @@ export function validateTranslation(
  * what was already generated and validated in English.
  *
  * THEOLOGICAL-REVIEW TOUCHPOINT: this prompt governs every localized
- * divine-name reason and every localized verse-connection reason. The wording
+ * divine-name reason, divine-name reflection paragraph and pairing
+ * explanation, and every localized verse-connection reason. The wording
  * is intentionally minimal and constrained — do not loosen it (see AGENTS.md
  * "AI-specific correctness").
  *

@@ -32,8 +32,10 @@ export const TASHBIH_PHRASES: RegExp[] = [
  * The shared backstop every AI-generation call site runs on its output before
  * caching or serving it (connections, divine-names reflection/pairings/verses,
  * translated reasons). English-only: the patterns can't see a violation
- * phrased in another language, so content generated directly in tr/ru/az is
- * still covered only by the prompt-side TANZIH_CONSTRAINT.
+ * phrased in another language, which is why every AI generation path writes
+ * its content in English first and only localizes it afterwards through
+ * translateReason (lib/ai/translate.ts). A violation introduced during that
+ * translation step is still covered only by the prompt-side TANZIH_CONSTRAINT.
  */
 export function containsTashbih(text: string): boolean {
   return TASHBIH_PHRASES.some((re) => re.test(text));

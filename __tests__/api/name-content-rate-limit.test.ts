@@ -112,9 +112,8 @@ describe("names AI routes — per-client rate limiting", () => {
     it(`${label}: serves a cache hit without consuming rate-limit budget`, async () => {
       const cached =
         label === "reflection" ? JSON.stringify("a cached reflection") : JSON.stringify([]);
-      // version must match each route's current VERSION const (reflection/pairings: 1, verses: 2)
-      const version = label === "verses" ? 2 : 1;
-      mockSelect.mockReturnValue(makeSelectChain([{ data: cached, version }]));
+      // version must match each route's current VERSION const (all three are 2)
+      mockSelect.mockReturnValue(makeSelectChain([{ data: cached, version: 2 }]));
       mockConsume.mockResolvedValue(false); // would deny — must never be asked
 
       const res = await call("ar-rahman");
