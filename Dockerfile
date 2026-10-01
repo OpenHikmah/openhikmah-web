@@ -64,6 +64,8 @@ COPY --from=deps /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
 # a standalone .mjs needs it resolvable in node_modules (same reason as postgres).
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/seed-quran.mjs ./scripts/seed-quran.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/embed-corpus.mjs ./scripts/embed-corpus.mjs
+# embed-corpus imports the shared Gemini 429 classifier (dependency-free .ts, run by bun).
+COPY --from=builder --chown=nextjs:nodejs /app/lib/ai/gemini-errors.ts ./lib/ai/gemini-errors.ts
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/seed-morphology.mjs ./scripts/seed-morphology.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/seed-translations.mjs ./scripts/seed-translations.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/data/morphology ./data/morphology

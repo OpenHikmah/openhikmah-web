@@ -5,16 +5,25 @@
  * upserts the vector. Idempotent and resumable: verses already embedded with the
  * current model are skipped, so re-running only fills gaps.
  *
- *   DATABASE_URL=... GEMINI_API_KEY=... node scripts/embed-corpus.mjs
+ *   DATABASE_URL=... GEMINI_API_KEY=... bun scripts/embed-corpus.mjs
  *
  * Embeddings are always Gemini (Anthropic has none) regardless of AI_PROVIDER.
  *
  * `--check` reports coverage (total verses vs. embedded for the current model)
  * without calling the embedding API — no GEMINI_API_KEY needed for this mode.
  *
- *   DATABASE_URL=... node scripts/embed-corpus.mjs --check
+ *   DATABASE_URL=... bun scripts/embed-corpus.mjs --check
+ *
+ * Bun-only: it imports the shared 429 classifier straight from
+ * lib/ai/gemini-errors.ts (shipped next to this script in the prod image).
  */
+import { pathToFileURL } from "node:url";
 import postgres from "postgres";
+import {
+  classifyGeminiError,
+  perMinuteBackoffMs,
+  PER_MINUTE_MAX_RETRIES,
+} from "../lib/ai/gemini-errors.ts";
 
 // gemini-embedding-001 is natively 3072-dim; we reduce to 768 via
 // outputDimensionality to match the verse_embeddings vector(768) column. Must stay
@@ -25,31 +34,17 @@ const OUTPUT_DIM = 768;
 const BATCH = Number(process.env.EMBED_BATCH ?? 100);
 const CHECK_ONLY = process.argv.includes("--check");
 
-if (!process.env.DATABASE_URL) {
-  console.error("DATABASE_URL is not set");
-  process.exit(1);
-}
-if (!CHECK_ONLY && !process.env.GEMINI_API_KEY) {
-  console.error("GEMINI_API_KEY is not set (required to embed the corpus)");
-  process.exit(1);
-}
+// A hung request must fail the run rather than hold the admin job slot (and its
+// advisory lock, released when this process exits) indefinitely.
+const FETCH_TIMEOUT_MS = 60_000;
+const defaultSleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Cap a single rate-limit wait. Per-minute (free-tier) 429s ask ~20-60s; a daily
-// quota asks for far longer — beyond this we stop and let the user resume later
-// (the run is idempotent).
-const MAX_RATE_WAIT_S = 120;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-function retryDelaySeconds(body) {
-  const m = body.match(/"retryDelay":\s*"([\d.]+)s"/) || body.match(/retry in ([\d.]+)s/i);
-  return m ? Math.ceil(parseFloat(m[1])) : 30;
-}
-
-// Returns the vectors, or null to signal "rate limited beyond the cap — stop and
-// resume later". Retries on 429 honoring Google's suggested retryDelay so a single
-// run self-paces under the free-tier per-minute quota.
-async function embedBatch(texts) {
-  for (;;) {
+// Returns the vectors, or null to signal "stop and resume later" (a daily quota,
+// per-minute retries exhausted, or a malformed response). Per-minute 429s are
+// waited out with the same backoff the app uses, at most PER_MINUTE_MAX_RETRIES
+// times; any other non-2xx throws.
+export async function embedBatch(texts, sleep = defaultSleep) {
+  for (let attempt = 1; ; attempt++) {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:batchEmbedContents?key=${process.env.GEMINI_API_KEY}`,
       {
@@ -62,20 +57,28 @@ async function embedBatch(texts) {
             outputDimensionality: OUTPUT_DIM,
           })),
         }),
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       }
     );
 
-    if (res.status === 429) {
-      const wait = retryDelaySeconds(await res.text().catch(() => "")) + 2;
-      if (wait > MAX_RATE_WAIT_S) return null;
-      console.log(`Rate limited (429) — waiting ${wait}s before retrying…`);
-      await sleep(wait * 1000);
-      continue;
-    }
     if (!res.ok) {
-      throw new Error(
-        `Embedding request failed: ${res.status} ${await res.text().catch(() => "")}`
-      );
+      const body = await res.text().catch(() => "");
+      const info = classifyGeminiError({ status: res.status, message: body });
+      if (info.cls === "daily") {
+        console.log(`Daily embedding quota exhausted (${info.quotaId ?? "429"}).`);
+        return null;
+      }
+      if (info.cls !== "per-minute" && info.cls !== "other-429") {
+        throw new Error(`Embedding request failed: ${res.status} ${body}`);
+      }
+      if (attempt > PER_MINUTE_MAX_RETRIES) {
+        console.log(`Still rate limited (429) after ${PER_MINUTE_MAX_RETRIES} retries.`);
+        return null;
+      }
+      const waitMs = perMinuteBackoffMs(attempt, info.retryAfterMs);
+      console.log(`Rate limited (429) — waiting ${Math.ceil(waitMs / 1000)}s before retrying…`);
+      await sleep(waitMs);
+      continue;
     }
     const data = await res.json();
     const embeddings = data.embeddings ?? [];
@@ -102,72 +105,87 @@ async function embedBatch(texts) {
   }
 }
 
-const sql = postgres(process.env.DATABASE_URL, { max: 1 });
-
-try {
-  if (CHECK_ONLY) {
-    const [{ total }] = await sql`SELECT count(*)::int AS total FROM verses`;
-    const [{ embedded }] = await sql`
-      SELECT count(DISTINCT v.ref)::int AS embedded
-      FROM verses v
-      JOIN verse_embeddings e ON e.ref = v.ref
-      WHERE e.model = ${EMBEDDING_MODEL}
-    `;
-    const missing = total - embedded;
-    console.log(`Corpus: ${total} verses.`);
-    console.log(`Embedded with ${EMBEDDING_MODEL}: ${embedded}/${total}.`);
-    console.log(
-      missing === 0
-        ? "Coverage complete — every verse has a current-model embedding."
-        : `Missing: ${missing} verse(s) — re-run without --check to fill the gap (resumable).`
-    );
-    process.exitCode = missing === 0 ? 0 : 1;
-  } else {
-    // Resume: only embed verses missing an embedding for the current model.
-    const pending = await sql`
-      SELECT v.ref, v.translation
-      FROM verses v
-      LEFT JOIN verse_embeddings e
-        ON e.ref = v.ref AND e.model = ${EMBEDDING_MODEL}
-      WHERE e.ref IS NULL
-      ORDER BY v.surah, v.ayah
-    `;
-
-    console.log(`${pending.length} verses to embed with ${EMBEDDING_MODEL}.`);
-    if (pending.length === 0) {
-      console.log("Nothing to do — corpus already embedded.");
-    }
-
-    let done = 0;
-    for (let i = 0; i < pending.length; i += BATCH) {
-      const batch = pending.slice(i, i + BATCH);
-      const vectors = await embedBatch(batch.map((r) => r.translation));
-
-      if (vectors === null) {
-        // embedBatch already logged the specific reason (a rate-limit wait
-        // beyond MAX_RATE_WAIT_S, or a malformed response — issue #567 C4).
-        console.log(`Stopped at ${done}/${pending.length}. Re-run later to resume (idempotent).`);
-        break;
-      }
-
-      for (let j = 0; j < batch.length; j++) {
-        const vec = `[${vectors[j].join(",")}]`;
-        await sql`
-          INSERT INTO verse_embeddings (ref, embedding, model)
-          VALUES (${batch[j].ref}, ${vec}::vector, ${EMBEDDING_MODEL})
-          ON CONFLICT (ref) DO UPDATE SET
-            embedding = EXCLUDED.embedding,
-            model = EXCLUDED.model
-        `;
-      }
-
-      done += batch.length;
-      console.log(`Embedded ${done}/${pending.length}`);
-    }
-
-    const [{ count }] = await sql`SELECT count(*)::int AS count FROM verse_embeddings`;
-    console.log(`Done. verse_embeddings table now holds ${count} rows.`);
+async function main() {
+  if (!process.env.DATABASE_URL) {
+    console.error("DATABASE_URL is not set");
+    process.exit(1);
   }
-} finally {
-  await sql.end();
+  if (!CHECK_ONLY && !process.env.GEMINI_API_KEY) {
+    console.error("GEMINI_API_KEY is not set (required to embed the corpus)");
+    process.exit(1);
+  }
+
+  const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+
+  try {
+    if (CHECK_ONLY) {
+      const [{ total }] = await sql`SELECT count(*)::int AS total FROM verses`;
+      const [{ embedded }] = await sql`
+        SELECT count(DISTINCT v.ref)::int AS embedded
+        FROM verses v
+        JOIN verse_embeddings e ON e.ref = v.ref
+        WHERE e.model = ${EMBEDDING_MODEL}
+      `;
+      const missing = total - embedded;
+      console.log(`Corpus: ${total} verses.`);
+      console.log(`Embedded with ${EMBEDDING_MODEL}: ${embedded}/${total}.`);
+      console.log(
+        missing === 0
+          ? "Coverage complete — every verse has a current-model embedding."
+          : `Missing: ${missing} verse(s) — re-run without --check to fill the gap (resumable).`
+      );
+      process.exitCode = missing === 0 ? 0 : 1;
+    } else {
+      // Resume: only embed verses missing an embedding for the current model.
+      const pending = await sql`
+        SELECT v.ref, v.translation
+        FROM verses v
+        LEFT JOIN verse_embeddings e
+          ON e.ref = v.ref AND e.model = ${EMBEDDING_MODEL}
+        WHERE e.ref IS NULL
+        ORDER BY v.surah, v.ayah
+      `;
+
+      console.log(`${pending.length} verses to embed with ${EMBEDDING_MODEL}.`);
+      if (pending.length === 0) {
+        console.log("Nothing to do — corpus already embedded.");
+      }
+
+      let done = 0;
+      for (let i = 0; i < pending.length; i += BATCH) {
+        const batch = pending.slice(i, i + BATCH);
+        const vectors = await embedBatch(batch.map((r) => r.translation));
+
+        if (vectors === null) {
+          // embedBatch already logged the specific reason (daily quota,
+          // per-minute retries exhausted, or a malformed response — #567 C4).
+          console.log(`Stopped at ${done}/${pending.length}. Re-run later to resume (idempotent).`);
+          break;
+        }
+
+        for (let j = 0; j < batch.length; j++) {
+          const vec = `[${vectors[j].join(",")}]`;
+          await sql`
+            INSERT INTO verse_embeddings (ref, embedding, model)
+            VALUES (${batch[j].ref}, ${vec}::vector, ${EMBEDDING_MODEL})
+            ON CONFLICT (ref) DO UPDATE SET
+              embedding = EXCLUDED.embedding,
+              model = EXCLUDED.model
+          `;
+        }
+
+        done += batch.length;
+        console.log(`Embedded ${done}/${pending.length}`);
+      }
+
+      const [{ count }] = await sql`SELECT count(*)::int AS count FROM verse_embeddings`;
+      console.log(`Done. verse_embeddings table now holds ${count} rows.`);
+    }
+  } finally {
+    await sql.end();
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
 }

@@ -13,6 +13,11 @@
  * Idempotent (IF NOT EXISTS / IF EXISTS) — safe to run on a database where
  * this has already been applied, or where 0020 hasn't run yet (no-ops until
  * the "locale" column exists).
+ *
+ * A failed CREATE INDEX CONCURRENTLY leaves the new index behind as INVALID,
+ * and IF NOT EXISTS would then skip rebuilding it. So validity is checked via
+ * pg_index.indisvalid: an invalid leftover is dropped and rebuilt, and the old
+ * index is only dropped once the new one is confirmed valid.
  */
 import postgres from "postgres";
 
@@ -22,6 +27,19 @@ if (!process.env.DATABASE_URL) {
 }
 
 const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+
+const NEW_INDEX = "connections_from_to_kind_locale_idx";
+
+/** `true`/`false` for the new index's pg_index.indisvalid, `null` when absent. */
+async function newIndexValidity() {
+  const [row] = await sql`
+    SELECT i.indisvalid
+    FROM pg_index i
+    JOIN pg_class c ON c.oid = i.indexrelid
+    WHERE c.relname = ${NEW_INDEX} AND pg_catalog.pg_table_is_visible(c.oid)
+  `;
+  return row ? row.indisvalid : null;
+}
 
 try {
   const [{ has_locale }] = await sql`
@@ -33,10 +51,17 @@ try {
   if (!has_locale) {
     console.log("connections.locale column not present yet — skipping index transition");
   } else {
+    if ((await newIndexValidity()) === false) {
+      console.log(`${NEW_INDEX} exists but is INVALID (an earlier build failed) — rebuilding`);
+      await sql`DROP INDEX CONCURRENTLY IF EXISTS connections_from_to_kind_locale_idx`;
+    }
     await sql`
       CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS connections_from_to_kind_locale_idx
       ON connections (from_ref, to_ref, kind, locale)
     `;
+    if ((await newIndexValidity()) !== true) {
+      throw new Error(`${NEW_INDEX} is not valid after build — keeping the old index`);
+    }
     await sql`DROP INDEX CONCURRENTLY IF EXISTS connections_from_to_kind_idx`;
     console.log("connections index transition complete");
   }
