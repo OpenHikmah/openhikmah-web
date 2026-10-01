@@ -249,7 +249,28 @@
     "loading": "Yüklənir…",
     "rootTitle": "Nəsə səhv getdi",
     "rootBody": "Gözlənilməz xəta bu səhifəni kəsdi. Yenidən cəhd edə və ya ana səhifəyə qayıda bilərsiniz.",
-    "todayVerseUnavailable": "Bugünkü ayə hazırda yüklənə bilmədi. Zəhmət olmasa sonra yenidən cəhd edin."
+    "todayVerseUnavailable": "Bugünkü ayə hazırda yüklənə bilmədi. Zəhmət olmasa sonra yenidən cəhd edin.",
+    "notFoundTitle": "Səhifə tapılmadı",
+    "notFoundBody": "Bu yol heç yerə aparmır. Axtardığınız ayə, ad və ya səhifə köçürülmüş ola bilər.",
+    "returnHome": "Ana səhifəyə qayıt"
+  },
+  "audio": {
+    "previousVerse": "Əvvəlki ayə",
+    "nextVerse": "Növbəti ayə",
+    "play": "Oxut",
+    "pause": "Fasilə",
+    "stopPlayback": "Oxutmanı dayandır"
+  },
+  "pagination": {
+    "label": "Səhifələmə",
+    "previous": "Əvvəlki səhifə",
+    "next": "Növbəti səhifə"
+  },
+  "morphology": {
+    "wordTriggerAria": "{word}, kökü və əlaqəli ayələri göstər",
+    "root": "Kök",
+    "versesSharingRoot": "Bu kökü paylaşan ayələr",
+    "noOtherVerses": "Hələ başqa ayə tapılmadı."
   },
   "authGate": {
     "title": "Davam etmək üçün daxil olun",

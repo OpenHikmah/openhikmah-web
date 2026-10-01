@@ -249,7 +249,28 @@
     "loading": "Yükleniyor…",
     "rootTitle": "Bir şeyler ters gitti",
     "rootBody": "Beklenmeyen bir hata bu sayfayı kesintiye uğrattı. Tekrar deneyebilir veya ana sayfaya dönebilirsiniz.",
-    "todayVerseUnavailable": "Bugünün ayeti şu anda yüklenemedi. Lütfen daha sonra tekrar deneyin."
+    "todayVerseUnavailable": "Bugünün ayeti şu anda yüklenemedi. Lütfen daha sonra tekrar deneyin.",
+    "notFoundTitle": "Sayfa bulunamadı",
+    "notFoundBody": "Bu yol hiçbir yere çıkmıyor. Aradığınız ayet, isim veya sayfa taşınmış olabilir.",
+    "returnHome": "Ana sayfaya dön"
+  },
+  "audio": {
+    "previousVerse": "Önceki ayet",
+    "nextVerse": "Sonraki ayet",
+    "play": "Oynat",
+    "pause": "Duraklat",
+    "stopPlayback": "Oynatmayı durdur"
+  },
+  "pagination": {
+    "label": "Sayfalama",
+    "previous": "Önceki sayfa",
+    "next": "Sonraki sayfa"
+  },
+  "morphology": {
+    "wordTriggerAria": "{word}, kökü ve ilgili ayetleri göster",
+    "root": "Kök",
+    "versesSharingRoot": "Bu kökü paylaşan ayetler",
+    "noOtherVerses": "Henüz başka ayet bulunamadı."
   },
   "authGate": {
     "title": "Devam etmek için giriş yapın",

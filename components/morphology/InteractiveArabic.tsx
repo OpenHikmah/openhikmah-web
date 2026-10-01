@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as Popover from "@radix-ui/react-popover";
 import { Loader2 } from "lucide-react";
 import { tokenizeVerse, type MorphologyWord, type VerseToken } from "@/lib/quran/arabic-morphology";
@@ -72,6 +73,7 @@ export function InteractiveArabic({ verse }: { verse: InteractiveVerse }) {
 }
 
 function WordPopover({ token, currentRef }: { token: VerseToken; currentRef: string }) {
+  const t = useTranslations("morphology");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [verses, setVerses] = useState<ConcordanceVerse[] | null>(null);
@@ -99,7 +101,7 @@ function WordPopover({ token, currentRef }: { token: VerseToken; currentRef: str
     >
       <Popover.Trigger asChild>
         <button
-          aria-label={`${token.text}, show root and related verses`}
+          aria-label={t("wordTriggerAria", { word: token.text })}
           className="cursor-pointer rounded underline decoration-dotted decoration-text-muted underline-offset-4 transition-colors hover:text-gold hover:decoration-gold"
         >
           {token.text}
@@ -119,7 +121,7 @@ function WordPopover({ token, currentRef }: { token: VerseToken; currentRef: str
               {token.root}
             </span>
             <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-text-muted">
-              Root
+              {t("root")}
             </span>
           </div>
           {token.lemma && (
@@ -130,7 +132,7 @@ function WordPopover({ token, currentRef }: { token: VerseToken; currentRef: str
 
           <div className="mt-3 border-t border-border pt-2">
             <p className="mb-1.5 text-[11px] font-medium text-text-muted">
-              Verses sharing this root
+              {t("versesSharingRoot")}
             </p>
             {loading ? (
               <div className="flex justify-center py-2">
@@ -155,7 +157,7 @@ function WordPopover({ token, currentRef }: { token: VerseToken; currentRef: str
                 ))}
               </ul>
             ) : (
-              <p className="py-1 text-[11px] text-text-muted">No other verses found yet.</p>
+              <p className="py-1 text-[11px] text-text-muted">{t("noOtherVerses")}</p>
             )}
           </div>
 

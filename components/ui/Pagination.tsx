@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,11 +31,12 @@ function pageRange(page: number, totalPages: number): Array<number | "ellipsis">
 }
 
 export function Pagination({ page, totalPages, href, className, onClick }: PaginationProps) {
+  const t = useTranslations("pagination");
   if (totalPages <= 1) return null;
 
   return (
     <nav
-      aria-label="Pagination"
+      aria-label={t("label")}
       className={cn("flex items-center justify-center gap-1", className)}
     >
       <PageLink
@@ -42,7 +44,7 @@ export function Pagination({ page, totalPages, href, className, onClick }: Pagin
         href={href}
         onClick={onClick}
         disabled={page <= 1}
-        aria-label="Previous page"
+        aria-label={t("previous")}
         className="px-2"
       >
         <ChevronLeft className="w-4 h-4" />
@@ -65,7 +67,7 @@ export function Pagination({ page, totalPages, href, className, onClick }: Pagin
         href={href}
         onClick={onClick}
         disabled={page >= totalPages}
-        aria-label="Next page"
+        aria-label={t("next")}
         className="px-2"
       >
         <ChevronRight className="w-4 h-4" />
