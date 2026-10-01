@@ -69,7 +69,7 @@ function buildCsp(nonce: string): string {
 
 /**
  * Maintenance mode, gated by the `maintenance_mode` admin flag. Runs on every
- * matched request (Proxy defaults to the Node.js runtime, so the DB-backed
+ * matched request except the /admin pages (Proxy defaults to the Node.js runtime, so the DB-backed
  * flag read is safe here — see lib/admin/feature-flags.ts for its short-TTL
  * cache). The matcher below excludes the admin API, auth, and health/metrics
  * endpoints, and the /admin pages skip the flag read entirely (see
