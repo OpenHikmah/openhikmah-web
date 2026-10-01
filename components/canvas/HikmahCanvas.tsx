@@ -132,8 +132,6 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
       nodeId: string,
       ref: string,
       kind: "thematic" | "root" | "contrast",
-      arabicText: string,
-      translation: string,
       sourcePos: { x: number; y: number }
     ) => {
       if (expandingRef.current) {
@@ -148,7 +146,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
         const res = await fetch("/api/connections", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fromRef: ref, kind, arabicText, translation, excludeRefs }),
+          body: JSON.stringify({ fromRef: ref, kind, excludeRefs }),
         });
 
         if (!res.ok) throw new Error("Connections API failed");
@@ -256,8 +254,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
     setPendingExpand(null);
     const sourceNode = getNodeById(nodeId);
     if (!sourceNode) return;
-    const verse = sourceNode.data as unknown as Verse;
-    runExpansion(nodeId, ref, kind, verse.arabicText, verse.translation, sourceNode.position);
+    runExpansion(nodeId, ref, kind, sourceNode.position);
   }, [pendingExpand, setPendingExpand, getNodeById, runExpansion]);
 
   useEffect(() => {
@@ -267,14 +264,7 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
     const sourceNode = getNodeById(nodeId);
     if (!sourceNode) return;
     const verse = sourceNode.data as unknown as Verse;
-    runExpansion(
-      nodeId,
-      verse.ref,
-      "thematic",
-      verse.arabicText,
-      verse.translation,
-      sourceNode.position
-    );
+    runExpansion(nodeId, verse.ref, "thematic", sourceNode.position);
   }, [pendingAutoExpand, setPendingAutoExpand, getNodeById, runExpansion]);
 
   // Search-added verses have no fixed relationship to the current view, so pan

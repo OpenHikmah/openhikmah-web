@@ -174,7 +174,7 @@ async function readActiveRows(
 export async function getConnections(
   fromRef: string,
   kind: EdgeKind,
-  source: SourceVerse,
+  sourceOrLoader: SourceVerse | (() => Promise<SourceVerse>),
   options: GetConnectionsOptions = {}
 ): Promise<ConnectionResult[]> {
   const excludeRefs = options.excludeRefs ?? [];
@@ -226,6 +226,8 @@ export async function getConnections(
   // records a model from another.
   const provider = await resolveProvider("connections", options.provider);
   const model = await resolveModel("connections", provider, options.model);
+
+  const source = typeof sourceOrLoader === "function" ? await sourceOrLoader() : sourceOrLoader;
 
   const key = cellKey(fromRef, kind, locale, provider, model, excludeRefs);
   const result = await singleFlight(

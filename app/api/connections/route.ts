@@ -2,24 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { getConnections } from "@/lib/ai/graph-service";
 import { ConnectionParseError } from "@/lib/ai/connection-generator";
 import { isValidRef } from "@/lib/quran/quran-corpus";
+import { resolveVerse } from "@/lib/quran/verse-resolver";
 import { RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
 import type { EdgeKind } from "@/types/quran";
 
 const MAX_EXCLUDE_REFS = 100;
-// A single verse's Arabic text and translation are at most a few hundred
-// characters even for the longest ayahs — this is a generous but bounded cap
-// to close the unbounded-prompt-into-AI-call gap without risking false
-// rejections on legitimate verses.
-const MAX_TEXT_LENGTH = 5000;
 
 export async function POST(req: NextRequest) {
   let body: {
     fromRef?: string;
     kind?: string;
-    arabicText?: string;
-    translation?: string;
     excludeRefs?: unknown;
   };
   try {
@@ -28,9 +22,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { fromRef, kind, arabicText, translation, excludeRefs: rawExcludeRefs } = body;
+  const { fromRef, kind, excludeRefs: rawExcludeRefs } = body;
 
-  if (!fromRef || !kind || !arabicText || !translation) {
+  if (!fromRef || !kind) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
@@ -40,10 +34,6 @@ export async function POST(req: NextRequest) {
 
   if (!isValidRef(fromRef)) {
     return NextResponse.json({ error: "Invalid fromRef" }, { status: 400 });
-  }
-
-  if (arabicText.length > MAX_TEXT_LENGTH || translation.length > MAX_TEXT_LENGTH) {
-    return NextResponse.json({ error: "arabicText/translation too long" }, { status: 400 });
   }
 
   let excludeRefs: string[] = [];
@@ -63,7 +53,13 @@ export async function POST(req: NextRequest) {
     const results = await getConnections(
       fromRef,
       kind as EdgeKind,
-      { arabicText, translation },
+      // Source text grounds the generation prompt and the result is cached for
+      // every user, so it must come from the corpus, never from the request body.
+      async () => {
+        const verse = await resolveVerse(fromRef);
+        if (!verse) throw new Error(`Source verse ${fromRef} did not resolve`);
+        return { arabicText: verse.arabicText, translation: verse.translation };
+      },
       { clientKey: clientKey(req), excludeRefs, locale }
     );
 
