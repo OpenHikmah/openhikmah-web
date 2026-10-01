@@ -39,7 +39,7 @@ export const AFAL_NAMES: DivineName[] = [
     slug: "al-bari",
     arabic: "الْبَارِئ",
     transliteration: "Al-Bāri'",
-    meaning: "The Originator",
+    meaning: "The Evolver",
     category: "af'al",
     root: "ب-ر-أ",
     description:
