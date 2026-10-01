@@ -35,11 +35,11 @@ const isDev = process.env.NODE_ENV === "development";
  * actually blocked, not merely reported; tracked as a known GA gap, not
  * something this PR can fix with CSP syntax alone.
  *
- * next.config.ts keeps its own no-nonce fallback CSP report-only (see its
- * `headers()` comment) for the routes this proxy's matcher excludes: admin,
- * a handful of specific api/* subpaths (auth, health, metrics, csp-report,
+ * next.config.ts sets its own enforced, no-nonce fallback CSP (see its
+ * `headers()` comment) for the routes this proxy's matcher excludes: a
+ * handful of specific api/* subpaths (auth, health, metrics, csp-report,
  * admin — see `config.matcher` below; most other api/* routes ARE matched
- * here and do get this enforced, nonce'd CSP), and static assets. Proxy runs
+ * here and do get this nonce'd CSP), and static assets. Proxy runs
  * after next.config.ts's `headers()` (confirmed via Next's own
  * source, not just its docs — see resolveRoutes in
  * node_modules/next/dist/server/lib/router-utils/resolve-routes.js: the
@@ -71,9 +71,10 @@ function buildCsp(nonce: string): string {
  * Maintenance mode, gated by the `maintenance_mode` admin flag. Runs on every
  * matched request (Proxy defaults to the Node.js runtime, so the DB-backed
  * flag read is safe here — see lib/admin/feature-flags.ts for its short-TTL
- * cache). The matcher below already excludes the admin surface, auth, and
- * health/metrics endpoints so an operator can always reach the flag to turn
- * maintenance back off.
+ * cache). The matcher below excludes the admin API, auth, and health/metrics
+ * endpoints, and the /admin pages skip the flag read entirely (see
+ * isAdminPage), so an operator can always reach the flag to turn maintenance
+ * back off, even if the DB read behind it is broken.
  *
  * Also generates this request's CSP nonce (see buildCsp above),
  * exposed as an `x-nonce` request header so a Server Component can read it
@@ -88,8 +89,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   const nonce = Buffer.from(randomUUID()).toString("base64");
   const csp = buildCsp(nonce);
 
-  const maintenance = await getFlagBoolean("maintenance_mode", false);
-  if (maintenance) {
+  if (!isAdminPage(request.nextUrl.pathname) && (await getFlagBoolean("maintenance_mode", false))) {
     const res = new NextResponse(MAINTENANCE_HTML, {
       status: 503,
       headers: { "Content-Type": "text/html; charset=utf-8", "Retry-After": "1800" },
@@ -106,6 +106,15 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   return res;
 }
 
+/**
+ * /admin is a server-rendered React page, so it runs through this proxy for a
+ * nonce'd CSP (issue #625) — but it must never depend on the maintenance flag
+ * read, or a broken DB read could lock operators out of turning it off.
+ */
+function isAdminPage(pathname: string): boolean {
+  return pathname === "/admin" || pathname.startsWith("/admin/");
+}
+
 const MAINTENANCE_HTML = `<!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>Open Hikmah — Maintenance</title>
@@ -120,6 +129,6 @@ const MAINTENANCE_HTML = `<!doctype html>
 
 export const config = {
   matcher: [
-    "/((?!admin|api/admin|api/auth|api/health|api/metrics|api/csp-report|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api/admin|api/auth|api/health|api/metrics|api/csp-report|_next/static|_next/image|favicon.ico).*)",
   ],
 };

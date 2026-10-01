@@ -29,28 +29,18 @@ const nextConfig: NextConfig = {
   // edge. The extension-anchored source only matches asset files — never HTML
   // routes (which have no extension) or API routes — so pages are never cached.
   async headers() {
-    // Baseline security headers on every response. proxy.ts enforces a
-    // nonce'd Content-Security-Policy for every route its matcher covers
-    // (the whole public app surface — see issue #125, building on the nonce
-    // infra from #570). The static value below is only the fallback for
-    // routes that matcher excludes: admin, a handful of specific api/*
-    // subpaths (auth, health, metrics, csp-report, admin — see proxy.ts's
-    // `config.matcher`; most other api/* routes ARE matched by the proxy and
-    // get the enforced, nonce'd CSP instead), and static assets.
+    // Baseline security headers on every response. proxy.ts sets a nonce'd
+    // Content-Security-Policy for every route its matcher covers — the whole
+    // app surface including /admin (issues #125, #570, #625) — and replaces
+    // the value below on those routes (same header key, proxy runs after
+    // `headers()`; see buildCsp's comment in proxy.ts).
     //
-    // This fallback stays Content-Security-Policy-Report-Only, NOT enforced:
-    // unlike the nonce'd path, this script-src has no nonce, and testing
-    // against a real production build (`next build` + standalone server)
-    // showed /admin — a real server-rendered React page, not just JSON/static
-    // assets — breaks hard under enforcement here. Next's own
-    // framework-injected inline scripts (hydration/flight-data payloads) and
-    // the GTM script tag both get blocked with only `script-src 'self'` and
-    // no nonce, which visibly errors the admin panel out. Fixing that
-    // properly means giving admin its own nonce (routing it through the
-    // proxy, which currently excludes it deliberately for the
-    // maintenance-mode DB-flag escape hatch) — out of scope here since
-    // AGENTS.md calls out app/api/admin/ as a high-risk surface that
-    // shouldn't be broken silently by a security PR. Tracked as a follow-up.
+    // The static value below therefore only reaches routes the matcher
+    // excludes: a handful of api/* subpaths (auth, health, metrics,
+    // csp-report, admin) and static assets. None of those render HTML with
+    // inline scripts, so it is enforced with no nonce. Any server-rendered
+    // page added under an excluded path would break under it — route it
+    // through the proxy instead.
     const securityHeaders = [
       { key: "X-Frame-Options", value: "DENY" },
       { key: "X-Content-Type-Options", value: "nosniff" },
@@ -58,7 +48,7 @@ const nextConfig: NextConfig = {
       { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
       { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
       {
-        key: "Content-Security-Policy-Report-Only",
+        key: "Content-Security-Policy",
         value: [
           "default-src 'self'",
           "script-src 'self'",
