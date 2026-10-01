@@ -6,6 +6,11 @@ import { resolveQfId } from "@/lib/auth/social-auth";
 import { rateLimitOrNull } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import { HAS_SESSION_COOKIE_NAME, hasSessionCookieOptions } from "@/lib/auth/session-cookie";
+import {
+  OAUTH_STATE_COOKIE_NAME,
+  matchesOAuthState,
+  oauthStateCookieOptions,
+} from "@/lib/auth/oauth-state-cookie";
 
 // Unauthenticated (pre-login) route — each request triggers an outbound
 // Basic-auth call to the QF token endpoint, so it's keyed per-IP rather than
@@ -50,17 +55,38 @@ export async function POST(req: NextRequest) {
   );
   if (limited) return limited;
 
-  let body: { code?: string; codeVerifier?: string; nonce?: string };
+  // Single-use: whatever happens below, this sign-in attempt's state cookie is
+  // spent, so a failed or replayed exchange can't reuse it.
+  const stateCookie = req.cookies.get(OAUTH_STATE_COOKIE_NAME)?.value;
+  const spendState = (res: NextResponse) => {
+    res.cookies.set(OAUTH_STATE_COOKIE_NAME, "", { ...oauthStateCookieOptions, maxAge: 0 });
+    return res;
+  };
+  const fail = (error: string, status: number) =>
+    spendState(NextResponse.json({ error }, { status }));
+
+  let body: { code?: unknown; codeVerifier?: unknown; state?: unknown; nonce?: unknown };
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return fail("Invalid request body", 400);
   }
 
-  const { code, codeVerifier } = body;
-  const nonce = typeof body.nonce === "string" ? body.nonce : undefined;
-  if (!code || !codeVerifier || !nonce) {
-    return NextResponse.json({ error: "Missing code, codeVerifier, or nonce" }, { status: 400 });
+  const str = (v: unknown) => (typeof v === "string" && v !== "" ? v : undefined);
+  const code = str(body.code);
+  const codeVerifier = str(body.codeVerifier);
+  const state = str(body.state);
+  const nonce = str(body.nonce);
+  if (!code || !codeVerifier || !state || !nonce) {
+    return fail("Missing code, codeVerifier, state, or nonce", 400);
+  }
+
+  // Login-CSRF defense (issue #636): state and nonce must equal the pair
+  // /api/auth/start issued to THIS browser, checked before the code is spent
+  // at the QF token endpoint.
+  if (!matchesOAuthState(stateCookie, state, nonce)) {
+    console.error("Auth exchange: state/nonce did not match the issued cookie — rejecting.");
+    return fail("State verification failed", 400);
   }
 
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/callback`;
@@ -93,7 +119,7 @@ export async function POST(req: NextRequest) {
     if (!res.ok) {
       const text = await res.text();
       console.error("Token exchange failed:", res.status, text);
-      return NextResponse.json({ error: "Token exchange failed" }, { status: 400 });
+      return fail("Token exchange failed", 400);
     }
 
     const data = (await res.json()) as {
@@ -111,7 +137,7 @@ export async function POST(req: NextRequest) {
     const claims = typeof data.id_token === "string" ? decodeJwtPayload(data.id_token) : null;
     if (!claims || claims.nonce !== nonce) {
       console.error("Auth exchange: id_token nonce verification failed — rejecting sign-in.");
-      return NextResponse.json({ error: "Nonce verification failed" }, { status: 400 });
+      return fail("Nonce verification failed", 400);
     }
 
     const accessToken = data.access_token;
@@ -175,7 +201,7 @@ export async function POST(req: NextRequest) {
       console.error("Social profile upsert failed (non-fatal):", err);
     }
 
-    const response = NextResponse.json({ accessToken, userId, username, isNewUser });
+    const response = spendState(NextResponse.json({ accessToken, userId, username, isNewUser }));
 
     // Refresh token goes in an HttpOnly cookie — never exposed to JS (XSS-safe).
     // A companion non-HttpOnly flag cookie (no token material, just a marker)
@@ -200,6 +226,6 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (err) {
     console.error("Auth exchange error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return fail("Internal server error", 500);
   }
 }
