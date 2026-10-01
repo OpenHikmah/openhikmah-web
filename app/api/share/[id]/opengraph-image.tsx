@@ -30,13 +30,19 @@ export default async function Image({ params }: { params: Promise<{ id: string }
     return fallback();
   }
 
-  const loaded = await loadSharePayload(id).catch(() => null);
+  const loaded = await loadSharePayload(id).catch((err) => {
+    console.error("share opengraph-image load error:", err);
+    return null;
+  });
   if (loaded?.status !== "ok") return fallback();
 
   // Text comes from the corpus, never from the stored row, so the card cached
   // for a year can't carry client-supplied content.
   const count = loaded.payload.nodes.length;
-  const first = await resolveVerse(loaded.payload.nodes[0].ref).catch(() => null);
+  const first = await resolveVerse(loaded.payload.nodes[0].ref).catch((err) => {
+    console.error("share opengraph-image verse error:", err);
+    return null;
+  });
   if (!first) return fallback();
 
   return new ImageResponse(
