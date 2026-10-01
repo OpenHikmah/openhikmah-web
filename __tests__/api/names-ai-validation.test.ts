@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
 // ── Chainable + thenable DB proxy (mirrors __tests__/lib/names/name-content.test.ts) ──
@@ -23,8 +23,9 @@ function makeSelectChain(resolveWith: unknown[]) {
   return chain;
 }
 
-const { mockConsume, mockCallAI, mockCookies } = vi.hoisted(() => ({
+const { mockConsume, mockCallAI, mockCookies, mockInsertValues } = vi.hoisted(() => ({
   mockConsume: vi.fn(),
+  mockInsertValues: vi.fn(),
   mockCallAI: vi.fn(),
   // The routes now call getUiLocale() (lib/i18n/request-prefs.ts), which reads
   // next/headers' cookies() — unavailable outside a real Next request scope.
@@ -40,10 +41,13 @@ vi.mock("@/lib/infra/db", () => ({
   db: {
     select: () => makeSelectChain([]), // durable cache always misses
     insert: () => ({
-      values: () => ({
-        onConflictDoUpdate: async () => undefined,
-        onConflictDoNothing: () => ({ returning: async () => [{ reason: "unused" }] }),
-      }),
+      values: (row: unknown) => {
+        mockInsertValues(row);
+        return {
+          onConflictDoUpdate: async () => undefined,
+          onConflictDoNothing: () => ({ returning: async () => [{ reason: "unused" }] }),
+        };
+      },
     }),
   },
 }));
@@ -80,6 +84,7 @@ describe("names AI routes — model output validation", () => {
   beforeEach(() => {
     mockConsume.mockReset().mockResolvedValue(true);
     mockCallAI.mockReset();
+    mockInsertValues.mockReset();
     mockFetch.mockReset();
     mockFetch.mockResolvedValue({ ok: false }); // quran.com search yields no refs
     mockCookies.mockReset().mockResolvedValue({ get: () => undefined }); // "en" default
@@ -589,5 +594,107 @@ describe("names AI routes — model output validation", () => {
     expect(body).toHaveLength(1);
     expect(body[0].reason).toMatch(/^Contains a form of/);
     errorSpy.mockRestore();
+  });
+  describe("verses: a failed reason call is never cached (issue #665)", () => {
+    function mockSearchFetch(refs: string[]) {
+      mockFetch.mockImplementation(async (url: unknown) => {
+        if (typeof url !== "string") return { ok: false };
+        if (url.includes("api.quran.com/api/v4/search")) {
+          return {
+            ok: true,
+            json: async () => ({ search: { results: refs.map((verse_key) => ({ verse_key })) } }),
+          };
+        }
+        if (url.includes("ar.alafasy"))
+          return {
+            ok: true,
+            json: async () => ({ data: { text: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ" } }),
+          };
+        if (url.includes("en.sahih"))
+          return {
+            ok: true,
+            json: async () => ({ data: { text: "Allah - there is no deity except Him." } }),
+          };
+        return { ok: false };
+      });
+    }
+
+    const versesCacheWrites = () =>
+      mockInsertValues.mock.calls.filter(([row]) => (row as { kind?: string }).kind === "verses");
+    const reasonCacheWrites = () =>
+      mockInsertValues.mock.calls.filter(([row]) => "reason" in (row as object));
+
+    let errorSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+    afterEach(() => {
+      errorSpy.mockRestore();
+    });
+
+    it("a refusal serves default reasons, caches nothing, and the next request retries", async () => {
+      mockSearchFetch(["2:255", "1:1"]);
+      mockCallAI.mockResolvedValue("I'm sorry, but I can't help with religious interpretation.");
+
+      const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+      const body = await res.json();
+      expect(body).toHaveLength(2);
+      expect(body.every((v: { reason: string }) => /^Contains a form of/.test(v.reason))).toBe(
+        true
+      );
+      expect(versesCacheWrites()).toHaveLength(0);
+      expect(mockCallAI).toHaveBeenCalledTimes(1); // refusal is not backed by Gemini
+
+      await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+      expect(mockCallAI).toHaveBeenCalledTimes(2); // retried, not served from a placeholder cache
+    });
+
+    it("unparsable reason output is not cached", async () => {
+      mockSearchFetch(["2:255"]);
+      mockCallAI.mockResolvedValue("not json at all");
+
+      const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+      expect(res.status).toBe(200);
+      expect((await res.json())[0].reason).toMatch(/^Contains a form of/);
+      expect(versesCacheWrites()).toHaveLength(0);
+    });
+
+    it("a thrown reason call is not cached", async () => {
+      mockSearchFetch(["2:255"]);
+      mockCallAI.mockRejectedValue(new Error("provider down"));
+
+      const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+      expect(res.status).toBe(200);
+      expect((await res.json())[0].reason).toMatch(/^Contains a form of/);
+      expect(versesCacheWrites()).toHaveLength(0);
+    });
+
+    it("a reason map missing only some refs is still cached", async () => {
+      mockSearchFetch(["2:255", "1:1"]);
+      mockCallAI.mockResolvedValue(JSON.stringify({ "2:255": "Ayat al-Kursi affirms His mercy." }));
+
+      const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+      const body = await res.json();
+      expect(body[0].reason).toBe("Ayat al-Kursi affirms His mercy.");
+      expect(body[1].reason).toMatch(/^Contains a form of/);
+      expect(versesCacheWrites()).toHaveLength(1);
+    });
+
+    it("a non-English locale does not translate or cache placeholder reasons", async () => {
+      withLocale("tr");
+      mockSearchFetch(["2:255"]);
+      mockCallAI.mockResolvedValue("I'm sorry, but I can't help with religious interpretation.");
+
+      const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+      expect((await res.json())[0].reason).toMatch(/^Contains a form of/);
+      expect(mockCallAI).toHaveBeenCalledTimes(1); // no translateReason call
+      expect(reasonCacheWrites()).toHaveLength(0);
+      expect(versesCacheWrites()).toHaveLength(0);
+    });
   });
 });

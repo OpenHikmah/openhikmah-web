@@ -8,7 +8,6 @@ import { resolveVerse } from "@/lib/quran/verse-resolver";
 import {
   getOrGenerateNameContent,
   getOrGenerateVerseReason,
-  type ResolvedNamesModel,
   type GenerationContext,
 } from "@/lib/names/name-content";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
@@ -19,8 +18,10 @@ import { LOCALE_LANGUAGE_NAME, DEFAULT_EDITION_BY_LOCALE, type Locale } from "@/
 import { TANZIH_CONSTRAINT, containsTashbih } from "@/lib/ai/theological-constraints";
 import type { VerseRef } from "@/types/quran";
 
-// Bump to force regeneration after a prompt/search change.
-const VERSES_VERSION = 2;
+// Bump to force regeneration after a prompt/search change. 3: flushes
+// name_content entries cached with placeholder-only reasons before issue #665's
+// fix (name_verse_reasons is unversioned and is not flushed by this).
+export const VERSES_VERSION = 3;
 
 interface NameVerse {
   ref: VerseRef;
@@ -71,12 +72,19 @@ async function searchVerseRefs(arabic: string): Promise<string[]> {
   }
 }
 
-// Generate AI reasons for why each verse is connected to this name
+// The per-verse reason shown when the model gave none for a ref.
+function defaultReason(transliteration: string): string {
+  return `Contains a form of ${transliteration}.`;
+}
+
+// Generate AI reasons for why each verse is connected to this name. An empty
+// map means the call failed (refusal, unparsable output, or a thrown error) or
+// every reason was dropped; callers must not persist a result built from it.
 async function buildReasons(
   refs: string[],
   transliteration: string,
   meaning: string,
-  resolved: ResolvedNamesModel
+  ctx: GenerationContext
 ): Promise<Map<string, string>> {
   if (refs.length === 0) return new Map();
   const prompt = `You are a classical Islamic scholar (Maturidi/Hanafi tradition).
@@ -94,17 +102,16 @@ Output format:
   try {
     const text = await callAI(prompt, {
       feature: "names",
-      provider: resolved.provider,
-      model: resolved.model,
+      provider: ctx.provider,
+      model: ctx.model,
     });
     if (looksLikeRefusal(text)) {
-      // A refusal here only degrades the per-verse *reason* text (each verse
-      // falls back to its default "Contains a form of ..." reason below) — it
-      // never empties the overall verses result, since the refs themselves
-      // already came from search, not this call. Logged for visibility; not
-      // gated through markRefusal() because there's nothing to gate here.
+      // Every verse then falls back to its default reason, and that
+      // placeholder-only result is not cached (see isUncacheable). The refusal
+      // must also not be silently answered by Gemini, so it is gated here.
       console.error(`Name verses: model returned a refusal for ${transliteration}, not caching`);
       incr("names_ai_refusal");
+      ctx.markRefusal();
       return new Map();
     }
     const match = text.match(/\{[\s\S]*\}/);
@@ -122,8 +129,8 @@ Output format:
       })
     );
   } catch (err) {
-    // Reasons are best-effort (a default reason is used per verse if missing) —
-    // log so a persistently malformed AI response is visible, not silent.
+    // The response is still served with default reasons, but not cached, so
+    // a later request retries — log so a persistently failing call is visible.
     console.error(`Name verses: failed to parse AI reasons for ${transliteration}:`, err);
     return new Map();
   }
@@ -154,10 +161,10 @@ Return ONLY a JSON array:
       model: ctx.model,
     });
     if (looksLikeRefusal(text)) {
-      // Unlike buildReasons above, this IS the sole content generator when
-      // search found nothing — an empty result here does gate the overall
-      // verses fallback, so a detected refusal must call markRefusal() to
-      // stop resolveAndGenerate from silently backing it with Gemini.
+      // This is the sole content generator when search found nothing, so an
+      // empty result gates the overall verses fallback. As in buildReasons, a
+      // detected refusal must call markRefusal() to stop resolveAndGenerate
+      // from silently backing it with Gemini.
       console.error(`Name verses: model returned a refusal for ${transliteration}, not caching`);
       incr("names_ai_refusal");
       ctx.markRefusal();
@@ -195,6 +202,15 @@ function stripHtml(text: string): string {
   return text.replace(/<[^>]*>/g, "");
 }
 
+// Not worth caching: nothing found, or every reason is the default placeholder
+// (the reason call failed). Persisting the latter would freeze placeholder
+// content for this name until VERSES_VERSION is bumped. A result where only
+// some refs lack a reason is still cached.
+function isUncacheable(verses: NameVerse[], transliteration: string): boolean {
+  const fallback = defaultReason(transliteration);
+  return verses.length === 0 || verses.every((v) => v.reason === fallback);
+}
+
 async function getVersesBySlug(
   slug: string,
   locale: Locale,
@@ -229,7 +245,7 @@ async function getVersesBySlug(
             return {
               ...vd,
               translation: stripHtml(vd.translation),
-              reason: reasonMap.get(ref) ?? `Contains a form of ${name.transliteration}.`,
+              reason: reasonMap.get(ref) ?? defaultReason(name.transliteration),
             } as NameVerse;
           })
           .filter((v): v is NameVerse => v !== null);
@@ -266,7 +282,7 @@ async function getVersesBySlug(
         })
         .filter((v): v is NameVerse => v !== null);
     },
-    (v) => v.length === 0,
+    (v) => isUncacheable(v, name.transliteration),
     onBeforeGenerate
   );
 
@@ -300,7 +316,12 @@ async function getVersesBySlug(
           })
         );
 
-  if (locale === "en") return hydratedVerses;
+  // An uncached placeholder-only result is served in English for this response:
+  // translating it would permanently cache the translated placeholder in
+  // name_verse_reasons, shadowing the real reasons a later request generates.
+  if (locale === "en" || isUncacheable(hydratedVerses, name.transliteration)) {
+    return hydratedVerses;
+  }
 
   // Localize only the per-verse reason text (a translation of the canonical
   // English reason, cached in name_verse_reasons) — the verse list itself

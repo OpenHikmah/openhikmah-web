@@ -60,9 +60,9 @@ vi.mock("@/lib/ai/ai", () => ({
   defaultModelFor: () => "claude-opus-4-7",
 }));
 
-import { GET as getReflection } from "@/app/api/names/[slug]/reflection/route";
-import { GET as getPairings } from "@/app/api/names/[slug]/pairings/route";
-import { GET as getVerses } from "@/app/api/names/[slug]/verses/route";
+import { GET as getReflection, REFLECTION_VERSION } from "@/app/api/names/[slug]/reflection/route";
+import { GET as getPairings, PAIRINGS_VERSION } from "@/app/api/names/[slug]/pairings/route";
+import { GET as getVerses, VERSES_VERSION } from "@/app/api/names/[slug]/verses/route";
 
 // Stub fetch AFTER static imports so vi.stubGlobal wins over any fetch patch
 // applied during next/server module initialization.
@@ -78,11 +78,24 @@ function params(slug: string) {
 
 const ROUTES: Array<{
   label: string;
+  version: number;
   call: (slug: string) => Promise<Response>;
 }> = [
-  { label: "reflection", call: (slug) => getReflection(req(slug, "reflection"), params(slug)) },
-  { label: "pairings", call: (slug) => getPairings(req(slug, "pairings"), params(slug)) },
-  { label: "verses", call: (slug) => getVerses(req(slug, "verses"), params(slug)) },
+  {
+    label: "reflection",
+    version: REFLECTION_VERSION,
+    call: (slug) => getReflection(req(slug, "reflection"), params(slug)),
+  },
+  {
+    label: "pairings",
+    version: PAIRINGS_VERSION,
+    call: (slug) => getPairings(req(slug, "pairings"), params(slug)),
+  },
+  {
+    label: "verses",
+    version: VERSES_VERSION,
+    call: (slug) => getVerses(req(slug, "verses"), params(slug)),
+  },
 ];
 
 describe("names AI routes — per-client rate limiting", () => {
@@ -95,7 +108,7 @@ describe("names AI routes — per-client rate limiting", () => {
     mockCookies.mockReset().mockResolvedValue({ get: () => undefined }); // "en" default
   });
 
-  for (const { label, call } of ROUTES) {
+  for (const { label, version, call } of ROUTES) {
     it(`${label}: returns 429 on a cache miss when the limiter denies, without calling the AI`, async () => {
       mockSelect.mockReturnValue(makeSelectChain([])); // durable-cache miss
       mockConsume.mockResolvedValue(false);
@@ -112,8 +125,8 @@ describe("names AI routes — per-client rate limiting", () => {
     it(`${label}: serves a cache hit without consuming rate-limit budget`, async () => {
       const cached =
         label === "reflection" ? JSON.stringify("a cached reflection") : JSON.stringify([]);
-      // version must match each route's current VERSION const (all three are 2)
-      mockSelect.mockReturnValue(makeSelectChain([{ data: cached, version: 2 }]));
+      // version must match the route's current VERSION const to count as a hit
+      mockSelect.mockReturnValue(makeSelectChain([{ data: cached, version }]));
       mockConsume.mockResolvedValue(false); // would deny — must never be asked
 
       const res = await call("ar-rahman");
