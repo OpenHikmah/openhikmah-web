@@ -8,11 +8,12 @@ import { clientKey } from "@/lib/infra/http";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
 import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
 import { TANZIH_CONSTRAINT, containsTashbih } from "@/lib/ai/theological-constraints";
+import { translateReason } from "@/lib/ai/translate";
 import { incr } from "@/lib/infra/metrics";
 
 // Bump to force regeneration after a prompt change. Exported so page.tsx can
 // use the same version when checking the cache for a server-side prefetch.
-export const PAIRINGS_VERSION = 1;
+export const PAIRINGS_VERSION = 2;
 
 interface Pairing {
   name: string;
@@ -21,23 +22,14 @@ interface Pairing {
   explanation: string;
 }
 
-function buildPrompt(
-  transliteration: string,
-  arabic: string,
-  meaning: string,
-  locale: Locale
-): string {
-  const languageLine =
-    locale === "en"
-      ? ""
-      : `\nWrite each "explanation" in ${LOCALE_LANGUAGE_NAME[locale]}. Keep "transliteration" and "arabic" as-is (do not translate names). Keep the Tanzih constraint above unchanged.`;
+function buildPrompt(transliteration: string, arabic: string, meaning: string): string {
   return `You are a classical Islamic scholar (Maturidi/Hanafi tradition).
 
 The divine name ${transliteration} (${arabic}) means "${meaning}".
 
 Task: Identify 2–3 other divine names from the 99 Names that most frequently appear paired with ${transliteration} in the Quran. For each, explain in ONE sentence why this pairing provides perfect theological balance in the specific contexts where they appear together.
 
-Only include pairings where both names actually co-appear in the same verse or in closely related verses as documented in classical tafsir. Maintain ${TANZIH_CONSTRAINT}.${languageLine}
+Only include pairings where both names actually co-appear in the same verse or in closely related verses as documented in classical tafsir. Maintain ${TANZIH_CONSTRAINT}.
 
 Return ONLY a JSON array:
 [
@@ -49,6 +41,14 @@ Return ONLY a JSON array:
 ]`;
 }
 
+const isEmpty = (v: Pairing[]) => v.length === 0;
+
+/**
+ * Always generated in English, so the English-only containsTashbih() scan sees
+ * every explanation before it is cached (issue #649). A non-English locale gets
+ * translations of those already-scanned explanations, never explanations
+ * written directly in the target language.
+ */
 async function getPairings(
   slug: string,
   locale: Locale,
@@ -57,15 +57,24 @@ async function getPairings(
   const name = getNameBySlug(slug);
   if (!name) return [];
 
-  return getOrGenerateNameContent(
+  // Generating the English source and translating it serve one request, so a
+  // cold non-English load charges the rate limit once, not twice.
+  let charged = false;
+  const onBeforeGenerateOnce = async () => {
+    if (charged) return;
+    charged = true;
+    await onBeforeGenerate();
+  };
+
+  const english = await getOrGenerateNameContent(
     slug,
     "pairings",
-    locale,
+    "en",
     PAIRINGS_VERSION,
     async (ctx) => {
       let text: string;
       try {
-        text = await callAI(buildPrompt(name.transliteration, name.arabic, name.meaning, locale), {
+        text = await callAI(buildPrompt(name.transliteration, name.arabic, name.meaning), {
           feature: "names",
           provider: ctx.provider,
           model: ctx.model,
@@ -152,9 +161,49 @@ async function getPairings(
         })
         .filter((p): p is Pairing => p !== null);
     },
-    (v) => v.length === 0,
-    onBeforeGenerate
+    isEmpty,
+    onBeforeGenerateOnce
   );
+  if (locale === "en" || isEmpty(english)) return english;
+
+  const language = LOCALE_LANGUAGE_NAME[locale];
+  const translated = await getOrGenerateNameContent(
+    slug,
+    "pairings",
+    locale,
+    PAIRINGS_VERSION,
+    async (ctx) => {
+      const explanations = await Promise.all(
+        english.map((p) =>
+          translateReason(
+            p.explanation,
+            language,
+            { feature: "names", provider: ctx.provider, model: ctx.model },
+            (reason) => {
+              if (reason === "refusal") ctx.markRefusal();
+            }
+          ).catch((err) => {
+            console.error(`Pairings: translation call failed for ${slug}/${locale}:`, err);
+            incr("names_ai_call_error");
+            return "";
+          })
+        )
+      );
+      // All-or-nothing: caching a set where some explanations stayed English
+      // would pin a half-translated entry for this locale until the next bump.
+      if (explanations.some((e) => e.trim() === "")) return [];
+      return english.map((p, i) => ({ ...p, explanation: explanations[i] }));
+    },
+    isEmpty,
+    onBeforeGenerateOnce
+  );
+  // Same as verses/route.ts: a failed translation (uncached, so retried on the
+  // next request) falls back to the already-scanned English, never to blank.
+  if (isEmpty(translated)) {
+    console.error(`Pairings: incomplete translation for ${slug}/${locale}, serving English`);
+    return english;
+  }
+  return translated;
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {

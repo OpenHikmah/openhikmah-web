@@ -268,36 +268,140 @@ describe("names AI routes — model output validation", () => {
     errorSpy.mockRestore();
   });
 
-  it("reflection: no language directive for the default (English) locale", async () => {
+  it("reflection: the default (English) locale generates once, with no translation pass", async () => {
     mockCallAI.mockResolvedValue("A reflection paragraph.");
     await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));
+    expect(mockCallAI).toHaveBeenCalledTimes(1);
     const prompt = mockCallAI.mock.calls[0][0] as string;
-    expect(prompt).not.toMatch(/write the reflection in/i);
     expect(prompt).toMatch(/strict tanzih/i);
   });
 
-  it("reflection: appends a language directive for a non-English locale, keeping Tanzih rules", async () => {
+  // Issue #649: containsTashbih() is English-only, so non-English content must
+  // be generated (and scanned) in English first, then translated.
+  it("reflection: a non-English locale generates in English, then translates the scanned text", async () => {
     withLocale("tr");
-    mockCallAI.mockResolvedValue("Bir yansıma paragrafı.");
-    await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));
-    const prompt = mockCallAI.mock.calls[0][0] as string;
-    expect(prompt).toMatch(/write the reflection in turkish/i);
-    expect(prompt).toMatch(/strict tanzih/i);
+    mockCallAI
+      .mockResolvedValueOnce("The believer strives in lawful means and trusts Allah alone.")
+      .mockResolvedValueOnce("Mümin helal yollarla çalışır ve yalnızca Allah'a güvenir.");
+
+    const res = await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));
+
+    expect(await res.json()).toEqual({
+      reflection: "Mümin helal yollarla çalışır ve yalnızca Allah'a güvenir.",
+    });
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
+    const generatePrompt = mockCallAI.mock.calls[0][0] as string;
+    expect(generatePrompt).not.toMatch(/turkish/i);
+    expect(generatePrompt).toMatch(/strict tanzih/i);
+    const translatePrompt = mockCallAI.mock.calls[1][0] as string;
+    expect(translatePrompt).toMatch(/translate the following sentence into turkish/i);
+    expect(translatePrompt).toContain("trusts Allah alone");
+    expect(mockConsume).toHaveBeenCalledTimes(1);
   });
 
-  it("pairings: no language directive for the default (English) locale", async () => {
-    mockCallAI.mockResolvedValue(JSON.stringify([]));
-    await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
-    const prompt = mockCallAI.mock.calls[0][0] as string;
-    expect(prompt).not.toMatch(/write each "explanation" in/i);
-  });
-
-  it("pairings: appends a language directive for a non-English locale", async () => {
+  it("reflection: a Tashbih-phrased English source is never translated for a non-English locale", async () => {
     withLocale("ru");
+    mockCallAI.mockResolvedValue("This shows God literally has a physical body.");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));
+
+    expect(await res.json()).toEqual({ reflection: "" });
+    // Claude + the Gemini retry, both rejected — no translation call follows.
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
+    for (const [prompt] of mockCallAI.mock.calls) {
+      expect(prompt).not.toMatch(/translate the following/i);
+    }
+    errorSpy.mockRestore();
+  });
+
+  it("reflection: a refused translation serves the English reflection, without retrying against Gemini", async () => {
+    withLocale("az");
+    mockCallAI
+      .mockResolvedValueOnce("The believer strives in lawful means and trusts Allah alone.")
+      .mockResolvedValueOnce("I'm sorry, but I can't help with translating religious content.");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));
+
+    expect(await res.json()).toEqual({
+      reflection: "The believer strives in lawful means and trusts Allah alone.",
+    });
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
+    errorSpy.mockRestore();
+  });
+
+  it("pairings: the default (English) locale generates once, with no translation pass", async () => {
     mockCallAI.mockResolvedValue(JSON.stringify([]));
     await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
     const prompt = mockCallAI.mock.calls[0][0] as string;
-    expect(prompt).toMatch(/write each "explanation" in russian/i);
+    expect(prompt).not.toMatch(/translate the following/i);
+  });
+
+  const EN_PAIRINGS = JSON.stringify([
+    {
+      transliteration: "Ar-Rahīm",
+      arabic: "الرَّحِيم",
+      explanation: "Balances universal grace with mercy specific to the believers.",
+    },
+    {
+      transliteration: "Al-Malik",
+      arabic: "الْمَلِك",
+      explanation: "Joins His mercy to His absolute sovereignty over creation.",
+    },
+  ]);
+
+  it("pairings: a non-English locale generates in English, then translates only the explanations", async () => {
+    withLocale("ru");
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.includes("universal grace"))
+        return "Уравновешивает всеобщую милость особой милостью к верующим.";
+      if (prompt.includes("absolute sovereignty"))
+        return "Соединяет Его милость с Его абсолютной властью над творением.";
+      return EN_PAIRINGS;
+    });
+
+    const res = await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
+
+    const body = await res.json();
+    expect(body).toEqual([
+      {
+        name: "ar-rahim",
+        transliteration: "Ar-Rahīm",
+        arabic: "الرَّحِيم",
+        explanation: "Уравновешивает всеобщую милость особой милостью к верующим.",
+      },
+      {
+        name: "al-malik",
+        transliteration: "Al-Malik",
+        arabic: "الْمَلِك",
+        explanation: "Соединяет Его милость с Его абсолютной властью над творением.",
+      },
+    ]);
+    const generatePrompt = mockCallAI.mock.calls[0][0] as string;
+    expect(generatePrompt).not.toMatch(/russian/i);
+    expect(mockCallAI).toHaveBeenCalledTimes(3);
+    expect(mockConsume).toHaveBeenCalledTimes(1);
+  });
+
+  it("pairings: an incomplete translation set serves English rather than a half-translated list", async () => {
+    withLocale("tr");
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.includes("universal grace"))
+        return "İnananlara özel rahmetle evrensel lütfu dengeler.";
+      if (prompt.includes("absolute sovereignty")) return "";
+      return EN_PAIRINGS;
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
+
+    const body = await res.json();
+    expect(body.map((p: { explanation: string }) => p.explanation)).toEqual([
+      "Balances universal grace with mercy specific to the believers.",
+      "Joins His mercy to His absolute sovereignty over creation.",
+    ]);
+    errorSpy.mockRestore();
   });
 
   function mockVerseFetch() {
