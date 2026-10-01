@@ -2,16 +2,20 @@ import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { friendships, users } from "@/lib/infra/db/schema";
 
-// @username: word chars only, matching the existing username convention
-// (see users.username in lib/infra/db/schema.ts) — no spaces/punctuation, so
-// a mention token ends cleanly at sentence punctuation like "@alice, thanks".
-const MENTION_RE = /@(\w+)/g;
+// 3-20 word chars, matching the username format enforced by app/api/social/me.
+// The lookbehind rejects an "@" glued to a word char or another "@", so email
+// addresses ("a@b.com") and "@@bob" are not mentions.
+const MENTION_RE = /(?<![\w@])@(\w{3,20})\b/g;
 
-/** Extracts unique @username tokens (without the @) from free-text note content. */
+// Bounds the username lookup per note; a note can hold thousands of tokens.
+export const MAX_MENTIONS_PER_NOTE = 20;
+
+/** Extracts up to MAX_MENTIONS_PER_NOTE unique @username tokens (without the @) from free-text note content. */
 export function parseMentionedUsernames(text: string): string[] {
   const seen = new Set<string>();
   for (const match of text.matchAll(MENTION_RE)) {
     seen.add(match[1].toLowerCase());
+    if (seen.size === MAX_MENTIONS_PER_NOTE) break;
   }
   return [...seen];
 }
@@ -31,7 +35,7 @@ export async function resolveFriendMentions(
   const candidates = await db
     .select({ id: users.id, username: users.username })
     .from(users)
-    .where(or(...usernames.map((u) => sql`lower(${users.username}) = ${u}`)));
+    .where(inArray(sql`lower(${users.username})`, usernames));
 
   if (candidates.length === 0) return [];
 
