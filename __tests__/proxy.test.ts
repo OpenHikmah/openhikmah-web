@@ -89,14 +89,38 @@ describe("proxy (CSP nonce)", () => {
   });
 });
 
-// The admin surface must stay reachable even when maintenance mode is on —
-// a matcher regression here would silently reintroduce a DB round-trip (and
-// its failure mode) on every /admin request, exactly what the operator's
-// escape hatch is meant to avoid. See lib/admin/feature-flags.ts.
+// Issue #625: /admin is a server-rendered page, so it needs the nonce'd CSP
+// like the rest of the app — but it must stay reachable even when maintenance
+// mode is on, so it never reads the maintenance flag (a DB round-trip whose
+// failure would lock operators out of the escape hatch).
+describe("proxy (admin pages)", () => {
+  it.each(["/admin", "/admin/flags"])(
+    "gives %s a nonce'd CSP and x-nonce without reading the maintenance flag",
+    async (path) => {
+      mockGetFlagBoolean.mockResolvedValue(true);
+      const res = await proxy(req(path));
+      expect(res.status).toBe(200);
+      const csp = res.headers.get("Content-Security-Policy");
+      const nonce = csp?.match(/'nonce-([A-Za-z0-9+/=]+)'/)?.[1];
+      expect(nonce).toBeTruthy();
+      expect(res.headers.get("x-middleware-request-x-nonce")).toBe(nonce);
+      expect(res.headers.get("x-middleware-request-content-security-policy")).toBe(csp);
+      expect(mockGetFlagBoolean).not.toHaveBeenCalled();
+    }
+  );
+
+  it("still serves maintenance for a non-admin path that merely starts with 'admin'", async () => {
+    mockGetFlagBoolean.mockResolvedValue(true);
+    const res = await proxy(req("/administrator"));
+    expect(res.status).toBe(503);
+  });
+});
+
+// The admin API, auth, and health/metrics endpoints must stay off the proxy:
+// a matcher regression would put the maintenance flag's DB read in front of
+// the very endpoints an operator needs to turn it back off.
 describe("proxy config.matcher", () => {
   const excluded = [
-    "/admin",
-    "/admin/flags",
     "/api/admin",
     "/api/admin/overview",
     "/api/auth",
@@ -109,7 +133,15 @@ describe("proxy config.matcher", () => {
     "/favicon.ico",
   ];
 
-  const included = ["/", "/search", "/canvas", "/api/bookmarks", "/settings"];
+  const included = [
+    "/",
+    "/search",
+    "/canvas",
+    "/api/bookmarks",
+    "/settings",
+    "/admin",
+    "/admin/flags",
+  ];
 
   it.each(excluded)("does not run proxy for %s", (path) => {
     expect(unstable_doesMiddlewareMatch({ config, url: `http://localhost${path}` })).toBe(false);
