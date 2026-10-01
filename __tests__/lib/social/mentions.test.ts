@@ -24,7 +24,11 @@ function makeSelectChain(resolveWith: unknown[]) {
 const { mockSelect } = vi.hoisted(() => ({ mockSelect: vi.fn() }));
 vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect } }));
 
-import { parseMentionedUsernames, resolveFriendMentions } from "@/lib/social/mentions";
+import {
+  MAX_MENTIONS_PER_NOTE,
+  parseMentionedUsernames,
+  resolveFriendMentions,
+} from "@/lib/social/mentions";
 
 describe("parseMentionedUsernames", () => {
   it("extracts a single @username", () => {
@@ -45,6 +49,36 @@ describe("parseMentionedUsernames", () => {
 
   it("ignores a bare @ with no following word characters", () => {
     expect(parseMentionedUsernames("email me at me @ home")).toEqual([]);
+  });
+
+  it("does not treat an email address as a mention", () => {
+    expect(parseMentionedUsernames("reach me at a@bob.com or alice@example.org")).toEqual([]);
+  });
+
+  it("still matches a mention that follows punctuation or starts the text", () => {
+    expect(parseMentionedUsernames('@alice (cc @bob), "@carol"')).toEqual([
+      "alice",
+      "bob",
+      "carol",
+    ]);
+  });
+
+  it("rejects a doubled @", () => {
+    expect(parseMentionedUsernames("@@bob")).toEqual([]);
+  });
+
+  it("ignores tokens outside the 3-20 character username format", () => {
+    expect(
+      parseMentionedUsernames("@ab and @" + "a".repeat(21) + " and @" + "b".repeat(20))
+    ).toEqual(["b".repeat(20)]);
+  });
+
+  it("truncates to MAX_MENTIONS_PER_NOTE distinct mentions, keeping the first ones", () => {
+    const text = Array.from({ length: 50 }, (_, i) => `@user${i}`).join(" ");
+    const result = parseMentionedUsernames(text);
+    expect(result).toHaveLength(MAX_MENTIONS_PER_NOTE);
+    expect(result[0]).toBe("user0");
+    expect(result[MAX_MENTIONS_PER_NOTE - 1]).toBe(`user${MAX_MENTIONS_PER_NOTE - 1}`);
   });
 });
 
