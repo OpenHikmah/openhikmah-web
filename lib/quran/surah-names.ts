@@ -66,7 +66,7 @@ export const SURAH_NAMES: Record<number, [string, string]> = {
   65: ["At-Talaq", "الطلاق"],
   66: ["At-Tahrim", "التحريم"],
   67: ["Al-Mulk", "الملك"],
-  68: ["Al-Qalam", "القلام"],
+  68: ["Al-Qalam", "القلم"],
   69: ["Al-Haqqah", "الحاقة"],
   70: ["Al-Maarij", "المعارج"],
   71: ["Nuh", "نوح"],
