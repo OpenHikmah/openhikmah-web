@@ -344,7 +344,11 @@ function ResultCard({ result }: { result: SearchResult }) {
       </div>
 
       <div className="mt-4 space-y-3">
-        <p className="font-arabic text-right text-lg leading-loose text-text-primary">
+        <p
+          lang="ar"
+          dir="rtl"
+          className="font-arabic text-right text-lg leading-loose text-text-primary"
+        >
           {result.arabicText}
         </p>
         <p className="text-sm leading-relaxed text-text-secondary">{result.translation}</p>

@@ -66,7 +66,9 @@ export default async function SurahReaderPage({ params }: Props) {
           <span>{t("backToSearch")}</span>
         </Link>
 
-        <h1 className="mb-2 font-arabic text-6xl text-gold">{nameArabic}</h1>
+        <h1 lang="ar" dir="rtl" className="mb-2 font-arabic text-6xl text-gold">
+          {nameArabic}
+        </h1>
         <p className="mb-2 text-xl text-text-primary">{name}</p>
         <p className="mb-6 text-sm text-text-secondary">{t("ayahCount", { count: ayahCount })}</p>
 

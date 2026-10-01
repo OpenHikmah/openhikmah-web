@@ -99,6 +99,8 @@ export function NameVerses({ slug, accent }: Props) {
             </span>
             <div className="flex items-center gap-2">
               <span
+                lang="ar"
+                dir="rtl"
                 className="font-arabic text-sm"
                 style={{ color: "var(--color-text-secondary)" }}
               >
@@ -119,6 +121,7 @@ export function NameVerses({ slug, accent }: Props) {
 
           {/* Arabic text */}
           <p
+            lang="ar"
             className="font-arabic text-xl text-right leading-loose mb-3"
             style={{ color: "var(--color-text-primary)" }}
             dir="rtl"

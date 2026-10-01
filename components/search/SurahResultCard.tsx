@@ -17,7 +17,7 @@ export function SurahResultCard({ surah }: { surah: MatchedSurah }) {
         <div>
           <p className="text-xs uppercase tracking-wider text-text-muted">{t("fullSurah")}</p>
           <h2 className="mt-1 text-xl font-semibold text-text-primary">{surah.name}</h2>
-          <p className="mt-1 font-arabic text-right text-2xl text-text-primary">
+          <p lang="ar" dir="rtl" className="mt-1 font-arabic text-right text-2xl text-text-primary">
             {surah.nameArabic}
           </p>
           <p className="mt-2 text-sm text-text-muted">

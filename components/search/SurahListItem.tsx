@@ -16,7 +16,9 @@ export function SurahListItem({ surah }: { surah: MatchedSurah }) {
       <div className="min-w-0">
         <p className="truncate text-sm font-medium text-text-primary">{surah.name}</p>
         <p className="truncate text-xs text-text-muted">
-          <span className="font-arabic">{surah.nameArabic}</span>
+          <span lang="ar" dir="rtl" className="font-arabic">
+            {surah.nameArabic}
+          </span>
           {" · "}
           {t("ayahCount", { count: surah.ayahCount })}
         </p>

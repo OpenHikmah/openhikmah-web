@@ -160,7 +160,11 @@ function PreviewCard({ node, delay }: { node: PreviewNode; delay: string }) {
         </div>
 
         {/* The ayah is shown in full — never clamped, never covered. */}
-        <p className="text-right font-arabic text-[14px] leading-loose text-text-primary">
+        <p
+          lang="ar"
+          dir="rtl"
+          className="text-right font-arabic text-[14px] leading-loose text-text-primary"
+        >
           {node.arabic}
         </p>
 

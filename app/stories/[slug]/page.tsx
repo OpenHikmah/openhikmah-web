@@ -69,7 +69,9 @@ export default async function StoryDetailPage({ params }: Props) {
           <span>{t("allStories")}</span>
         </Link>
 
-        <h1 className="mb-3 font-arabic text-6xl text-gold">{story.arabicName}</h1>
+        <h1 lang="ar" dir="rtl" className="mb-3 font-arabic text-6xl text-gold">
+          {story.arabicName}
+        </h1>
         <p className="mb-2 text-xl text-text-primary">{resolveLocalized(story.name, locale)}</p>
         <p className="mb-6 text-sm text-text-secondary">
           {resolveLocalized(story.tagline, locale)}

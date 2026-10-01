@@ -47,7 +47,11 @@ export function StoryVerseCard({ verse }: { verse: Verse }) {
         </Tooltip>
       </div>
 
-      <p dir="rtl" className="font-arabic text-right text-xl leading-[2] text-text-primary">
+      <p
+        lang="ar"
+        dir="rtl"
+        className="font-arabic text-right text-xl leading-[2] text-text-primary"
+      >
         {verse.arabicText}
       </p>
 

@@ -523,7 +523,11 @@ function VerseCard({
         </span>
       </div>
 
-      <p className="font-arabic text-right text-base leading-loose line-clamp-2 text-text-primary">
+      <p
+        lang="ar"
+        dir="rtl"
+        className="font-arabic text-right text-base leading-loose line-clamp-2 text-text-primary"
+      >
         {verse.arabicText}
       </p>
 

@@ -74,7 +74,9 @@ export default async function NamesPage() {
           <p className="text-xs uppercase tracking-[0.2em] font-mono mb-3 text-text-muted">
             {t("eyebrow")}
           </p>
-          <h1 className="font-arabic text-5xl mb-2 text-gold">أَسْمَاءُ اللَّه الْحُسْنَى</h1>
+          <h1 lang="ar" dir="rtl" className="font-arabic text-5xl mb-2 text-gold">
+            أَسْمَاءُ اللَّه الْحُسْنَى
+          </h1>
           <p className="text-2xl font-light mb-4 text-text-primary">{t("heroTitle")}</p>
           <p className="text-sm max-w-xl mx-auto text-text-secondary">{t("heroDescription")}</p>
 
@@ -88,7 +90,9 @@ export default async function NamesPage() {
                 <div key={cat} className="flex items-center gap-2 text-xs">
                   <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
                   <span className="text-text-secondary">{t(labelKeys.label)}</span>
-                  <span className="font-arabic text-sm text-text-muted">{label.ar}</span>
+                  <span lang="ar" dir="rtl" className="font-arabic text-sm text-text-muted">
+                    {label.ar}
+                  </span>
                 </div>
               );
             })}
@@ -108,7 +112,9 @@ export default async function NamesPage() {
                   <div className="flex items-center gap-3 mb-2">
                     <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${colors.dot}`} />
                     <h2 className="text-lg font-medium text-text-primary">{t(labelKeys.label)}</h2>
-                    <span className="font-arabic text-xl text-text-secondary">{label.ar}</span>
+                    <span lang="ar" dir="rtl" className="font-arabic text-xl text-text-secondary">
+                      {label.ar}
+                    </span>
                   </div>
                   <p className="text-xs pl-5 text-text-muted">{t(labelKeys.description)}</p>
                 </div>
@@ -121,7 +127,11 @@ export default async function NamesPage() {
                       href={`/names/${name.slug}`}
                       className="group rounded-lg border border-border bg-surface p-3 transition-all duration-200 hover:scale-[1.02] hover:border-gold"
                     >
-                      <div className="font-arabic text-xl text-center mb-2 leading-relaxed text-text-primary">
+                      <div
+                        lang="ar"
+                        dir="rtl"
+                        className="font-arabic text-xl text-center mb-2 leading-relaxed text-text-primary"
+                      >
                         {name.arabic}
                       </div>
                       <div className="text-xs text-center font-mono mb-1 text-text-secondary">

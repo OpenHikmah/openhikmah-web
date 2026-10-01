@@ -63,7 +63,9 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
   if (state.phase === "denied") {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-bg px-6 text-center">
-        <p className="font-arabic text-2xl text-text-muted">٤٠٤</p>
+        <p lang="ar" dir="rtl" className="font-arabic text-2xl text-text-muted">
+          ٤٠٤
+        </p>
         <h1 className="text-lg text-text-primary">This page could not be found.</h1>
         <Link href="/" className="text-sm text-gold hover:underline">
           Return home

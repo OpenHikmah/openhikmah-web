@@ -56,7 +56,12 @@ export function NameReflection({ slug, accent, initialReflection }: Props) {
         <span className="text-xs font-mono uppercase tracking-widest" style={{ color: accent }}>
           {t("reflectionLabel")}
         </span>
-        <span className="text-xs font-arabic" style={{ color: "var(--color-text-muted)" }}>
+        <span
+          lang="ar"
+          dir="rtl"
+          className="text-xs font-arabic"
+          style={{ color: "var(--color-text-muted)" }}
+        >
           التخلق
         </span>
       </div>

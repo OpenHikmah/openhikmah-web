@@ -56,7 +56,11 @@ export function InteractiveArabic({ verse }: { verse: InteractiveVerse }) {
   );
 
   return (
-    <p dir="rtl" className="font-arabic text-right text-lg leading-loose text-text-primary">
+    <p
+      lang="ar"
+      dir="rtl"
+      className="font-arabic text-right text-lg leading-loose text-text-primary"
+    >
       {tokens.map((token, i) => (
         <span key={i}>
           {i > 0 ? " " : ""}
@@ -111,7 +115,7 @@ function WordPopover({ token, currentRef }: { token: VerseToken; currentRef: str
           className="z-50 w-64 rounded-md border border-border bg-surface-overlay p-3 shadow-floating data-[state=open]:animate-[fadeIn_120ms_ease-out]"
         >
           <div className="flex items-baseline justify-between gap-2">
-            <span dir="rtl" className="font-arabic text-base text-gold">
+            <span lang="ar" dir="rtl" className="font-arabic text-base text-gold">
               {token.root}
             </span>
             <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-text-muted">
@@ -119,7 +123,7 @@ function WordPopover({ token, currentRef }: { token: VerseToken; currentRef: str
             </span>
           </div>
           {token.lemma && (
-            <p dir="rtl" className="mt-1 font-arabic text-sm text-text-secondary">
+            <p lang="ar" dir="rtl" className="mt-1 font-arabic text-sm text-text-secondary">
               {token.lemma}
             </p>
           )}

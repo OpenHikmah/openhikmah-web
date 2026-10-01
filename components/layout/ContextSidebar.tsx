@@ -56,6 +56,7 @@ function TafsirSection({ surah, ayah }: { surah: number; ayah: number }) {
             blocks.map((b, i) =>
               b.arabic ? (
                 <p
+                  lang="ar"
                   key={i}
                   dir="rtl"
                   className="font-arabic text-right text-sm leading-loose text-text-primary"
@@ -457,7 +458,11 @@ export function ContextSidebar() {
                   {renderedContent.toVerse.ref}
                 </span>
               </div>
-              <p className="font-arabic text-right text-sm leading-loose text-text-primary">
+              <p
+                lang="ar"
+                dir="rtl"
+                className="font-arabic text-right text-sm leading-loose text-text-primary"
+              >
                 {renderedContent.toVerse.arabicText}
               </p>
               <p className="text-xs leading-relaxed text-text-secondary">
