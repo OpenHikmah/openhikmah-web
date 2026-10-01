@@ -73,7 +73,9 @@ function SidebarContent({
   return (
     <>
       <div className="flex items-baseline gap-2 px-5 py-5">
-        <span className="font-arabic text-lg text-gold">حكمة</span>
+        <span lang="ar" dir="rtl" className="font-arabic text-lg text-gold">
+          حكمة
+        </span>
         <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-text-muted">
           admin
         </span>
@@ -206,7 +208,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         >
           <Menu className="h-5 w-5" />
         </button>
-        <span className="font-arabic text-base text-gold">حكمة</span>
+        <span lang="ar" dir="rtl" className="font-arabic text-base text-gold">
+          حكمة
+        </span>
         <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-text-muted">
           admin
         </span>
@@ -236,7 +240,11 @@ function AdminBrand() {
   return (
     <div className="flex shrink-0 items-center gap-2.5">
       <Image src="/logo-mark.png" alt="" width={20} height={20} className="size-5" />
-      <span className="font-arabic text-[19px] leading-none tracking-wide text-text-primary">
+      <span
+        lang="ar"
+        dir="rtl"
+        className="font-arabic text-[19px] leading-none tracking-wide text-text-primary"
+      >
         Open <span className="text-gold">Hikmah</span>
       </span>
     </div>

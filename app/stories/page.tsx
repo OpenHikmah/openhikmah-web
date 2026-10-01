@@ -38,7 +38,9 @@ export default async function StoriesPage() {
                 href={`/stories/${story.slug}`}
                 className="group rounded-lg border border-border bg-surface p-5 transition-all duration-200 hover:scale-[1.01] hover:border-gold"
               >
-                <div className="mb-2 font-arabic text-3xl text-gold">{story.arabicName}</div>
+                <div lang="ar" dir="rtl" className="mb-2 font-arabic text-3xl text-gold">
+                  {story.arabicName}
+                </div>
                 <h2 className="text-lg font-medium text-text-primary">
                   {resolveLocalized(story.name, locale)}
                 </h2>

@@ -102,7 +102,12 @@ export function NamePairings({ slug, accent, initialPairings }: Props) {
                     {p.transliteration}
                   </span>
                 )}
-                <span className="font-arabic text-sm" style={{ color: "var(--color-text-muted)" }}>
+                <span
+                  lang="ar"
+                  dir="rtl"
+                  className="font-arabic text-sm"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
                   {p.arabic}
                 </span>
               </div>

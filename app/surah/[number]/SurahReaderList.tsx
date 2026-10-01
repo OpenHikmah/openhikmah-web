@@ -68,7 +68,11 @@ export function SurahReaderList({ verses }: { verses: Verse[] }) {
               </Tooltip>
             </div>
 
-            <p dir="rtl" className="font-arabic text-right text-xl leading-[2] text-text-primary">
+            <p
+              lang="ar"
+              dir="rtl"
+              className="font-arabic text-right text-xl leading-[2] text-text-primary"
+            >
               {verse.arabicText}
             </p>
 

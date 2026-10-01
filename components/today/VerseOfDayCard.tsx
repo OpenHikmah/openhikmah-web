@@ -78,11 +78,14 @@ export function VerseOfDayCard({ verse, reflection }: { verse: Verse; reflection
         <div className="flex items-baseline gap-2">
           <span className="text-sm text-text-secondary">{verse.surahName}</span>
           {verse.surahNameArabic && (
-            <span className="font-arabic text-sm text-text-muted">{verse.surahNameArabic}</span>
+            <span lang="ar" dir="rtl" className="font-arabic text-sm text-text-muted">
+              {verse.surahNameArabic}
+            </span>
           )}
         </div>
 
         <p
+          lang="ar"
           dir="rtl"
           className="font-arabic text-right text-[22px] leading-[2.05] text-text-primary"
         >

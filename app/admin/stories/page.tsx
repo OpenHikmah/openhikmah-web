@@ -86,7 +86,9 @@ export default function AdminStoriesPage() {
               {data.stories.map((s) => (
                 <tr key={s.slug}>
                   <Td className="whitespace-nowrap">
-                    <span className="font-arabic text-base text-gold">{s.arabicName}</span>{" "}
+                    <span lang="ar" dir="rtl" className="font-arabic text-base text-gold">
+                      {s.arabicName}
+                    </span>{" "}
                     <span className="text-text-secondary">{s.name}</span>
                   </Td>
                   <Td className="text-xs text-text-secondary">{s.chapters}</Td>

@@ -12,7 +12,13 @@ async function gotoAndSettle(page: Page, path: string): Promise<void> {
   await page.goto(path, { waitUntil: "domcontentloaded" });
 }
 
+async function assertArabicMarkup(page: Page, label: string): Promise<void> {
+  const unmarked = await page.locator('.font-arabic:not([lang="ar"][dir="rtl"])').count();
+  expect(unmarked, `${label}: .font-arabic elements missing lang="ar"/dir="rtl"`).toBe(0);
+}
+
 async function scanAndAssert(page: Page, label: string): Promise<void> {
+  await assertArabicMarkup(page, label);
   const results = await new AxeBuilder({ page }).analyze();
   const blocking = results.violations.filter((v) => BLOCKING_IMPACTS.has(v.impact ?? ""));
   const advisory = results.violations.filter((v) => !BLOCKING_IMPACTS.has(v.impact ?? ""));

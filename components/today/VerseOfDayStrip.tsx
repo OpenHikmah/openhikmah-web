@@ -27,6 +27,7 @@ export function VerseOfDayStrip({ verse }: { verse: Verse }) {
           flex item shrink below its content width instead of blowing out the row;
           the full verse is one tap away at /today. */}
       <p
+        lang="ar"
         dir="rtl"
         className="min-w-0 flex-1 overflow-hidden whitespace-nowrap font-arabic text-[22px] leading-[1.9] text-text-primary md:text-[28px]"
       >

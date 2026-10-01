@@ -194,7 +194,11 @@ function VerseNodeInner({ id, data, selected }: NodeProps) {
           </div>
         </div>
 
-        <p className="font-arabic text-right text-sm leading-loose text-text-primary">
+        <p
+          lang="ar"
+          dir="rtl"
+          className="font-arabic text-right text-sm leading-loose text-text-primary"
+        >
           {verse.arabicText}
         </p>
 

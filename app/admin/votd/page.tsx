@@ -430,7 +430,11 @@ function DayEditor({
 
       {preview && (
         <div className="space-y-2 rounded-md border border-border-subtle bg-bg p-3">
-          <p dir="rtl" className="font-arabic text-right text-lg leading-loose text-text-primary">
+          <p
+            lang="ar"
+            dir="rtl"
+            className="font-arabic text-right text-lg leading-loose text-text-primary"
+          >
             {preview.arabicText}
           </p>
           <p className="text-xs leading-relaxed text-text-secondary">{preview.translation}</p>

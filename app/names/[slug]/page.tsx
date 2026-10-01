@@ -113,7 +113,12 @@ export default async function NameDetailPage({ params }: Props) {
             {t("ofNinetyNine", { id: name.id })}
           </div>
 
-          <h1 className="mb-3 font-arabic text-7xl" style={{ color: styles.accent }}>
+          <h1
+            lang="ar"
+            dir="rtl"
+            className="mb-3 font-arabic text-7xl"
+            style={{ color: styles.accent }}
+          >
             {name.arabic}
           </h1>
 
@@ -176,7 +181,9 @@ export default async function NameDetailPage({ params }: Props) {
               className="group flex items-center gap-2 text-xs text-text-secondary transition-opacity hover:opacity-80"
             >
               <ArrowLeft className="h-3 w-3" />
-              <span className="font-arabic text-base text-text-muted">{prevName.arabic}</span>
+              <span lang="ar" dir="rtl" className="font-arabic text-base text-text-muted">
+                {prevName.arabic}
+              </span>
               <span>{prevName.transliteration}</span>
             </Link>
           ) : (
@@ -196,7 +203,9 @@ export default async function NameDetailPage({ params }: Props) {
               className="group flex items-center gap-2 text-xs text-text-secondary transition-opacity hover:opacity-80"
             >
               <span>{nextName.transliteration}</span>
-              <span className="font-arabic text-base text-text-muted">{nextName.arabic}</span>
+              <span lang="ar" dir="rtl" className="font-arabic text-base text-text-muted">
+                {nextName.arabic}
+              </span>
               <ArrowRight className="h-3 w-3" />
             </Link>
           ) : (
