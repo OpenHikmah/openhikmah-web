@@ -87,6 +87,29 @@ describe("useActivityTracker restore vs. genuine activity", () => {
     );
   });
 
+  it("fires both verse_added and connection_made when a node and its edge land in one render", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+    vi.stubGlobal("fetch", fetchMock);
+    const source = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+
+    renderHook(() => useActivityTracker());
+
+    await act(async () => {
+      const target = useCanvasStore.getState().addVerseNode(baseVerse, { x: 300, y: 0 });
+      useCanvasStore.getState().addConnectionEdge({
+        id: `${source}-${target}`,
+        source,
+        target,
+        type: "connection",
+        data: { kind: "thematic", reason: "r" },
+      } as never);
+    });
+
+    const bodies = fetchMock.mock.calls.map((c) => String((c[1] as { body: string }).body));
+    expect(bodies.some((b) => b.includes("verse_added"))).toBe(true);
+    expect(bodies.some((b) => b.includes("connection_made"))).toBe(true);
+  });
+
   it("does not fire an activity POST when appendWorkspace merges a loaded workspace", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
     vi.stubGlobal("fetch", fetchMock);

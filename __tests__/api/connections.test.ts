@@ -86,6 +86,11 @@ import { POST } from "@/app/api/connections/route";
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
+// Al-Fatiha 1:1 and its Saheeh International (en.sahih) translation — the corpus
+// text the route must ground prompts in, never the request body's.
+const CORPUS_ARABIC_1_1 = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ";
+const CORPUS_SAHEEH_1_1 = "In the name of Allah, the Entirely Merciful, the Especially Merciful.";
+
 function arabicResp(text = "آية كريمة") {
   return { ok: true, json: async () => ({ data: { text } }) };
 }
@@ -113,6 +118,13 @@ const defaultAnthropicText = JSON.stringify([
 describe("POST /api/connections", () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    // The route resolves the source verse server-side on a cache miss.
+    mockFetch.mockImplementation(async (url: string) => {
+      if (typeof url !== "string") return { ok: false };
+      if (url.includes("ar.alafasy")) return arabicResp(CORPUS_ARABIC_1_1);
+      if (url.includes("en.sahih")) return transResp(CORPUS_SAHEEH_1_1);
+      return { ok: false };
+    });
     mockSelect.mockClear();
     mockInsert.mockClear();
     mockConsume.mockReset();
@@ -159,27 +171,27 @@ describe("POST /api/connections", () => {
     expect(mockConsume).not.toHaveBeenCalled();
   });
 
-  it("returns 400 when arabicText exceeds the max length, without calling the AI path", async () => {
-    const req = makeRequest({
-      fromRef: "1:1",
-      kind: "thematic",
-      arabicText: "x".repeat(5001),
-      translation: "trans",
+  it("ignores client-supplied arabicText/translation and grounds the prompt in the corpus verse", async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (typeof url !== "string") return { ok: false };
+      if (url.includes("ar.alafasy")) return arabicResp(CORPUS_ARABIC_1_1);
+      if (url.includes("en.sahih")) return transResp(CORPUS_SAHEEH_1_1);
+      return { ok: false };
     });
-    const res = await POST(req);
-    expect(res.status).toBe(400);
-    expect(mockConsume).not.toHaveBeenCalled();
-  });
 
-  it("returns 400 when translation exceeds the max length", async () => {
-    const req = makeRequest({
-      fromRef: "1:1",
-      kind: "thematic",
-      arabicText: "text",
-      translation: "x".repeat(5001),
-    });
-    const res = await POST(req);
-    expect(res.status).toBe(400);
+    const res = await POST(
+      makeRequest({
+        fromRef: "1:1",
+        kind: "thematic",
+        arabicText: "FORGED-ARABIC-MARKER",
+        translation: "FORGED-TRANSLATION-MARKER",
+      })
+    );
+    expect(res.status).toBe(200);
+    const prompts = JSON.stringify(mockAnthropicCreate.mock.calls);
+    expect(prompts).not.toContain("FORGED-ARABIC-MARKER");
+    expect(prompts).not.toContain("FORGED-TRANSLATION-MARKER");
+    expect(prompts).toContain(CORPUS_SAHEEH_1_1);
   });
 
   it("returns 400 for a malformed fromRef", async () => {

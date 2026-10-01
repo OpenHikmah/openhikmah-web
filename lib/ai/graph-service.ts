@@ -50,6 +50,13 @@ interface SourceVerse {
   translation: string;
 }
 
+/** The source verse text, or a loader for it. Callers that resolve it from the
+ *  corpus pass a loader so it only runs where a prompt is actually built. */
+type SourceInput = SourceVerse | (() => Promise<SourceVerse>);
+
+const resolveSource = (source: SourceInput): Promise<SourceVerse> =>
+  typeof source === "function" ? source() : Promise.resolve(source);
+
 interface GetConnectionsOptions {
   /** Identifier (e.g. client IP) used to rate-limit the AI generation path.
    *  When set and the client is over budget, a miss throws RateLimitError.
@@ -174,7 +181,7 @@ async function readActiveRows(
 export async function getConnections(
   fromRef: string,
   kind: EdgeKind,
-  source: SourceVerse,
+  source: SourceInput,
   options: GetConnectionsOptions = {}
 ): Promise<ConnectionResult[]> {
   const excludeRefs = options.excludeRefs ?? [];
@@ -269,7 +276,7 @@ export async function getConnections(
 async function generateLocalizedCell(
   fromRef: string,
   kind: EdgeKind,
-  source: SourceVerse,
+  source: SourceInput,
   excludeRefs: string[],
   locale: Locale,
   provider: Provider,
@@ -422,7 +429,7 @@ async function persistTranslatedRows(
 export async function generateConnectionsForCell(
   fromRef: string,
   kind: EdgeKind,
-  source: SourceVerse,
+  source: SourceInput,
   excludeRefs: string[] = [],
   provider: Provider,
   model: string,
@@ -459,27 +466,33 @@ export async function generateConnectionsForCell(
   // Only fall back to it on a true first-time miss (no grounding data seeded
   // for this verse yet); once a caller is asking for more, an empty candidate
   // pool means the grounded data is genuinely exhausted, not unavailable.
-  const generated =
-    candidates.length > 0
-      ? await generateGroundedConnections(
-          fromRef,
-          source.arabicText,
-          source.translation,
-          kind,
-          candidates,
-          "en",
-          ...genOpts
-        )
-      : excludeRefs.length > 0
-        ? []
-        : await generateConnections(
-            fromRef,
-            source.arabicText,
-            source.translation,
-            kind,
-            "en",
-            ...genOpts
-          );
+  // Resolved only on the two branches that build a prompt, so an exhausted
+  // "get more" never needs the source text.
+  let generated: ConnectionResult[];
+  if (candidates.length > 0) {
+    const src = await resolveSource(source);
+    generated = await generateGroundedConnections(
+      fromRef,
+      src.arabicText,
+      src.translation,
+      kind,
+      candidates,
+      "en",
+      ...genOpts
+    );
+  } else if (excludeRefs.length > 0) {
+    generated = [];
+  } else {
+    const src = await resolveSource(source);
+    generated = await generateConnections(
+      fromRef,
+      src.arabicText,
+      src.translation,
+      kind,
+      "en",
+      ...genOpts
+    );
+  }
 
   if (generated.length > 0) {
     // Attribute the row to the exact model that generated it — the caller

@@ -182,6 +182,38 @@ describe("GET /api/social/friends", () => {
     expect(body.items[0].friend.streak).toBe(0);
   });
 
+  it("decays a friend's streak against the friend's own timezone, not UTC", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      // 20:00Z is already 2026-06-11 at UTC+14, so a 06-09 last activity is two
+      // local days old (broken) even though it is still "yesterday" in UTC.
+      vi.setSystemTime(new Date("2026-06-10T20:00:00Z"));
+      authedAs(makeUser({ id: 1 }));
+      mockSelect
+        .mockReturnValueOnce(
+          makeDbChain([
+            { id: 1, requesterId: 1, addresseeId: 2, status: "accepted", createdAt: new Date() },
+          ])
+        )
+        .mockReturnValueOnce(
+          makeDbChain([
+            {
+              id: 2,
+              username: "friend2",
+              currentStreak: 7,
+              lastActivityDate: "2026-06-09",
+              timezoneOffsetMinutes: 840,
+            },
+          ])
+        );
+      const res = await GET(makeGetReq());
+      const body = await res.json();
+      expect(body.items[0].friend.streak).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("shows the live streak for a friend active today", async () => {
     authedAs(makeUser({ id: 1 }));
     const today = new Date().toISOString().slice(0, 10);

@@ -26,6 +26,10 @@ describe("SURAH_NAMES", () => {
     expect(SURAH_NAMES[55][0]).toBe("Ar-Rahman");
   });
 
+  it("spells Al-Qalam's Arabic name correctly", () => {
+    expect(SURAH_NAMES[68]).toEqual(["Al-Qalam", "القلم"]);
+  });
+
   it("every entry has two non-empty strings", () => {
     for (const [key, val] of Object.entries(SURAH_NAMES)) {
       expect(typeof val[0]).toBe("string");

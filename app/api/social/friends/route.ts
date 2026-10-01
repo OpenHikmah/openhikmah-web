@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
             username: users.username,
             currentStreak: users.currentStreak,
             lastActivityDate: users.lastActivityDate,
+            timezoneOffsetMinutes: users.timezoneOffsetMinutes,
           })
           .from(users)
           .where(
@@ -65,7 +66,11 @@ export async function GET(req: NextRequest) {
         ? {
             id: friend.id,
             username: friend.username,
-            streak: effectiveStreak(friend.currentStreak, friend.lastActivityDate),
+            streak: effectiveStreak(
+              friend.currentStreak,
+              friend.lastActivityDate,
+              friend.timezoneOffsetMinutes
+            ),
           }
         : null,
       createdAt: r.createdAt,

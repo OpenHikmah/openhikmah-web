@@ -221,6 +221,35 @@ describe("POST /api/social/activity", () => {
     expect(body.streak).toBe(4);
   });
 
+  it("a lastActivityDate in the future keeps the streak instead of resetting it", async () => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + 1);
+    authedAs(
+      makeUser({
+        currentStreak: 6,
+        longestStreak: 6,
+        lastActivityDate: d.toISOString().slice(0, 10),
+      })
+    );
+    const res = await POST(makeReq({ type: "verse_added" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.isNewDay).toBe(false);
+    expect(body.streak).toBe(6);
+  });
+
+  it("rejects a non-string verse_ref with 400, not 500", async () => {
+    authedAs(makeUser());
+    const res = await POST(makeReq({ type: "verse_added", verse_ref: 123 }));
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects a verse_added verse_ref that is not a real ayah", async () => {
+    authedAs(makeUser());
+    const res = await POST(makeReq({ type: "verse_added", verse_ref: "999:1" }));
+    expect(res.status).toBe(400);
+  });
+
   it("yesterday: isNewDay true, streak increments by 1", async () => {
     authedAs(makeUser({ currentStreak: 3, longestStreak: 5, lastActivityDate: yesterdayStr() }));
     const res = await POST(makeReq({ type: "connection_made" }));

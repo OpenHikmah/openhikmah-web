@@ -92,6 +92,18 @@ describe("STORIES", () => {
   });
 });
 
+describe("Nuh story chapter placement", () => {
+  it("keeps Surah Nuh 71:1-10 together in the opening chapter, not the flood chapter", () => {
+    const nuh = getStoryBySlug("nuh")!;
+    const opening = nuh.chapters.find((c) => c.id === "a-clear-warner")!;
+    const flood = nuh.chapters.find((c) => c.id === "the-ship-and-the-flood")!;
+    for (let a = 1; a <= 10; a++) {
+      expect(opening.verseRefs).toContain(`71:${a}`);
+      expect(flood.verseRefs).not.toContain(`71:${a}`);
+    }
+  });
+});
+
 describe("getStoryBySlug", () => {
   it("returns the matching story", () => {
     expect(getStoryBySlug("yusuf")?.slug).toBe("yusuf");

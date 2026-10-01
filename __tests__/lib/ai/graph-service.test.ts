@@ -452,6 +452,35 @@ describe("getConnections", () => {
     expect(mockDiscover).toHaveBeenCalledWith("1:1", "thematic", undefined, ["2:255"]);
   });
 
+  it("resolves a lazy source exactly once on an en miss and feeds it to the prompt", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockGenerate.mockResolvedValue([result("2:255")]);
+    const loader = vi.fn(async () => ({ arabicText: SOURCE_ARABIC, translation: "tr" }));
+
+    await getConnections("1:1", "thematic", loader);
+
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(mockGenerate).toHaveBeenCalledWith(
+      "1:1",
+      SOURCE_ARABIC,
+      "tr",
+      "thematic",
+      "en",
+      RESOLVED
+    );
+  });
+
+  it("does not resolve the source when excludeRefs exhausts the grounded candidates", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockDiscover.mockResolvedValue([]);
+    const loader = vi.fn(async () => ({ arabicText: SOURCE_ARABIC, translation: "tr" }));
+
+    const out = await getConnections("1:1", "thematic", loader, { excludeRefs: ["2:255"] });
+
+    expect(out).toEqual([]);
+    expect(loader).not.toHaveBeenCalled();
+  });
+
   it("returns [] without falling back to legacy generation when excludeRefs exhausts candidates", async () => {
     mockSelect.mockReturnValue(makeSelectChain([])); // miss
     mockDiscover.mockResolvedValue([]); // nothing left to offer beyond excludeRefs
@@ -549,6 +578,30 @@ describe("getConnections — en-canonical localized reasons", () => {
       expect.objectContaining({ toRef: "3:18", locale: "tr", reason: "TR(because)" }),
     ]);
     expect(out.map((c) => c.reason)).toEqual(["TR(because)", "TR(because)"]);
+  });
+
+  it("never resolves the source verse when a locale repair translates already-cached en rows", async () => {
+    mockSelect.mockReturnValueOnce(makeSelectChain([])).mockReturnValue(
+      makeSelectChain([
+        {
+          fromRef: "1:1",
+          toRef: "2:255",
+          kind: "thematic",
+          reason: "en reason",
+          status: "active",
+        },
+      ])
+    );
+    mockReturning.mockResolvedValue([{ toRef: "2:255" }]);
+    mockTranslateReason.mockResolvedValue("ru reason");
+    const loader = vi.fn(async () => {
+      throw new Error("source text must not be loaded for a locale repair");
+    });
+
+    const out = await getConnections("1:1", "thematic", loader, { locale: "ru" });
+
+    expect(loader).not.toHaveBeenCalled();
+    expect(out[0]).toMatchObject({ ref: "2:255", reason: "ru reason" });
   });
 
   it("translates the existing en rows without regenerating when they are already cached", async () => {

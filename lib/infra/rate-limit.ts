@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { lt, sql } from "drizzle-orm";
+import { and, lt, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { rateLimits } from "@/lib/infra/db/schema";
 import { redisIncrWithTtl } from "@/lib/infra/redis";
@@ -88,15 +88,40 @@ const SWEEP_PROBABILITY = 0.01;
 /** Keep this many windows of history before a bucket is eligible for pruning. */
 const SWEEP_RETENTION_WINDOWS = 10;
 
+/** Rows written before the window was part of the key (`<key>:<bucket>`). */
+const LEGACY_KEY_PATTERN = ":w[0-9]+:[0-9]+$";
+const LEGACY_ROW_MAX_AGE_SECONDS = 24 * 60 * 60;
+
 /**
- * Deletes rate-limit buckets older than `olderThanSeconds`. Only buckets for the
- * current (and the immediately preceding) window matter; everything older is dead
- * weight. Exported so a cron job can call it directly if preferred over the
- * opportunistic sweep below.
+ * Selects the rows `sweepRateLimits` may delete. A bucket's lifetime depends on
+ * its own window, so only rows keyed with `windowSeconds` are judged against it
+ * (matched on the trailing `:w<window>:<bucket>` suffix, never a lookalike
+ * segment inside the caller's own key) —
+ * sweeping every row by the caller's window would delete the long-window
+ * buckets (the 20h tz-anchor limiter) as soon as a short-window caller swept.
+ * Legacy rows with no window in the key are pruned after a day, longer than any
+ * configured window.
  */
-export async function sweepRateLimits(olderThanSeconds: number): Promise<void> {
-  const cutoff = new Date(Date.now() - olderThanSeconds * 1000);
-  await db.delete(rateLimits).where(lt(rateLimits.createdAt, cutoff));
+export function expiredBucketsCondition(windowSeconds: number, now: Date = new Date()): SQL {
+  const windowCutoff = new Date(now.getTime() - windowSeconds * SWEEP_RETENTION_WINDOWS * 1000);
+  const legacyCutoff = new Date(now.getTime() - LEGACY_ROW_MAX_AGE_SECONDS * 1000);
+  return or(
+    and(
+      sql`${rateLimits.key} ~ ${`:w${windowSeconds}:[0-9]+$`}`,
+      lt(rateLimits.createdAt, windowCutoff)
+    ),
+    and(sql`${rateLimits.key} !~ ${LEGACY_KEY_PATTERN}`, lt(rateLimits.createdAt, legacyCutoff))
+  )!;
+}
+
+/**
+ * Deletes rate-limit buckets that have outlived `SWEEP_RETENTION_WINDOWS` windows
+ * of `windowSeconds`. Only buckets for the current (and the immediately preceding)
+ * window matter; everything older is dead weight. Exported so a cron job can call
+ * it directly if preferred over the opportunistic sweep below.
+ */
+export async function sweepRateLimits(windowSeconds: number): Promise<void> {
+  await db.delete(rateLimits).where(expiredBucketsCondition(windowSeconds));
 }
 
 /**
@@ -106,7 +131,7 @@ export async function sweepRateLimits(olderThanSeconds: number): Promise<void> {
 function maybeSweep(windowSeconds: number): void {
   try {
     if (Math.random() >= SWEEP_PROBABILITY) return;
-    void sweepRateLimits(windowSeconds * SWEEP_RETENTION_WINDOWS).catch(() => {});
+    void sweepRateLimits(windowSeconds).catch(() => {});
   } catch {
     // Never let cleanup affect rate limiting.
   }
@@ -136,7 +161,7 @@ export async function consume(
 
 async function consumeWith(key: string, limit: number, windowSeconds: number): Promise<boolean> {
   const bucket = Math.floor(Date.now() / 1000 / windowSeconds);
-  const rowKey = `${key}:${bucket}`;
+  const rowKey = `${key}:w${windowSeconds}:${bucket}`;
 
   // Prefer Redis: atomic, no Postgres write contention. Expire after two windows
   // so the bucket key self-cleans. Returns null when Redis is disabled/erroring,

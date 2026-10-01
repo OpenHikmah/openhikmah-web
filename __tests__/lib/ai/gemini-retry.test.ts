@@ -20,7 +20,7 @@ vi.mock("@/lib/admin/feature-flags", () => ({
   getFlagString: vi.fn((_k: string, fallback: string) => fallback),
 }));
 
-import { callAIDetailed, resetGeminiRateLimitState } from "@/lib/ai/ai";
+import { AiTruncatedError, callAIDetailed, resetGeminiRateLimitState } from "@/lib/ai/ai";
 import {
   GeminiDailyQuotaError,
   GeminiKeyInvalidError,
@@ -180,5 +180,32 @@ describe("callGemini retry / classification", () => {
       if (last instanceof GeminiDailyQuotaError) break;
     }
     expect(last).toBeInstanceOf(GeminiDailyQuotaError);
+  });
+});
+
+describe("callGemini truncation", () => {
+  it("throws AiTruncatedError when the candidate stopped at MAX_TOKENS", async () => {
+    mockGenerate.mockResolvedValueOnce({
+      response: {
+        text: () => "half a sentence that",
+        usageMetadata: null,
+        candidates: [{ finishReason: "MAX_TOKENS" }],
+      },
+    });
+    await expect(callAIDetailed("p", { provider: "gemini" })).rejects.toBeInstanceOf(
+      AiTruncatedError
+    );
+  });
+
+  it("accepts a candidate that finished with STOP", async () => {
+    mockGenerate.mockResolvedValueOnce({
+      response: {
+        text: () => "complete",
+        usageMetadata: null,
+        candidates: [{ finishReason: "STOP" }],
+      },
+    });
+    const res = await callAIDetailed("p", { provider: "gemini" });
+    expect(res.text).toBe("complete");
   });
 });
