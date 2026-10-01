@@ -1,0 +1,33 @@
+name: Delete merged branch
+
+# Deletes the PR's head branch once the PR is merged. Fork PRs are skipped
+# (their branches live in the fork, and we have no write access there). Uses
+# the base repo's GITHUB_TOKEN and never checks out PR code.
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  delete-branch:
+    name: Delete head branch
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref != github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete ${{ github.event.pull_request.head.ref }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          # The repo's auto-delete setting may have removed it already.
+          if gh api "repos/$REPO/git/ref/heads/$BRANCH" --silent 2>/dev/null; then
+            gh api --method DELETE "repos/$REPO/git/refs/heads/$BRANCH"
+          else
+            echo "$BRANCH already deleted"
+          fi
