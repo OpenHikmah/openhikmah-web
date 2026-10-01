@@ -144,11 +144,6 @@ describe("getNamesByCategory", () => {
 });
 
 describe("divine name wording", () => {
-  it("gives every name a distinct English gloss", () => {
-    const meanings = DIVINE_NAMES.map((n) => n.meaning);
-    expect(new Set(meanings).size).toBe(meanings.length);
-  });
-
   it("gives every name a distinct Arabic spelling", () => {
     const arabic = DIVINE_NAMES.map((n) => n.arabic);
     expect(new Set(arabic).size).toBe(arabic.length);

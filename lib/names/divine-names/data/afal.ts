@@ -39,11 +39,11 @@ export const AFAL_NAMES: DivineName[] = [
     slug: "al-bari",
     arabic: "الْبَارِئ",
     transliteration: "Al-Bāri'",
-    meaning: "The Flawless Maker",
+    meaning: "The Originator",
     category: "af'al",
     root: "ب-ر-أ",
     description:
-      "He who creates everything flawlessly and in harmony, distinguishing each created thing from the rest and assigning it its own nature and form.",
+      "He who distinguishes and separates created things from one another, assigning to each its own nature and form.",
   },
   {
     id: 13,
@@ -285,7 +285,7 @@ export const AFAL_NAMES: DivineName[] = [
     category: "af'al",
     root: "ب-د-أ",
     description:
-      "He who begins creation without prior matter or precedent — the initial act of bringing forth that demonstrates unlimited creative power.",
+      "He who begins creation without precedent or model — the initial act of bringing forth that demonstrates unlimited creative power.",
   },
   {
     id: 59,
