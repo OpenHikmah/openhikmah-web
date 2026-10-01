@@ -388,7 +388,13 @@ async function translateCellReasons(
         // A daily-quota hit or an invalid key is not a translation problem —
         // bubble it to the single handler in runConnectionBatch so the pass ends
         // "quota-daily" / "key-invalid" and the loop rotates keys.
-        if (err instanceof GeminiDailyQuotaError || err instanceof GeminiKeyInvalidError) throw err;
+        if (
+          err instanceof GeminiDailyQuotaError ||
+          err instanceof GeminiKeyInvalidError ||
+          err instanceof GeminiRateLimitError
+        ) {
+          throw err;
+        }
         gen.pacer?.noteRequest();
         console.error(`connection-batch: translation failed ${fromRef} ${kind} ${locale}:`, err);
         incr("connection_batch_translate_failed");

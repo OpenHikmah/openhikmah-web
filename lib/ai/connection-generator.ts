@@ -1,4 +1,9 @@
 import { callAIDetailed, type Provider } from "@/lib/ai/ai";
+import {
+  GeminiDailyQuotaError,
+  GeminiKeyInvalidError,
+  GeminiRateLimitError,
+} from "@/lib/ai/gemini-errors";
 import { getPrompt, renderTemplate } from "@/lib/ai/prompt-registry";
 import { TANZIH_CONSTRAINT, containsTashbih } from "@/lib/ai/theological-constraints";
 import { db } from "@/lib/infra/db";
@@ -549,6 +554,18 @@ export async function verifyConnections(
     opts.pacer?.noteRequest();
   } catch (err) {
     opts.pacer?.noteRequest();
+    // Quota, key, rate-limit and cancel signals belong to the batch's single
+    // handler (key rotation / clean stop). Swallowing them here would persist
+    // unverified connections, even after an admin Stop.
+    if (
+      err instanceof GeminiDailyQuotaError ||
+      err instanceof GeminiKeyInvalidError ||
+      err instanceof GeminiRateLimitError ||
+      opts.signal?.aborted ||
+      (err instanceof Error && err.name === "AbortError")
+    ) {
+      throw err;
+    }
     console.error("connection verification call failed, keeping candidates:", err);
     incr("connection_verify_call_failed");
     return candidates;

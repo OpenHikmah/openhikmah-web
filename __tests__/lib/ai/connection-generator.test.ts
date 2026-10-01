@@ -48,6 +48,7 @@ import {
   ConnectionParseError,
 } from "@/lib/ai/connection-generator";
 import { getPrompt } from "@/lib/ai/prompt-registry";
+import { GeminiDailyQuotaError } from "@/lib/ai/gemini-errors";
 
 // Sacred-data rule (AGENTS.md): plausible Arabic + a real translation even in
 // fixtures. Al-Fatiha 1:1.
@@ -407,6 +408,46 @@ describe("generateConnections — content quality gate", () => {
       });
     const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
     expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+  });
+
+  it("rethrows a daily-quota error from verification instead of keeping unverified candidates", async () => {
+    mockCallAIDetailed
+      .mockResolvedValueOnce({
+        text: JSON.stringify([
+          { ref: "2:255", reason: "A well-formed connection worth persisting." },
+        ]),
+        usage: { inputTokens: 100, outputTokens: 20 },
+        provider: "gemini" as const,
+        model: "gemini-test",
+      })
+      .mockRejectedValueOnce(
+        new GeminiDailyQuotaError({ cls: "daily", retryAfterMs: null, message: "quota" } as never)
+      );
+    await expect(
+      generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic")
+    ).rejects.toBeInstanceOf(GeminiDailyQuotaError);
+  });
+
+  it("rethrows an abort from verification so a Stop never persists unverified edges", async () => {
+    const controller = new AbortController();
+    mockCallAIDetailed
+      .mockResolvedValueOnce({
+        text: JSON.stringify([
+          { ref: "2:255", reason: "A well-formed connection worth persisting." },
+        ]),
+        usage: { inputTokens: 100, outputTokens: 20 },
+        provider: "gemini" as const,
+        model: "gemini-test",
+      })
+      .mockImplementationOnce(async () => {
+        controller.abort();
+        throw Object.assign(new Error("aborted"), { name: "AbortError" });
+      });
+    await expect(
+      generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", "en", {
+        signal: controller.signal,
+      })
+    ).rejects.toThrow("aborted");
   });
 
   it("skips verification entirely (no call, no spend) when nothing survives the gate", async () => {

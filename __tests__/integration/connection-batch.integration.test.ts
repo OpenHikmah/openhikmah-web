@@ -472,6 +472,27 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     expect((await db.select().from(connectionCoverage)).length).toBe(0);
   });
 
+  it("a per-minute rate limit on a translation call ends the pass 'rate-limited' instead of being swallowed", async () => {
+    for (const r of ["1:1", "2:255", "3:18"]) await seed(r);
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.startsWith("Translate the following sentence")) {
+        throw new GeminiRateLimitError({ cls: "per-minute", status: 429, raw: "PerMinute" }, 6);
+      }
+      return JSON.stringify([
+        { ref: "2:255", reason: "This verse describes the throne and vast divine knowledge." },
+        { ref: "3:18", reason: "Both verses bear witness to the absolute oneness of God." },
+      ]);
+    });
+
+    const summary = await runConnectionBatch(
+      { mode: "baseline", provider: "gemini", locales: ["tr"], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+
+    expect(summary.stoppedReason).toBe("rate-limited");
+    expect(summary.cellsFailed).toBe(0);
+  });
+
   it("callDelayMs: exactly one delay between consecutive real LLM requests", async () => {
     await seed("1:1");
     await seed("2:255");

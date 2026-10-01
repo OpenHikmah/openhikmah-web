@@ -127,6 +127,21 @@ export async function resolveProvider(feature?: AiFeature, override?: Provider):
 }
 
 /**
+ * The model stopped because it hit its output-token cap, so the text is cut off
+ * mid-thought. Thrown rather than returned: a truncated reason or translation
+ * would otherwise be cached as canonical content.
+ */
+export class AiTruncatedError extends Error {
+  constructor(
+    readonly provider: Provider,
+    readonly model: string
+  ) {
+    super(`${provider} response from ${model} was truncated at the output-token limit`);
+    this.name = "AiTruncatedError";
+  }
+}
+
+/**
  * Calls the configured LLM provider and returns the response text plus the
  * token usage, resolved provider, and model id. Prefer this over `callAI` when
  * you need to log spend or thread a provider override.
@@ -156,6 +171,7 @@ async function callClaude(prompt: string, model: string): Promise<AiResult> {
     thinking: { type: "adaptive" },
     messages: [{ role: "user", content: prompt }],
   });
+  if (message.stop_reason === "max_tokens") throw new AiTruncatedError("claude", model);
   const block = message.content.find((b) => b.type === "text");
   if (!block || block.type !== "text") throw new Error("No text block in Claude response");
   return {
@@ -206,6 +222,9 @@ async function callGemini(
       // the request in Google's service (still billed) — SDK docs are explicit.
       const result = await genModel.generateContent(prompt, signal ? { signal } : {});
       ambiguous429Streak.delete(key);
+      if (result.response.candidates?.[0]?.finishReason === "MAX_TOKENS") {
+        throw new AiTruncatedError("gemini", model);
+      }
       const meta = result.response.usageMetadata;
       return {
         text: result.response.text(),
