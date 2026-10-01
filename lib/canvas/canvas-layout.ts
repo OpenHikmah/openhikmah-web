@@ -110,6 +110,13 @@ export function viewportCenter(
   };
 }
 
+const EDGE_LABEL_MAX = 60;
+
+/** Short edge label derived from a connection's reason. */
+export function connectionLabel(reason: string): string {
+  return reason.slice(0, EDGE_LABEL_MAX);
+}
+
 /**
  * Builds the edge for an expansion connection, whether its target is a
  * freshly-added node or one that already existed elsewhere on the canvas (the
@@ -130,7 +137,7 @@ export function buildConnectionEdge(
     type: "hikmah",
     data: {
       kind: conn.kind,
-      label: conn.reason.slice(0, 60),
+      label: connectionLabel(conn.reason),
       reason: conn.reason,
     },
   };

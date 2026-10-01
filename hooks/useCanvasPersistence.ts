@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import { useCanvasStore, serializeCanvas, type SavedCanvas } from "@/store/canvas";
+import { toSharePayload } from "@/lib/canvas/share-payload";
 
 /** localStorage key for the in-progress canvas. Exported so the home screen can
  *  surface a "continue where you left off" entry without re-deriving the key. */
@@ -17,7 +18,7 @@ export async function buildShareUrl(canvas: SavedCanvas): Promise<string> {
   const res = await fetch("/api/share", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(canvas),
+    body: JSON.stringify(toSharePayload(canvas)),
   });
   if (!res.ok) throw new Error("Share failed");
   const { id } = (await res.json()) as { id: string };
@@ -93,7 +94,12 @@ export function useCanvasPersistence() {
       const raw = localStorage.getItem(LS_KEY);
       if (raw) {
         const saved: SavedCanvas = JSON.parse(raw);
-        if (saved?.v === 1 && saved.nodes.length > 0) {
+        if (
+          saved?.v === 1 &&
+          Array.isArray(saved.nodes) &&
+          saved.nodes.length > 0 &&
+          Array.isArray(saved.edges)
+        ) {
           restoreCanvas(saved);
         }
       }
@@ -114,7 +120,12 @@ export function useCanvasPersistence() {
       fetch(`/api/share/${shareId}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((saved: SavedCanvas | null) => {
-          if (saved?.v === 1 && saved.nodes.length > 0) {
+          if (
+            saved?.v === 1 &&
+            Array.isArray(saved.nodes) &&
+            saved.nodes.length > 0 &&
+            Array.isArray(saved.edges)
+          ) {
             restoreCanvas(saved);
             // Only clean the URL once we've successfully restored — preserves the
             // share link for retry if the fetch fails or returns invalid data.

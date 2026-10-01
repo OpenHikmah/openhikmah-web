@@ -1,76 +1,143 @@
-import { describe, it, expect } from "vitest";
-import { isValidNode } from "@/lib/canvas/share-canvas";
+import { describe, it, expect, vi } from "vitest";
 
-function nodeWith(verse: unknown) {
-  return { verse };
-}
+vi.mock("@/lib/infra/db", () => ({ db: {} }));
 
-describe("isValidNode", () => {
-  it("accepts a node with all required verse string fields", () => {
-    expect(
-      isValidNode(
-        nodeWith({ ref: "1:1", surahName: "Al-Fatihah", translation: "In the name of..." })
-      )
-    ).toBe(true);
+import { MAX_SHARE_EDGES, MAX_SHARE_NODES, parseSharePayload } from "@/lib/canvas/share-canvas";
+
+const node = (id: string, ref = "2:255") => ({ id, x: 10, y: 20, ref });
+const edge = (id: string, source: string, target: string, kind = "thematic") => ({
+  id,
+  source,
+  target,
+  kind,
+});
+const payload = (overrides: Record<string, unknown> = {}) => ({
+  v: 2,
+  nodes: [node("node-1"), node("node-2", "112:1")],
+  edges: [edge("edge-1", "node-1", "node-2")],
+  ...overrides,
+});
+
+describe("parseSharePayload", () => {
+  it("accepts a well-formed payload", () => {
+    const result = parseSharePayload(payload());
+    expect(result).toEqual({ ok: true, payload: payload() });
   });
 
-  it("rejects null", () => {
-    expect(isValidNode(null)).toBe(false);
-  });
-
-  it("rejects non-object primitives", () => {
-    expect(isValidNode("string")).toBe(false);
-    expect(isValidNode(42)).toBe(false);
-    expect(isValidNode(undefined)).toBe(false);
-  });
-
-  it("rejects a node missing verse entirely", () => {
-    expect(isValidNode({})).toBe(false);
-  });
-
-  it("rejects a node whose verse is null", () => {
-    expect(isValidNode(nodeWith(null))).toBe(false);
-  });
-
-  it("rejects a node whose verse is not an object", () => {
-    expect(isValidNode(nodeWith("not an object"))).toBe(false);
-  });
-
-  it("rejects when ref is missing or the wrong type", () => {
-    expect(isValidNode(nodeWith({ surahName: "x", translation: "y" }))).toBe(false);
-    expect(isValidNode(nodeWith({ ref: 1, surahName: "x", translation: "y" }))).toBe(false);
-  });
-
-  it("rejects when surahName is missing or the wrong type", () => {
-    expect(isValidNode(nodeWith({ ref: "1:1", translation: "y" }))).toBe(false);
-    expect(isValidNode(nodeWith({ ref: "1:1", surahName: 1, translation: "y" }))).toBe(false);
-  });
-
-  it("rejects when translation is missing or the wrong type", () => {
-    expect(isValidNode(nodeWith({ ref: "1:1", surahName: "x" }))).toBe(false);
-    expect(isValidNode(nodeWith({ ref: "1:1", surahName: "x", translation: 1 }))).toBe(false);
-  });
-
-  it("rejects a field longer than the 2000-char cap", () => {
-    const tooLong = "a".repeat(2001);
-    expect(isValidNode(nodeWith({ ref: tooLong, surahName: "x", translation: "y" }))).toBe(false);
-    expect(isValidNode(nodeWith({ ref: "1:1", surahName: tooLong, translation: "y" }))).toBe(false);
-    expect(isValidNode(nodeWith({ ref: "1:1", surahName: "x", translation: tooLong }))).toBe(false);
-  });
-
-  it("accepts a field right at the 2000-char cap", () => {
-    const atCap = "a".repeat(2000);
-    expect(isValidNode(nodeWith({ ref: atCap, surahName: "x", translation: "y" }))).toBe(true);
-  });
-
-  it("ignores extra/unexpected fields and validates only ref/surahName/translation", () => {
-    // A `__proto__` key from JSON.parse is just an own data property, not the
-    // object's actual prototype — this asserts isValidNode doesn't get tripped
-    // up by it either way, as long as the three required fields are present.
-    const withExtraField = JSON.parse(
-      '{"verse": {"ref": "1:1", "surahName": "x", "translation": "y", "__proto__": {"polluted": true}}}'
+  it("accepts an empty edges array and keeps isRoot", () => {
+    const result = parseSharePayload(
+      payload({ nodes: [{ ...node("node-1"), isRoot: true }], edges: [] })
     );
-    expect(isValidNode(withExtraField)).toBe(true);
-    expect(Object.getPrototypeOf(withExtraField.verse)).toBe(Object.prototype);
+    expect(result).toEqual({
+      ok: true,
+      payload: { v: 2, nodes: [{ ...node("node-1"), isRoot: true }], edges: [] },
+    });
+  });
+
+  it("drops forged verse text and edge reasons instead of keeping them", () => {
+    const result = parseSharePayload(
+      payload({
+        nodes: [
+          {
+            ...node("node-1"),
+            arabicText: "forged arabic",
+            translation: "forged translation",
+            verse: { ref: "2:255", translation: "forged" },
+          },
+          node("node-2", "112:1"),
+        ],
+        edges: [{ ...edge("edge-1", "node-1", "node-2"), reason: "forged", label: "forged" }],
+        extra: "ignored",
+      })
+    );
+    expect(result).toEqual({ ok: true, payload: payload() });
+  });
+
+  it.each([
+    ["a non-object", "nope"],
+    ["null", null],
+    ["the old v1 format", { v: 1, nodes: [{ verse: { ref: "2:255" } }] }],
+    ["an unknown version", payload({ v: 3 })],
+  ])("rejects %s", (_label, input) => {
+    expect(parseSharePayload(input).ok).toBe(false);
+  });
+
+  it("rejects missing, non-array and oversized edges", () => {
+    expect(parseSharePayload({ v: 2, nodes: [node("node-1")] }).ok).toBe(false);
+    expect(parseSharePayload(payload({ edges: {} })).ok).toBe(false);
+    const edges = Array.from({ length: MAX_SHARE_EDGES + 1 }, (_, i) =>
+      edge(`e${i}`, "node-1", "node-2")
+    );
+    expect(parseSharePayload(payload({ edges })).ok).toBe(false);
+  });
+
+  it("rejects empty and oversized node lists", () => {
+    expect(parseSharePayload(payload({ nodes: [], edges: [] })).ok).toBe(false);
+    const nodes = Array.from({ length: MAX_SHARE_NODES + 1 }, (_, i) => node(`n${i}`));
+    expect(parseSharePayload(payload({ nodes, edges: [] })).ok).toBe(false);
+    const max = Array.from({ length: MAX_SHARE_NODES }, (_, i) => node(`n${i}`));
+    expect(parseSharePayload(payload({ nodes: max, edges: [] })).ok).toBe(true);
+  });
+
+  it.each(["", "foo", "0:1", "1:8", "115:1", "2:0", "02:255", "2:255 "])(
+    "rejects the invalid verse ref %j",
+    (ref) => {
+      expect(parseSharePayload(payload({ nodes: [node("node-1", ref)], edges: [] })).ok).toBe(
+        false
+      );
+    }
+  );
+
+  it("rejects a non-string ref", () => {
+    expect(
+      parseSharePayload(payload({ nodes: [{ ...node("node-1"), ref: 2255 }], edges: [] })).ok
+    ).toBe(false);
+  });
+
+  it("rejects bad node ids and duplicate node ids", () => {
+    for (const id of ["", "has space", "<script>", "a".repeat(129), 5]) {
+      expect(parseSharePayload(payload({ nodes: [{ ...node("x"), id }], edges: [] })).ok).toBe(
+        false
+      );
+    }
+    expect(
+      parseSharePayload(payload({ nodes: [node("node-1"), node("node-1")], edges: [] })).ok
+    ).toBe(false);
+  });
+
+  it("rejects non-finite or out-of-range coordinates", () => {
+    for (const bad of [Infinity, -Infinity, NaN, "10", null, 1e9]) {
+      expect(
+        parseSharePayload(payload({ nodes: [{ ...node("node-1"), x: bad }], edges: [] })).ok
+      ).toBe(false);
+      expect(
+        parseSharePayload(payload({ nodes: [{ ...node("node-1"), y: bad }], edges: [] })).ok
+      ).toBe(false);
+    }
+  });
+
+  it("rejects a non-boolean isRoot", () => {
+    expect(
+      parseSharePayload(payload({ nodes: [{ ...node("node-1"), isRoot: "yes" }], edges: [] })).ok
+    ).toBe(false);
+  });
+
+  it("rejects an edge kind outside EdgeKind", () => {
+    expect(
+      parseSharePayload(payload({ edges: [edge("edge-1", "node-1", "node-2", "forged")] })).ok
+    ).toBe(false);
+  });
+
+  it("rejects edges with unknown endpoints, self-loops or bad ids", () => {
+    expect(parseSharePayload(payload({ edges: [edge("edge-1", "node-1", "missing")] })).ok).toBe(
+      false
+    );
+    expect(parseSharePayload(payload({ edges: [edge("edge-1", "node-1", "node-1")] })).ok).toBe(
+      false
+    );
+    expect(parseSharePayload(payload({ edges: [edge("bad id", "node-1", "node-2")] })).ok).toBe(
+      false
+    );
+    expect(parseSharePayload(payload({ edges: ["edge"] })).ok).toBe(false);
   });
 });

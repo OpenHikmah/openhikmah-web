@@ -145,4 +145,46 @@ describe("useCanvasPersistence flush-on-unload", () => {
     fetchSpy.mockRestore();
     window.history.pushState({}, "", "/canvas");
   });
+
+  it("does not restore (or throw on) a fetched share that has no edges array", async () => {
+    window.history.pushState({}, "", "/canvas?share=12345678-1234-1234-1234-123456789abc");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ v: 1, nodes: [{ id: "node-1", x: 0, y: 0, verse: baseVerse }] }),
+    } as Response);
+
+    renderHook(() => useCanvasPersistence());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(useCanvasStore.getState().nodes).toEqual([]);
+    expect(window.location.search).toContain("share=");
+
+    fetchSpy.mockRestore();
+    window.history.pushState({}, "", "/canvas");
+  });
+
+  it("restores a fetched share with nodes and edges and clears the share param", async () => {
+    window.history.pushState({}, "", "/canvas?share=12345678-1234-1234-1234-123456789abc");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        v: 1,
+        nodes: [{ id: "node-1", x: 0, y: 0, verse: baseVerse }],
+        edges: [],
+      }),
+    } as Response);
+
+    renderHook(() => useCanvasPersistence());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(useCanvasStore.getState().nodes).toHaveLength(1);
+    expect(window.location.search).not.toContain("share=");
+
+    fetchSpy.mockRestore();
+    window.history.pushState({}, "", "/canvas");
+  });
 });
