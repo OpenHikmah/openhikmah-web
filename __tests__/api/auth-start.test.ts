@@ -15,7 +15,7 @@ describe("POST /api/auth/start", () => {
     expect(cookie.toLowerCase()).toContain("httponly");
     expect(cookie.toLowerCase()).toContain("samesite=lax");
     expect(cookie).toContain("Path=/api/auth");
-    expect(cookie).toContain("Max-Age=600");
+    expect(cookie).toContain("Max-Age=1800");
   });
 
   it("issues different values on each call", async () => {

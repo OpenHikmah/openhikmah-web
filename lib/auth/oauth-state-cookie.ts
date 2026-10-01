@@ -17,8 +17,9 @@ export const oauthStateCookieOptions = {
   // Lax is enough: the cookie is only read by the same-origin exchange POST.
   sameSite: "lax" as const,
   path: "/api/auth",
-  // Covers a slow trip through the QF login page; the cookie is single-use anyway.
-  maxAge: 10 * 60,
+  // Long enough for a first-time QF signup (email verification included); the
+  // cookie is single-use anyway.
+  maxAge: 30 * 60,
 };
 
 export function encodeOAuthState(state: string, nonce: string): string {

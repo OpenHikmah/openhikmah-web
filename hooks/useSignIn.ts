@@ -25,9 +25,9 @@ export function useSignIn() {
       sessionStorage.setItem("pkce_nonce", nonce);
       window.location.href = url;
     } catch (err) {
-      // Building the auth URL failed (e.g. crypto unavailable) — re-enable the
+      // /api/auth/start or building the auth URL failed — re-enable the
       // button instead of leaving it stuck on "signing in".
-      console.error("useSignIn: buildAuthUrl failed:", err);
+      console.error("useSignIn: starting sign-in failed:", err);
       setSigningIn(false);
     }
   };
