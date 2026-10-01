@@ -38,8 +38,10 @@ vi.mock("@/lib/infra/redis", () => ({ redisIncrWithTtl: mockRedisIncr }));
 vi.mock("@/lib/infra/metrics", () => ({ incr: mockIncr }));
 vi.mock("@/lib/admin/feature-flags", () => ({ getFlagNumber: mockGetFlagNumber }));
 
+import { PgDialect } from "drizzle-orm/pg-core";
 import {
   consume,
+  expiredBucketsCondition,
   rateLimitOrNull,
   sweepRateLimits,
   RateLimitError,
@@ -86,7 +88,7 @@ describe("rate-limit consume", () => {
     mockReturning.mockResolvedValue([{ count: 1 }]);
     await consume("ip:1", 20, 60);
     const key = mockValues.mock.calls[0][0] as { key: string };
-    expect(key.key).toMatch(/^ip:1:\d+$/);
+    expect(key.key).toMatch(/^ip:1:w60:\d+$/);
   });
 
   it("RateLimitError carries a name", () => {
@@ -192,6 +194,43 @@ describe("sweepRateLimits", () => {
     await sweepRateLimits(600);
     expect(mockDelete).toHaveBeenCalledOnce();
     expect(mockDeleteWhere).toHaveBeenCalledOnce();
+  });
+});
+
+describe("expiredBucketsCondition", () => {
+  const now = new Date("2026-06-10T12:00:00Z");
+  const render = (windowSeconds: number) =>
+    new PgDialect().sqlToQuery(expiredBucketsCondition(windowSeconds, now));
+
+  it("judges only rows keyed with the caller's own window against that window's retention", () => {
+    const { sql: text, params } = render(600);
+    expect(params).toContain("%:w600:%");
+    expect(text).toMatch(/like/i);
+    // 10 retained windows of 600s = 6000s before now.
+    expect(params).toContainEqual(new Date(now.getTime() - 6000 * 1000).toISOString());
+  });
+
+  it("a short-window sweep does not match the 20h tz-anchor bucket", () => {
+    const { params } = render(600);
+    expect(params).not.toContain("%:w72000:%");
+    expect(params).toContain("%:w600:%");
+  });
+
+  it("prunes legacy keys (no window segment) only after a day", () => {
+    const { params } = render(600);
+    expect(params).toContain(":w[0-9]+:[0-9]+$");
+    expect(params).toContainEqual(new Date(now.getTime() - 24 * 3600 * 1000).toISOString());
+  });
+});
+
+describe("consume row keys", () => {
+  it("embeds the window in the postgres bucket key so sweeps can tell windows apart", async () => {
+    mockRedisIncr.mockResolvedValue(null);
+    mockReturning.mockResolvedValue([{ count: 1 }]);
+    mockValues.mockClear();
+    await consume("tz-anchor:7", 2, 72000);
+    const row = mockValues.mock.calls[0][0] as { key: string };
+    expect(row.key).toMatch(/^tz-anchor:7:w72000:\d+$/);
   });
 });
 
