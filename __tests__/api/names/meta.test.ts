@@ -59,6 +59,7 @@ vi.mock("@/lib/ai/ai", () => ({
 }));
 
 import { GET as getMeta } from "@/app/api/names/[slug]/meta/route";
+import { META_VERSION } from "@/lib/names/name-meta";
 
 function req(slug: string) {
   return new NextRequest(`http://localhost/api/names/${slug}/meta`);
@@ -204,7 +205,9 @@ describe("GET /api/names/[slug]/meta", () => {
     // resolve concurrently, so asserting per-field values by call order would be
     // flaky) — return the same cached string for either and check both fields got it.
     withLocale("tr");
-    mockSelect.mockReturnValue(makeSelectChain([{ data: JSON.stringify("çeviri"), version: 1 }]));
+    mockSelect.mockReturnValue(
+      makeSelectChain([{ data: JSON.stringify("çeviri"), version: META_VERSION }])
+    );
 
     const res = await getMeta(req("al-malik"), params("al-malik"));
 

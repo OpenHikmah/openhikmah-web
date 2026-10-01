@@ -4,7 +4,7 @@ import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
 import { incr } from "@/lib/infra/metrics";
 
 // Bump to force regeneration after a prompt change (see translateReason).
-export const META_VERSION = 1;
+export const META_VERSION = 2;
 
 export type NameMetaField = "meaning" | "description";
 

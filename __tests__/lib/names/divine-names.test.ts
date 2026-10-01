@@ -142,3 +142,33 @@ describe("getNamesByCategory", () => {
     expect(total).toBe(99);
   });
 });
+
+describe("divine name wording", () => {
+  it("gives every name a distinct English gloss", () => {
+    const meanings = DIVINE_NAMES.map((n) => n.meaning);
+    expect(new Set(meanings).size).toBe(meanings.length);
+  });
+
+  it("gives every name a distinct Arabic spelling", () => {
+    const arabic = DIVINE_NAMES.map((n) => n.arabic);
+    expect(new Set(arabic).size).toBe(arabic.length);
+  });
+
+  it("keeps Al-Walī (the Protecting Friend) and Al-Wālī (the Governor) as separate names", () => {
+    const walī = getNameBySlug("al-wali");
+    const wālī = getNameBySlug("al-wali-governor");
+    expect(walī?.arabic).not.toBe(wālī?.arabic);
+    expect(walī?.meaning).not.toBe(wālī?.meaning);
+  });
+
+  it("includes Al-Majīd", () => {
+    expect(getNameBySlug("al-majid")?.meaning).toBe("The Most Glorious");
+  });
+
+  it("does not describe divine attributes with a physical 'hand' idiom (Tashbih)", () => {
+    const offenders = DIVINE_NAMES.filter((n) =>
+      /\bhands?\b/i.test(`${n.meaning} ${n.description}`)
+    );
+    expect(offenders.map((n) => n.slug)).toEqual([]);
+  });
+});

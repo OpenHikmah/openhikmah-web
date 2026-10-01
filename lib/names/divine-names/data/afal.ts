@@ -39,11 +39,11 @@ export const AFAL_NAMES: DivineName[] = [
     slug: "al-bari",
     arabic: "الْبَارِئ",
     transliteration: "Al-Bāri'",
-    meaning: "The Originator",
+    meaning: "The Flawless Maker",
     category: "af'al",
     root: "ب-ر-أ",
     description:
-      "He who distinguishes and separates created things from one another, assigning to each its own nature and form.",
+      "He who creates everything flawlessly and in harmony, distinguishing each created thing from the rest and assigning it its own nature and form.",
   },
   {
     id: 13,
@@ -131,7 +131,7 @@ export const AFAL_NAMES: DivineName[] = [
     category: "af'al",
     root: "خ-ف-ض",
     description:
-      "He who lowers the arrogant and the unjust; the one in whose hand every station rises or falls according to divine wisdom and justice.",
+      "He who lowers the arrogant and the unjust; the one under whose dominion every station rises or falls according to divine wisdom and justice.",
   },
   {
     id: 23,
@@ -285,7 +285,7 @@ export const AFAL_NAMES: DivineName[] = [
     category: "af'al",
     root: "ب-د-أ",
     description:
-      "He who begins creation without precedent or model — the initial act of bringing forth that demonstrates unlimited creative power.",
+      "He who begins creation without prior matter or precedent — the initial act of bringing forth that demonstrates unlimited creative power.",
   },
   {
     id: 59,
@@ -318,7 +318,7 @@ export const AFAL_NAMES: DivineName[] = [
     category: "af'al",
     root: "م-و-ت",
     description:
-      "He who decrees the death of every living thing — paired with Al-Muhyi to affirm that life and death are entirely in His hand, neither random nor outside His will.",
+      "He who decrees the death of every living thing — paired with Al-Muhyi to affirm that life and death are entirely under His dominion and decree, neither random nor outside His will.",
   },
   {
     id: 70,
