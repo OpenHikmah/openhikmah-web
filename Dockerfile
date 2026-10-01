@@ -24,7 +24,6 @@ ENV NEXT_PUBLIC_QF_AUTH_BASE=$NEXT_PUBLIC_QF_AUTH_BASE
 # real values are injected at runtime via docker-compose environment.
 ENV ANTHROPIC_API_KEY=build-placeholder
 ENV QF_CLIENT_SECRET=build-placeholder
-ENV QF_API_BASE=https://placeholder.example.com
 ENV QF_AUTH_BASE=https://placeholder.example.com
 ENV DATABASE_URL=postgresql://openh:placeholder@localhost:5432/open_hikmah
 
