@@ -5,11 +5,15 @@ import { STORIES } from "../lib/stories";
 import { test, expect } from "./fixtures/auth";
 
 const BLOCKING_IMPACTS = new Set(["serious", "critical"]);
+// Spinners (route/auth loading) and skeletons (session restore, AI content).
+// A scan taken while any of these is showing tests the placeholder, not the page.
+const LOADING_INDICATORS = ".animate-spin, .animate-pulse";
 const FIRST_DIVINE_NAME_SLUG = DIVINE_NAMES[0].slug;
 const FIRST_STORY_SLUG = STORIES[0].slug;
 
 async function gotoAndSettle(page: Page, path: string): Promise<void> {
   await page.goto(path, { waitUntil: "domcontentloaded" });
+  await expect(page.locator(LOADING_INDICATORS)).toHaveCount(0, { timeout: 30_000 });
 }
 
 async function assertArabicMarkup(page: Page, label: string): Promise<void> {
@@ -35,17 +39,19 @@ async function scanAndAssert(page: Page, label: string): Promise<void> {
 
 test.describe("accessibility", () => {
   test("home page has no serious a11y violations", async ({ page }) => {
-    await page.goto("/");
+    await gotoAndSettle(page, "/");
     await scanAndAssert(page, "home");
   });
 
   test("canvas page has no serious a11y violations", async ({ authenticatedPage: page }) => {
-    await page.goto("/canvas");
+    await gotoAndSettle(page, "/canvas");
+    // HikmahCanvas is a client-only dynamic import whose fallback is plain text.
+    await page.locator(".react-flow").waitFor();
     await scanAndAssert(page, "canvas");
   });
 
   test("social page has no serious a11y violations", async ({ authenticatedPage: page }) => {
-    await page.goto("/social");
+    await gotoAndSettle(page, "/social");
     await scanAndAssert(page, "social");
   });
 

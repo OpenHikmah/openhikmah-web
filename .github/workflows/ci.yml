@@ -151,7 +151,6 @@ jobs:
       GEMINI_API_KEY: placeholder-gemini-key
       GEMINI_MODEL: gemini-3.5-flash-lite
       NEXT_PUBLIC_QF_CLIENT_ID: placeholder-client-id
-      QF_API_BASE: https://placeholder.example.com
       QF_AUTH_BASE: https://placeholder.example.com
       QF_CLIENT_SECRET: placeholder-secret
       NEXT_PUBLIC_APP_URL: https://openhikmah.com
@@ -300,7 +299,6 @@ jobs:
       GEMINI_API_KEY: placeholder-gemini-key
       GEMINI_MODEL: gemini-3.5-flash-lite
       NEXT_PUBLIC_QF_CLIENT_ID: placeholder-client-id
-      QF_API_BASE: https://placeholder.example.com
       QF_AUTH_BASE: https://placeholder.example.com
       QF_CLIENT_SECRET: placeholder-secret
       NEXT_PUBLIC_APP_URL: http://localhost:3100

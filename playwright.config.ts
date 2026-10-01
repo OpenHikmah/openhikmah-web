@@ -12,6 +12,8 @@ const PORT = 3100;
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
+  // A committed test.only would otherwise silently skip the rest of the suite in CI.
+  forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   // All e2e tests share one fixed dev-bypass identity (DEV_AUTH_TOKEN/DEV_AUTH_QF_ID),
   // so running them in parallel causes real cross-test collisions on that user's data.
