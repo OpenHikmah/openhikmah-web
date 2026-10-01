@@ -249,7 +249,28 @@
     "loading": "Loading…",
     "rootTitle": "Something went wrong",
     "rootBody": "An unexpected error interrupted this page. You can try again, or head back home.",
-    "todayVerseUnavailable": "Couldn't load today's verse right now. Please try again later."
+    "todayVerseUnavailable": "Couldn't load today's verse right now. Please try again later.",
+    "notFoundTitle": "Page not found",
+    "notFoundBody": "This path doesn’t lead anywhere. The verse, name, or page you’re looking for may have moved.",
+    "returnHome": "Return home"
+  },
+  "audio": {
+    "previousVerse": "Previous verse",
+    "nextVerse": "Next verse",
+    "play": "Play",
+    "pause": "Pause",
+    "stopPlayback": "Stop playback"
+  },
+  "pagination": {
+    "label": "Pagination",
+    "previous": "Previous page",
+    "next": "Next page"
+  },
+  "morphology": {
+    "wordTriggerAria": "{word}, show root and related verses",
+    "root": "Root",
+    "versesSharingRoot": "Verses sharing this root",
+    "noOtherVerses": "No other verses found yet."
   },
   "authGate": {
     "title": "Sign in to continue",

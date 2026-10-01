@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { useAudioStore } from "@/store/audio";
 import { Play, Pause, SkipBack, SkipForward, X, Loader2, Volume2 } from "lucide-react";
 import { IconButton } from "@/components/ui";
@@ -25,6 +26,7 @@ export function MiniPlayer() {
     prev,
   } = useAudioStore();
   const mobileNavVisible = useMobileNavVisible();
+  const t = useTranslations("audio");
 
   useEffect(() => {
     if (!currentRef) return;
@@ -80,7 +82,7 @@ export function MiniPlayer() {
             tone="teal"
             size="xs"
             onClick={prev}
-            aria-label="Previous verse"
+            aria-label={t("previousVerse")}
             className="border-transparent"
           >
             <SkipBack />
@@ -91,7 +93,7 @@ export function MiniPlayer() {
           tone="teal"
           size="sm"
           onClick={isPlaying ? pause : resume}
-          aria-label={isPlaying ? "Pause" : "Play"}
+          aria-label={isPlaying ? t("pause") : t("play")}
           disabled={isLoading}
           className="border-teal text-teal"
         >
@@ -103,7 +105,7 @@ export function MiniPlayer() {
             tone="teal"
             size="xs"
             onClick={next}
-            aria-label="Next verse"
+            aria-label={t("nextVerse")}
             className="border-transparent"
           >
             <SkipForward />
@@ -114,7 +116,7 @@ export function MiniPlayer() {
           tone="danger"
           size="xs"
           onClick={stop}
-          aria-label="Stop playback"
+          aria-label={t("stopPlayback")}
           className="ml-1 border-transparent"
         >
           <X />
