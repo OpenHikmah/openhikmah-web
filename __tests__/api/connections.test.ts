@@ -86,6 +86,11 @@ import { POST } from "@/app/api/connections/route";
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
+// Al-Fatiha 1:1 and its Saheeh International (en.sahih) translation — the corpus
+// text the route must ground prompts in, never the request body's.
+const CORPUS_ARABIC_1_1 = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ";
+const CORPUS_SAHEEH_1_1 = "In the name of Allah, the Entirely Merciful, the Especially Merciful.";
+
 function arabicResp(text = "آية كريمة") {
   return { ok: true, json: async () => ({ data: { text } }) };
 }
@@ -116,8 +121,8 @@ describe("POST /api/connections", () => {
     // The route resolves the source verse server-side on a cache miss.
     mockFetch.mockImplementation(async (url: string) => {
       if (typeof url !== "string") return { ok: false };
-      if (url.includes("ar.alafasy")) return arabicResp("بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ");
-      if (url.includes("en.sahih")) return transResp("In the name of Allah.");
+      if (url.includes("ar.alafasy")) return arabicResp(CORPUS_ARABIC_1_1);
+      if (url.includes("en.sahih")) return transResp(CORPUS_SAHEEH_1_1);
       return { ok: false };
     });
     mockSelect.mockClear();
@@ -169,8 +174,8 @@ describe("POST /api/connections", () => {
   it("ignores client-supplied arabicText/translation and grounds the prompt in the corpus verse", async () => {
     mockFetch.mockImplementation(async (url: string) => {
       if (typeof url !== "string") return { ok: false };
-      if (url.includes("ar.alafasy")) return arabicResp("نص حقيقي من المصحف");
-      if (url.includes("en.sahih")) return transResp("Real corpus translation.");
+      if (url.includes("ar.alafasy")) return arabicResp(CORPUS_ARABIC_1_1);
+      if (url.includes("en.sahih")) return transResp(CORPUS_SAHEEH_1_1);
       return { ok: false };
     });
 
@@ -186,7 +191,7 @@ describe("POST /api/connections", () => {
     const prompts = JSON.stringify(mockAnthropicCreate.mock.calls);
     expect(prompts).not.toContain("FORGED-ARABIC-MARKER");
     expect(prompts).not.toContain("FORGED-TRANSLATION-MARKER");
-    expect(prompts).toContain("Real corpus translation.");
+    expect(prompts).toContain(CORPUS_SAHEEH_1_1);
   });
 
   it("returns 400 for a malformed fromRef", async () => {

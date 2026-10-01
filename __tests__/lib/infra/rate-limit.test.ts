@@ -203,17 +203,26 @@ describe("expiredBucketsCondition", () => {
     new PgDialect().sqlToQuery(expiredBucketsCondition(windowSeconds, now));
 
   it("judges only rows keyed with the caller's own window against that window's retention", () => {
-    const { sql: text, params } = render(600);
-    expect(params).toContain("%:w600:%");
-    expect(text).toMatch(/like/i);
+    const { params } = render(600);
+    expect(params).toContain(":w600:[0-9]+$");
     // 10 retained windows of 600s = 6000s before now.
     expect(params).toContainEqual(new Date(now.getTime() - 6000 * 1000).toISOString());
   });
 
+  it("matches only the trailing window suffix, not a lookalike segment inside the caller's key", () => {
+    const { sql: text, params } = render(600);
+    expect(text).toMatch(/ ~ /);
+    const re = new RegExp(params.find((p) => String(p).startsWith(":w600:")) as string);
+    // `scope:w600:item` consume()d with a 20h window is stored as ...:w72000:<bucket>
+    expect(re.test("scope:w600:item:w72000:5")).toBe(false);
+    expect(re.test("scope:w600:item:w600:5")).toBe(true);
+    expect(re.test("ip:1:w600:29847133")).toBe(true);
+  });
+
   it("a short-window sweep does not match the 20h tz-anchor bucket", () => {
     const { params } = render(600);
-    expect(params).not.toContain("%:w72000:%");
-    expect(params).toContain("%:w600:%");
+    expect(params).not.toContain(":w72000:[0-9]+$");
+    expect(params).toContain(":w600:[0-9]+$");
   });
 
   it("prunes legacy keys (no window segment) only after a day", () => {

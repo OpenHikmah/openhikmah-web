@@ -94,7 +94,9 @@ const LEGACY_ROW_MAX_AGE_SECONDS = 24 * 60 * 60;
 
 /**
  * Selects the rows `sweepRateLimits` may delete. A bucket's lifetime depends on
- * its own window, so only rows keyed with `windowSeconds` are judged against it —
+ * its own window, so only rows keyed with `windowSeconds` are judged against it
+ * (matched on the trailing `:w<window>:<bucket>` suffix, never a lookalike
+ * segment inside the caller's own key) —
  * sweeping every row by the caller's window would delete the long-window
  * buckets (the 20h tz-anchor limiter) as soon as a short-window caller swept.
  * Legacy rows with no window in the key are pruned after a day, longer than any
@@ -105,7 +107,7 @@ export function expiredBucketsCondition(windowSeconds: number, now: Date = new D
   const legacyCutoff = new Date(now.getTime() - LEGACY_ROW_MAX_AGE_SECONDS * 1000);
   return or(
     and(
-      sql`${rateLimits.key} like ${`%:w${windowSeconds}:%`}`,
+      sql`${rateLimits.key} ~ ${`:w${windowSeconds}:[0-9]+$`}`,
       lt(rateLimits.createdAt, windowCutoff)
     ),
     and(sql`${rateLimits.key} !~ ${LEGACY_KEY_PATTERN}`, lt(rateLimits.createdAt, legacyCutoff))
