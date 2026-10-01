@@ -18,8 +18,9 @@ import { LOCALE_LANGUAGE_NAME, DEFAULT_EDITION_BY_LOCALE, type Locale } from "@/
 import { TANZIH_CONSTRAINT, containsTashbih } from "@/lib/ai/theological-constraints";
 import type { VerseRef } from "@/types/quran";
 
-// Bump to force regeneration after a prompt/search change. 3: flushes entries
-// cached with placeholder-only reasons before issue #665's fix.
+// Bump to force regeneration after a prompt/search change. 3: flushes
+// name_content entries cached with placeholder-only reasons before issue #665's
+// fix (name_verse_reasons is unversioned and is not flushed by this).
 export const VERSES_VERSION = 3;
 
 interface NameVerse {
@@ -160,10 +161,10 @@ Return ONLY a JSON array:
       model: ctx.model,
     });
     if (looksLikeRefusal(text)) {
-      // Unlike buildReasons above, this IS the sole content generator when
-      // search found nothing — an empty result here does gate the overall
-      // verses fallback, so a detected refusal must call markRefusal() to
-      // stop resolveAndGenerate from silently backing it with Gemini.
+      // This is the sole content generator when search found nothing, so an
+      // empty result gates the overall verses fallback. As in buildReasons, a
+      // detected refusal must call markRefusal() to stop resolveAndGenerate
+      // from silently backing it with Gemini.
       console.error(`Name verses: model returned a refusal for ${transliteration}, not caching`);
       incr("names_ai_refusal");
       ctx.markRefusal();

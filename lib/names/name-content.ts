@@ -177,9 +177,11 @@ const inFlight = new Map<string, Promise<unknown>>();
  * empty), and returns it.
  *
  * `isEmpty` decides whether a result is worth caching — an empty array or blank
- * string usually means a transient search/AI failure, so we return it but do NOT
- * persist, leaving the next request free to retry (mirrors how the connection
- * graph only stores non-empty generations). Bumping `version` for a kind forces
+ * string, or a degraded result built from a failed AI call (e.g. verses whose
+ * reasons all fell back to a placeholder), usually means a transient
+ * search/AI failure, so we return it but do NOT persist, leaving the next
+ * request free to retry (mirrors how the connection graph only stores
+ * non-empty generations). Bumping `version` for a kind forces
  * regeneration after a prompt change.
  *
  * `onBeforeGenerate` runs only on a durable-cache miss, before joining or
