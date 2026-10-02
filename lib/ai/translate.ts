@@ -182,7 +182,12 @@ async function checkMeaning(
     if (!match) return "failed";
     const verdict: unknown = JSON.parse(match[0]);
     if (typeof verdict !== "object" || verdict === null) return "failed";
-    return (verdict as { same?: unknown }).same === true ? "same" : "drift";
+    // Only an explicit boolean is a verdict: true approves, false is drift. A
+    // missing or non-boolean value is a malformed reply, i.e. a failed check.
+    const same = (verdict as { same?: unknown }).same;
+    if (same === true) return "same";
+    if (same === false) return "drift";
+    return "failed";
   } catch (err) {
     if (
       err instanceof TranslationBudgetExhaustedError ||

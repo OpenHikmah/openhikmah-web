@@ -223,8 +223,8 @@ describe("translateReason — back-translation meaning check", () => {
   });
 
   it.each([
-    ["a missing verdict", '{ "note": "fine" }', "meaning_drift"],
-    ["a string verdict", '{ "same": "true" }', "meaning_drift"],
+    ["a missing verdict", '{ "note": "fine" }', "verification_failed"],
+    ["a string verdict", '{ "same": "true" }', "verification_failed"],
     ["prose with no JSON", "Yes, they match.", "verification_failed"],
     ["invalid JSON", "{ same: true", "verification_failed"],
   ])("does not approve %s", async (_label, compare, reason) => {
