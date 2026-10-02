@@ -108,6 +108,20 @@ jobs:
       - name: Type-check
         run: bun run typecheck
 
+      # schema.ts is the source of truth for generated migrations. `check`
+      # validates the migration journal/snapshots; `generate` must find nothing
+      # to do, otherwise schema.ts changed without a migration (or a snapshot is
+      # stale) and the new files it wrote show up in git status.
+      - name: Schema drift check
+        run: |
+          bunx drizzle-kit check
+          bunx drizzle-kit generate --name ci_drift_probe
+          if [ -n "$(git status --porcelain -- lib/infra/db/migrations)" ]; then
+            echo "::error::lib/infra/db/schema.ts is out of sync with lib/infra/db/migrations. Run 'bunx drizzle-kit generate' and commit the migration."
+            git status --porcelain -- lib/infra/db/migrations
+            exit 1
+          fi
+
       - name: Test (with coverage)
         run: bun run test:coverage
 

@@ -169,6 +169,13 @@
       "when": 1787939592251,
       "tag": "0023_user_tz_offset",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790929243729,
+      "tag": "0024_schema_drift_indexes",
+      "breakpoints": true
     }
   ]
 }
