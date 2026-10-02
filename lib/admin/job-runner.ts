@@ -14,6 +14,7 @@ import {
 } from "@/lib/ai/connection-batch-loop";
 import type { Provider } from "@/lib/ai/ai";
 import { runVerifyBatch, type VerifyOptions } from "@/lib/ai/connection-verify-batch";
+import { runVerifyLoop, type VerifyLoopOptions } from "@/lib/ai/connection-verify-loop";
 import { SELECTABLE_MODELS, isModelForProvider } from "@/lib/ai/models";
 import { LOCALES, type Locale } from "@/lib/i18n/config";
 import { tryAcquireJobLock, releaseJobLock } from "@/lib/admin/job-lock";
@@ -110,6 +111,57 @@ export function configuredGeminiKeys(): string[] {
 const MAX_CALL_DELAY_MS = 60_000;
 const DEFAULT_CALL_DELAY_MS = 1500;
 
+/** Validates the Gemini key-rotation inputs shared by every "loop mode" job:
+ *  the selected `GEMINI_API1..5` env names, the delay between calls. Returns the
+ *  key VALUES and their labels in pool order, de-duplicated by value. Throws on
+ *  bad input (routes map to 400). */
+function parseKeyRotation(raw: Record<string, unknown>): {
+  apiKeys: string[];
+  apiKeyLabels: string[];
+  callDelayMs: number;
+} {
+  const rawKeys = Array.isArray(raw.keys) ? raw.keys : [];
+  const poolOrder = GEMINI_KEY_POOL as readonly string[];
+  const keyLabels = poolOrder.filter(
+    (name) => rawKeys.includes(name) // dedupe + pool order in one pass
+  );
+  const unknown = rawKeys.filter((k) => typeof k !== "string" || !poolOrder.includes(k));
+  if (unknown.length > 0) throw new Error(`unknown key name(s): ${unknown.join(", ")}`);
+  if (keyLabels.length === 0) throw new Error("loop mode requires at least one Gemini key");
+  const missing = keyLabels.filter((name) => !process.env[name]);
+  if (missing.length > 0) {
+    throw new Error(`keys not configured in env: ${missing.join(", ")}`);
+  }
+
+  let callDelayMs = DEFAULT_CALL_DELAY_MS;
+  if (raw.callDelayMs !== undefined && raw.callDelayMs !== "") {
+    callDelayMs = Number(raw.callDelayMs);
+    if (!Number.isInteger(callDelayMs) || callDelayMs < 0 || callDelayMs > MAX_CALL_DELAY_MS) {
+      throw new Error(`callDelayMs must be an integer between 0 and ${MAX_CALL_DELAY_MS}`);
+    }
+  }
+
+  // Dedupe by VALUE, not just name: `keyLabels` is already unique by env-var
+  // name, but two pool slots (e.g. GEMINI_API1/GEMINI_API3) can hold the same
+  // underlying secret. Rotating to a "different" key that shares state with
+  // the one just exhausted immediately re-hits the same per-day quota
+  // instead of actually spreading load (issue #567 C3) — keep the first
+  // label seen for each distinct value.
+  const seenValues = new Set<string>();
+  const dedupedLabels: string[] = [];
+  for (const name of keyLabels) {
+    const value = process.env[name] as string;
+    if (seenValues.has(value)) continue;
+    seenValues.add(value);
+    dedupedLabels.push(name);
+  }
+  return {
+    apiKeys: dedupedLabels.map((name) => process.env[name] as string),
+    apiKeyLabels: dedupedLabels,
+    callDelayMs,
+  };
+}
+
 export type ParsedBackfill =
   { kind: "single"; opts: BatchOptions } | { kind: "loop"; opts: LoopOptions };
 
@@ -145,41 +197,7 @@ function parseBackfillParams(raw: Record<string, unknown>): ParsedBackfill {
       throw new Error("loop mode requires provider=gemini (Claude has no free tier)");
     }
 
-    const rawKeys = Array.isArray(raw.keys) ? raw.keys : [];
-    const poolOrder = GEMINI_KEY_POOL as readonly string[];
-    const keyLabels = poolOrder.filter(
-      (name) => rawKeys.includes(name) // dedupe + pool order in one pass
-    );
-    const unknown = rawKeys.filter((k) => typeof k !== "string" || !poolOrder.includes(k));
-    if (unknown.length > 0) throw new Error(`unknown key name(s): ${unknown.join(", ")}`);
-    if (keyLabels.length === 0) throw new Error("loop mode requires at least one Gemini key");
-    const missing = keyLabels.filter((name) => !process.env[name]);
-    if (missing.length > 0) {
-      throw new Error(`keys not configured in env: ${missing.join(", ")}`);
-    }
-
-    let callDelayMs = DEFAULT_CALL_DELAY_MS;
-    if (raw.callDelayMs !== undefined && raw.callDelayMs !== "") {
-      callDelayMs = Number(raw.callDelayMs);
-      if (!Number.isInteger(callDelayMs) || callDelayMs < 0 || callDelayMs > MAX_CALL_DELAY_MS) {
-        throw new Error(`callDelayMs must be an integer between 0 and ${MAX_CALL_DELAY_MS}`);
-      }
-    }
-
-    // Dedupe by VALUE, not just name: `keyLabels` is already unique by env-var
-    // name, but two pool slots (e.g. GEMINI_API1/GEMINI_API3) can hold the same
-    // underlying secret. Rotating to a "different" key that shares state with
-    // the one just exhausted immediately re-hits the same per-day quota
-    // instead of actually spreading load (issue #567 C3) — keep the first
-    // label seen for each distinct value.
-    const seenValues = new Set<string>();
-    const dedupedLabels: string[] = [];
-    for (const name of keyLabels) {
-      const value = process.env[name] as string;
-      if (seenValues.has(value)) continue;
-      seenValues.add(value);
-      dedupedLabels.push(name);
-    }
+    const { apiKeys, apiKeyLabels, callDelayMs } = parseKeyRotation(raw);
 
     return {
       kind: "loop",
@@ -187,8 +205,8 @@ function parseBackfillParams(raw: Record<string, unknown>): ParsedBackfill {
         mode,
         model: model as string | undefined,
         locales,
-        apiKeys: dedupedLabels.map((name) => process.env[name] as string),
-        apiKeyLabels: dedupedLabels,
+        apiKeys,
+        apiKeyLabels,
         callDelayMs,
         maxCalls: optionalPositiveInt(raw.maxCalls, "maxCalls"),
         maxCostUsd: optionalPositiveNumber(raw.maxCostUsd, "maxCostUsd"),
@@ -221,10 +239,15 @@ function parseBackfillParams(raw: Record<string, unknown>): ParsedBackfill {
   };
 }
 
-/** Validates raw admin input for the re-verification job. Both budgets are
- *  required (unlike the backfill loop, there is no uncapped mode). Throws on bad
- *  input (routes map to 400). */
-function parseVerifyParams(raw: Record<string, unknown>): VerifyOptions {
+export type ParsedVerify =
+  { kind: "single"; opts: VerifyOptions } | { kind: "loop"; opts: VerifyLoopOptions };
+
+/** Validates raw admin input for the re-verification job. Returns either the
+ *  one-pass options `runVerifyBatch` takes (both budgets required), or, when
+ *  `raw.loop` is set, the key-rotating options `runVerifyLoop` takes (budgets
+ *  are optional safety caps, like the backfill loop). Throws on bad input
+ *  (routes map to 400). */
+function parseVerifyParams(raw: Record<string, unknown>): ParsedVerify {
   const provider = raw.provider;
   if (provider !== "claude" && provider !== "gemini") {
     throw new Error("provider must be claude or gemini");
@@ -233,6 +256,21 @@ function parseVerifyParams(raw: Record<string, unknown>): VerifyOptions {
   const model = raw.model === undefined || raw.model === "" ? undefined : raw.model;
   if (model !== undefined && (typeof model !== "string" || !isModelForProvider(model, provider))) {
     throw new Error(`model must be one of: ${SELECTABLE_MODELS[provider].join(", ")}`);
+  }
+
+  if (raw.loop) {
+    if (provider !== "gemini") {
+      throw new Error("loop mode requires provider=gemini (Claude has no free tier)");
+    }
+    return {
+      kind: "loop",
+      opts: {
+        model: model as string | undefined,
+        ...parseKeyRotation(raw),
+        maxCalls: optionalPositiveInt(raw.maxCalls, "maxCalls"),
+        maxCostUsd: optionalPositiveNumber(raw.maxCostUsd, "maxCostUsd"),
+      },
+    };
   }
 
   const maxCalls = Number(raw.maxCalls);
@@ -252,10 +290,34 @@ function parseVerifyParams(raw: Record<string, unknown>): VerifyOptions {
     }
   }
 
-  const requiredKey = provider === "gemini" ? "GEMINI_API_KEY" : "ANTHROPIC_API_KEY";
-  if (!process.env[requiredKey]) throw new Error(`Missing required env var: ${requiredKey}`);
+  // A one-pass Gemini run uses GEMINI_API_KEY, or else the first configured
+  // GEMINI_API1..5 key (deployments keep their free-tier keys only in the pool).
+  let apiKey: string | undefined;
+  if (provider === "gemini") {
+    if (!process.env.GEMINI_API_KEY) {
+      const pooled = configuredGeminiKeys()[0];
+      if (!pooled) {
+        throw new Error(
+          "Missing required env var: GEMINI_API_KEY (or at least one of GEMINI_API1..GEMINI_API5)"
+        );
+      }
+      apiKey = process.env[pooled];
+    }
+  } else if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error("Missing required env var: ANTHROPIC_API_KEY");
+  }
 
-  return { provider, model: model as string | undefined, maxCalls, maxCostUsd, callDelayMs };
+  return {
+    kind: "single",
+    opts: {
+      provider,
+      model: model as string | undefined,
+      maxCalls,
+      maxCostUsd,
+      callDelayMs,
+      apiKey,
+    },
+  };
 }
 
 /** A blank optional ceiling means "no cap" — `Number.POSITIVE_INFINITY`, which
@@ -368,7 +430,7 @@ export async function startJob(
   }
 
   let backfill: ParsedBackfill | null = null;
-  let verify: VerifyOptions | null = null;
+  let verify: ParsedVerify | null = null;
   if (job.acceptsParams) {
     if (!params) throw new Error(`Job "${job.id}" requires params`);
     if (job.id === "backfill-connections") backfill = parseBackfillParams(params);
@@ -437,8 +499,10 @@ export async function startJob(
           error?: string;
           lastError?: string;
         };
-        if (parsedVerify) {
-          summary = await runVerifyBatch(parsedVerify, hooks, signal);
+        if (parsedVerify?.kind === "loop") {
+          summary = await runVerifyLoop(parsedVerify.opts, hooks, signal);
+        } else if (parsedVerify) {
+          summary = await runVerifyBatch(parsedVerify.opts, hooks, signal);
         } else if (parsedBackfill?.kind === "loop") {
           summary = await runConnectionBatchLoop(parsedBackfill.opts, hooks, signal);
         } else {
@@ -448,11 +512,14 @@ export async function startJob(
             signal
           );
         }
-        const status = mapTerminalStatus(summary.stoppedReason, !!parsedVerify);
+        // Only the one-pass verify run is "direct": the loop rotates away from a
+        // rate-limited key itself, so that reason never ends a loop run.
+        const directVerify = parsedVerify?.kind === "single";
+        const status = mapTerminalStatus(summary.stoppedReason, directVerify);
         // The verify run reports a provider stop (daily quota, invalid key, rate
         // limit) in `lastError` rather than `error`; a failed run must show why.
         const message =
-          summary.error ?? (parsedVerify && status === "failed" ? summary.lastError : undefined);
+          summary.error ?? (directVerify && status === "failed" ? summary.lastError : undefined);
         finishRun(state, status, message ?? null);
       } catch (err) {
         pushLogLine(state, `job failed: ${err instanceof Error ? err.message : String(err)}`);

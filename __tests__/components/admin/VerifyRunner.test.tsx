@@ -25,10 +25,23 @@ async function clickRun(confirmLabel: string) {
   });
 }
 
+/** The form fetches /gemini-keys on mount and POSTs to /jobs on submit. */
+function mockApiImpl(keys: string[] = ["GEMINI_API1", "GEMINI_API2"], jobError?: Error) {
+  return (path: string) => {
+    if (path === "/gemini-keys") return Promise.resolve({ keys });
+    return jobError ? Promise.reject(jobError) : Promise.resolve({ runId: 1 });
+  };
+}
+
+/** POST calls to /jobs only (excludes the /gemini-keys mount fetch). */
+function jobPosts() {
+  return mockApi.mock.calls.filter((c) => c[0] === "/jobs");
+}
+
 describe("VerifyRunner", () => {
   beforeEach(() => {
     mockApi.mockReset();
-    mockApi.mockResolvedValue({ runId: 1 });
+    mockApi.mockImplementation(mockApiImpl());
   });
 
   it("disables Run and posts nothing while the budget fields are blank", () => {
@@ -39,7 +52,7 @@ describe("VerifyRunner", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Run verification" }));
     expect(screen.queryByRole("button", { name: "Verify on gemini?" })).not.toBeInTheDocument();
-    expect(mockApi).not.toHaveBeenCalled();
+    expect(jobPosts()).toHaveLength(0);
   });
 
   it("posts the verify-connections job with the entered params after the two-click confirm", async () => {
@@ -91,7 +104,9 @@ describe("VerifyRunner", () => {
   });
 
   it("keeps the typed inputs and shows the server message when a job is already running", async () => {
-    mockApi.mockRejectedValueOnce(new AdminApiError(400, "Job is already running"));
+    mockApi.mockImplementation(
+      mockApiImpl(undefined, new AdminApiError(400, "Job is already running"))
+    );
     render(<VerifyRunner />);
     fillBudgets("40", "1.5");
 
@@ -112,5 +127,97 @@ describe("VerifyRunner", () => {
 
     expect(onStarted).toHaveBeenCalledOnce();
     expect(screen.getByText(/Started\. Watch progress on the Jobs page\./)).toBeInTheDocument();
+  });
+});
+
+describe("VerifyRunner loop mode", () => {
+  beforeEach(() => {
+    mockApi.mockReset();
+    mockApi.mockImplementation(mockApiImpl());
+  });
+
+  async function openLoop() {
+    render(<VerifyRunner />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /Loop: keep running/ }));
+    await screen.findByRole("checkbox", { name: "GEMINI_API1" });
+  }
+
+  it("shows the key picker with every configured key ticked, and makes the budgets optional", async () => {
+    await openLoop();
+    expect(screen.getByRole("checkbox", { name: "GEMINI_API1" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "GEMINI_API2" })).toBeChecked();
+    expect(screen.getByText("Max LLM calls (optional)")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start loop" })).not.toBeDisabled();
+  });
+
+  it("forces Gemini and disables Claude while looping", async () => {
+    await openLoop();
+    const [provider] = screen.getAllByRole("combobox") as HTMLSelectElement[];
+    expect(provider.value).toBe("gemini");
+    expect(provider).toBeDisabled();
+  });
+
+  it("submits loop:true with the selected keys, the delay, and no blank budgets", async () => {
+    await openLoop();
+    fireEvent.click(screen.getByRole("checkbox", { name: "GEMINI_API2" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Start loop" }));
+    const confirm = await screen.findByRole("button", { name: "Loop verification on 1 key(s)?" });
+    await act(async () => {
+      fireEvent.click(confirm);
+    });
+
+    expect(jobPosts()).toEqual([
+      [
+        "/jobs",
+        {
+          method: "POST",
+          json: {
+            jobId: "verify-connections",
+            params: { provider: "gemini", loop: true, keys: ["GEMINI_API1"], callDelayMs: 1500 },
+          },
+        },
+      ],
+    ]);
+  });
+
+  it("sends optional caps when they are filled in", async () => {
+    await openLoop();
+    const spin = screen.getAllByRole("spinbutton");
+    fireEvent.change(spin[0], { target: { value: "500" } });
+    fireEvent.change(spin[1], { target: { value: "2" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Start loop" }));
+    const confirm = await screen.findByRole("button", { name: "Loop verification on 2 key(s)?" });
+    await act(async () => {
+      fireEvent.click(confirm);
+    });
+
+    expect(jobPosts()[0][1].json.params).toMatchObject({ maxCalls: 500, maxCostUsd: 2 });
+  });
+
+  it("keeps Start disabled when no key is selected", async () => {
+    await openLoop();
+    fireEvent.click(screen.getByRole("checkbox", { name: "GEMINI_API1" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "GEMINI_API2" }));
+    expect(screen.getByRole("button", { name: "Start loop" })).toBeDisabled();
+    expect(screen.getByText(/Select at least one Gemini key/)).toBeInTheDocument();
+  });
+
+  it("explains when no pool keys are configured", async () => {
+    mockApi.mockImplementation(mockApiImpl([]));
+    render(<VerifyRunner />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /Loop: keep running/ }));
+    expect(await screen.findByText(/No GEMINI_API1..5 keys configured/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start loop" })).toBeDisabled();
+  });
+
+  it("says the key list could not be loaded instead of claiming none are configured", async () => {
+    mockApi.mockImplementation((path: string) =>
+      path === "/gemini-keys" ? Promise.reject(new Error("401")) : Promise.resolve({})
+    );
+    render(<VerifyRunner />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /Loop: keep running/ }));
+    expect(await screen.findByText(/Reload the page to retry/)).toBeInTheDocument();
   });
 });
