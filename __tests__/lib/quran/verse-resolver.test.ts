@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Verse, VerseRef } from "@/types/quran";
 
-const { mockGetVerse, mockGetSurahName } = vi.hoisted(() => ({
+const { mockGetVerse, mockGetSurahName, mockIncr } = vi.hoisted(() => ({
   mockGetVerse: vi.fn(),
   mockGetSurahName: vi.fn(),
+  mockIncr: vi.fn(),
 }));
+vi.mock("@/lib/infra/metrics", () => ({ incr: mockIncr }));
 
 // Partial mock: real isValidRef (the live-fetch gate), stubbed getVerse.
 vi.mock("@/lib/quran/quran-corpus", async (importOriginal) => {
@@ -31,6 +33,7 @@ function verse(ref: string): Verse {
 describe("resolveVerse", () => {
   beforeEach(() => {
     mockGetVerse.mockReset();
+    mockIncr.mockReset();
     mockGetSurahName.mockReset();
     mockGetSurahName.mockReturnValue(["Al-Fatihah", "الفاتحة"]);
     vi.stubGlobal("fetch", vi.fn());
@@ -205,5 +208,33 @@ describe("resolveVerse", () => {
     });
     const result = await resolveVerse("2:255", "tr.diyanet");
     expect(result?.translation).toBe("English fallback");
+    expect(result?.edition).toBe("en.sahih");
+    expect(mockIncr).toHaveBeenCalledWith("translation_edition_substituted");
+  });
+
+  it("live fallback reports the requested edition when upstream serves it", async () => {
+    mockGetVerse.mockResolvedValue(null);
+    vi.mocked(fetch).mockImplementation(async (url: string | URL | Request) => {
+      const text = String(url).includes("ar.alafasy")
+        ? "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ"
+        : "Allah, O'ndan başka ilah yoktur.";
+      return { ok: true, json: async () => ({ data: { text } }) } as Response;
+    });
+    const result = await resolveVerse("2:255", "tr.diyanet");
+    expect(result?.edition).toBe("tr.diyanet");
+    expect(mockIncr).not.toHaveBeenCalled();
+  });
+
+  it("live fallback reports en.sahih for a default-edition request without metering a substitution", async () => {
+    mockGetVerse.mockResolvedValue(null);
+    vi.mocked(fetch).mockImplementation(async (url: string | URL | Request) => {
+      const text = String(url).includes("ar.alafasy")
+        ? "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ"
+        : "Allah - there is no deity except Him.";
+      return { ok: true, json: async () => ({ data: { text } }) } as Response;
+    });
+    const result = await resolveVerse("2:255");
+    expect(result?.edition).toBe("en.sahih");
+    expect(mockIncr).not.toHaveBeenCalled();
   });
 });

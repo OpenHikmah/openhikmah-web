@@ -6,6 +6,10 @@ export interface Verse {
   ref: VerseRef;
   arabicText: string;
   translation: string;
+  /** The translation edition `translation` actually carries — the requested one, or
+   *  "en.sahih" when the requested edition has no text for this verse. Always set
+   *  for verses read from the corpus or resolved live. */
+  edition?: string;
   surahName: string;
   surahNameArabic: string;
   isRoot?: boolean;

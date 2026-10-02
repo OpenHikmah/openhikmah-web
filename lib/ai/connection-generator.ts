@@ -293,7 +293,14 @@ function parseRawConnections(
   if (parsed.length > 0 && valid.length === 0) {
     throw new ConnectionParseError("AI response array had no well-formed entries", jsonMatch[0]);
   }
-  return valid;
+  // A model that repeats a ref would otherwise yield duplicate candidates, and
+  // once persisted a unique-constraint conflict. The first occurrence wins.
+  const seen = new Set<string>();
+  return valid.filter((c) => {
+    if (seen.has(c.ref)) return false;
+    seen.add(c.ref);
+    return true;
+  });
 }
 
 /**

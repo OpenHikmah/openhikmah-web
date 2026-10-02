@@ -39,6 +39,7 @@ import {
   GeminiRateLimitError,
 } from "@/lib/ai/gemini-errors";
 import { getCoverageReport } from "@/lib/admin/coverage-report";
+import { counterSnapshot } from "@/lib/infra/metrics";
 
 async function reset() {
   await db.execute(
@@ -346,6 +347,36 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     expect(summary.stoppedReason).toBe("error");
     expect(summary.error).toContain("0 generated");
     expect(summary.lastError).toBe("bad api key");
+  });
+
+  it("a failed coverage write while recording a cell failure is logged and metered, and does not abort the run", async () => {
+    await seed("1:1");
+    mockCallAI.mockRejectedValue(new Error("bad api key"));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const realInsert = db.insert.bind(db);
+    const insertSpy = vi.spyOn(db, "insert").mockImplementation(((table: unknown) =>
+      table === connectionCoverage
+        ? {
+            values: () => ({
+              onConflictDoUpdate: () => Promise.reject(new Error("coverage down")),
+            }),
+          }
+        : realInsert(table as never)) as never);
+    const before = counterSnapshot()["connection_batch_coverage_write_failed"] ?? 0;
+
+    const summary = await runConnectionBatch(
+      { mode: "baseline", provider: "gemini", locales: [], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+    insertSpy.mockRestore();
+
+    expect(summary.cellsFailed).toBe(3);
+    expect(counterSnapshot()["connection_batch_coverage_write_failed"]).toBe(before + 3);
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining("recording the failure of"),
+      expect.any(Error)
+    );
+    errSpy.mockRestore();
   });
 
   it("daily quota: ends the pass 'quota-daily' without a cell failure or fail-fast", async () => {

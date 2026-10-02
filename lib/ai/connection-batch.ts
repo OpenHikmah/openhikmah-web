@@ -699,7 +699,13 @@ export async function runConnectionBatch(
       // this is the only place the admin sees *why* a run generated nothing.
       hooks.onProgress(`[${opts.mode}] cell ${cell.fromRef} ${cell.kind} FAILED: ${message}`);
       // One bad verse must not abort the run — record and move on.
-      await upsertCoverage(cell.fromRef, cell.kind, { lastError: message }).catch(() => {});
+      await upsertCoverage(cell.fromRef, cell.kind, { lastError: message }).catch((coverageErr) => {
+        console.error(
+          `connection-batch: recording the failure of ${cell.fromRef} ${cell.kind} failed:`,
+          coverageErr
+        );
+        incr("connection_batch_coverage_write_failed");
+      });
 
       if (summary.generated === 0 && consecutiveFailures >= FAIL_FAST_THRESHOLD) {
         summary.stoppedReason = "error";
