@@ -32,15 +32,29 @@ function makeDbChain(resolveWith: unknown = [], calls?: Array<[string, unknown[]
   return chain;
 }
 
-const { mockSelect, mockUpdate, mockDelete } = vi.hoisted(() => ({
+const { mockSelect, mockUpdate, mockDelete, mockGetVerses } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
   mockUpdate: vi.fn(() => makeDbChain([])),
   mockDelete: vi.fn(() => makeDbChain([])),
+  mockGetVerses: vi.fn(),
 }));
-vi.mock("@/lib/infra/db", () => ({
-  db: { select: mockSelect, update: mockUpdate, delete: mockDelete },
-}));
+vi.mock("@/lib/infra/db", () => {
+  const db = {
+    select: mockSelect,
+    update: mockUpdate,
+    delete: mockDelete,
+    transaction: async (fn: (tx: unknown) => unknown) =>
+      fn({ update: mockUpdate, delete: mockDelete }),
+  };
+  return { db };
+});
+// Partial mock: real isValidRef (the shared ref gate), stubbed corpus lookup.
+vi.mock("@/lib/quran/quran-corpus", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/quran/quran-corpus")>();
+  return { ...actual, getVerses: mockGetVerses };
+});
 
+import { PgDialect } from "drizzle-orm/pg-core";
 import { GET, PATCH, DELETE } from "@/app/api/admin/names/route";
 import { requireAdmin } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
@@ -71,9 +85,30 @@ beforeEach(() => {
   vi.mocked(requireAdmin).mockResolvedValue(admin);
   mockSelect.mockReturnValue(makeDbChain([]));
   mockUpdate.mockClear().mockReturnValue(makeDbChain([]));
-  mockDelete.mockReturnValue(makeDbChain([]));
+  mockDelete.mockClear().mockReturnValue(makeDbChain([]));
+  mockGetVerses.mockReset().mockResolvedValue(new Map());
   vi.mocked(logAdminAction).mockClear();
 });
+
+// Verified corpus text (Ayat al-Kursi) the admin editor must store instead of
+// anything the client sends.
+const CORPUS_2_255 = {
+  surah: 2,
+  ayah: 255,
+  ref: "2:255",
+  arabicText: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ",
+  translation: "Allah - there is no deity except Him, the Ever-Living, the Sustainer of existence.",
+  surahName: "Al-Baqarah",
+  surahNameArabic: "البقرة",
+};
+const corpusWith2_255 = () => new Map([["2:255", CORPUS_2_255]]);
+
+function renderedWheres(calls: Array<[string, unknown[]]>) {
+  const dialect = new PgDialect();
+  return calls
+    .filter(([name]) => name === "where")
+    .map(([, args]) => dialect.sqlToQuery(args[0] as never));
+}
 
 describe("GET /api/admin/names", () => {
   it("returns the guard's own response for a non-admin caller", async () => {
@@ -161,27 +196,71 @@ describe("PATCH /api/admin/names", () => {
     expect(res.status).toBe(404);
   });
 
-  it("updates the cached content and logs the action", async () => {
+  it("stores the corpus text for a verse, not what the client sent, and logs the action", async () => {
     mockUpdate.mockReturnValue(makeDbChain([{ slug: "ar-rahman", kind: "verses" }]));
-    const validVerse = [
-      {
-        ref: "2:255",
-        surah: 2,
-        ayah: 255,
-        arabicText: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ",
-        translation: "translation",
-        surahName: "Al-Baqarah",
-        surahNameArabic: "البقرة",
-        reason: "reason",
-      },
-    ];
-    const res = await PATCH(patch({ slug: "ar-rahman", kind: "verses", data: validVerse }));
+    mockGetVerses.mockResolvedValue(corpusWith2_255());
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "verses",
+        data: [
+          {
+            ref: "2:255",
+            surah: 2,
+            ayah: 255,
+            // Altered Arabic and translation, wrong names: all must be ignored.
+            arabicText: "altered arabic",
+            translation: "altered translation",
+            surahName: "Wrong",
+            surahNameArabic: "خطأ",
+            reason: "Affirms the Ever-Living attribute.",
+          },
+        ],
+      })
+    );
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.data).toEqual(validVerse);
+    const stored = [{ ...CORPUS_2_255, reason: "Affirms the Ever-Living attribute." }];
+    expect((await res.json()).data).toEqual(stored);
     expect(logAdminAction).toHaveBeenCalledWith(
       expect.objectContaining({ action: "name.edit", targetId: "ar-rahman/verses" })
     );
+  });
+
+  it("looks verses up in the corpus by ref and rejects one the corpus lacks, without persisting", async () => {
+    mockGetVerses.mockResolvedValue(new Map());
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "verses",
+        data: [{ ref: "2:255", reason: "A reason." }],
+      })
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("not in the Quran corpus");
+    expect(mockGetVerses).toHaveBeenCalledWith(["2:255"]);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a verse reason with Tashbih phrasing, without persisting", async () => {
+    mockGetVerses.mockResolvedValue(corpusWith2_255());
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "verses",
+        data: [{ ref: "2:255", reason: "He literally has a hand and sits on the throne." }],
+      })
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("Tashbih");
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a verse with a blank reason", async () => {
+    const res = await PATCH(
+      patch({ slug: "ar-rahman", kind: "verses", data: [{ ref: "2:255", reason: "  " }] })
+    );
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("rejects verses data that isn't an array of the expected shape", async () => {
@@ -237,53 +316,19 @@ describe("PATCH /api/admin/names", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it("rejects verses data with a wrong field type (surah as string)", async () => {
+  it("ignores client-supplied surah/ayah that disagree with the ref and stores the corpus identity", async () => {
+    mockUpdate.mockReturnValue(makeDbChain([{ slug: "ar-rahman", kind: "verses" }]));
+    mockGetVerses.mockResolvedValue(corpusWith2_255());
     const res = await PATCH(
       patch({
         slug: "ar-rahman",
         kind: "verses",
-        data: [
-          {
-            ref: "2:255",
-            surah: "2",
-            ayah: 255,
-            arabicText: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ",
-            translation: "t",
-            surahName: "s",
-            surahNameArabic: "s",
-            reason: "r",
-          },
-        ],
+        data: [{ ref: "2:255", surah: "1", ayah: 1, reason: "A reason." }],
       })
     );
-    expect(res.status).toBe(400);
-  });
-
-  it("rejects verses data where surah/ayah don't match the parsed ref", async () => {
-    const res = await PATCH(
-      patch({
-        slug: "ar-rahman",
-        kind: "verses",
-        data: [
-          {
-            // Valid ref, but surah/ayah point at a different verse (1:1) —
-            // downstream features that key off surah/ayah (e.g.
-            // InteractiveArabic morphology lookups) would then disagree
-            // with the ref-identified verse.
-            ref: "1:1",
-            surah: 2,
-            ayah: 255,
-            arabicText: "a",
-            translation: "t",
-            surahName: "s",
-            surahNameArabic: "s",
-            reason: "r",
-          },
-        ],
-      })
-    );
-    expect(res.status).toBe(400);
-    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    const [verse] = (await res.json()).data;
+    expect(verse).toMatchObject({ ref: "2:255", surah: 2, ayah: 255 });
   });
 
   it("accepts a valid reflection (plain string)", async () => {
@@ -292,6 +337,19 @@ describe("PATCH /api/admin/names", () => {
       patch({ slug: "ar-rahman", kind: "reflection", data: "A believer's reflection." })
     );
     expect(res.status).toBe(200);
+  });
+
+  it("rejects a reflection with Tashbih phrasing, without persisting", async () => {
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "reflection",
+        data: "Allah takes the physical form of a radiant light.",
+      })
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("Tashbih");
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("rejects a reflection that isn't a string", async () => {
@@ -317,6 +375,66 @@ describe("PATCH /api/admin/names", () => {
       })
     );
     expect(res.status).toBe(200);
+  });
+
+  it("overwrites a pairing's transliteration and arabic with the canonical name's", async () => {
+    mockUpdate.mockReturnValue(makeDbChain([{ slug: "ar-rahman", kind: "pairings" }]));
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "pairings",
+        data: [
+          {
+            name: "ar-rahim",
+            transliteration: "Wrong",
+            arabic: "خطأ",
+            explanation: "Balances mercy in general and specific senses.",
+          },
+        ],
+      })
+    );
+    expect(res.status).toBe(200);
+    expect((await res.json()).data).toEqual([
+      {
+        name: "ar-rahim",
+        transliteration: "Ar-Rahīm",
+        arabic: "الرَّحِيم",
+        explanation: "Balances mercy in general and specific senses.",
+      },
+    ]);
+  });
+
+  it("rejects a pairing whose name is not one of the 99, without persisting", async () => {
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "pairings",
+        data: [
+          {
+            name: "not-a-real-name",
+            transliteration: "Ar-Rahim",
+            arabic: "الرَّحِيم",
+            explanation: "Balances mercy in general and specific senses.",
+          },
+        ],
+      })
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("not one of the 99");
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a pairing explanation with Tashbih phrasing, without persisting", async () => {
+    const res = await PATCH(
+      patch({
+        slug: "ar-rahman",
+        kind: "pairings",
+        data: [{ name: "ar-rahim", explanation: "He resembles a human in mercy." }],
+      })
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("Tashbih");
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("rejects pairings missing a required field", async () => {
@@ -348,6 +466,51 @@ describe("PATCH /api/admin/names", () => {
     );
     expect(res.status).toBe(400);
     expect(mockUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe("PATCH /api/admin/names — locales", () => {
+  it("edits only the en row and deletes the localized rows so they regenerate from the edit", async () => {
+    const updateCalls: Array<[string, unknown[]]> = [];
+    const deleteCalls: Array<[string, unknown[]]> = [];
+    mockUpdate.mockReturnValue(
+      makeDbChain([{ slug: "ar-rahman", kind: "reflection" }], updateCalls)
+    );
+    mockDelete.mockReturnValue(makeDbChain([], deleteCalls));
+
+    const res = await PATCH(
+      patch({ slug: "ar-rahman", kind: "reflection", data: "A believer's reflection." })
+    );
+    expect(res.status).toBe(200);
+
+    const [updateWhere] = renderedWheres(updateCalls);
+    expect(updateWhere.sql).toMatch(/"locale" = \$/);
+    expect(updateWhere.params).toEqual(["ar-rahman", "reflection", "en"]);
+
+    expect(mockDelete).toHaveBeenCalledTimes(1);
+    const [deleteWhere] = renderedWheres(deleteCalls);
+    expect(deleteWhere.sql).toMatch(/"locale" <> \$/);
+    expect(deleteWhere.params).toEqual(["ar-rahman", "reflection", "en"]);
+  });
+
+  it("also clears the per-locale verse reasons when editing verses", async () => {
+    mockUpdate.mockReturnValue(makeDbChain([{ slug: "ar-rahman", kind: "verses" }]));
+    mockGetVerses.mockResolvedValue(corpusWith2_255());
+    const res = await PATCH(
+      patch({ slug: "ar-rahman", kind: "verses", data: [{ ref: "2:255", reason: "A reason." }] })
+    );
+    expect(res.status).toBe(200);
+    // name_content localized rows + name_verse_reasons localized rows.
+    expect(mockDelete).toHaveBeenCalledTimes(2);
+  });
+
+  it("deletes nothing when there is no en row to edit", async () => {
+    mockUpdate.mockReturnValue(makeDbChain([]));
+    const res = await PATCH(
+      patch({ slug: "ar-rahman", kind: "reflection", data: "A reflection." })
+    );
+    expect(res.status).toBe(404);
+    expect(mockDelete).not.toHaveBeenCalled();
   });
 });
 
