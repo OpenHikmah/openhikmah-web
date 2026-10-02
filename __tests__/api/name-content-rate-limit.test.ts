@@ -23,10 +23,11 @@ function makeSelectChain(resolveWith: unknown[]) {
   return chain;
 }
 
-const { mockSelect, mockConsume, mockCallAI, mockCookies } = vi.hoisted(() => ({
+const { mockSelect, mockConsume, mockCallAI, mockVerifyAI, mockCookies } = vi.hoisted(() => ({
   mockSelect: vi.fn(),
   mockConsume: vi.fn(),
   mockCallAI: vi.fn(),
+  mockVerifyAI: vi.fn(),
   // The routes now call getUiLocale() (lib/i18n/request-prefs.ts), which reads
   // next/headers' cookies() — unavailable outside a real Next request scope.
   // Defaults to no cookie set (→ "en"); individual tests can override.
@@ -54,7 +55,12 @@ vi.mock("@/lib/infra/rate-limit", async (importOriginal) => {
 });
 
 vi.mock("@/lib/ai/ai", () => ({
-  callAI: mockCallAI,
+  // The divine-name review fails closed, so its prompt is answered by its own
+  // mock (default: approve) and generation call counts stay exact.
+  callAI: (prompt: string, opts?: unknown) =>
+    prompt.includes("reviewing content that another scholar wrote about a divine name")
+      ? mockVerifyAI(prompt, opts)
+      : mockCallAI(prompt, opts),
   resolveProvider: vi.fn(async () => "claude" as const),
   resolveModel: vi.fn(async () => "claude-opus-4-7"),
   defaultModelFor: () => "claude-opus-4-7",
@@ -62,12 +68,17 @@ vi.mock("@/lib/ai/ai", () => ({
 
 import { GET as getReflection, REFLECTION_VERSION } from "@/app/api/names/[slug]/reflection/route";
 import { GET as getPairings, PAIRINGS_VERSION } from "@/app/api/names/[slug]/pairings/route";
+import { approveNameVerification } from "../test-utils/name-verification";
 import { GET as getVerses, VERSES_VERSION } from "@/app/api/names/[slug]/verses/route";
 
 // Stub fetch AFTER static imports so vi.stubGlobal wins over any fetch patch
 // applied during next/server module initialization.
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
+
+// Plausible Arabic containing the name under test (ar-rahman): the AI-fallback
+// verse selection requires the name to appear in the verse text.
+const ARABIC_WITH_NAME = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
 
 function req(slug: string, path: string) {
   return new NextRequest(`http://localhost/api/names/${slug}/${path}`);
@@ -103,6 +114,9 @@ describe("names AI routes — per-client rate limiting", () => {
     mockSelect.mockReset();
     mockConsume.mockReset();
     mockCallAI.mockReset();
+    mockVerifyAI
+      .mockReset()
+      .mockImplementation(async (prompt: string) => approveNameVerification(prompt));
     mockFetch.mockReset();
     mockFetch.mockResolvedValue({ ok: false });
     mockCookies.mockReset().mockResolvedValue({ get: () => undefined }); // "en" default
@@ -179,7 +193,7 @@ describe("names AI routes — per-client rate limiting", () => {
     mockFetch.mockImplementation(async (url: unknown) => {
       if (typeof url !== "string") return { ok: false };
       if (url.includes("api.alquran.cloud"))
-        return { ok: true, json: async () => ({ data: { text: "نص" } }) };
+        return { ok: true, json: async () => ({ data: { text: ARABIC_WITH_NAME } }) };
       return { ok: false };
     });
 
@@ -214,7 +228,7 @@ describe("names AI routes — per-client rate limiting", () => {
     mockFetch.mockImplementation(async (url: unknown) => {
       if (typeof url !== "string") return { ok: false };
       if (url.includes("api.alquran.cloud"))
-        return { ok: true, json: async () => ({ data: { text: "نص" } }) };
+        return { ok: true, json: async () => ({ data: { text: ARABIC_WITH_NAME } }) };
       return { ok: false };
     });
 

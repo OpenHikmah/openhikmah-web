@@ -3,6 +3,7 @@ import { callAI } from "@/lib/ai/ai";
 import { looksLikeRefusal } from "@/lib/ai/refusal";
 import { getNameBySlug } from "@/lib/names/divine-names";
 import { getOrGenerateNameContent } from "@/lib/names/name-content";
+import { verifyReflection } from "@/lib/names/name-verify";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
@@ -92,6 +93,9 @@ async function getReflection(
           incr("names_rejected_tashbih");
           return "";
         }
+        // Second-pass review before this is cached for every user. Fails
+        // closed: an unapproved reflection is empty, so not cached and retried.
+        if (!(await verifyReflection(name, text, ctx))) return "";
         return text;
       } catch (err) {
         // Not cached (empty result), so the next request retries — mirrors how
