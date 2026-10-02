@@ -111,6 +111,25 @@ jobs:
       - name: Test (with coverage)
         run: bun run test:coverage
 
+  dependency-audit:
+    name: Dependency audit (production)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # Reads bun.lock directly. Production dependencies only: dev/test-only
+      # advisories are left to Dependabot so they don't block unrelated PRs.
+      # Fails on any high or critical advisory; fix it (upgrade or an
+      # `overrides` entry in package.json) rather than allowlisting it.
+      - name: Audit production dependencies
+        run: bun audit --prod --audit-level=high
+
   integration:
     name: Integration (Testcontainers)
     runs-on: ubuntu-latest
