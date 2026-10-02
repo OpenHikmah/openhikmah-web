@@ -46,8 +46,11 @@ import {
   generateConnections,
   generateGroundedConnections,
   ConnectionParseError,
+  VerificationBudgetExhaustedError,
 } from "@/lib/ai/connection-generator";
+import { counterSnapshot } from "@/lib/infra/metrics";
 import { getPrompt } from "@/lib/ai/prompt-registry";
+import { approveAllVerdicts, isVerificationPrompt } from "../../test-utils/verification";
 import { GeminiDailyQuotaError } from "@/lib/ai/gemini-errors";
 
 // Sacred-data rule (AGENTS.md): plausible Arabic + a real translation even in
@@ -68,12 +71,17 @@ function verse(ref: string): Verse {
   };
 }
 
-const defaultDetailed = async (prompt: string) => ({
-  text: await mockCallAI(prompt),
-  usage: { inputTokens: 100, outputTokens: 20 },
-  provider: "claude" as const,
-  model: "claude-opus-4-7",
-});
+// The verification pass fails closed, so its prompt is answered with a verdict
+// array (still routed through mockCallAI so call counts include it).
+const defaultDetailed = async (prompt: string) => {
+  const text = await mockCallAI(prompt);
+  return {
+    text: isVerificationPrompt(prompt) ? approveAllVerdicts(prompt) : text,
+    usage: { inputTokens: 100, outputTokens: 20 },
+    provider: "claude" as const,
+    model: "claude-opus-4-7",
+  };
+};
 
 describe("generateConnections", () => {
   beforeEach(() => {
@@ -379,18 +387,39 @@ describe("generateConnections — content quality gate", () => {
     expect(mockCallAIDetailed).toHaveBeenCalledTimes(2);
   });
 
-  it("skips verification (no extra call) when the batch job's budget is exhausted", async () => {
+  it("throws, with no verification call, when the batch job's budget is exhausted — never returns unverified candidates", async () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([{ ref: "2:255", reason: "A well-formed connection worth persisting." }])
     );
-    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", "en", {
-      spendBudget: () => false,
-    });
-    expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+    await expect(
+      generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", "en", {
+        spendBudget: () => false,
+      })
+    ).rejects.toBeInstanceOf(VerificationBudgetExhaustedError);
     expect(mockCallAIDetailed).toHaveBeenCalledTimes(1);
   });
 
-  it("fails open — keeps candidates when the verification response can't be parsed", async () => {
+  it("fails closed — throws instead of keeping candidates when the verifier call errors", async () => {
+    mockCallAIDetailed
+      .mockResolvedValueOnce({
+        text: JSON.stringify([
+          { ref: "2:255", reason: "A well-formed connection worth persisting." },
+        ]),
+        usage: { inputTokens: 100, outputTokens: 20 },
+        provider: "claude" as const,
+        model: "claude-opus-4-7",
+      })
+      .mockRejectedValueOnce(new Error("503 upstream unavailable"));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const before = counterSnapshot()["connection_verify_call_failed"] ?? 0;
+    await expect(generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic")).rejects.toThrow(
+      "503 upstream unavailable"
+    );
+    expect(counterSnapshot()["connection_verify_call_failed"]).toBe(before + 1);
+    errSpy.mockRestore();
+  });
+
+  it("fails closed — throws ConnectionParseError when the verification response can't be parsed", async () => {
     mockCallAIDetailed
       .mockResolvedValueOnce({
         text: JSON.stringify([
@@ -406,8 +435,39 @@ describe("generateConnections — content quality gate", () => {
         provider: "claude" as const,
         model: "claude-opus-4-7",
       });
-    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
-    expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const before = counterSnapshot()["connection_verify_parse_failed"] ?? 0;
+    await expect(
+      generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic")
+    ).rejects.toBeInstanceOf(ConnectionParseError);
+    expect(counterSnapshot()["connection_verify_parse_failed"]).toBe(before + 1);
+    errSpy.mockRestore();
+  });
+
+  it.each([
+    ["an empty verdict array", "[]"],
+    ["verdicts of the wrong shape", JSON.stringify([{ ref: "2:255" }, { valid: true }])],
+  ])("fails closed — %s is not an approval", async (_label, verificationText) => {
+    mockCallAIDetailed
+      .mockResolvedValueOnce({
+        text: JSON.stringify([
+          { ref: "2:255", reason: "A well-formed connection worth persisting." },
+        ]),
+        usage: { inputTokens: 100, outputTokens: 20 },
+        provider: "claude" as const,
+        model: "claude-opus-4-7",
+      })
+      .mockResolvedValueOnce({
+        text: verificationText,
+        usage: null,
+        provider: "claude" as const,
+        model: "claude-opus-4-7",
+      });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(
+      generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic")
+    ).rejects.toBeInstanceOf(ConnectionParseError);
+    errSpy.mockRestore();
   });
 
   it("rethrows a daily-quota error from verification instead of keeping unverified candidates", async () => {
@@ -491,6 +551,24 @@ describe("generateGroundedConnections", () => {
       reason: "Describes the throne verse and God's knowledge.",
       kind: "thematic",
     });
+  });
+
+  it("fails closed on the grounded path too — a verifier error throws instead of returning unverified selections", async () => {
+    mockCallAIDetailed
+      .mockResolvedValueOnce({
+        text: JSON.stringify([
+          { ref: "2:255", reason: "Describes the throne verse and God's knowledge." },
+        ]),
+        usage: { inputTokens: 100, outputTokens: 20 },
+        provider: "claude" as const,
+        model: "claude-opus-4-7",
+      })
+      .mockRejectedValueOnce(new Error("503 upstream unavailable"));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(
+      generateGroundedConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", ["2:255", "3:18"])
+    ).rejects.toThrow("503 upstream unavailable");
+    errSpy.mockRestore();
   });
 
   it("rejects any ref the model returns that was not in the candidate set", async () => {

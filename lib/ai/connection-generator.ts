@@ -242,6 +242,19 @@ export class ConnectionParseError extends Error {
   }
 }
 
+/**
+ * The verification pass was skipped because the batch job's call budget is
+ * spent. Candidates are never persisted unverified, so the cell is abandoned
+ * with nothing saved and retried by a later run; the batch treats this as a
+ * clean budget stop, not a cell failure.
+ */
+export class VerificationBudgetExhaustedError extends Error {
+  constructor() {
+    super("connection verification skipped: call budget exhausted");
+    this.name = "VerificationBudgetExhaustedError";
+  }
+}
+
 function parseRawConnections(
   text: string
 ): Array<{ ref: string; reason: string; confidence?: number }> {
@@ -506,9 +519,19 @@ function parseVerifyVerdicts(text: string): VerifyVerdict[] {
   if (!Array.isArray(parsed)) {
     throw new ConnectionParseError("verification response JSON was not an array", jsonMatch[0]);
   }
-  return parsed.filter(
+  const verdicts = parsed.filter(
     (v): v is VerifyVerdict => v && typeof v.ref === "string" && typeof v.valid === "boolean"
   );
+  // Verification is only ever asked about a non-empty candidate set, so a
+  // response with no usable verdict at all (empty, or every entry the wrong
+  // shape) is a failed verification, not an approval of everything.
+  if (verdicts.length === 0) {
+    throw new ConnectionParseError(
+      "verification response had no well-formed verdicts",
+      jsonMatch[0]
+    );
+  }
+  return verdicts;
 }
 
 /**
@@ -516,11 +539,15 @@ function parseVerifyVerdicts(text: string): VerifyVerdict[] {
  * gate: one extra call (never one per candidate) asking the model to flag any
  * that don't genuinely justify the connection or that violate Tanzih.
  *
- * Fails OPEN, not closed: this is defense-in-depth layered on top of the other
- * checks, so a verifier call that errors or a response that doesn't parse must
- * not wipe out otherwise-valid connections — it just means this extra look
- * didn't happen for this batch. Skips the call entirely (no spend) when
- * there's nothing to verify, or when the batch job's budget is exhausted.
+ * Fails CLOSED: this is the theological/quality gate between generation and
+ * persistence, so a candidate that was not actually verified is never returned.
+ * A verifier call that errors, a response that doesn't parse (or carries no
+ * usable verdict) and an exhausted batch budget all throw — the caller persists
+ * nothing and the cell is retried by a later batch pass or request. (Returning
+ * [] instead would be indistinguishable from "the verifier rejected everything".)
+ * Quota, key, rate-limit and cancel signals are rethrown unchanged for the
+ * batch's own handler. Skips the call entirely (no spend) when there's nothing
+ * to verify.
  */
 export async function verifyConnections(
   fromRef: string,
@@ -533,7 +560,7 @@ export async function verifyConnections(
   if (candidates.length === 0) return candidates;
   if (opts.spendBudget && !opts.spendBudget()) {
     incr("connection_verify_skipped_budget");
-    return candidates;
+    throw new VerificationBudgetExhaustedError();
   }
 
   const proposals = candidates.map((c) => `- ${c.ref}: "${c.reason}"`).join("\n");
@@ -566,9 +593,9 @@ export async function verifyConnections(
     ) {
       throw err;
     }
-    console.error("connection verification call failed, keeping candidates:", err);
+    console.error("connection verification call failed, discarding candidates:", err);
     incr("connection_verify_call_failed");
-    return candidates;
+    throw err;
   }
 
   // Best-effort audit log — never fail verification because logging failed.
@@ -588,9 +615,9 @@ export async function verifyConnections(
   try {
     verdicts = parseVerifyVerdicts(res.text);
   } catch (err) {
-    console.error("connection verification response unparseable, keeping candidates:", err);
+    console.error("connection verification response unparseable, discarding candidates:", err);
     incr("connection_verify_parse_failed");
-    return candidates;
+    throw err;
   }
 
   const invalidRefs = new Set(verdicts.filter((v) => !v.valid).map((v) => v.ref));
