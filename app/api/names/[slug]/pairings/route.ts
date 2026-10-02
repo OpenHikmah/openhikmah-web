@@ -3,6 +3,7 @@ import { callAI } from "@/lib/ai/ai";
 import { looksLikeRefusal } from "@/lib/ai/refusal";
 import { getNameBySlug, DIVINE_NAMES } from "@/lib/names/divine-names";
 import { getOrGenerateNameContent } from "@/lib/names/name-content";
+import { verifyPairings } from "@/lib/names/name-verify";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
@@ -130,7 +131,7 @@ async function getPairings(
         return [];
       }
 
-      return items
+      const candidates = items
         .slice(0, 3)
         .map((p): Pairing | null => {
           if (containsTashbih(p.explanation)) {
@@ -160,6 +161,10 @@ async function getPairings(
           };
         })
         .filter((p): p is Pairing => p !== null);
+      // Second-pass review before these are cached for every user: only
+      // explicitly approved pairings survive, and any failure is empty, so
+      // not cached and retried.
+      return verifyPairings(name, candidates, ctx);
     },
     isEmpty,
     onBeforeGenerateOnce
