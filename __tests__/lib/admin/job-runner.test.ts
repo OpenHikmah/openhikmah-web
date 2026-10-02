@@ -58,6 +58,9 @@ vi.mock("@/lib/admin/job-lock", () => ({
 const { mockRunConnectionBatch } = vi.hoisted(() => ({ mockRunConnectionBatch: vi.fn() }));
 vi.mock("@/lib/ai/connection-batch", () => ({ runConnectionBatch: mockRunConnectionBatch }));
 
+const { mockRunVerifyBatch } = vi.hoisted(() => ({ mockRunVerifyBatch: vi.fn() }));
+vi.mock("@/lib/ai/connection-verify-batch", () => ({ runVerifyBatch: mockRunVerifyBatch }));
+
 const { mockRunConnectionBatchLoop } = vi.hoisted(() => ({
   mockRunConnectionBatchLoop: vi.fn(),
 }));
@@ -84,6 +87,7 @@ beforeEach(() => {
   });
   mockRunConnectionBatch.mockReset().mockResolvedValue({ stoppedReason: "completed" });
   mockRunConnectionBatchLoop.mockReset().mockResolvedValue({ stoppedReason: "all-keys-daily" });
+  mockRunVerifyBatch.mockReset().mockResolvedValue({ stoppedReason: "completed" });
   mockTryAcquireJobLock.mockReset().mockResolvedValue(true);
   mockReleaseJobLock.mockReset().mockResolvedValue(undefined);
 });
@@ -205,6 +209,7 @@ describe("JOBS", () => {
       "embed-corpus",
       "seed-translations",
       "backfill-connections",
+      "verify-connections",
     ]);
   });
 });
@@ -348,6 +353,105 @@ describe("startJob — backfill-connections params", () => {
     expect(mockUpdate).toHaveBeenCalled();
     const next = await startJob("seed-quran", "qf-admin");
     expect(next.runId).toBe(42);
+  });
+});
+
+describe("startJob — verify-connections", () => {
+  const validParams = { provider: "claude", maxCalls: 50, maxCostUsd: 3 };
+
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+  });
+
+  it("rejects the job with no params", async () => {
+    await expect(startJob("verify-connections", "qf-admin")).rejects.toThrow(/requires params/);
+    expect(mockRunVerifyBatch).not.toHaveBeenCalled();
+  });
+
+  it("requires a valid provider and positive budgets (there is no uncapped mode)", async () => {
+    await expect(
+      startJob("verify-connections", "qf-admin", { ...validParams, provider: "openai" })
+    ).rejects.toThrow(/provider must be/);
+    for (const maxCalls of [0, -1, 1.5, "abc", undefined]) {
+      await expect(
+        startJob("verify-connections", "qf-admin", { ...validParams, maxCalls })
+      ).rejects.toThrow(/maxCalls/);
+    }
+    for (const maxCostUsd of [0, -1, "x", undefined]) {
+      await expect(
+        startJob("verify-connections", "qf-admin", { ...validParams, maxCostUsd })
+      ).rejects.toThrow(/maxCostUsd/);
+    }
+    expect(mockRunVerifyBatch).not.toHaveBeenCalled();
+  });
+
+  it("rejects a model that does not belong to the provider and an out-of-range delay", async () => {
+    await expect(
+      startJob("verify-connections", "qf-admin", { ...validParams, model: "gemini-3.7-flash" })
+    ).rejects.toThrow(/model must be one of/);
+    for (const callDelayMs of [-1, 60_001, 1.5, "slow"]) {
+      await expect(
+        startJob("verify-connections", "qf-admin", { ...validParams, callDelayMs })
+      ).rejects.toThrow(/callDelayMs/);
+    }
+  });
+
+  it("requires the provider's API key", async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    await expect(startJob("verify-connections", "qf-admin", validParams)).rejects.toThrow(
+      "ANTHROPIC_API_KEY"
+    );
+    expect(mockRunVerifyBatch).not.toHaveBeenCalled();
+  });
+
+  it("runs in-process (no spawn) and passes parsed options to runVerifyBatch", async () => {
+    await startJob("verify-connections", "qf-admin", validParams);
+    expect(mockSpawn).not.toHaveBeenCalled();
+    expect(mockRunVerifyBatch).toHaveBeenCalledWith(
+      { provider: "claude", model: undefined, maxCalls: 50, maxCostUsd: 3, callDelayMs: 0 },
+      expect.objectContaining({ onProgress: expect.any(Function) }),
+      expect.any(AbortSignal)
+    );
+    expect(mockRunConnectionBatch).not.toHaveBeenCalled();
+    expect(mockRunConnectionBatchLoop).not.toHaveBeenCalled();
+  });
+
+  it("defaults the delay to 1500 ms for Gemini and honours an explicit one", async () => {
+    await startJob("verify-connections", "qf-admin", { ...validParams, provider: "gemini" });
+    expect(mockRunVerifyBatch.mock.calls[0][0]).toMatchObject({ callDelayMs: 1500 });
+    await Promise.resolve();
+    await Promise.resolve();
+    await startJob("verify-connections", "qf-admin", {
+      ...validParams,
+      provider: "gemini",
+      callDelayMs: 250,
+    });
+    expect(mockRunVerifyBatch.mock.calls[1][0]).toMatchObject({ callDelayMs: 250 });
+  });
+
+  it("releases the guard when the run finishes, and records a failure when it stops with 'error'", async () => {
+    mockRunVerifyBatch.mockResolvedValueOnce({ stoppedReason: "error", error: "provider down" });
+    await startJob("verify-connections", "qf-admin", validParams);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(mockUpdate).toHaveBeenCalled();
+    const next = await startJob("seed-quran", "qf-admin");
+    expect(next.runId).toBe(42);
+  });
+
+  it("stopJob aborts the verify run's signal", async () => {
+    let signal!: AbortSignal;
+    mockRunVerifyBatch.mockImplementationOnce(
+      async (_o: unknown, _h: unknown, sig: AbortSignal) => {
+        signal = sig;
+        await new Promise<void>((resolve) => sig.addEventListener("abort", () => resolve()));
+        return { stoppedReason: "cancelled" };
+      }
+    );
+    await startJob("verify-connections", "qf-admin", validParams);
+    expect(stopJob("qf-admin")).toEqual({ jobId: "verify-connections" });
+    expect(signal.aborted).toBe(true);
   });
 });
 

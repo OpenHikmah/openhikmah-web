@@ -339,6 +339,11 @@ export const connectionCoverage = pgTable(
     exhaustedAt: timestamp("exhausted_at", { withTimezone: true }),
     lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
     lastError: text("last_error"),
+    // Set on the `en` row once every active English connection of this cell has
+    // been through `verifyConnections` (at generation, or by the re-verification
+    // job). NULL means "not verified yet": a cell with active rows and no
+    // coverage row, or a NULL here, is on the re-verification job's work list.
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

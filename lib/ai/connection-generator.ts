@@ -431,7 +431,7 @@ async function buildSelectionPrompt(
   return { text, promptVersion: version };
 }
 
-function toResult(
+export function toResult(
   verse: Verse,
   reason: string,
   kind: EdgeKind,

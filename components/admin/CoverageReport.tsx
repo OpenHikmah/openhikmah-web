@@ -8,6 +8,7 @@ import { useAdminFetch } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 import { SkeletonRows } from "@/components/admin/Skeleton";
 import { BackfillRunner } from "@/components/admin/BackfillRunner";
+import { VerifyRunner } from "@/components/admin/VerifyRunner";
 import type { CoverageReport as CoverageResponse, CoverageCell } from "@/lib/admin/coverage-report";
 import type { Locale } from "@/lib/i18n/config";
 import type { EdgeKind } from "@/types/quran";
@@ -209,6 +210,7 @@ export function CoverageReport() {
       )}
 
       <BackfillRunner onStarted={() => reload({ keepDataOnError: true })} />
+      <VerifyRunner onStarted={() => reload({ keepDataOnError: true })} />
     </div>
   );
 }
