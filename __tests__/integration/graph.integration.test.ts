@@ -4,13 +4,27 @@ import { and, eq, sql } from "drizzle-orm";
 // Real Postgres (Testcontainers) — only the AI call is mocked. The generator
 // uses callAIDetailed; mockCallAI stays the text source so assertions on call
 // count / response body are unchanged.
-const { mockCallAI } = vi.hoisted(() => ({ mockCallAI: vi.fn() }));
+const { mockCallAI, mockCheckCall } = vi.hoisted(() => ({
+  mockCallAI: vi.fn(),
+  // translateReason's back-translation meaning check (two extra calls per translation).
+  mockCheckCall: vi.fn(),
+}));
 // The verification pass fails closed, so its prompt is answered with a verdict
 // array (still routed through mockCallAI so call counts include it).
 vi.mock("@/lib/ai/ai", async () => {
   const { approveAllVerdicts, isVerificationPrompt } = await import("../test-utils/verification");
   return {
-    callAI: vi.fn((prompt: string) => mockCallAI(prompt)),
+    // translateReason's back-translation meaning check fails closed, so its two
+    // extra prompts go to their own mock (default: approve); mockCallAI keeps
+    // counting generation/translation/verification.
+    callAI: vi.fn(async (prompt: string) => {
+      if (
+        prompt.startsWith("Render the following") ||
+        prompt.includes("comparing two English sentences")
+      )
+        return mockCheckCall(prompt);
+      return mockCallAI(prompt);
+    }),
     callAIDetailed: vi.fn(async (prompt: string) => {
       const text = await mockCallAI(prompt);
       return {
@@ -66,6 +80,13 @@ async function seed(ref: string) {
 }
 
 beforeEach(async () => {
+  mockCheckCall
+    .mockReset()
+    .mockImplementation(async (prompt: string) =>
+      prompt.startsWith("Render the following")
+        ? "A faithful English rendering."
+        : '{ "same": true }'
+    );
   mockCallAI.mockReset();
   await reset();
   await db.delete(connectionCoverage);
@@ -323,6 +344,36 @@ describe("connection graph (integration, real Postgres)", () => {
     const rows = await db.select().from(connections);
     expect(rows.map((r) => r.locale).sort()).toEqual(["en", "ru"]);
     expect(rows.find((r) => r.locale === "en")?.reason).toBe(WITNESS_REASON);
+  });
+
+  it("a translation whose meaning drifted is not persisted: the English reason is served and a later request retries", async () => {
+    await seed("2:255");
+    const WITNESS_REASON = "Both verses bear witness to the absolute oneness of God.";
+    const RU_TRANSLATION = "witness of oneness translated into Russian for this test (ru)";
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.startsWith("Translate the following sentence")) return RU_TRANSLATION;
+      return JSON.stringify([{ ref: "2:255", reason: WITNESS_REASON }]);
+    });
+    mockCheckCall.mockImplementation(async (prompt: string) =>
+      prompt.startsWith("Render the following") ? "A different claim." : '{ "same": false }'
+    );
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const ru = await getConnections("1:1", "thematic", source, { locale: "ru" });
+    errSpy.mockRestore();
+
+    // The unverified translation is not served or cached; English is.
+    expect(ru[0]).toMatchObject({ ref: "2:255", reason: WITNESS_REASON });
+    const rows = await db.select().from(connections);
+    expect(rows.map((r) => r.locale)).toEqual(["en"]);
+
+    // A later request with a passing check translates and persists it.
+    mockCheckCall.mockImplementation(async (prompt: string) =>
+      prompt.startsWith("Render the following") ? "A faithful rendering." : '{ "same": true }'
+    );
+    const retry = await getConnections("1:1", "thematic", source, { locale: "ru" });
+    expect(retry[0]).toMatchObject({ ref: "2:255", reason: RU_TRANSLATION });
+    expect((await db.select().from(connections)).map((r) => r.locale).sort()).toEqual(["en", "ru"]);
   });
 
   it("persists a concrete model id even when no provider is passed (resolves the flag)", async () => {

@@ -3,7 +3,11 @@ import { sql } from "drizzle-orm";
 
 // Real Postgres (Testcontainers) — only the LLM call is mocked. Both connection
 // generation (legacy path) and reason translation funnel through callAIDetailed.
-const { mockCallAI } = vi.hoisted(() => ({ mockCallAI: vi.fn() }));
+const { mockCallAI, mockCheckCall } = vi.hoisted(() => ({
+  mockCallAI: vi.fn(),
+  // translateReason's back-translation meaning check (two extra calls per translation).
+  mockCheckCall: vi.fn(),
+}));
 vi.mock("@/lib/ai/ai", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/ai/ai")>();
   // The verification pass fails closed, so its prompt is answered with a verdict
@@ -11,7 +15,17 @@ vi.mock("@/lib/ai/ai", async (importOriginal) => {
   const { approveAllVerdicts, isVerificationPrompt } = await import("../test-utils/verification");
   return {
     ...actual,
-    callAI: vi.fn((prompt: string) => mockCallAI(prompt)),
+    // translateReason's back-translation meaning check fails closed, so its two
+    // extra prompts go to their own mock (default: approve); mockCallAI keeps
+    // counting generation/translation/verification.
+    callAI: vi.fn(async (prompt: string) => {
+      if (
+        prompt.startsWith("Render the following") ||
+        prompt.includes("comparing two English sentences")
+      )
+        return mockCheckCall(prompt);
+      return mockCallAI(prompt);
+    }),
     callAIDetailed: vi.fn(async (prompt: string) => {
       const text = await mockCallAI(prompt);
       return {
@@ -69,7 +83,11 @@ async function seed(ref: string) {
 
 const hooks = { onProgress: () => {} };
 
+const approveCheck = async (prompt: string) =>
+  prompt.startsWith("Render the following") ? "A faithful English rendering." : '{ "same": true }';
+
 beforeEach(async () => {
+  mockCheckCall.mockReset().mockImplementation(approveCheck);
   mockCallAI.mockReset();
   mockSleep.mockClear();
   await reset();
@@ -138,6 +156,96 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     );
     expect(mockCallAI).not.toHaveBeenCalled();
     expect(rerun.generated).toBe(0);
+  });
+
+  it("a translation whose meaning drifted is not persisted, and the gap is retried on the next pass", async () => {
+    await seed("1:1");
+    await seed("2:255");
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.startsWith("Translate the following sentence"))
+        return "localized reason text for testing purposes";
+      return JSON.stringify([
+        { ref: "2:255", reason: "This verse describes the throne and vast divine knowledge." },
+      ]);
+    });
+    // Pass 1: the comparison says the meaning changed.
+    mockCheckCall.mockImplementation(async (prompt: string) =>
+      prompt.startsWith("Render the following")
+        ? "A different claim entirely."
+        : '{ "same": false }'
+    );
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const pass1 = await runConnectionBatch(
+      { mode: "baseline", provider: "claude", locales: ["tr"], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+    errSpy.mockRestore();
+
+    expect(pass1.generated).toBeGreaterThan(0);
+    expect(pass1.translated).toBe(0);
+    expect(
+      await db
+        .select()
+        .from(connections)
+        .where(sql`${connections.locale} = 'tr'`)
+    ).toHaveLength(0);
+    expect(
+      (
+        await db
+          .select()
+          .from(connections)
+          .where(sql`${connections.locale} = 'en'`)
+      ).length
+    ).toBeGreaterThan(0);
+
+    // Pass 2: the check now approves; the same gap is translated, English is not regenerated.
+    mockCheckCall.mockImplementation(approveCheck);
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.startsWith("Translate the following sentence"))
+        return "localized reason text for testing purposes";
+      throw new Error("unexpected generation call - English rows already exist");
+    });
+    const pass2 = await runConnectionBatch(
+      { mode: "baseline", provider: "claude", locales: ["tr"], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+    expect(pass2.generated).toBe(0);
+    expect(pass2.translated).toBeGreaterThan(0);
+    expect(
+      (
+        await db
+          .select()
+          .from(connections)
+          .where(sql`${connections.locale} = 'tr'`)
+      ).length
+    ).toBeGreaterThan(0);
+  });
+
+  it("spend guard: a budget that pays for the translation but not its meaning check persists no translation and stops cleanly", async () => {
+    await seed("1:1");
+    await seed("2:255");
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.startsWith("Translate the following sentence"))
+        return "localized reason text for testing purposes";
+      return JSON.stringify([
+        { ref: "2:255", reason: "This verse describes the throne and vast divine knowledge." },
+      ]);
+    });
+    // generation (1) + English verification (2) + translation (3); the check has no call left.
+    const summary = await runConnectionBatch(
+      { mode: "baseline", provider: "claude", locales: ["tr"], maxCalls: 3, maxCostUsd: 100 },
+      hooks
+    );
+
+    expect(summary.stoppedReason).toBe("call-budget");
+    expect(summary.cellsFailed).toBe(0);
+    expect(mockCheckCall).not.toHaveBeenCalled();
+    expect(
+      await db
+        .select()
+        .from(connections)
+        .where(sql`${connections.locale} = 'tr'`)
+    ).toHaveLength(0);
   });
 
   it("a junk translation (model refusal) is not persisted and the gap is retried on the next pass", async () => {
@@ -621,7 +729,8 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     expect(summary.stoppedReason).toBe("completed");
     expect(summary.generated).toBeGreaterThan(0);
     expect(summary.translated).toBe(summary.generated);
-    const realRequests = mockCallAI.mock.calls.length;
+    // Each translation also makes two paced meaning-check calls.
+    const realRequests = mockCallAI.mock.calls.length + mockCheckCall.mock.calls.length;
     expect(mockSleep).toHaveBeenCalledTimes(realRequests - 1);
   });
 

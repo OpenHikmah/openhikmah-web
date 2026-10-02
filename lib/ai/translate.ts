@@ -2,6 +2,11 @@ import { callAI, type CallAiOptions } from "@/lib/ai/ai";
 import { looksLikeRefusal } from "@/lib/ai/refusal";
 import { TANZIH_CONSTRAINT, containsTashbih } from "@/lib/ai/theological-constraints";
 import { incr } from "@/lib/infra/metrics";
+import {
+  GeminiDailyQuotaError,
+  GeminiKeyInvalidError,
+  GeminiRateLimitError,
+} from "@/lib/ai/gemini-errors";
 
 /**
  * A translated reason that fails one of these checks is junk, not localized
@@ -26,7 +31,13 @@ const LABEL_PREFIX =
   /^\s*(?:sure[,!.]?\s+)?(?:here(?:['’]s| is)[^:]*:|(?:[a-z]+ )?translation:|translated(?: sentence| text| (?:in)?to [a-z]+)?:)\s*/i;
 
 export type TranslationRejection =
-  "label_prefix" | "refusal" | "tashbih" | "english_echo" | "length_ratio";
+  | "label_prefix"
+  | "refusal"
+  | "tashbih"
+  | "english_echo"
+  | "length_ratio"
+  | "meaning_drift"
+  | "verification_failed";
 
 export type TranslationVerdict =
   { ok: true; text: string } | { ok: false; reason: TranslationRejection };
@@ -91,6 +102,104 @@ export function validateTranslation(
 }
 
 /**
+ * The batch job's call budget has no room for the meaning check's calls, and a
+ * translation is never persisted unverified, so it is abandoned (nothing saved)
+ * and retried by a later run. The batch treats this as a clean budget stop.
+ */
+export class TranslationBudgetExhaustedError extends Error {
+  constructor() {
+    super("translation meaning check skipped: call budget exhausted");
+    this.name = "TranslationBudgetExhaustedError";
+  }
+}
+
+/** Budget guard and pacer for the meaning check's extra calls (batch jobs only). */
+export interface TranslationVerifyHooks {
+  spendBudget?: () => boolean;
+  pacer?: { waitTurn: () => Promise<void>; noteRequest: () => void };
+}
+
+const BACK_TRANSLATE_PROMPT = (translated: string, language: string) =>
+  `Render the following ${language} sentence in English. Translate it as literally and completely as you can, adding nothing and leaving nothing out. Return ONLY the English sentence, with no quotation marks, labels, or explanation.
+
+Sentence: "${translated}"`;
+
+const COMPARE_PROMPT = (source: string, back: string, language: string) =>
+  `You are a classical Islamic scholar grounded in the Maturidi/Hanafi tradition (Ahl al-Sunnah wal-Jama'ah), comparing two English sentences. The second is a back-translation of a ${language} rendering of the first.
+
+Original: "${source}"
+Back-translation: "${back}"
+
+Do they mean exactly the same thing? Answer false if the back-translation adds, removes, weakens, strengthens or alters any theological claim, or implies any physical form, spatial location, or resemblance to created things for God. Differences of wording that do not change the meaning are fine. Maintain ${TANZIH_CONSTRAINT}.
+
+Return ONLY a valid JSON object, no prose, no markdown:
+{ "same": true }`;
+
+/** One paced, budgeted call of the meaning check. */
+async function checkCall(
+  prompt: string,
+  opts: CallAiOptions,
+  hooks?: TranslationVerifyHooks
+): Promise<string> {
+  if (hooks?.spendBudget && !hooks.spendBudget()) {
+    incr("translation_verify_skipped_budget");
+    throw new TranslationBudgetExhaustedError();
+  }
+  await hooks?.pacer?.waitTurn();
+  try {
+    return await callAI(prompt, opts);
+  } finally {
+    hooks?.pacer?.noteRequest();
+  }
+}
+
+type MeaningCheck = "same" | "drift" | "refusal" | "failed";
+
+/**
+ * Back-translation check that a localized sentence still means exactly what the
+ * canonical English `source` says. Call 1 renders the translation back into
+ * English WITHOUT seeing the source (so it cannot just echo it); call 2 asks
+ * whether the back-translation says the same thing as the source. Only an
+ * explicit `same: true` passes. Quota/key/rate-limit/cancel signals and budget
+ * exhaustion propagate to the caller's own handler; any other failure of the
+ * check counts as not verified.
+ */
+async function checkMeaning(
+  source: string,
+  translated: string,
+  language: string,
+  opts: CallAiOptions,
+  hooks?: TranslationVerifyHooks
+): Promise<MeaningCheck> {
+  try {
+    const back = (await checkCall(BACK_TRANSLATE_PROMPT(translated, language), opts, hooks)).trim();
+    if (looksLikeRefusal(back)) return "refusal";
+    if (back === "") return "failed";
+
+    const reply = await checkCall(COMPARE_PROMPT(source, back, language), opts, hooks);
+    if (looksLikeRefusal(reply)) return "refusal";
+    const match = reply.match(/\{[\s\S]*\}/);
+    if (!match) return "failed";
+    const verdict: unknown = JSON.parse(match[0]);
+    if (typeof verdict !== "object" || verdict === null) return "failed";
+    return (verdict as { same?: unknown }).same === true ? "same" : "drift";
+  } catch (err) {
+    if (
+      err instanceof TranslationBudgetExhaustedError ||
+      err instanceof GeminiDailyQuotaError ||
+      err instanceof GeminiKeyInvalidError ||
+      err instanceof GeminiRateLimitError ||
+      opts.signal?.aborted ||
+      (err instanceof Error && err.name === "AbortError")
+    ) {
+      throw err;
+    }
+    console.error("translateReason: meaning check failed:", err);
+    return "failed";
+  }
+}
+
+/**
  * Translates (not re-derives) a canonical English `reason` sentence into the
  * target language, so the underlying theological justification stays exactly
  * what was already generated and validated in English.
@@ -100,6 +209,13 @@ export function validateTranslation(
  * explanation, and every localized verse-connection reason. The wording
  * is intentionally minimal and constrained — do not loosen it (see AGENTS.md
  * "AI-specific correctness").
+ *
+ * A translation that passes {@link validateTranslation} must also pass the
+ * back-translation meaning check ({@link checkMeaning}) before it is returned:
+ * the localized text is cached for every user, and the English-only Tashbih
+ * regex cannot see a theological change made in another language. This costs
+ * two extra calls per translation, paced and budgeted through `verifyHooks`
+ * for batch jobs.
  *
  * Returns "" when the model output is empty or fails {@link validateTranslation};
  * every caller already treats "" as "skip, keep the English reason, retry later"
@@ -114,12 +230,17 @@ export async function translateReason(
   language: string,
   opts: CallAiOptions = {},
   onRejected?: (reason: TranslationRejection) => void,
-  validationOpts?: { maxLengthRatio?: number }
+  validationOpts?: { maxLengthRatio?: number },
+  verifyHooks?: TranslationVerifyHooks
 ): Promise<string> {
   const prompt = `Translate the following sentence into ${language}. Preserve its meaning exactly — do not add, remove, or alter any theological claim, and maintain ${TANZIH_CONSTRAINT}. Return ONLY the translated sentence, with no quotation marks, labels, or explanation.
 
 Sentence: "${reason}"`;
   const translated = (await callAI(prompt, opts)).trim();
+  // The caller paces and notes this request only after we return, which is
+  // after the meaning check's own calls; note it now so the first check is
+  // spaced from it like every other request.
+  verifyHooks?.pacer?.noteRequest();
   if (translated === "") return "";
 
   const verdict = validateTranslation(reason, translated, validationOpts);
@@ -127,6 +248,16 @@ Sentence: "${reason}"`;
     console.error(`translateReason: rejected translation into ${language} (${verdict.reason})`);
     incr(`translation_rejected_${verdict.reason}`);
     onRejected?.(verdict.reason);
+    return "";
+  }
+
+  const check = await checkMeaning(reason, verdict.text, language, opts, verifyHooks);
+  if (check !== "same") {
+    const rejection: TranslationRejection =
+      check === "refusal" ? "refusal" : check === "drift" ? "meaning_drift" : "verification_failed";
+    console.error(`translateReason: meaning check rejected the ${language} translation (${check})`);
+    incr(`translation_rejected_${rejection}`);
+    onRejected?.(rejection);
     return "";
   }
   return verdict.text;

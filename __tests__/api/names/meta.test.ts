@@ -99,6 +99,9 @@ describe("GET /api/names/[slug]/meta", () => {
   // mock off which canonical sentence is being translated instead of call order.
   function mockTranslationsBySource(bySource: Record<string, string | Error>) {
     mockCallAI.mockImplementation(async (prompt: string) => {
+      // translateReason's meaning check: a faithful back-translation, then "same".
+      if (prompt.startsWith("Render the following")) return "A faithful English rendering.";
+      if (prompt.includes("comparing two English sentences")) return '{ "same": true }';
       const match = Object.entries(bySource).find(([source]) => prompt.includes(source));
       if (!match) throw new Error(`unexpected prompt: ${prompt}`);
       const [, result] = match;
@@ -129,7 +132,10 @@ describe("GET /api/names/[slug]/meta", () => {
     const body = await res.json();
     expect(body.meaning).toBe("Hükümdar");
     expect(body.description).toBe(TR_DESCRIPTION);
-    expect(mockCallAI).toHaveBeenCalledTimes(2);
+    const translationCalls = mockCallAI.mock.calls.filter(([p]) =>
+      String(p).startsWith("Translate the following sentence")
+    );
+    expect(translationCalls).toHaveLength(2);
   });
 
   it("falls back to the canonical English field when its translation call fails, without failing the request", async () => {

@@ -6,7 +6,7 @@ import {
   ConnectionParseError,
   VerificationBudgetExhaustedError,
 } from "@/lib/ai/connection-generator";
-import { translateReason } from "@/lib/ai/translate";
+import { translateReason, TranslationBudgetExhaustedError } from "@/lib/ai/translate";
 import { estimateCostUsd } from "@/lib/ai/ai-cost";
 import { resolveModel, type Provider } from "@/lib/ai/ai";
 import {
@@ -379,15 +379,29 @@ async function translateCellReasons(
 
       let translated: string;
       try {
-        translated = await translateReason(en.reason, LOCALE_LANGUAGE_NAME[locale], {
-          feature: "connections",
-          provider,
-          model,
-          apiKey: gen.apiKey,
-          signal: gen.signal,
-        });
+        translated = await translateReason(
+          en.reason,
+          LOCALE_LANGUAGE_NAME[locale],
+          {
+            feature: "connections",
+            provider,
+            model,
+            apiKey: gen.apiKey,
+            signal: gen.signal,
+          },
+          undefined,
+          undefined,
+          // The back-translation meaning check makes two more calls per
+          // translation; they spend the same budget and use the same pacer.
+          { spendBudget: () => budget.spend(), pacer: gen.pacer }
+        );
         gen.pacer?.noteRequest();
       } catch (err) {
+        // No room left to verify this translation, and it is never persisted
+        // unverified: stop the pass cleanly; a later run redoes it.
+        if (err instanceof TranslationBudgetExhaustedError) {
+          return { inserted, stoppedReason: budget.stoppedReason };
+        }
         // A daily-quota hit or an invalid key is not a translation problem —
         // bubble it to the single handler in runConnectionBatch so the pass ends
         // "quota-daily" / "key-invalid" and the loop rotates keys.
