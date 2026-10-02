@@ -51,8 +51,8 @@ export interface GenerateOpts {
   existingReasons?: string[];
   /** Batch job's spend guard for the extra verification call this module
    *  makes after the deterministic gate. Returns false when the run is out of
-   *  budget — verification is then skipped (candidates pass through
-   *  unverified) rather than blocking or throwing. Omitted for live traffic,
+   *  budget — {@link VerificationBudgetExhaustedError} is then thrown, because
+   *  candidates are never persisted unverified. Omitted for live traffic,
    *  which has no run-level cost budget. */
   spendBudget?: () => boolean;
   /** Batch job's pacer, so the verification call is spaced out from the main
