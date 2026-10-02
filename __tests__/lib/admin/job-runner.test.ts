@@ -440,6 +440,58 @@ describe("startJob — verify-connections", () => {
     expect(next.runId).toBe(42);
   });
 
+  /** Captures what finishRun writes to job_runs for the run that is about to finish. */
+  function captureFinish() {
+    const set = vi.fn(() => ({ where: () => ({ catch: () => undefined }) }));
+    mockUpdate.mockReturnValue({ set });
+    return set;
+  }
+
+  it.each([
+    ["quota-daily", "failed", "Gemini daily quota exhausted"],
+    ["key-invalid", "failed", "API key not valid"],
+    ["rate-limited", "failed", "Gemini rate limit survived retries"],
+  ])(
+    "records a %s stop as a %s run carrying the provider message from lastError",
+    async (stoppedReason, status, lastError) => {
+      const set = captureFinish();
+      mockRunVerifyBatch.mockResolvedValueOnce({ stoppedReason, lastError });
+
+      await startJob("verify-connections", "qf-admin", validParams);
+      await vi.waitFor(() => expect(set).toHaveBeenCalled());
+
+      expect(set).toHaveBeenCalledWith(expect.objectContaining({ status, error: lastError }));
+    }
+  );
+
+  it("prefers the run's own error over lastError", async () => {
+    const set = captureFinish();
+    mockRunVerifyBatch.mockResolvedValueOnce({
+      stoppedReason: "error",
+      error: "aborted after 5 consecutive cell failures",
+      lastError: "503 upstream",
+    });
+    await startJob("verify-connections", "qf-admin", validParams);
+    await vi.waitFor(() => expect(set).toHaveBeenCalled());
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "failed",
+        error: "aborted after 5 consecutive cell failures",
+      })
+    );
+  });
+
+  it("records a budget stop as a success and does not surface a cell-level lastError as the run error", async () => {
+    const set = captureFinish();
+    mockRunVerifyBatch.mockResolvedValueOnce({
+      stoppedReason: "call-budget",
+      lastError: "one cell failed earlier",
+    });
+    await startJob("verify-connections", "qf-admin", validParams);
+    await vi.waitFor(() => expect(set).toHaveBeenCalled());
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({ status: "success", error: null }));
+  });
+
   it("stopJob aborts the verify run's signal", async () => {
     let signal!: AbortSignal;
     mockRunVerifyBatch.mockImplementationOnce(
@@ -638,6 +690,29 @@ describe("startJob — backfill-connections loop mode", () => {
     expect(signal.aborted).toBe(false);
     expect(stopJob("qf-admin")).toEqual({ jobId: "backfill-connections" });
     expect(signal.aborted).toBe(true);
+  });
+});
+
+describe("startJob — a rate-limited terminal reason", () => {
+  beforeEach(() => {
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+  });
+
+  it("is still a success for the single-pass backfill (unchanged); only the direct verify run treats it as a fault", async () => {
+    const set = vi.fn(() => ({ where: () => ({ catch: () => undefined }) }));
+    mockUpdate.mockReturnValue({ set });
+    mockRunConnectionBatch.mockResolvedValueOnce({ stoppedReason: "rate-limited" });
+
+    await startJob("backfill-connections", "qf-admin", {
+      mode: "baseline",
+      provider: "gemini",
+      locales: "",
+      maxCalls: 5,
+      maxCostUsd: 1,
+    });
+    await vi.waitFor(() => expect(set).toHaveBeenCalled());
+
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({ status: "success" }));
   });
 });
 
