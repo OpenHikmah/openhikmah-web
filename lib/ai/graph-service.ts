@@ -1,4 +1,4 @@
-import { and, eq, inArray, notInArray } from "drizzle-orm";
+import { and, eq, inArray, ne, notInArray } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { connections, type Connection } from "@/lib/infra/db/schema";
 import { generateConnections, generateGroundedConnections } from "@/lib/ai/connection-generator";
@@ -174,6 +174,26 @@ async function readActiveRows(
     .limit(200);
 }
 
+/** Target refs whose row in this locale was flagged or retired (hidden by moderation). */
+async function readBlockedRefs(
+  fromRef: string,
+  kind: EdgeKind,
+  locale: Locale
+): Promise<Set<string>> {
+  const rows = await db
+    .select({ toRef: connections.toRef })
+    .from(connections)
+    .where(
+      and(
+        eq(connections.fromRef, fromRef),
+        eq(connections.kind, kind),
+        eq(connections.locale, locale),
+        ne(connections.status, "active")
+      )
+    );
+  return new Set(rows.map((r) => r.toRef));
+}
+
 /**
  * Returns connections for a source verse and kind. Served from the DB graph when
  * present; otherwise generated, persisted, and returned. `source` text is only
@@ -195,8 +215,24 @@ export async function getConnections(
   const enRows =
     locale === "en" ? existing : await readActiveRows(fromRef, kind, "en", excludeRefs);
 
+  let blocked = new Set<string>();
   if (locale === "en") {
     if (existing.length > 0) return hydrate(existing, kind);
+  } else if (enRows.length > 0) {
+    // A translation hidden by moderation is settled, not missing: the reader
+    // gets the canonical English reason for that pair, and it is never
+    // re-translated (that would be fresh provider work on every request and
+    // would bypass the quarantine).
+    const localeRefs = new Set(existing.map((r) => r.toRef));
+    if (enRows.every((r) => localeRefs.has(r.toRef))) return hydrate(existing, kind);
+    blocked = await readBlockedRefs(fromRef, kind, locale);
+    if (enRows.every((r) => localeRefs.has(r.toRef) || blocked.has(r.toRef))) {
+      const byRef = new Map(existing.map((r) => [r.toRef, r]));
+      return hydrate(
+        enRows.map((r) => byRef.get(r.toRef) ?? r),
+        kind
+      );
+    }
   } else if (existing.length > 0) {
     // A non-`en` cell is a hit only when EVERY active canonical `en` ref has an
     // active row in this locale — ref-by-ref, matching `findTranslationGaps` in
@@ -251,6 +287,7 @@ export async function getConnections(
             model,
             enRows,
             existing,
+            blocked,
             options.clientKey
           ),
     locale === "en"
@@ -288,6 +325,7 @@ async function generateLocalizedCell(
   // repair pass doesn't re-query either.
   enRows: Connection[],
   existingLocaleRows: Connection[],
+  blockedRefs: Set<string>,
   clientKey?: string
 ): Promise<CellGenerationResult> {
   let enPairs: { ref: string; reason: string }[];
@@ -318,6 +356,10 @@ async function generateLocalizedCell(
     const already = existingLocale.get(en.ref);
     if (already !== undefined) {
       localized.push({ toRef: en.ref, reason: already });
+      continue;
+    }
+    if (blockedRefs.has(en.ref)) {
+      localized.push({ toRef: en.ref, reason: en.reason });
       continue;
     }
     if (budgetSpent) {

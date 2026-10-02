@@ -145,7 +145,7 @@ async function applyVerdicts(
     if (rejectedToRefs.length > 0) {
       await tx
         .update(connections)
-        .set({ status: "flagged" })
+        .set({ status: "flagged", reviewedAt: null, reviewedBy: null })
         .where(
           and(
             eq(connections.fromRef, fromRef),

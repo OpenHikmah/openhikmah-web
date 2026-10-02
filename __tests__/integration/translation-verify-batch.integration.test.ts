@@ -143,6 +143,45 @@ describe("runTranslationVerifyBatch (integration, real Postgres)", () => {
     expect((await rowOf("1:1", "2:255", "en")).status).toBe("active");
   });
 
+  it("a flagged row that was reviewed before comes back as pending review", async () => {
+    await seedPair("1:1", "2:255", ["ru"]);
+    await db
+      .update(connections)
+      .set({ reviewedAt: new Date(), reviewedBy: "admin-1" })
+      .where(eq(connections.locale, "ru"));
+    checker("Localized reason ru");
+
+    await runTranslationVerifyBatch(OPTS, hooks);
+
+    const ru = await rowOf("1:1", "2:255", "ru");
+    expect(ru.status).toBe("flagged");
+    expect(ru.reviewedAt).toBeNull();
+    expect(ru.reviewedBy).toBeNull();
+  });
+
+  it("an admin decision made during the run wins over the stale drift verdict", async () => {
+    await seedPair("1:1", "2:255", ["ru"]);
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (prompt.startsWith("Render the following")) {
+        // The admin flags and restores the row while the check is in flight.
+        await db
+          .update(connections)
+          .set({ status: "active", reviewedAt: new Date(), reviewedBy: "admin-1" })
+          .where(eq(connections.locale, "ru"));
+        return "drifted text";
+      }
+      return JSON.stringify({ same: false });
+    });
+
+    const summary = await runTranslationVerifyBatch(OPTS, hooks);
+
+    expect(summary.rowsFlagged).toBe(0);
+    const ru = await rowOf("1:1", "2:255", "ru");
+    expect(ru.status).toBe("active");
+    expect(ru.reviewedBy).toBe("admin-1");
+    expect(ru.translationCheckedAt).toBeInstanceOf(Date);
+  });
+
   it("does not flag a restored false positive again on the next run", async () => {
     await seedPair("1:1", "2:255", ["ru"]);
     checker("Localized reason ru");

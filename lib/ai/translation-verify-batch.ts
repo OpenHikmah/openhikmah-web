@@ -61,6 +61,8 @@ interface WorkRow {
   toRef: string;
   locale: string;
   translated: string;
+  /** Snapshot of the review state: an admin decision made mid-run changes it. */
+  reviewedAt: Date | null;
   /** Canonical English reason of the same pair, or null if there is no active one. */
   source: string | null;
 }
@@ -75,6 +77,7 @@ async function buildWorkList(): Promise<WorkRow[]> {
       toRef: connections.toRef,
       locale: connections.locale,
       translated: connections.reason,
+      reviewedAt: connections.reviewedAt,
       source: en.reason,
     })
     .from(connections)
@@ -114,11 +117,34 @@ async function logProgress(hooks: BatchHooks): Promise<void> {
   }
 }
 
-async function stamp(id: number, flag: boolean): Promise<void> {
-  await db
-    .update(connections)
-    .set({ translationCheckedAt: new Date(), ...(flag ? { status: "flagged" } : {}) })
-    .where(and(eq(connections.id, id), eq(connections.status, "active")));
+/**
+ * Records the check and, on drift, flags the row as a fresh pending review item
+ * (reviewedAt cleared, so a row an admin approved earlier surfaces again). The
+ * flag only applies if the row is still active with the review state the work
+ * list saw: if an admin flagged or restored it meanwhile, their decision wins
+ * and the stale verdict is dropped (the row is still stamped as checked).
+ * Returns whether the row was flagged.
+ */
+async function stamp(row: WorkRow, flag: boolean): Promise<boolean> {
+  const now = new Date();
+  if (flag) {
+    const flagged = await db
+      .update(connections)
+      .set({ translationCheckedAt: now, status: "flagged", reviewedAt: null, reviewedBy: null })
+      .where(
+        and(
+          eq(connections.id, row.id),
+          eq(connections.status, "active"),
+          row.reviewedAt === null
+            ? isNull(connections.reviewedAt)
+            : eq(connections.reviewedAt, row.reviewedAt)
+        )
+      )
+      .returning({ id: connections.id });
+    if (flagged.length > 0) return true;
+  }
+  await db.update(connections).set({ translationCheckedAt: now }).where(eq(connections.id, row.id));
+  return false;
 }
 
 export async function runTranslationVerifyBatch(
@@ -192,13 +218,15 @@ export async function runTranslationVerifyBatch(
 
     try {
       if (row.source === null) {
-        await stamp(row.id, true);
+        const flagged = await stamp(row, true);
         summary.cellsVerified++;
-        summary.rowsFlagged++;
-        incr("translation_reverify_flagged");
-        hooks.onProgress(
-          `[verify-translations] ${row.fromRef}->${row.toRef} ${row.kind} ${row.locale}: no active English reason to compare with, flagged`
-        );
+        if (flagged) {
+          summary.rowsFlagged++;
+          incr("translation_reverify_flagged");
+          hooks.onProgress(
+            `[verify-translations] ${row.fromRef}->${row.toRef} ${row.kind} ${row.locale}: no active English reason to compare with, flagged`
+          );
+        }
       } else {
         const verdict = await checkTranslationMeaning(
           row.source,
@@ -214,9 +242,9 @@ export async function runTranslationVerifyBatch(
           { spendBudget: () => budget.spend(), pacer }
         );
         if (verdict === "same" || verdict === "drift") {
-          await stamp(row.id, verdict === "drift");
+          const flagged = await stamp(row, verdict === "drift");
           summary.cellsVerified++;
-          if (verdict === "drift") {
+          if (flagged) {
             summary.rowsFlagged++;
             incr("translation_reverify_flagged");
             hooks.onProgress(
