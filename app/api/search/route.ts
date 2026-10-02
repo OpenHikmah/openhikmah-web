@@ -27,6 +27,10 @@ const RELATED_RESULT_CAP = 5;
 // request from holding up the (otherwise fast) keyword response it runs
 // alongside in Promise.all.
 const RELATED_TIMEOUT_MS = 4000;
+// Same bound the names route puts on its quran.com search.
+const KEYWORD_FETCH_TIMEOUT_MS = 5000;
+// quran.com paginates far below this; a larger value is only ever abuse.
+const MAX_PAGE = 100;
 
 function stripHtml(text: string): string {
   // Strip angle brackets directly so partial/unterminated tags (e.g. "<script")
@@ -55,6 +59,7 @@ async function fetchQuranComSearch(
   const res = await fetch(url, {
     headers: { Accept: "application/json" },
     next: { revalidate: 300 },
+    signal: AbortSignal.timeout(KEYWORD_FETCH_TIMEOUT_MS),
   });
   if (!res.ok) {
     console.error(`Search API error: ${res.status} ${res.statusText}`);
@@ -118,7 +123,9 @@ async function keywordSearch(
 }
 
 /** Fills in `arabicText`/`translation` from our own corpus so the full-text view
- *  always shows the same text as the rest of the app, regardless of source. */
+ *  always shows the same text as the rest of the app, regardless of source. A ref
+ *  the corpus lacks goes through `resolveVerse` (the same path as a ref query);
+ *  one that resolves nowhere is dropped rather than shown with an empty Arabic block. */
 async function hydrate(
   partial: Array<Omit<SearchResult, "arabicText" | "translation">>,
   edition: string
@@ -127,14 +134,17 @@ async function hydrate(
     partial.map((r) => r.ref),
     edition
   );
-  return partial.map((r) => {
-    const verse = verseMap.get(r.ref);
-    return {
-      ...r,
-      arabicText: verse?.arabicText ?? "",
-      translation: verse?.translation ?? r.snippet,
-    };
-  });
+  const hydrated = await Promise.all(
+    partial.map(async (r) => {
+      const verse = verseMap.get(r.ref) ?? (await resolveVerse(r.ref, edition));
+      if (!verse) {
+        console.error(`Search result ${r.ref} did not resolve; dropping it`);
+        return null;
+      }
+      return { ...r, arabicText: verse.arabicText, translation: verse.translation };
+    })
+  );
+  return hydrated.filter((r): r is SearchResult => r !== null);
 }
 
 /** Best-effort semantic lookup backing the "related by meaning" section — gated
@@ -183,7 +193,10 @@ async function maybeLogSearchQuery(
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim();
-  const page = Math.max(1, parseInt(req.nextUrl.searchParams.get("page") ?? "1", 10) || 1);
+  const page = Math.min(
+    MAX_PAGE,
+    Math.max(1, parseInt(req.nextUrl.searchParams.get("page") ?? "1", 10) || 1)
+  );
   const pageSize = Math.max(
     1,
     Math.min(parseInt(req.nextUrl.searchParams.get("pageSize") ?? "10", 10) || 10, 50)
@@ -194,6 +207,20 @@ export async function GET(req: NextRequest) {
   }
   if (q.length > MAX_QUERY_LENGTH) {
     return NextResponse.json({ error: "Query too long" }, { status: 400 });
+  }
+
+  // Every path below (surah-name match, ref lookup — which can fall back to live
+  // alquran.cloud fetches — and keyword search) is a cheap proxy call, not an AI
+  // generation, so they share one bucket that normal typing/paging never spends
+  // from the AI-generation budget (search: prefix, shared with the best-effort
+  // "related by meaning" lookup).
+  const allowed = await consume(
+    `searchkw:${clientKey(req)}`,
+    KEYWORD_SEARCH_LIMIT,
+    KEYWORD_SEARCH_WINDOW_SECONDS
+  );
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many search requests" }, { status: 429 });
   }
 
   const edition = await getQuranEdition();
@@ -244,18 +271,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(response);
   }
 
-  // Plain keyword search is a cheap proxy call, not an AI generation — its own
-  // bucket so normal typing/paging never competes with the AI-generation
-  // budget (search: prefix, shared with the best-effort "related by meaning" lookup).
-  const allowed = await consume(
-    `searchkw:${clientKey(req)}`,
-    KEYWORD_SEARCH_LIMIT,
-    KEYWORD_SEARCH_WINDOW_SECONDS
-  );
-  if (!allowed) {
-    return NextResponse.json({ error: "Too many search requests" }, { status: 429 });
-  }
-
   // Semantic matches run alongside keyword search, best-effort — only on page 1
   // (a small supplementary section, not paginated) and never surfaced as an error
   // or fallback notice. A miss (unseeded embeddings, quota, rate limit) is simply
@@ -286,7 +301,11 @@ export async function GET(req: NextRequest) {
     ...(related.length > 0 ? { related } : {}),
     ...(matchedSurahs.length > 0 ? { matchedSurahs } : {}),
   };
-  await maybeLogSearchQuery(req, q, "keyword", total);
+  // An upstream failure is not a zero-result search; logging it would record an
+  // outage as many failed queries.
+  if (!failed) {
+    await maybeLogSearchQuery(req, q, "keyword", total);
+  }
   if (related.length > 0) {
     await maybeLogSearchQuery(req, q, "meaning", related.length);
   }
