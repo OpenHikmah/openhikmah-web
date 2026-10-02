@@ -23,10 +23,11 @@ function makeSelectChain(resolveWith: unknown[]) {
   return chain;
 }
 
-const { mockConsume, mockCallAI, mockCookies, mockInsertValues } = vi.hoisted(() => ({
+const { mockConsume, mockCallAI, mockVerifyAI, mockCookies, mockInsertValues } = vi.hoisted(() => ({
   mockConsume: vi.fn(),
   mockInsertValues: vi.fn(),
   mockCallAI: vi.fn(),
+  mockVerifyAI: vi.fn(),
   // The routes now call getUiLocale() (lib/i18n/request-prefs.ts), which reads
   // next/headers' cookies() — unavailable outside a real Next request scope.
   // Defaults to no cookie set (→ "en"); individual tests can override.
@@ -58,15 +59,22 @@ vi.mock("@/lib/infra/rate-limit", async (importOriginal) => {
 });
 
 vi.mock("@/lib/ai/ai", () => ({
-  callAI: mockCallAI,
+  // The divine-name review fails closed, so its prompt is answered by its own
+  // mock (default: approve) and generation call counts stay exact.
+  callAI: (prompt: string, opts?: unknown) =>
+    prompt.includes("reviewing content that another scholar wrote about a divine name")
+      ? mockVerifyAI(prompt, opts)
+      : mockCallAI(prompt, opts),
   resolveProvider: vi.fn(async () => "claude" as const),
   resolveModel: vi.fn(async () => "claude-opus-4-7"),
   defaultModelFor: () => "claude-opus-4-7",
 }));
 
 import { GET as getPairings } from "@/app/api/names/[slug]/pairings/route";
+import { approveNameVerification } from "../test-utils/name-verification";
 import { GET as getVerses } from "@/app/api/names/[slug]/verses/route";
 import { counterSnapshot } from "@/lib/infra/metrics";
+import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
 import { GET as getReflection } from "@/app/api/names/[slug]/reflection/route";
 
 // Stub fetch AFTER static imports so vi.stubGlobal wins over any fetch patch
@@ -85,6 +93,9 @@ describe("names AI routes — model output validation", () => {
   beforeEach(() => {
     mockConsume.mockReset().mockResolvedValue(true);
     mockCallAI.mockReset();
+    mockVerifyAI
+      .mockReset()
+      .mockImplementation(async (prompt: string) => approveNameVerification(prompt));
     mockInsertValues.mockReset();
     mockFetch.mockReset();
     mockFetch.mockResolvedValue({ ok: false }); // quran.com search yields no refs
@@ -583,6 +594,110 @@ describe("names AI routes — model output validation", () => {
     // Unlike a refusal, a Tashbih hit is a bad answer, so the Gemini retry runs.
     expect(mockCallAI).toHaveBeenCalledTimes(2);
     errorSpy.mockRestore();
+  });
+
+  describe("second-pass review of generated names content", () => {
+    const GOOD_REFLECTION = "A reflection on mercy that stays within divine transcendence.";
+    const GOOD_PAIRINGS = JSON.stringify([
+      {
+        transliteration: "Ar-Rahim",
+        arabic: "الرَّحِيم",
+        explanation: "Balances mercy in general and in specific senses.",
+      },
+      {
+        transliteration: "Al-Malik",
+        arabic: "الْمَلِك",
+        explanation: "Pairs mercy with sovereignty, as classical tafsir notes.",
+      },
+    ]);
+
+    it("reflection: an approved reflection is cached and served; the reviewer is asked once", async () => {
+      mockCallAI.mockResolvedValue(GOOD_REFLECTION);
+      const res = await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));
+      expect(await res.json()).toEqual({ reflection: GOOD_REFLECTION });
+      expect(mockVerifyAI).toHaveBeenCalledTimes(1);
+      const prompt = mockVerifyAI.mock.calls[0][0] as string;
+      expect(prompt).toContain(GOOD_REFLECTION);
+      expect(prompt).toContain(TANZIH_CONSTRAINT);
+    });
+
+    it("reflection: a rejected reflection is empty and not cached, and a Gemini retry is allowed", async () => {
+      mockCallAI.mockResolvedValue(GOOD_REFLECTION);
+      mockVerifyAI.mockResolvedValue(JSON.stringify({ valid: false }));
+      const res = await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));
+      expect(await res.json()).toEqual({ reflection: "" });
+      expect(mockInsertValues).not.toHaveBeenCalled();
+      // A rejection is a bad answer, not a refusal: the retry runs (generation + review again).
+      expect(mockCallAI).toHaveBeenCalledTimes(2);
+      expect(mockVerifyAI).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([
+      ["unparseable", "I cannot tell."],
+      ["no explicit approval", JSON.stringify({ comment: "fine" })],
+    ])("reflection: a reviewer reply with %s is not an approval", async (_label, reply) => {
+      mockCallAI.mockResolvedValue(GOOD_REFLECTION);
+      mockVerifyAI.mockResolvedValue(reply);
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const res = await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));
+      expect(await res.json()).toEqual({ reflection: "" });
+      expect(mockInsertValues).not.toHaveBeenCalled();
+      errSpy.mockRestore();
+    });
+
+    it("reflection: a reviewer error fails closed (empty, not cached)", async () => {
+      mockCallAI.mockResolvedValue(GOOD_REFLECTION);
+      mockVerifyAI.mockRejectedValue(new Error("503 reviewer unavailable"));
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const res = await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ reflection: "" });
+      expect(mockInsertValues).not.toHaveBeenCalled();
+      errSpy.mockRestore();
+    });
+
+    it("reflection: a reviewer refusal is not retried against Gemini", async () => {
+      mockCallAI.mockResolvedValue(GOOD_REFLECTION);
+      mockVerifyAI.mockResolvedValue("I'm sorry, but I can't help with that.");
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const res = await getReflection(req("ar-rahman", "reflection"), params("ar-rahman"));
+      expect(await res.json()).toEqual({ reflection: "" });
+      expect(mockCallAI).toHaveBeenCalledTimes(1);
+      expect(mockInsertValues).not.toHaveBeenCalled();
+      errSpy.mockRestore();
+    });
+
+    it("pairings: only explicitly approved pairings are cached and served", async () => {
+      mockCallAI.mockResolvedValue(GOOD_PAIRINGS);
+      mockVerifyAI.mockResolvedValue(
+        JSON.stringify([
+          { name: "ar-rahim", valid: true },
+          { name: "al-malik", valid: false },
+        ])
+      );
+      const res = await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
+      const body = await res.json();
+      expect(body.map((p: { name: string }) => p.name)).toEqual(["ar-rahim"]);
+    });
+
+    it("pairings: a pairing the reviewer does not mention is dropped", async () => {
+      mockCallAI.mockResolvedValue(GOOD_PAIRINGS);
+      mockVerifyAI.mockResolvedValue(JSON.stringify([{ name: "al-malik", valid: true }]));
+      const res = await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
+      const body = await res.json();
+      expect(body.map((p: { name: string }) => p.name)).toEqual(["al-malik"]);
+    });
+
+    it("pairings: a reviewer error fails closed (empty, not cached)", async () => {
+      mockCallAI.mockResolvedValue(GOOD_PAIRINGS);
+      mockVerifyAI.mockRejectedValue(new Error("503 reviewer unavailable"));
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const res = await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual([]);
+      expect(mockInsertValues).not.toHaveBeenCalled();
+      errSpy.mockRestore();
+    });
   });
 
   it("pairings: a Tashbih-phrased explanation is dropped, clean ones kept", async () => {
