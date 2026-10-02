@@ -336,12 +336,17 @@ function finishRun(
  *  covered" are the loop's *designed* clean endings — `success`, with the log
  *  tail explaining which. Only a genuine fault is `failed`. */
 function mapTerminalStatus(
-  reason: StoppedReason | LoopStoppedReason
+  reason: StoppedReason | LoopStoppedReason,
+  directRun = false
 ): "success" | "failed" | "cancelled" {
   if (reason === "cancelled") return "cancelled";
   // "quota-daily" / "key-invalid" are per-pass reasons the loop consumes
   // internally; if one ever surfaces as a terminal reason, it's a fault.
   if (reason === "error" || reason === "quota-daily" || reason === "key-invalid") return "failed";
+  // "rate-limited" is likewise a pass reason the loop rotates away from, but a
+  // direct single-pass run (the re-verification job) has no loop around it: it
+  // ended before finishing its work, which is a fault, not a clean ending.
+  if (directRun && reason === "rate-limited") return "failed";
   return "success";
 }
 
@@ -427,7 +432,11 @@ export async function startJob(
       try {
         const hooks = { onProgress: (line: string) => pushLogLine(state, line) };
         const signal = state.controller.signal;
-        let summary: { stoppedReason: StoppedReason | LoopStoppedReason; error?: string };
+        let summary: {
+          stoppedReason: StoppedReason | LoopStoppedReason;
+          error?: string;
+          lastError?: string;
+        };
         if (parsedVerify) {
           summary = await runVerifyBatch(parsedVerify, hooks, signal);
         } else if (parsedBackfill?.kind === "loop") {
@@ -439,7 +448,12 @@ export async function startJob(
             signal
           );
         }
-        finishRun(state, mapTerminalStatus(summary.stoppedReason), summary.error ?? null);
+        const status = mapTerminalStatus(summary.stoppedReason, !!parsedVerify);
+        // The verify run reports a provider stop (daily quota, invalid key, rate
+        // limit) in `lastError` rather than `error`; a failed run must show why.
+        const message =
+          summary.error ?? (parsedVerify && status === "failed" ? summary.lastError : undefined);
+        finishRun(state, status, message ?? null);
       } catch (err) {
         pushLogLine(state, `job failed: ${err instanceof Error ? err.message : String(err)}`);
         finishRun(state, "failed", err instanceof Error ? err.message : String(err));
