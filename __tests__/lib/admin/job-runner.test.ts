@@ -58,6 +58,9 @@ vi.mock("@/lib/admin/job-lock", () => ({
 const { mockRunConnectionBatch } = vi.hoisted(() => ({ mockRunConnectionBatch: vi.fn() }));
 vi.mock("@/lib/ai/connection-batch", () => ({ runConnectionBatch: mockRunConnectionBatch }));
 
+const { mockRunVerifyLoop } = vi.hoisted(() => ({ mockRunVerifyLoop: vi.fn() }));
+vi.mock("@/lib/ai/connection-verify-loop", () => ({ runVerifyLoop: mockRunVerifyLoop }));
+
 const { mockRunVerifyBatch } = vi.hoisted(() => ({ mockRunVerifyBatch: vi.fn() }));
 vi.mock("@/lib/ai/connection-verify-batch", () => ({ runVerifyBatch: mockRunVerifyBatch }));
 
@@ -88,6 +91,7 @@ beforeEach(() => {
   mockRunConnectionBatch.mockReset().mockResolvedValue({ stoppedReason: "completed" });
   mockRunConnectionBatchLoop.mockReset().mockResolvedValue({ stoppedReason: "all-keys-daily" });
   mockRunVerifyBatch.mockReset().mockResolvedValue({ stoppedReason: "completed" });
+  mockRunVerifyLoop.mockReset().mockResolvedValue({ stoppedReason: "work-exhausted" });
   mockTryAcquireJobLock.mockReset().mockResolvedValue(true);
   mockReleaseJobLock.mockReset().mockResolvedValue(undefined);
 });
@@ -504,6 +508,144 @@ describe("startJob — verify-connections", () => {
     await startJob("verify-connections", "qf-admin", validParams);
     expect(stopJob("qf-admin")).toEqual({ jobId: "verify-connections" });
     expect(signal.aborted).toBe(true);
+  });
+});
+
+describe("startJob — verify-connections with the GEMINI_API1..5 key pool", () => {
+  const single = { provider: "gemini", maxCalls: 50, maxCostUsd: 3 };
+
+  beforeEach(() => {
+    delete process.env.GEMINI_API_KEY;
+    process.env.GEMINI_API1 = "key-1";
+    process.env.GEMINI_API2 = "key-2";
+    delete process.env.GEMINI_API3;
+  });
+  afterEach(() => {
+    delete process.env.GEMINI_API1;
+    delete process.env.GEMINI_API2;
+  });
+
+  it("a one-pass Gemini run uses the first pool key when GEMINI_API_KEY is not set", async () => {
+    await startJob("verify-connections", "qf-admin", single);
+    expect(mockRunVerifyBatch.mock.calls[0][0]).toMatchObject({
+      provider: "gemini",
+      apiKey: "key-1",
+    });
+  });
+
+  it("prefers GEMINI_API_KEY when it is set (no explicit key override)", async () => {
+    process.env.GEMINI_API_KEY = "main-key";
+    await startJob("verify-connections", "qf-admin", single);
+    expect(mockRunVerifyBatch.mock.calls[0][0].apiKey).toBeUndefined();
+  });
+
+  it("names both options when neither GEMINI_API_KEY nor any pool key is set", async () => {
+    delete process.env.GEMINI_API1;
+    delete process.env.GEMINI_API2;
+    await expect(startJob("verify-connections", "qf-admin", single)).rejects.toThrow(
+      /GEMINI_API_KEY.*GEMINI_API1/
+    );
+    expect(mockRunVerifyBatch).not.toHaveBeenCalled();
+  });
+
+  describe("loop mode", () => {
+    const loop = { provider: "gemini", loop: true, keys: ["GEMINI_API1", "GEMINI_API2"] };
+
+    it("requires provider=gemini", async () => {
+      await expect(
+        startJob("verify-connections", "qf-admin", { ...loop, provider: "claude" })
+      ).rejects.toThrow(/loop mode requires provider=gemini/);
+    });
+
+    it("rejects no keys, an unknown key, and a key that is not configured", async () => {
+      await expect(
+        startJob("verify-connections", "qf-admin", { ...loop, keys: [] })
+      ).rejects.toThrow(/at least one Gemini key/);
+      await expect(
+        startJob("verify-connections", "qf-admin", { ...loop, keys: ["NOPE"] })
+      ).rejects.toThrow(/unknown key/);
+      await expect(
+        startJob("verify-connections", "qf-admin", { ...loop, keys: ["GEMINI_API3"] })
+      ).rejects.toThrow(/not configured/);
+    });
+
+    it("does not need GEMINI_API_KEY, makes both budgets optional caps, and dispatches to the loop", async () => {
+      await startJob("verify-connections", "qf-admin", loop);
+
+      expect(mockRunVerifyBatch).not.toHaveBeenCalled();
+      expect(mockRunVerifyLoop).toHaveBeenCalledWith(
+        {
+          model: undefined,
+          apiKeys: ["key-1", "key-2"],
+          apiKeyLabels: ["GEMINI_API1", "GEMINI_API2"],
+          callDelayMs: 1500,
+          maxCalls: Number.POSITIVE_INFINITY,
+          maxCostUsd: Number.POSITIVE_INFINITY,
+        },
+        expect.objectContaining({ onProgress: expect.any(Function) }),
+        expect.any(AbortSignal)
+      );
+    });
+
+    it("passes optional caps, a model and a delay through, and rejects a bad delay or model", async () => {
+      await startJob("verify-connections", "qf-admin", {
+        ...loop,
+        maxCalls: 100,
+        maxCostUsd: 2.5,
+        callDelayMs: 300,
+      });
+      expect(mockRunVerifyLoop.mock.calls[0][0]).toMatchObject({
+        maxCalls: 100,
+        maxCostUsd: 2.5,
+        callDelayMs: 300,
+      });
+      await expect(
+        startJob("verify-connections", "qf-admin", { ...loop, callDelayMs: 70_000 })
+      ).rejects.toThrow(/callDelayMs/);
+      await expect(
+        startJob("verify-connections", "qf-admin", { ...loop, model: "claude-opus-4-7" })
+      ).rejects.toThrow(/model must be one of/);
+    });
+
+    it("dedupes keys that hold the same secret, keeping the first label", async () => {
+      process.env.GEMINI_API2 = "key-1";
+      await startJob("verify-connections", "qf-admin", loop);
+      expect(mockRunVerifyLoop.mock.calls[0][0]).toMatchObject({
+        apiKeys: ["key-1"],
+        apiKeyLabels: ["GEMINI_API1"],
+      });
+    });
+
+    it.each([
+      ["work-exhausted", "success", undefined],
+      ["all-keys-daily", "success", undefined],
+      ["call-budget", "success", undefined],
+      ["cancelled", "cancelled", undefined],
+      ["error", "failed", "every key hit the same wall"],
+    ])("records a %s ending as %s", async (stoppedReason, status, error) => {
+      const set = vi.fn(() => ({ where: () => ({ catch: () => undefined }) }));
+      mockUpdate.mockReturnValue({ set });
+      mockRunVerifyLoop.mockResolvedValueOnce({ stoppedReason, ...(error ? { error } : {}) });
+
+      await startJob("verify-connections", "qf-admin", loop);
+      await vi.waitFor(() => expect(set).toHaveBeenCalled());
+
+      expect(set).toHaveBeenCalledWith(expect.objectContaining({ status, error: error ?? null }));
+    });
+
+    it("stopJob aborts the loop's signal", async () => {
+      let signal!: AbortSignal;
+      mockRunVerifyLoop.mockImplementationOnce(
+        async (_o: unknown, _h: unknown, sig: AbortSignal) => {
+          signal = sig;
+          await new Promise<void>((resolve) => sig.addEventListener("abort", () => resolve()));
+          return { stoppedReason: "cancelled" };
+        }
+      );
+      await startJob("verify-connections", "qf-admin", loop);
+      expect(stopJob("qf-admin")).toEqual({ jobId: "verify-connections" });
+      expect(signal.aborted).toBe(true);
+    });
   });
 });
 

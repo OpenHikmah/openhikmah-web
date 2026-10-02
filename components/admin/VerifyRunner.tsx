@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Input, NativeSelect } from "@/components/ui";
 import { StateNote, ConfirmButton, Panel } from "@/components/admin/primitives";
@@ -19,6 +19,12 @@ const MAX_CALL_DELAY_MS = 60_000;
  * every language) for the review queue. Like the backfill form, both budgets
  * are required and have no default, so a stray click can never start a run that
  * spends money; progress and Stop live on the Jobs page.
+ *
+ * "Loop" mode (Gemini-only, free tier), the same as the backfill form: the job
+ * runs pass after pass, rotating through the selected GEMINI_API1..5 keys and
+ * moving to the next only when the current one hits its daily quota, until
+ * nothing is left to verify (the job log then says ALL DONE), every key is
+ * spent, or the admin clicks Stop. Both budgets are then optional safety caps.
  */
 export function VerifyRunner({ onStarted }: { onStarted?: () => void }) {
   const api = useAdminFetch();
@@ -28,17 +34,63 @@ export function VerifyRunner({ onStarted }: { onStarted?: () => void }) {
   const [maxCostUsd, setMaxCostUsd] = useState<number | "">("");
   const [callDelayMs, setCallDelayMs] = useState<number | "">(GEMINI_DEFAULT_DELAY_MS);
 
+  const [loop, setLoop] = useState(false);
+  const [geminiKeys, setGeminiKeys] = useState<string[] | null>(null);
+  const [keysError, setKeysError] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Record<string, boolean>>({});
+
   const [runNote, setRunNote] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    api<{ keys: string[] }>("/gemini-keys")
+      .then((r) => {
+        if (cancelled) return;
+        setKeysError(false);
+        setGeminiKeys(r.keys);
+        // Seed the selection once: a token refresh re-runs this effect and must
+        // not re-check keys the admin deliberately unticked.
+        setSelectedKeys((prev) =>
+          Object.keys(prev).length > 0 ? prev : Object.fromEntries(r.keys.map((k) => [k, true]))
+        );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // "Could not check" is not "none configured": an auth blip must not read
+        // as "set your env vars".
+        setKeysError(true);
+        setGeminiKeys((prev) => prev ?? []);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
+
+  const selectedKeyList = (geminiKeys ?? []).filter((k) => selectedKeys[k]);
   const delayInvalid =
     callDelayMs === "" ||
     !Number.isInteger(callDelayMs) ||
     callDelayMs < 0 ||
     callDelayMs > MAX_CALL_DELAY_MS;
   const budgetsInvalid = maxCalls === "" || maxCostUsd === "" || maxCalls <= 0 || maxCostUsd <= 0;
-  const formInvalid = budgetsInvalid || delayInvalid;
+  const budgetInvalid = (v: number | "") => v !== "" && (!Number.isFinite(v) || v <= 0);
+  const formInvalid = loop
+    ? delayInvalid ||
+      selectedKeyList.length === 0 ||
+      budgetInvalid(maxCalls) ||
+      budgetInvalid(maxCostUsd)
+    : budgetsInvalid || delayInvalid;
+
+  const toggleLoop = (checked: boolean) => {
+    setLoop(checked);
+    if (checked && provider !== "gemini") {
+      setProvider("gemini");
+      setModel("");
+      setCallDelayMs(GEMINI_DEFAULT_DELAY_MS);
+    }
+  };
 
   const startRun = async () => {
     setRunNote(null);
@@ -50,7 +102,17 @@ export function VerifyRunner({ onStarted }: { onStarted?: () => void }) {
         method: "POST",
         json: {
           jobId: "verify-connections",
-          params: { provider, ...(model ? { model } : {}), maxCalls, maxCostUsd, callDelayMs },
+          params: loop
+            ? {
+                provider: "gemini",
+                loop: true,
+                keys: selectedKeyList,
+                ...(model ? { model } : {}),
+                callDelayMs: callDelayMs === "" ? GEMINI_DEFAULT_DELAY_MS : callDelayMs,
+                ...(maxCalls !== "" ? { maxCalls } : {}),
+                ...(maxCostUsd !== "" ? { maxCostUsd } : {}),
+              }
+            : { provider, ...(model ? { model } : {}), maxCalls, maxCostUsd, callDelayMs },
         },
       });
       setRunNote("Started. Watch progress on the Jobs page.");
@@ -79,7 +141,8 @@ export function VerifyRunner({ onStarted }: { onStarted?: () => void }) {
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label="Provider">
           <NativeSelect
-            value={provider}
+            value={loop ? "gemini" : provider}
+            disabled={loop}
             onChange={(e) => {
               const next = e.target.value as "claude" | "gemini";
               setProvider(next);
@@ -88,14 +151,16 @@ export function VerifyRunner({ onStarted }: { onStarted?: () => void }) {
             }}
           >
             <option value="gemini">gemini — cheapest</option>
-            <option value="claude">claude — highest fidelity</option>
+            <option value="claude" disabled={loop}>
+              claude — highest fidelity
+            </option>
           </NativeSelect>
         </Field>
 
         <Field label="Model">
           <NativeSelect value={model} onChange={(e) => setModel(e.target.value)}>
             <option value="">default</option>
-            {SELECTABLE_MODELS[provider].map((m) => (
+            {SELECTABLE_MODELS[loop ? "gemini" : provider].map((m) => (
               <option key={m} value={m}>
                 {m}
               </option>
@@ -104,23 +169,23 @@ export function VerifyRunner({ onStarted }: { onStarted?: () => void }) {
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Max LLM calls">
+          <Field label={loop ? "Max LLM calls (optional)" : "Max LLM calls"}>
             <Input
               type="number"
               min={1}
               value={maxCalls}
-              placeholder="required"
+              placeholder={loop ? "unbounded" : "required"}
               onChange={(e) => setMaxCalls(e.target.value === "" ? "" : Number(e.target.value))}
               className="tabular-nums"
             />
           </Field>
-          <Field label="Max cost (USD, est.)">
+          <Field label={loop ? "Max cost (optional cap)" : "Max cost (USD, est.)"}>
             <Input
               type="number"
               min={0.1}
               step={0.1}
               value={maxCostUsd}
-              placeholder="required"
+              placeholder={loop ? "unbounded" : "required"}
               onChange={(e) => setMaxCostUsd(e.target.value === "" ? "" : Number(e.target.value))}
               className="tabular-nums"
             />
@@ -143,7 +208,65 @@ export function VerifyRunner({ onStarted }: { onStarted?: () => void }) {
         </Field>
       </div>
 
+      <div className="mt-4 border-t border-border pt-3">
+        <label className="flex items-start gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={loop}
+            className="mt-0.5"
+            onChange={(e) => toggleLoop(e.target.checked)}
+          />
+          <span>
+            <span className="text-text-secondary">
+              Loop: keep running, rotating Gemini keys, until everything is verified or every
+              selected key hits its daily quota
+            </span>
+            <span className="mt-0.5 block text-text-muted">
+              Gemini-only (free tier). Only a per-day quota rotates to the next key. The job log
+              says ALL DONE when nothing is left to verify. Stop a run from the{" "}
+              <Link href="/admin/jobs" className="underline">
+                Jobs page
+              </Link>
+              .
+            </span>
+          </span>
+        </label>
+
+        {loop && (
+          <div className="mt-3 text-xs">
+            <span className="mb-1 block text-text-secondary">Gemini keys (rotation order)</span>
+            {geminiKeys === null ? (
+              <span className="text-text-muted">Loading…</span>
+            ) : keysError ? (
+              <span className="text-text-muted">
+                Couldn&apos;t load the key list. Reload the page to retry.
+              </span>
+            ) : geminiKeys.length === 0 ? (
+              <span className="text-text-muted">
+                No GEMINI_API1..5 keys configured. Set them in the environment to use loop mode.
+              </span>
+            ) : (
+              <div className="flex flex-wrap gap-3">
+                {geminiKeys.map((k) => (
+                  <label key={k} className="flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={selectedKeys[k] ?? false}
+                      onChange={(e) => setSelectedKeys((s) => ({ ...s, [k]: e.target.checked }))}
+                    />
+                    {k}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <p className="mt-2 text-[11px] text-text-muted">
+        {loop
+          ? "In loop mode both budget fields are optional safety caps. Leave them blank to run until everything is verified, the keys are exhausted, or you click Stop. "
+          : null}
         Max LLM calls and Max cost are both required. The job stops cleanly at whichever limit is
         hit first. When a Gemini key hits its daily quota the run ends; start it again later or with
         another key to continue. Stop a run in progress from the{" "}
@@ -165,7 +288,9 @@ export function VerifyRunner({ onStarted }: { onStarted?: () => void }) {
 
       {formInvalid && (
         <p className="mt-2 text-[11px] text-text-muted">
-          Enter Max LLM calls, Max cost and a valid delay to enable the run.
+          {loop
+            ? "Select at least one Gemini key and a valid delay to enable the run."
+            : "Enter Max LLM calls, Max cost and a valid delay to enable the run."}
         </p>
       )}
 
@@ -174,9 +299,13 @@ export function VerifyRunner({ onStarted }: { onStarted?: () => void }) {
           variant="secondary"
           disabled={starting || formInvalid}
           onConfirm={startRun}
-          confirmLabel={`Verify on ${provider}?`}
+          confirmLabel={
+            loop
+              ? `Loop verification on ${selectedKeyList.length} key(s)?`
+              : `Verify on ${provider}?`
+          }
         >
-          {starting ? "Starting…" : "Run verification"}
+          {starting ? "Starting…" : loop ? "Start loop" : "Run verification"}
         </ConfirmButton>
       </div>
     </Panel>
