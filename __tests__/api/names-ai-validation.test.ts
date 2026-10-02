@@ -66,6 +66,7 @@ vi.mock("@/lib/ai/ai", () => ({
 
 import { GET as getPairings } from "@/app/api/names/[slug]/pairings/route";
 import { GET as getVerses } from "@/app/api/names/[slug]/verses/route";
+import { counterSnapshot } from "@/lib/infra/metrics";
 import { GET as getReflection } from "@/app/api/names/[slug]/reflection/route";
 
 // Stub fetch AFTER static imports so vi.stubGlobal wins over any fetch patch
@@ -212,7 +213,7 @@ describe("names AI routes — model output validation", () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([{ ref: "2:255", reason: "Ayat al-Kursi." }, { ref: "0:0" }, null])
     );
-    const ARABIC = "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ";
+    const ARABIC = "هُوَ ٱلرَّحْمَٰنُ ٱلرَّحِيمُ ٱلْعَلِيمُ ٱلْقَدِيرُ";
     const ENGLISH = "Allah - there is no deity except Him, the Ever-Living.";
     mockFetch.mockImplementation(async (url: unknown) => {
       if (typeof url !== "string") return { ok: false };
@@ -233,6 +234,57 @@ describe("names AI routes — model output validation", () => {
     expect(body[0].reason).toBe("Ayat al-Kursi.");
     expect(body[0].arabicText).toBe(ARABIC);
     expect(body[0].translation).toBe(ENGLISH);
+  });
+
+  it("verses: an AI-fallback verse whose text does not contain the name is dropped", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        { ref: "2:255", reason: "Names the Ever-Living." },
+        { ref: "112:1", reason: "Claims a relation the verse text does not support." },
+      ])
+    );
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const before = counterSnapshot()["names_rejected_root_mismatch"] ?? 0;
+    mockFetch.mockImplementation(async (url: unknown) => {
+      if (typeof url !== "string") return { ok: false };
+      if (url.includes("ayah/2:255/ar.alafasy"))
+        return { ok: true, json: async () => ({ data: { text: "هُوَ ٱلرَّحْمَٰنُ ٱلرَّحِيمُ" } }) };
+      // 112:1 does not contain ar-rahman.
+      if (url.includes("ar.alafasy"))
+        return { ok: true, json: async () => ({ data: { text: "قُلْ هُوَ ٱللَّهُ أَحَدٌ" } }) };
+      if (url.includes("en.sahih"))
+        return { ok: true, json: async () => ({ data: { text: "English text." } }) };
+      return { ok: false };
+    });
+
+    const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.map((v: { ref: string }) => v.ref)).toEqual(["2:255"]);
+    expect(counterSnapshot()["names_rejected_root_mismatch"]).toBe(before + 1);
+    errSpy.mockRestore();
+  });
+
+  it("verses: when no AI-fallback verse contains the name the result is empty, so it is not cached", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([{ ref: "112:1", reason: "Claims a relation the text does not support." }])
+    );
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockFetch.mockImplementation(async (url: unknown) => {
+      if (typeof url !== "string") return { ok: false };
+      if (url.includes("ar.alafasy"))
+        return { ok: true, json: async () => ({ data: { text: "قُلْ هُوَ ٱللَّهُ أَحَدٌ" } }) };
+      if (url.includes("en.sahih"))
+        return { ok: true, json: async () => ({ data: { text: "English text." } }) };
+      return { ok: false };
+    });
+
+    const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([]);
+    errSpy.mockRestore();
   });
 
   it("verses: the AI-fallback prompt includes the Tanzih constraint", async () => {
@@ -415,7 +467,9 @@ describe("names AI routes — model output validation", () => {
       if (url.includes("ar.alafasy"))
         return {
           ok: true,
-          json: async () => ({ data: { text: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ" } }),
+          json: async () => ({
+            data: { text: "هُوَ ٱلرَّحْمَٰنُ ٱلرَّحِيمُ ٱلْعَلِيمُ ٱلْقَدِيرُ" },
+          }),
         };
       if (url.includes("en.sahih"))
         return { ok: true, json: async () => ({ data: { text: "English text" } }) };
@@ -490,7 +544,12 @@ describe("names AI routes — model output validation", () => {
         return { ok: true, json: async () => ({ search: { results: [{ verse_key: "2:255" }] } }) };
       }
       if (url.includes("ar.alafasy"))
-        return { ok: true, json: async () => ({ data: { text: "AR" } }) };
+        return {
+          ok: true,
+          json: async () => ({
+            data: { text: "هُوَ ٱلرَّحْمَٰنُ ٱلرَّحِيمُ ٱلْعَلِيمُ ٱلْقَدِيرُ" },
+          }),
+        };
       if (url.includes("en.sahih"))
         return { ok: true, json: async () => ({ data: { text: "EN" } }) };
       return { ok: false };
@@ -574,7 +633,9 @@ describe("names AI routes — model output validation", () => {
       if (url.includes("ar.alafasy"))
         return {
           ok: true,
-          json: async () => ({ data: { text: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ" } }),
+          json: async () => ({
+            data: { text: "هُوَ ٱلرَّحْمَٰنُ ٱلرَّحِيمُ ٱلْعَلِيمُ ٱلْقَدِيرُ" },
+          }),
         };
       if (url.includes("en.sahih"))
         return {
@@ -608,7 +669,9 @@ describe("names AI routes — model output validation", () => {
         if (url.includes("ar.alafasy"))
           return {
             ok: true,
-            json: async () => ({ data: { text: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ" } }),
+            json: async () => ({
+              data: { text: "هُوَ ٱلرَّحْمَٰنُ ٱلرَّحِيمُ ٱلْعَلِيمُ ٱلْقَدِيرُ" },
+            }),
           };
         if (url.includes("en.sahih"))
           return {

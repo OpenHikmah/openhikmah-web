@@ -69,6 +69,10 @@ import { GET as getVerses, VERSES_VERSION } from "@/app/api/names/[slug]/verses/
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
+// Plausible Arabic containing the name under test (ar-rahman): the AI-fallback
+// verse selection requires the name to appear in the verse text.
+const ARABIC_WITH_NAME = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
+
 function req(slug: string, path: string) {
   return new NextRequest(`http://localhost/api/names/${slug}/${path}`);
 }
@@ -179,7 +183,7 @@ describe("names AI routes — per-client rate limiting", () => {
     mockFetch.mockImplementation(async (url: unknown) => {
       if (typeof url !== "string") return { ok: false };
       if (url.includes("api.alquran.cloud"))
-        return { ok: true, json: async () => ({ data: { text: "نص" } }) };
+        return { ok: true, json: async () => ({ data: { text: ARABIC_WITH_NAME } }) };
       return { ok: false };
     });
 
@@ -214,7 +218,7 @@ describe("names AI routes — per-client rate limiting", () => {
     mockFetch.mockImplementation(async (url: unknown) => {
       if (typeof url !== "string") return { ok: false };
       if (url.includes("api.alquran.cloud"))
-        return { ok: true, json: async () => ({ data: { text: "نص" } }) };
+        return { ok: true, json: async () => ({ data: { text: ARABIC_WITH_NAME } }) };
       return { ok: false };
     });
 

@@ -3,6 +3,7 @@ import { callAI } from "@/lib/ai/ai";
 import { translateReason } from "@/lib/ai/translate";
 import { looksLikeRefusal } from "@/lib/ai/refusal";
 import { getNameBySlug } from "@/lib/names/divine-names";
+import { verseMentionsName } from "@/lib/names/name-verse-match";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
 import {
@@ -263,14 +264,21 @@ async function getVersesBySlug(
       );
       if (aiItems.length === 0) return [];
 
-      const verseDataResults = await Promise.all(
-        aiItems.slice(0, 5).map((item) => fetchVerseData(item.ref))
-      );
-      return aiItems
-        .slice(0, 5)
-        .map((item, i) => {
+      const picked = aiItems.slice(0, 5);
+      const verseDataResults = await Promise.all(picked.map((item) => fetchVerseData(item.ref)));
+      const checked = await Promise.all(
+        picked.map(async (item, i): Promise<NameVerse | null> => {
           const vd = verseDataResults[i];
           if (!vd) return null;
+          // The model proposed this ref from memory and its reason asserts a
+          // relation to the name: only keep verses whose own corpus text really
+          // contains it (deterministic, no AI). A rejection is safe: the verse
+          // is dropped, and an empty result is not cached, so it is retried.
+          if (!(await verseMentionsName(vd.ref, vd.arabicText, name))) {
+            console.error(`Name verses: dropping ${item.ref}, it does not contain ${name.slug}`);
+            incr("names_rejected_root_mismatch");
+            return null;
+          }
           // Same as the search path above: Saheeh International text carries
           // footnote markup (<sup foot_note=…>) that must be stripped before it
           // is cached and rendered.
@@ -280,7 +288,8 @@ async function getVersesBySlug(
             reason: item.reason,
           } as NameVerse;
         })
-        .filter((v): v is NameVerse => v !== null);
+      );
+      return checked.filter((v): v is NameVerse => v !== null);
     },
     (v) => isUncacheable(v, name.transliteration),
     onBeforeGenerate

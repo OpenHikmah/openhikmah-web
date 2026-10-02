@@ -94,7 +94,10 @@ import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
-function arabicResp(text = "آية كريمة") {
+// Plausible Arabic that contains the divine names under test (ar-rahman, al-alim):
+// the AI-fallback verse selection now requires the name to appear in the verse text.
+const ARABIC_WITH_NAMES = "هُوَ ٱلرَّحْمَٰنُ ٱلرَّحِيمُ ٱلْعَلِيمُ ٱلْقَدِيرُ";
+function arabicResp(text = ARABIC_WITH_NAMES) {
   return { ok: true, json: async () => ({ data: { text } }) };
 }
 function transResp(text = "A noble verse.") {
@@ -168,7 +171,7 @@ describe("GET /api/names/[slug]/verses", () => {
   it("each verse has ref, arabicText, translation, surahName, and reason", async () => {
     mockFetch.mockImplementation(async (url: string) => {
       if (typeof url !== "string") return { ok: false };
-      if (url.includes("ar.alafasy")) return arabicResp("اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ");
+      if (url.includes("ar.alafasy")) return arabicResp();
       if (url.includes("en.sahih")) return transResp("English translation");
       return { ok: false };
     });
@@ -193,7 +196,7 @@ describe("GET /api/names/[slug]/verses", () => {
       // quran.com search finds nothing → the route takes the AI-fallback path.
       if (new URL(url).hostname === "api.quran.com")
         return { ok: true, json: async () => ({ search: { results: [] } }) };
-      if (url.includes("ar.alafasy")) return arabicResp("اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ");
+      if (url.includes("ar.alafasy")) return arabicResp();
       if (url.includes("en.sahih"))
         return transResp('And He is the Most Merciful.<sup foot_note="12345">1</sup>');
       return { ok: false };
@@ -266,7 +269,7 @@ describe("GET /api/names/[slug]/verses", () => {
             search: { results: [{ verse_key: "2:255" }, { verse_key: "3:18" }] },
           }),
         };
-      if (url.includes("ar.alafasy")) return arabicResp("اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ");
+      if (url.includes("ar.alafasy")) return arabicResp();
       if (url.includes("tr.diyanet")) return transResp("Türkçe çeviri");
       if (url.includes("en.sahih")) return transResp("English translation");
       return { ok: false };
@@ -294,7 +297,7 @@ describe("GET /api/names/[slug]/verses", () => {
     mockGetQuranEdition.mockResolvedValue("tr.diyanet");
     mockFetch.mockImplementation(async (url: string) => {
       if (typeof url !== "string") return { ok: false };
-      if (url.includes("ar.alafasy")) return arabicResp();
+      if (url.includes("ar.alafasy")) return arabicResp("هُوَ ٱلسَّلَٰمُ ٱلْمُؤْمِنُ");
       if (url.includes("tr.diyanet")) return transResp("Türkçe çeviri");
       if (url.includes("en.sahih")) return transResp("English translation");
       return { ok: false };
