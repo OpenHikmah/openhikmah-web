@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Input, NativeSelect } from "@/components/ui";
 import { StateNote, ConfirmButton, Panel } from "@/components/admin/primitives";
@@ -8,9 +8,65 @@ import { Field } from "@/components/admin/Field";
 import { SectionHeading } from "@/components/admin/SectionHeading";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { SELECTABLE_MODELS } from "@/lib/ai/models";
+import type { VerificationProgress } from "@/lib/ai/verification-progress";
 
 const GEMINI_DEFAULT_DELAY_MS = 1500;
 const MAX_CALL_DELAY_MS = 60_000;
+
+const nf = new Intl.NumberFormat("en-US");
+
+/** How much of the backlog is verified: a bar plus the numbers, refreshable. */
+function ProgressBlock({
+  progress,
+  error,
+  onRefresh,
+}: {
+  progress: VerificationProgress | null;
+  error: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="mt-4 rounded border border-border p-3 text-xs" aria-live="polite">
+      <div className="flex items-center justify-between">
+        <span className="text-text-secondary">Verification progress</span>
+        <button type="button" className="underline text-text-muted" onClick={onRefresh}>
+          Refresh
+        </button>
+      </div>
+      {progress ? (
+        <>
+          <progress
+            className="mt-2 h-2 w-full"
+            aria-label="Connections verified"
+            max={Math.max(progress.connections.total, 1)}
+            value={progress.connections.done}
+          />
+          <p className="mt-2 tabular-nums">
+            <span className="text-text-secondary">
+              {progress.connections.percent}% of connections verified
+            </span>
+            {": "}
+            {nf.format(progress.connections.done)} of {nf.format(progress.connections.total)}
+            {", "}
+            {nf.format(progress.connections.remaining)} remaining
+          </p>
+          <p className="mt-1 tabular-nums text-text-muted">
+            Verses fully verified: {nf.format(progress.verses.done)} of{" "}
+            {nf.format(progress.verses.total)} ({progress.verses.percent}%),{" "}
+            {nf.format(progress.verses.remaining)} remaining
+          </p>
+          <p className="mt-1 text-text-muted">
+            Connections the verifier flags are hidden and drop out of these totals.
+          </p>
+        </>
+      ) : (
+        <p className="mt-2 text-text-muted">
+          {error ? "Could not load the progress. Try Refresh." : "Loading…"}
+        </p>
+      )}
+    </div>
+  );
+}
 
 /**
  * The "Re-verify existing connections" console. Runs every active English
@@ -33,6 +89,40 @@ export function VerifyRunner({ onStarted }: { onStarted?: () => void }) {
   const [maxCalls, setMaxCalls] = useState<number | "">("");
   const [maxCostUsd, setMaxCostUsd] = useState<number | "">("");
   const [callDelayMs, setCallDelayMs] = useState<number | "">(GEMINI_DEFAULT_DELAY_MS);
+
+  const [progress, setProgress] = useState<VerificationProgress | null>(null);
+  const [progressError, setProgressError] = useState(false);
+  const fetchProgress = useCallback(
+    () =>
+      api<{ connections?: VerificationProgress }>("/verification").then((r) => {
+        if (!r.connections) throw new Error("no progress in response");
+        return r.connections;
+      }),
+    [api]
+  );
+  useEffect(() => {
+    let cancelled = false;
+    fetchProgress()
+      .then((p) => {
+        if (cancelled) return;
+        setProgress(p);
+        setProgressError(false);
+      })
+      .catch(() => {
+        if (!cancelled) setProgressError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchProgress]);
+  const loadProgress = useCallback(() => {
+    fetchProgress()
+      .then((p) => {
+        setProgress(p);
+        setProgressError(false);
+      })
+      .catch(() => setProgressError(true));
+  }, [fetchProgress]);
 
   const [loop, setLoop] = useState(false);
   const [geminiKeys, setGeminiKeys] = useState<string[] | null>(null);
@@ -117,6 +207,7 @@ export function VerifyRunner({ onStarted }: { onStarted?: () => void }) {
       });
       setRunNote("Started. Watch progress on the Jobs page.");
       onStarted?.();
+      loadProgress();
     } catch (e) {
       setRunError(e instanceof AdminApiError ? e.message : "Failed to start the verification job.");
     } finally {
@@ -137,6 +228,8 @@ export function VerifyRunner({ onStarted }: { onStarted?: () => void }) {
         where a false positive can be restored. Resumable: a verified cell is never re-checked, and
         a run that stops (budget, quota, Stop) continues where it left off the next time.
       </p>
+
+      <ProgressBlock progress={progress} error={progressError} onRefresh={loadProgress} />
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label="Provider">
