@@ -19,6 +19,7 @@ import {
   GeminiRateLimitError,
 } from "@/lib/ai/gemini-errors";
 import { getVerses } from "@/lib/quran/quran-corpus";
+import { formatProgress, getVerificationProgress } from "@/lib/ai/verification-progress";
 import { incr } from "@/lib/infra/metrics";
 import type { ConnectionResult, EdgeKind } from "@/types/quran";
 
@@ -103,6 +104,17 @@ async function buildWorkList(): Promise<VerifyCell[]> {
     .groupBy(connections.fromRef, connections.kind)
     .orderBy(asc(connections.fromRef), asc(connections.kind));
   return rows.map((r) => ({ fromRef: r.fromRef, kind: r.kind as EdgeKind }));
+}
+
+/** Logs how much of the whole backlog is verified. A failed lookup is logged and
+ *  metered but never stops the run: the progress line is informational. */
+async function logProgress(hooks: BatchHooks): Promise<void> {
+  try {
+    hooks.onProgress(`[verify] progress: ${formatProgress(await getVerificationProgress())}`);
+  } catch (err) {
+    console.error("connection-verify: progress lookup failed:", err);
+    incr("connection_reverify_progress_failed");
+  }
 }
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -225,6 +237,7 @@ export async function runVerifyBatch(
     `[verify] ${cells.length} cells to verify | provider=${opts.provider} | model=${model} | ` +
       `maxCalls=${opts.maxCalls} | maxCost=$${opts.maxCostUsd}`
   );
+  await logProgress(hooks);
 
   const callCost = perCallCost(opts.provider, model);
   const budget: { spend: () => boolean; stoppedReason: StoppedReason | null } = {
@@ -380,6 +393,7 @@ export async function runVerifyBatch(
           `$${summary.costUsd.toFixed(2)} | verified=${summary.cellsVerified} ` +
           `flagged=${summary.rowsFlagged} fail=${summary.cellsFailed}`
       );
+      await logProgress(hooks);
     }
   }
 
@@ -393,6 +407,7 @@ export async function runVerifyBatch(
     summary.error = `${summary.cellsFailed}/${summary.cellsProcessed} cells failed, 0 verified, last error: ${summary.lastError}`;
   }
 
+  await logProgress(hooks);
   hooks.onProgress(
     `[verify] DONE (${summary.stoppedReason}) | ${summary.cellsProcessed} cells | ` +
       `${summary.callsUsed} calls | $${summary.costUsd.toFixed(2)} | verified=${summary.cellsVerified} ` +

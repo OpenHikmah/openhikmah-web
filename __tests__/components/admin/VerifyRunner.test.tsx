@@ -26,8 +26,15 @@ async function clickRun(confirmLabel: string) {
 }
 
 /** The form fetches /gemini-keys on mount and POSTs to /jobs on submit. */
+const PROGRESS = {
+  verses: { total: 6236, done: 1204, remaining: 5032, percent: 19.3 },
+  cells: { total: 18000, done: 3600, remaining: 14400, percent: 20 },
+  connections: { total: 18708, done: 3812, remaining: 14896, percent: 20.4 },
+};
+
 function mockApiImpl(keys: string[] = ["GEMINI_API1", "GEMINI_API2"], jobError?: Error) {
   return (path: string) => {
+    if (path === "/verification") return Promise.resolve({ connections: PROGRESS });
     if (path === "/gemini-keys") return Promise.resolve({ keys });
     return jobError ? Promise.reject(jobError) : Promise.resolve({ runId: 1 });
   };
@@ -219,5 +226,57 @@ describe("VerifyRunner loop mode", () => {
     render(<VerifyRunner />);
     fireEvent.click(screen.getByRole("checkbox", { name: /Loop: keep running/ }));
     expect(await screen.findByText(/Reload the page to retry/)).toBeInTheDocument();
+  });
+});
+
+describe("VerifyRunner progress", () => {
+  beforeEach(() => {
+    mockApi.mockReset();
+    mockApi.mockImplementation(mockApiImpl());
+  });
+
+  it("shows how many connections and verses are verified, the percent, and what remains", async () => {
+    render(<VerifyRunner />);
+    expect(await screen.findByText(/20\.4% of connections verified/)).toBeInTheDocument();
+    expect(screen.getByText(/3,812 of 18,708, 14,896 remaining/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Verses fully verified: 1,204 of 6,236 \(19\.3%\), 5,032 remaining/)
+    ).toBeInTheDocument();
+    const bar = screen.getByRole("progressbar", { name: "Connections verified" });
+    expect(bar).toHaveAttribute("value", "3812");
+    expect(bar).toHaveAttribute("max", "18708");
+  });
+
+  it("refreshes on demand", async () => {
+    render(<VerifyRunner />);
+    await screen.findByText(/20\.4% of connections verified/);
+    const before = mockApi.mock.calls.filter((c) => c[0] === "/verification").length;
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    });
+    expect(mockApi.mock.calls.filter((c) => c[0] === "/verification").length).toBe(before + 1);
+  });
+
+  it("says it could not load the progress instead of showing zeros", async () => {
+    mockApi.mockImplementation((path: string) =>
+      path === "/verification" ? Promise.reject(new Error("500")) : Promise.resolve({ keys: [] })
+    );
+    render(<VerifyRunner />);
+    expect(await screen.findByText(/Could not load the progress/)).toBeInTheDocument();
+  });
+
+  it("reloads the progress after a run is started", async () => {
+    render(<VerifyRunner />);
+    await screen.findByText(/20\.4% of connections verified/);
+    const before = mockApi.mock.calls.filter((c) => c[0] === "/verification").length;
+    const spin = screen.getAllByRole("spinbutton");
+    fireEvent.change(spin[0], { target: { value: "40" } });
+    fireEvent.change(spin[1], { target: { value: "1.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run verification" }));
+    const confirm = await screen.findByRole("button", { name: "Verify on gemini?" });
+    await act(async () => {
+      fireEvent.click(confirm);
+    });
+    expect(mockApi.mock.calls.filter((c) => c[0] === "/verification").length).toBe(before + 1);
   });
 });
