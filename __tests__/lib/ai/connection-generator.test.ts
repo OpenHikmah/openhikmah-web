@@ -387,6 +387,96 @@ describe("generateConnections — content quality gate", () => {
     expect(mockCallAIDetailed).toHaveBeenCalledTimes(2);
   });
 
+  describe("verifier context", () => {
+    const ARABIC_2_255 = "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ";
+    const ARABIC_112_1 = "قُلْ هُوَ اللَّهُ أَحَدٌ";
+    const generation = {
+      text: JSON.stringify([
+        { ref: "2:255", reason: "Describes the throne verse and God's knowledge." },
+        { ref: "112:1", reason: "Both verses affirm the absolute oneness of God." },
+      ]),
+      usage: { inputTokens: 100, outputTokens: 20 },
+      provider: "claude" as const,
+      model: "claude-opus-4-7",
+    };
+
+    function seedDistinctVerses() {
+      mockGetVerses.mockImplementation(async (refs: string[]) => {
+        const texts: Record<string, [string, string]> = {
+          "2:255": [ARABIC_2_255, "Allah - there is no deity except Him, the Ever-Living."],
+          "112:1": [ARABIC_112_1, "Say, He is Allah, [who is] One."],
+        };
+        return new Map(
+          refs.map((r) => [r, { ...verse(r), arabicText: texts[r][0], translation: texts[r][1] }])
+        );
+      });
+    }
+
+    it("gives the verifier each target verse's Arabic and translation, not just its reference", async () => {
+      seedDistinctVerses();
+      mockCallAIDetailed
+        .mockResolvedValueOnce(generation)
+        .mockImplementationOnce(async (prompt: string) => ({
+          text: approveAllVerdicts(prompt),
+          usage: null,
+          provider: "claude" as const,
+          model: "claude-opus-4-7",
+        }));
+      const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+      expect(out.map((c) => c.ref)).toEqual(["2:255", "112:1"]);
+
+      const verificationPrompt = mockCallAIDetailed.mock.calls[1][0] as string;
+      expect(isVerificationPrompt(verificationPrompt)).toBe(true);
+      expect(verificationPrompt).toContain(ARABIC_2_255);
+      expect(verificationPrompt).toContain(
+        "Allah - there is no deity except Him, the Ever-Living."
+      );
+      expect(verificationPrompt).toContain(ARABIC_112_1);
+      expect(verificationPrompt).toContain("Say, He is Allah, [who is] One.");
+    });
+
+    it("keeps each target verse's text under its own proposal, and still verifies in a single call", async () => {
+      seedDistinctVerses();
+      mockCallAIDetailed
+        .mockResolvedValueOnce(generation)
+        .mockImplementationOnce(async (prompt: string) => ({
+          text: approveAllVerdicts(prompt),
+          usage: null,
+          provider: "claude" as const,
+          model: "claude-opus-4-7",
+        }));
+      await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+      expect(mockCallAIDetailed).toHaveBeenCalledTimes(2);
+
+      const prompt = mockCallAIDetailed.mock.calls[1][0] as string;
+      const first = prompt.indexOf('- 2:255: "');
+      const second = prompt.indexOf('- 112:1: "');
+      expect(first).toBeGreaterThan(-1);
+      expect(second).toBeGreaterThan(first);
+      const firstBlock = prompt.slice(first, second);
+      expect(firstBlock).toContain(ARABIC_2_255);
+      expect(firstBlock).not.toContain(ARABIC_112_1);
+      expect(prompt.slice(second)).toContain(ARABIC_112_1);
+    });
+
+    it("tells the verifier to judge the reason against the shown verse text, not memory", async () => {
+      seedDistinctVerses();
+      mockCallAIDetailed
+        .mockResolvedValueOnce(generation)
+        .mockImplementationOnce(async (prompt: string) => ({
+          text: approveAllVerdicts(prompt),
+          usage: null,
+          provider: "claude" as const,
+          model: "claude-opus-4-7",
+        }));
+      await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+      const prompt = mockCallAIDetailed.mock.calls[1][0] as string;
+      expect(prompt).toContain("not from your memory of the reference");
+      // The Tanzih criterion and constraint are still present.
+      expect(prompt).toContain("strict Tanzih");
+    });
+  });
+
   describe("explicit approval only", () => {
     const generation = {
       text: JSON.stringify([

@@ -485,11 +485,12 @@ Reference: {{fromRef}}
 Arabic: {{arabicText}}
 Translation: {{translation}}
 
-Proposed {{kind}} connections to review:
+Proposed {{kind}} connections to review (each proposal is followed by the text of its target verse):
 {{proposals}}
 
 For EACH proposed connection, judge whether:
 - The reason genuinely and specifically justifies a {{kind}} connection between the two verses (not vague or generic).
+- The reason is accurate to the actual wording and meaning of the target verse as shown under its proposal. Judge from that text, not from your memory of the reference; a reason that misdescribes or misattributes the target verse is invalid.
 - The reason stays within strict Tanzih and does not imply any physical form, spatial location, or resemblance to created things for God.
 
 Return ONLY a valid JSON array, one entry per proposal in the same order, no prose, no markdown:
@@ -565,7 +566,16 @@ export async function verifyConnections(
     throw new VerificationBudgetExhaustedError();
   }
 
-  const proposals = candidates.map((c) => `- ${c.ref}: "${c.reason}"`).join("\n");
+  // The first line of each proposal keeps the `- <ref>: "<reason>"` shape the
+  // verdicts are keyed on. The target verse's own text (read from the corpus
+  // during hydration, never from the model) follows, so the verifier judges the
+  // reason against the verse rather than against its memory of the reference.
+  const proposals = candidates
+    .map(
+      (c) =>
+        `- ${c.ref}: "${c.reason}"\n  Target verse (Arabic): ${c.arabicText}\n  Target verse (Saheeh International): ${c.translation}`
+    )
+    .join("\n");
   const prompt =
     renderTemplate(VERIFY_TEMPLATE, { fromRef, arabicText, translation, kind, proposals }) +
     tanzihDirective();
