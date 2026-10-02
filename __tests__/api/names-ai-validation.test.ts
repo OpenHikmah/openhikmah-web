@@ -59,10 +59,13 @@ vi.mock("@/lib/infra/rate-limit", async (importOriginal) => {
 });
 
 vi.mock("@/lib/ai/ai", () => ({
-  // The divine-name review fails closed, so its prompt is answered by its own
-  // mock (default: approve) and generation call counts stay exact.
+  // The divine-name review and translateReason's back-translation meaning check
+  // fail closed, so their prompts are answered by their own mock (default:
+  // approve) and generation/translation call counts stay exact.
   callAI: (prompt: string, opts?: unknown) =>
-    prompt.includes("reviewing content that another scholar wrote about a divine name")
+    prompt.includes("reviewing content that another scholar wrote about a divine name") ||
+    prompt.startsWith("Render the following") ||
+    prompt.includes("comparing two English sentences")
       ? mockVerifyAI(prompt, opts)
       : mockCallAI(prompt, opts),
   resolveProvider: vi.fn(async () => "claude" as const),
