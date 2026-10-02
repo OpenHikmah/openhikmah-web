@@ -74,6 +74,7 @@ const {
   mockConsume,
   mockIncr,
   mockTranslateReason,
+  mockMarkCellVerified,
 } = vi.hoisted(() => {
   // Mirrors the real chain: .values(...).onConflictDoNothing().returning(...) —
   // `returning` resolves with the rows actually inserted (empty by default here,
@@ -95,11 +96,14 @@ const {
     mockConsume: vi.fn(),
     mockIncr: vi.fn(),
     mockTranslateReason: vi.fn(),
+    mockMarkCellVerified: vi.fn(),
   };
 });
 
 vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect, insert: mockInsert } }));
 vi.mock("@/lib/ai/translate", () => ({ translateReason: mockTranslateReason }));
+// Has its own integration coverage (graph.integration.test.ts); here only its calls matter.
+vi.mock("@/lib/ai/connection-verified", () => ({ markCellVerified: mockMarkCellVerified }));
 const { ConnectionParseError } = vi.hoisted(() => ({
   ConnectionParseError: class ConnectionParseError extends Error {
     constructor(msg = "unparseable") {
@@ -156,6 +160,7 @@ describe("getConnections", () => {
     mockOnConflict.mockClear();
     mockReturning.mockReset().mockResolvedValue([]);
     mockIncr.mockClear();
+    mockMarkCellVerified.mockReset().mockResolvedValue(undefined);
     mockGenerate.mockReset();
     mockGenerateGrounded.mockReset();
     mockDiscover.mockReset();
@@ -278,6 +283,44 @@ describe("getConnections", () => {
     // Only the getConnections cache-read select — generateConnectionsForCell
     // must not issue a second select when excludeRefs is empty.
     expect(mockSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks a first-time cell verified after persisting it", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockGenerate.mockResolvedValue([result("2:255")]);
+    mockReturning.mockResolvedValue([{ toRef: "2:255" }]);
+
+    await getConnections("1:1", "thematic", source);
+
+    expect(mockMarkCellVerified).toHaveBeenCalledWith("1:1", "thematic");
+  });
+
+  it("does not mark a cell verified on a get-more request: its older rows were not part of this verification", async () => {
+    mockSelect
+      .mockReturnValueOnce(makeSelectChain([])) // cache read: miss for the excluded ref
+      .mockReturnValueOnce(makeSelectChain([{ toRef: "9:1", reason: "prior reason" }]))
+      .mockReturnValue(makeSelectChain([]));
+    mockDiscover.mockResolvedValue(["2:255"]);
+    mockGenerateGrounded.mockResolvedValue([result("2:255")]);
+    mockReturning.mockResolvedValue([{ toRef: "2:255" }]);
+
+    await getConnections("1:1", "thematic", source, { excludeRefs: ["9:1"] });
+
+    expect(mockMarkCellVerified).not.toHaveBeenCalled();
+  });
+
+  it("a failed stamp is logged and metered but does not fail the request", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockGenerate.mockResolvedValue([result("2:255")]);
+    mockReturning.mockResolvedValue([{ toRef: "2:255" }]);
+    mockMarkCellVerified.mockRejectedValue(new Error("coverage down"));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const out = await getConnections("1:1", "thematic", source);
+    errSpy.mockRestore();
+
+    expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+    expect(mockIncr).toHaveBeenCalledWith("connection_verified_stamp_failed");
   });
 
   it("threads an explicit provider+model override through to generation", async () => {

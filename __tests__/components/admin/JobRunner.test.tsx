@@ -92,3 +92,44 @@ describe("JobRunner — polling keeps the table on a transient poll error", () =
     expect(screen.getByText("Something went wrong")).toBeInTheDocument();
   });
 });
+
+describe("JobRunner — verify-connections row", () => {
+  const verifyJob = (status: "never-run" | "running") => ({
+    id: "verify-connections" as const,
+    label: "Re-verify existing connections",
+    status,
+    startedAt: status === "running" ? new Date().toISOString() : null,
+    completedAt: null,
+    error: null,
+    logTail: null,
+  });
+
+  beforeEach(() => {
+    mockApi.mockReset();
+  });
+
+  it("links an idle run to the Coverage form instead of offering a parameterless Run", async () => {
+    mockApi.mockResolvedValue({
+      jobs: [verifyJob("never-run")],
+      embedCoverage: { embedded: 0, total: 0 },
+    });
+    render(<JobRunner />);
+
+    expect(await screen.findByText("Re-verify existing connections")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Run from Coverage/ })).toHaveAttribute(
+      "href",
+      "/admin/coverage"
+    );
+    expect(screen.queryByRole("button", { name: "Run" })).not.toBeInTheDocument();
+  });
+
+  it("offers Stop while the job is running", async () => {
+    mockApi.mockResolvedValue({
+      jobs: [verifyJob("running")],
+      embedCoverage: { embedded: 0, total: 0 },
+    });
+    render(<JobRunner />);
+
+    expect(await screen.findByRole("button", { name: "Stop" })).toBeInTheDocument();
+  });
+});

@@ -150,7 +150,7 @@ async function pace(ms: number | undefined, signal?: AbortSignal): Promise<void>
   await interruptibleSleep(ms, signal);
 }
 
-interface Pacer {
+export interface Pacer {
   waitTurn(): Promise<void>;
   noteRequest(): void;
 }
@@ -159,7 +159,7 @@ interface Pacer {
  *  generation→translation and cell→cell boundaries alike. `waitTurn()` before a
  *  request waits only if a prior request is owed a delay; `noteRequest()` after a
  *  request that actually went out arms the next wait. */
-function createPacer(ms: number | undefined, signal?: AbortSignal): Pacer {
+export function createPacer(ms: number | undefined, signal?: AbortSignal): Pacer {
   let owed = false;
   return {
     async waitTurn() {
@@ -174,7 +174,7 @@ function createPacer(ms: number | undefined, signal?: AbortSignal): Pacer {
 
 /** Cost of one generation call, estimated (the generation path doesn't return
  *  token usage). Deliberately the DEFAULT_TOKENS path so the guard errs early. */
-function perCallCost(provider: Provider, model: string): number {
+export function perCallCost(provider: Provider, model: string): number {
   return estimateCostUsd(model, provider, null);
 }
 

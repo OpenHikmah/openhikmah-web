@@ -13,6 +13,7 @@ import {
   type LoopStoppedReason,
 } from "@/lib/ai/connection-batch-loop";
 import type { Provider } from "@/lib/ai/ai";
+import { runVerifyBatch, type VerifyOptions } from "@/lib/ai/connection-verify-batch";
 import { SELECTABLE_MODELS, isModelForProvider } from "@/lib/ai/models";
 import { LOCALES, type Locale } from "@/lib/i18n/config";
 import { tryAcquireJobLock, releaseJobLock } from "@/lib/admin/job-lock";
@@ -39,7 +40,12 @@ import { tryAcquireJobLock, releaseJobLock } from "@/lib/admin/job-lock";
  */
 
 export type JobId =
-  "seed-quran" | "seed-morphology" | "embed-corpus" | "seed-translations" | "backfill-connections";
+  | "seed-quran"
+  | "seed-morphology"
+  | "embed-corpus"
+  | "seed-translations"
+  | "backfill-connections"
+  | "verify-connections";
 
 export interface JobDefinition {
   id: JobId;
@@ -74,6 +80,12 @@ export const JOBS: readonly JobDefinition[] = [
   {
     id: "backfill-connections",
     label: "Backfill verse connections",
+    inProcess: true,
+    acceptsParams: true,
+  },
+  {
+    id: "verify-connections",
+    label: "Re-verify existing connections",
     inProcess: true,
     acceptsParams: true,
   },
@@ -209,6 +221,43 @@ function parseBackfillParams(raw: Record<string, unknown>): ParsedBackfill {
   };
 }
 
+/** Validates raw admin input for the re-verification job. Both budgets are
+ *  required (unlike the backfill loop, there is no uncapped mode). Throws on bad
+ *  input (routes map to 400). */
+function parseVerifyParams(raw: Record<string, unknown>): VerifyOptions {
+  const provider = raw.provider;
+  if (provider !== "claude" && provider !== "gemini") {
+    throw new Error("provider must be claude or gemini");
+  }
+
+  const model = raw.model === undefined || raw.model === "" ? undefined : raw.model;
+  if (model !== undefined && (typeof model !== "string" || !isModelForProvider(model, provider))) {
+    throw new Error(`model must be one of: ${SELECTABLE_MODELS[provider].join(", ")}`);
+  }
+
+  const maxCalls = Number(raw.maxCalls);
+  if (!Number.isInteger(maxCalls) || maxCalls <= 0) {
+    throw new Error("maxCalls must be a positive integer");
+  }
+  const maxCostUsd = Number(raw.maxCostUsd);
+  if (!Number.isFinite(maxCostUsd) || maxCostUsd <= 0) {
+    throw new Error("maxCostUsd must be a positive number");
+  }
+
+  let callDelayMs = provider === "gemini" ? DEFAULT_CALL_DELAY_MS : 0;
+  if (raw.callDelayMs !== undefined && raw.callDelayMs !== "") {
+    callDelayMs = Number(raw.callDelayMs);
+    if (!Number.isInteger(callDelayMs) || callDelayMs < 0 || callDelayMs > MAX_CALL_DELAY_MS) {
+      throw new Error(`callDelayMs must be an integer between 0 and ${MAX_CALL_DELAY_MS}`);
+    }
+  }
+
+  const requiredKey = provider === "gemini" ? "GEMINI_API_KEY" : "ANTHROPIC_API_KEY";
+  if (!process.env[requiredKey]) throw new Error(`Missing required env var: ${requiredKey}`);
+
+  return { provider, model: model as string | undefined, maxCalls, maxCostUsd, callDelayMs };
+}
+
 /** A blank optional ceiling means "no cap" — `Number.POSITIVE_INFINITY`, which
  *  the batch's `+1 > max` / `+cost > max` guards treat as always-allowed. */
 function optionalPositiveInt(value: unknown, name: string): number {
@@ -314,9 +363,11 @@ export async function startJob(
   }
 
   let backfill: ParsedBackfill | null = null;
+  let verify: VerifyOptions | null = null;
   if (job.acceptsParams) {
     if (!params) throw new Error(`Job "${job.id}" requires params`);
     if (job.id === "backfill-connections") backfill = parseBackfillParams(params);
+    if (job.id === "verify-connections") verify = parseVerifyParams(params);
   } else if (params) {
     throw new Error(`Job "${job.id}" does not accept params`);
   }
@@ -369,14 +420,25 @@ export async function startJob(
     // endpoint reads. `runConnectionBatch` is budget-capped and single-flight,
     // and a redeploy kills it exactly like it killed the spawned child — the
     // `job_runs` row + resumable work list cover restart recovery.
-    const parsed = backfill as ParsedBackfill;
+    // Exactly one of `backfill` / `verify` is set for an in-process job.
+    const parsedBackfill = backfill;
+    const parsedVerify = verify;
     void (async () => {
       try {
         const hooks = { onProgress: (line: string) => pushLogLine(state, line) };
-        const summary =
-          parsed.kind === "loop"
-            ? await runConnectionBatchLoop(parsed.opts, hooks, state.controller.signal)
-            : await runConnectionBatch(parsed.opts, hooks, state.controller.signal);
+        const signal = state.controller.signal;
+        let summary: { stoppedReason: StoppedReason | LoopStoppedReason; error?: string };
+        if (parsedVerify) {
+          summary = await runVerifyBatch(parsedVerify, hooks, signal);
+        } else if (parsedBackfill?.kind === "loop") {
+          summary = await runConnectionBatchLoop(parsedBackfill.opts, hooks, signal);
+        } else {
+          summary = await runConnectionBatch(
+            (parsedBackfill as ParsedBackfill).opts as BatchOptions,
+            hooks,
+            signal
+          );
+        }
         finishRun(state, mapTerminalStatus(summary.stoppedReason), summary.error ?? null);
       } catch (err) {
         pushLogLine(state, `job failed: ${err instanceof Error ? err.message : String(err)}`);

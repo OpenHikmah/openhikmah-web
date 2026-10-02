@@ -2,6 +2,7 @@ import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { connections, type Connection } from "@/lib/infra/db/schema";
 import { generateConnections, generateGroundedConnections } from "@/lib/ai/connection-generator";
+import { markCellVerified } from "@/lib/ai/connection-verified";
 import { resolveModel, resolveProvider, type Provider } from "@/lib/ai/ai";
 import { translateReason } from "@/lib/ai/translate";
 import { discoverCandidates } from "@/lib/ai/connection-discovery";
@@ -514,6 +515,17 @@ export async function generateConnectionsForCell(
         )
         .onConflictDoNothing()
         .returning({ toRef: connections.toRef });
+
+      // A first-time cell (no `excludeRefs`: there is no other active row)
+      // holds only rows that just passed verifyConnections, so it needs no
+      // later re-verification. Best-effort: a failed stamp only means the
+      // re-verification job looks at this cell once.
+      if (excludeRefs.length === 0) {
+        await markCellVerified(fromRef, kind).catch((err) => {
+          console.error(`connection graph: could not mark ${fromRef} ${kind} verified:`, err);
+          incr("connection_verified_stamp_failed");
+        });
+      }
 
       // A concurrent generation on another instance can win the same
       // (fromRef, toRef, kind, locale) row first — RETURNING omits exactly the

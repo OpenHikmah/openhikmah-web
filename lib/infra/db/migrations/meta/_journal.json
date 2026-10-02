@@ -176,6 +176,13 @@
       "when": 1790929243729,
       "tag": "0024_schema_drift_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790949464913,
+      "tag": "0025_connection_coverage_verified_at",
+      "breakpoints": true
     }
   ]
 }

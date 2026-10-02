@@ -38,7 +38,7 @@ vi.stubGlobal(
 );
 
 import { db } from "@/lib/infra/db";
-import { verses, connections, aiGenerations } from "@/lib/infra/db/schema";
+import { verses, connections, connectionCoverage, aiGenerations } from "@/lib/infra/db/schema";
 import { getConnections } from "@/lib/ai/graph-service";
 import { consume } from "@/lib/infra/rate-limit";
 import { isVerificationPrompt } from "../test-utils/verification";
@@ -68,6 +68,7 @@ async function seed(ref: string) {
 beforeEach(async () => {
   mockCallAI.mockReset();
   await reset();
+  await db.delete(connectionCoverage);
 });
 
 const source = { arabicText: "x", translation: "y" };
@@ -127,6 +128,38 @@ describe("connection graph (integration, real Postgres)", () => {
     const retry = await getConnections("1:1", "thematic", source);
     expect(retry).toHaveLength(2);
     expect(await db.select().from(connections)).toHaveLength(2);
+  });
+
+  it("stamps a freshly generated first-time cell as verified, so the re-verification job skips it", async () => {
+    await seed("2:255");
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        { ref: "2:255", reason: "This verse describes the throne and vast divine knowledge." },
+      ])
+    );
+
+    await getConnections("1:1", "thematic", source);
+
+    const [cov] = await db.select().from(connectionCoverage);
+    expect(cov).toMatchObject({ fromRef: "1:1", kind: "thematic", locale: "en", activeCount: 1 });
+    expect(cov.verifiedAt).toBeInstanceOf(Date);
+  });
+
+  it("does not stamp a cell whose generation failed verification (nothing persisted)", async () => {
+    await seed("2:255");
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (isVerificationPrompt(prompt)) throw new Error("503 verifier unavailable");
+      return JSON.stringify([
+        { ref: "2:255", reason: "This verse describes the throne and vast divine knowledge." },
+      ]);
+    });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(getConnections("1:1", "thematic", source)).rejects.toThrow("503");
+    errSpy.mockRestore();
+
+    expect(await db.select().from(connections)).toHaveLength(0);
+    expect(await db.select().from(connectionCoverage)).toHaveLength(0);
   });
 
   it("drops a hallucinated ref that is not in the corpus", async () => {
