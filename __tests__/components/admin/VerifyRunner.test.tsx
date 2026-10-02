@@ -32,9 +32,19 @@ const PROGRESS = {
   connections: { total: 18708, done: 3812, remaining: 14896, percent: 20.4 },
 };
 
+const TRANSLATIONS = {
+  rows: { total: 1800, done: 412, remaining: 1388, percent: 22.9 },
+  byLocale: {
+    az: { total: 600, done: 122, remaining: 478, percent: 20.3 },
+    ru: { total: 600, done: 140, remaining: 460, percent: 23.3 },
+    tr: { total: 600, done: 150, remaining: 450, percent: 25 },
+  },
+};
+
 function mockApiImpl(keys: string[] = ["GEMINI_API1", "GEMINI_API2"], jobError?: Error) {
   return (path: string) => {
-    if (path === "/verification") return Promise.resolve({ connections: PROGRESS });
+    if (path === "/verification")
+      return Promise.resolve({ connections: PROGRESS, translations: TRANSLATIONS });
     if (path === "/gemini-keys") return Promise.resolve({ keys });
     return jobError ? Promise.reject(jobError) : Promise.resolve({ runId: 1 });
   };
@@ -278,5 +288,64 @@ describe("VerifyRunner progress", () => {
       fireEvent.click(confirm);
     });
     expect(mockApi.mock.calls.filter((c) => c[0] === "/verification").length).toBe(before + 1);
+  });
+});
+
+describe("VerifyRunner translations variant", () => {
+  beforeEach(() => {
+    mockApi.mockReset();
+    mockApi.mockImplementation(mockApiImpl());
+  });
+
+  it("shows its own heading and the translation progress with a per-language breakdown", async () => {
+    render(<VerifyRunner variant="translations" />);
+    expect(screen.getByText("Re-check existing translations")).toBeInTheDocument();
+    expect(await screen.findByText(/22\.9% of translations checked/)).toBeInTheDocument();
+    expect(screen.getByText(/412 of 1,800, 1,388 remaining/)).toBeInTheDocument();
+    expect(screen.getByText(/AZ 122 of 600 \| RU 140 of 600 \| TR 150 of 600/)).toBeInTheDocument();
+    const bar = screen.getByRole("progressbar", { name: "Translations checked" });
+    expect(bar).toHaveAttribute("value", "412");
+    expect(bar).toHaveAttribute("max", "1800");
+  });
+
+  it("starts the verify-translations job with the entered params", async () => {
+    render(<VerifyRunner variant="translations" />);
+    await screen.findByText(/22\.9% of translations checked/);
+    const spin = screen.getAllByRole("spinbutton");
+    fireEvent.change(spin[0], { target: { value: "60" } });
+    fireEvent.change(spin[1], { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run verification" }));
+    const confirm = await screen.findByRole("button", { name: "Verify on gemini?" });
+    await act(async () => {
+      fireEvent.click(confirm);
+    });
+    expect(jobPosts()[0][1].json).toEqual({
+      jobId: "verify-translations",
+      params: { provider: "gemini", maxCalls: 60, maxCostUsd: 2, callDelayMs: 1500 },
+    });
+  });
+
+  it("the default variant still starts verify-connections", async () => {
+    render(<VerifyRunner />);
+    await screen.findByText(/20\.4% of connections verified/);
+    const spin = screen.getAllByRole("spinbutton");
+    fireEvent.change(spin[0], { target: { value: "5" } });
+    fireEvent.change(spin[1], { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run verification" }));
+    const confirm = await screen.findByRole("button", { name: "Verify on gemini?" });
+    await act(async () => {
+      fireEvent.click(confirm);
+    });
+    expect(jobPosts()[0][1].json.jobId).toBe("verify-connections");
+  });
+
+  it("says it could not load the translation progress instead of showing zeros", async () => {
+    mockApi.mockImplementation((path: string) =>
+      path === "/verification"
+        ? Promise.resolve({ connections: PROGRESS })
+        : Promise.resolve({ keys: [] })
+    );
+    render(<VerifyRunner variant="translations" />);
+    expect(await screen.findByText(/Could not load the progress/)).toBeInTheDocument();
   });
 });

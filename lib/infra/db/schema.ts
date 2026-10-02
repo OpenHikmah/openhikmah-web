@@ -311,6 +311,11 @@ export const connections = pgTable(
     // Independent of `status` — an admin can mark an `active` edge reviewed without
     // changing it, or reviewedAt gets stamped automatically on any status change.
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    // Non-`en` rows only: set once this translation has passed the back-translation
+    // meaning check (at creation, or by the re-verification job). NULL means "not
+    // checked yet" and puts the row on that job's work list. Stamped on a flag too,
+    // so an admin who restores a false positive is not flagged again.
+    translationCheckedAt: timestamp("translation_checked_at", { withTimezone: true }),
     reviewedBy: text("reviewed_by"),
   },
   (t) => [

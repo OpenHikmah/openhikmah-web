@@ -376,7 +376,18 @@ async function persistTranslatedRows(
   try {
     const inserted = await db
       .insert(connections)
-      .values(rows.map((r) => ({ fromRef, toRef: r.toRef, kind, reason: r.reason, model, locale })))
+      .values(
+        rows.map((r) => ({
+          fromRef,
+          toRef: r.toRef,
+          kind,
+          reason: r.reason,
+          model,
+          locale,
+          // translateReason ran the back-translation meaning check on it.
+          translationCheckedAt: new Date(),
+        }))
+      )
       .onConflictDoNothing()
       .returning({ toRef: connections.toRef });
 

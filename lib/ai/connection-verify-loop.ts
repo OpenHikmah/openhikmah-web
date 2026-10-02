@@ -1,5 +1,9 @@
 import { resetGeminiRateLimitState } from "@/lib/ai/ai";
-import { runVerifyBatch, type VerifySummary } from "@/lib/ai/connection-verify-batch";
+import {
+  runVerifyBatch,
+  type VerifyOptions,
+  type VerifySummary,
+} from "@/lib/ai/connection-verify-batch";
 import type { BatchHooks } from "@/lib/ai/connection-batch";
 import type { LoopStoppedReason } from "@/lib/ai/connection-batch-loop";
 
@@ -60,6 +64,24 @@ export interface VerifyLoopSummary {
   lastError?: string;
 }
 
+/**
+ * What differs between the jobs this loop drives: the pass it runs and what
+ * "ALL DONE" says. The default is the English connection re-verification; the
+ * translation re-check passes its own (see translation-verify-batch.ts).
+ */
+export interface VerifyLoopVariant {
+  run: (opts: VerifyOptions, hooks: BatchHooks, signal?: AbortSignal) => Promise<VerifySummary>;
+  /** The ALL DONE line, given the totals so far. */
+  allDone: (agg: VerifyLoopSummary) => string;
+}
+
+export const CONNECTIONS_VARIANT: VerifyLoopVariant = {
+  run: (opts, hooks, signal) => runVerifyBatch(opts, hooks, signal),
+  allDone: (agg) =>
+    `ALL DONE: every active English connection has been verified. ` +
+    `${agg.rowsFlagged} connection(s) were flagged for review (Admin > Connections, "pending")`,
+};
+
 /** Defensive ceiling per key. A completed pass handles the whole work list, so
  *  this is only reachable if something keeps failing without ever erroring out. */
 const MAX_PASSES_PER_KEY = 50;
@@ -77,7 +99,8 @@ function mergeCounters(agg: VerifyLoopSummary, pass: VerifySummary): void {
 export async function runVerifyLoop(
   opts: VerifyLoopOptions,
   hooks: BatchHooks,
-  signal: AbortSignal
+  signal: AbortSignal,
+  variant: VerifyLoopVariant = CONNECTIONS_VARIANT
 ): Promise<VerifyLoopSummary> {
   const agg: VerifyLoopSummary = {
     stoppedReason: "all-keys-daily",
@@ -104,7 +127,7 @@ export async function runVerifyLoop(
   for (let k = 0; k < n; k++) {
     if (signal.aborted) {
       agg.stoppedReason = "cancelled";
-      return finish(agg, hooks);
+      return finish(agg, hooks, variant);
     }
 
     const label = opts.apiKeyLabels[k];
@@ -119,18 +142,18 @@ export async function runVerifyLoop(
     for (let p = 0; p < MAX_PASSES_PER_KEY && !rotate; p++) {
       if (signal.aborted) {
         agg.stoppedReason = "cancelled";
-        return finish(agg, hooks);
+        return finish(agg, hooks, variant);
       }
       if (agg.callsUsed >= opts.maxCalls) {
         agg.stoppedReason = "call-budget";
-        return finish(agg, hooks);
+        return finish(agg, hooks, variant);
       }
       if (agg.costUsd >= opts.maxCostUsd) {
         agg.stoppedReason = "cost-budget";
-        return finish(agg, hooks);
+        return finish(agg, hooks, variant);
       }
 
-      const pass = await runVerifyBatch(
+      const pass = await variant.run(
         {
           provider: "gemini",
           model: opts.model,
@@ -172,19 +195,19 @@ export async function runVerifyLoop(
         case "call-budget":
         case "cost-budget":
           agg.stoppedReason = pass.stoppedReason;
-          return finish(agg, hooks);
+          return finish(agg, hooks, variant);
 
         case "error":
           // Non-quota failure: every key would hit the same wall. Stop.
           agg.stoppedReason = "error";
           agg.error = pass.error;
           hooks.onProgress(`[verify-loop] pass failed (${pass.error}), stopping the loop`);
-          return finish(agg, hooks);
+          return finish(agg, hooks, variant);
 
         case "completed":
           if (pass.workListSize === 0) {
             agg.stoppedReason = "work-exhausted";
-            return finish(agg, hooks);
+            return finish(agg, hooks, variant);
           }
           hooks.onProgress(
             `[verify-loop] pass ${agg.passes} done (verified=${pass.cellsVerified} ` +
@@ -198,7 +221,7 @@ export async function runVerifyLoop(
       agg.stoppedReason = "error";
       agg.error = `key ${label} ran ${MAX_PASSES_PER_KEY} passes without converging`;
       hooks.onProgress(`[verify-loop] ${agg.error}, stopping the loop`);
-      return finish(agg, hooks);
+      return finish(agg, hooks, variant);
     }
   }
 
@@ -208,21 +231,22 @@ export async function runVerifyLoop(
     agg.stoppedReason = "error";
     agg.error = `all ${n} selected key(s) are invalid or rate-limited (none hit a daily quota)`;
     hooks.onProgress(`[verify-loop] ${agg.error}, stopping the loop`);
-    return finish(agg, hooks);
+    return finish(agg, hooks, variant);
   }
   agg.stoppedReason = "all-keys-daily";
   hooks.onProgress(
     `[verify-loop] all ${n} selected key(s) exhausted, invalid or rate-limited. Not finished: start the job again later and it continues where it stopped`
   );
-  return finish(agg, hooks);
+  return finish(agg, hooks, variant);
 }
 
-function finish(agg: VerifyLoopSummary, hooks: BatchHooks): VerifyLoopSummary {
+function finish(
+  agg: VerifyLoopSummary,
+  hooks: BatchHooks,
+  variant: VerifyLoopVariant
+): VerifyLoopSummary {
   if (agg.stoppedReason === "work-exhausted") {
-    hooks.onProgress(
-      `[verify-loop] ALL DONE: every active English connection has been verified. ` +
-        `${agg.rowsFlagged} connection(s) were flagged for review (Admin > Connections, "pending")`
-    );
+    hooks.onProgress(`[verify-loop] ${variant.allDone(agg)}`);
   }
   hooks.onProgress(
     `[verify-loop] DONE (${agg.stoppedReason}) | ${agg.passes} pass(es) | ${agg.keysUsed} key(s) | ` +

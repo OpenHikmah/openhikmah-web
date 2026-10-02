@@ -153,7 +153,7 @@ async function checkCall(
   }
 }
 
-type MeaningCheck = "same" | "drift" | "refusal" | "failed";
+export type MeaningCheck = "same" | "drift" | "refusal" | "failed";
 
 /**
  * Back-translation check that a localized sentence still means exactly what the
@@ -164,7 +164,7 @@ type MeaningCheck = "same" | "drift" | "refusal" | "failed";
  * exhaustion propagate to the caller's own handler; any other failure of the
  * check counts as not verified.
  */
-async function checkMeaning(
+export async function checkTranslationMeaning(
   source: string,
   translated: string,
   language: string,
@@ -216,7 +216,7 @@ async function checkMeaning(
  * "AI-specific correctness").
  *
  * A translation that passes {@link validateTranslation} must also pass the
- * back-translation meaning check ({@link checkMeaning}) before it is returned:
+ * back-translation meaning check ({@link checkTranslationMeaning}) before it is returned:
  * the localized text is cached for every user, and the English-only Tashbih
  * regex cannot see a theological change made in another language. This costs
  * two extra calls per translation, paced and budgeted through `verifyHooks`
@@ -256,7 +256,7 @@ Sentence: "${reason}"`;
     return "";
   }
 
-  const check = await checkMeaning(reason, verdict.text, language, opts, verifyHooks);
+  const check = await checkTranslationMeaning(reason, verdict.text, language, opts, verifyHooks);
   if (check !== "same") {
     const rejection: TranslationRejection =
       check === "refusal" ? "refusal" : check === "drift" ? "meaning_drift" : "verification_failed";

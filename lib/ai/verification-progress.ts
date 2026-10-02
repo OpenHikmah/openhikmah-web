@@ -82,3 +82,54 @@ export function formatProgress(p: VerificationProgress): string {
     `${fmt(p.connections.remaining)} connections remaining`
   );
 }
+
+export interface TranslationProgress {
+  /** Active translated (non-English) connection rows. */
+  rows: Progress;
+  /** The same, per locale (tr, ru, az). */
+  byLocale: Record<string, Progress>;
+}
+
+interface LocaleRow extends Record<string, unknown> {
+  locale: string;
+  total: number;
+  done: number;
+}
+
+/**
+ * How many of the active translated connections have passed the back-translation
+ * meaning check (`translation_checked_at` set: at creation, or by the
+ * translation re-verification job). Flagged rows drop out, as for connections.
+ */
+export async function getTranslationProgress(): Promise<TranslationProgress> {
+  const rows = await db.execute<LocaleRow>(sql`
+    SELECT locale,
+           count(*)::int AS total,
+           (count(*) FILTER (WHERE translation_checked_at IS NOT NULL))::int AS done
+    FROM connections
+    WHERE locale <> 'en' AND status = 'active'
+    GROUP BY locale
+    ORDER BY locale
+  `);
+  const byLocale: Record<string, Progress> = {};
+  let total = 0;
+  let done = 0;
+  for (const r of rows) {
+    byLocale[r.locale] = toProgress(r.total, r.done);
+    total += r.total;
+    done += r.done;
+  }
+  return { rows: toProgress(total, done), byLocale };
+}
+
+/** One log line, e.g. "412/1,800 translations (22.9%) | tr 150/600 ru 140/600 az 122/600 | 1,388 remaining". */
+export function formatTranslationProgress(p: TranslationProgress): string {
+  const locales = Object.entries(p.byLocale)
+    .map(([l, v]) => `${l} ${fmt(v.done)}/${fmt(v.total)}`)
+    .join(" ");
+  return (
+    `${fmt(p.rows.done)}/${fmt(p.rows.total)} translations (${p.rows.percent}%)` +
+    (locales ? ` | ${locales}` : "") +
+    ` | ${fmt(p.rows.remaining)} remaining`
+  );
+}

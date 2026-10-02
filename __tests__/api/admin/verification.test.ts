@@ -4,8 +4,14 @@ import type { User } from "@/lib/infra/db/schema";
 
 vi.mock("@/lib/admin/admin-auth", () => ({ requireAdmin: vi.fn() }));
 
-const { mockGetProgress } = vi.hoisted(() => ({ mockGetProgress: vi.fn() }));
-vi.mock("@/lib/ai/verification-progress", () => ({ getVerificationProgress: mockGetProgress }));
+const { mockGetProgress, mockGetTranslations } = vi.hoisted(() => ({
+  mockGetProgress: vi.fn(),
+  mockGetTranslations: vi.fn(),
+}));
+vi.mock("@/lib/ai/verification-progress", () => ({
+  getVerificationProgress: mockGetProgress,
+  getTranslationProgress: mockGetTranslations,
+}));
 
 import { GET } from "@/app/api/admin/verification/route";
 import { requireAdmin } from "@/lib/admin/admin-auth";
@@ -22,9 +28,19 @@ const progress = {
   connections: { total: 900, done: 360, remaining: 540, percent: 40 },
 };
 
+const translations = {
+  rows: { total: 300, done: 90, remaining: 210, percent: 30 },
+  byLocale: {
+    az: { total: 100, done: 30, remaining: 70, percent: 30 },
+    ru: { total: 100, done: 30, remaining: 70, percent: 30 },
+    tr: { total: 100, done: 30, remaining: 70, percent: 30 },
+  },
+};
+
 beforeEach(() => {
   vi.mocked(requireAdmin).mockResolvedValue(admin);
   mockGetProgress.mockReset().mockResolvedValue(progress);
+  mockGetTranslations.mockReset().mockResolvedValue(translations);
 });
 
 describe("GET /api/admin/verification", () => {
@@ -35,16 +51,17 @@ describe("GET /api/admin/verification", () => {
     const res = await GET(get());
     expect(res.status).toBe(404);
     expect(mockGetProgress).not.toHaveBeenCalled();
+    expect(mockGetTranslations).not.toHaveBeenCalled();
   });
 
-  it("returns the connection re-verification progress", async () => {
+  it("returns both the connection and the translation re-verification progress", async () => {
     const res = await GET(get());
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ connections: progress });
+    expect(await res.json()).toEqual({ connections: progress, translations });
   });
 
-  it("returns a 500 without leaking the error when the query fails", async () => {
-    mockGetProgress.mockRejectedValue(new Error("connection refused on 10.0.0.5"));
+  it("returns a 500 without leaking the error when either query fails", async () => {
+    mockGetTranslations.mockRejectedValue(new Error("connection refused on 10.0.0.5"));
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await GET(get());
     errSpy.mockRestore();
