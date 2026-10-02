@@ -108,8 +108,41 @@ jobs:
       - name: Type-check
         run: bun run typecheck
 
+      # schema.ts is the source of truth for generated migrations. `check`
+      # validates the migration journal/snapshots; `generate` must find nothing
+      # to do, otherwise schema.ts changed without a migration (or a snapshot is
+      # stale) and the new files it wrote show up in git status.
+      - name: Schema drift check
+        run: |
+          bunx drizzle-kit check
+          bunx drizzle-kit generate --name ci_drift_probe
+          if [ -n "$(git status --porcelain -- lib/infra/db/migrations)" ]; then
+            echo "::error::lib/infra/db/schema.ts is out of sync with lib/infra/db/migrations. Run 'bunx drizzle-kit generate' and commit the migration."
+            git status --porcelain -- lib/infra/db/migrations
+            exit 1
+          fi
+
       - name: Test (with coverage)
         run: bun run test:coverage
+
+  dependency-audit:
+    name: Dependency audit (production)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # Reads bun.lock directly. Production dependencies only: dev/test-only
+      # advisories are left to Dependabot so they don't block unrelated PRs.
+      # Fails on any high or critical advisory; fix it (upgrade or an
+      # `overrides` entry in package.json) rather than allowlisting it.
+      - name: Audit production dependencies
+        run: bun audit --prod --audit-level=high
 
   integration:
     name: Integration (Testcontainers)

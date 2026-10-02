@@ -1,9 +1,8 @@
-import { getVerse, isValidRef } from "@/lib/quran/quran-corpus";
+import { DEFAULT_EDITION, getVerse, isValidRef } from "@/lib/quran/quran-corpus";
+import { incr } from "@/lib/infra/metrics";
 import { getSurahName } from "@/lib/quran/surah-names";
 import { isValidEdition } from "@/lib/i18n/config";
 import type { Verse, VerseRef } from "@/types/quran";
-
-const DEFAULT_EDITION = "en.sahih";
 
 /**
  * Resolves a verse ref to full verse data: local corpus first, falling back to a
@@ -51,6 +50,7 @@ async function fetchVerseLive(ref: string, edition: string): Promise<Verse | nul
     // gap in that translator's coverage) — fall back to en.sahih rather than
     // failing the whole verse lookup.
     let translationData: { data: { text: string } };
+    let servedEdition = edition;
     if (translationRes.ok) {
       translationData = await translationRes.json();
     } else if (edition !== DEFAULT_EDITION) {
@@ -60,6 +60,9 @@ async function fetchVerseLive(ref: string, edition: string): Promise<Verse | nul
       );
       if (!fallbackRes.ok) return null;
       translationData = await fallbackRes.json();
+      servedEdition = DEFAULT_EDITION;
+      incr("translation_edition_substituted");
+      console.warn(`Live fetch of ${ref} has no ${edition} text; serving ${DEFAULT_EDITION}`);
     } else {
       return null;
     }
@@ -73,6 +76,7 @@ async function fetchVerseLive(ref: string, edition: string): Promise<Verse | nul
       ref: ref as VerseRef,
       arabicText: arabicData.data.text,
       translation: translationData.data.text,
+      edition: servedEdition,
       surahName,
       surahNameArabic,
     };

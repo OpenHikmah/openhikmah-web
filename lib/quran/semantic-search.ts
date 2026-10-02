@@ -29,8 +29,10 @@ async function embedQueryCached(query: string, signal?: AbortSignal): Promise<nu
         incr("embed_cache_hit");
         return vec;
       }
-    } catch {
+    } catch (err) {
       // Corrupt entry — fall through and re-embed.
+      console.error("Embedding cache entry is not valid JSON, re-embedding:", err);
+      incr("embed_cache_corrupt");
     }
   }
 

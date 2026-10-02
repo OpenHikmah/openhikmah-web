@@ -3,7 +3,11 @@ import { db } from "@/lib/infra/db";
 import { verses, verseTranslations, type VerseRow } from "@/lib/infra/db/schema";
 import { getSurahName } from "@/lib/quran/surah-names";
 import { SURAH_LENGTHS } from "@/lib/quran/audio";
+import { incr } from "@/lib/infra/metrics";
 import type { Verse, VerseRef } from "@/types/quran";
+
+/** The edition stored on every `verses` row; also the substitute when another edition has no text. */
+export const DEFAULT_EDITION = "en.sahih";
 
 /**
  * Local Quran corpus — reads verse data from the `verses` table instead of
@@ -15,7 +19,7 @@ import type { Verse, VerseRef } from "@/types/quran";
  * requested edition has no row for that verse.
  */
 
-function rowToVerse(row: VerseRow, translationOverride?: string): Verse {
+function rowToVerse(row: VerseRow, edition: string, translationOverride?: string): Verse {
   const [surahName, surahNameArabic] = getSurahName(row.surah);
   return {
     surah: row.surah,
@@ -23,9 +27,15 @@ function rowToVerse(row: VerseRow, translationOverride?: string): Verse {
     ref: row.ref as VerseRef,
     arabicText: row.arabicText,
     translation: translationOverride ?? row.translation,
+    edition: translationOverride === undefined ? DEFAULT_EDITION : edition,
     surahName,
     surahNameArabic,
   };
+}
+
+/** Meters verses served in en.sahih because the requested edition had no row for them. */
+function noteSubstitutions(substituted: number): void {
+  if (substituted > 0) incr("translation_edition_substituted", substituted);
 }
 
 /**
@@ -54,7 +64,7 @@ export function isValidRef(ref: string): boolean {
 export async function getVerse(ref: string, edition?: string): Promise<Verse | null> {
   if (!edition) {
     const rows = await db.select().from(verses).where(eq(verses.ref, ref)).limit(1);
-    return rows[0] ? rowToVerse(rows[0]) : null;
+    return rows[0] ? rowToVerse(rows[0], DEFAULT_EDITION) : null;
   }
   const rows = await db
     .select({ verse: verses, translationText: verseTranslations.text })
@@ -66,7 +76,9 @@ export async function getVerse(ref: string, edition?: string): Promise<Verse | n
     .where(eq(verses.ref, ref))
     .limit(1);
   const row = rows[0];
-  return row ? rowToVerse(row.verse, row.translationText ?? undefined) : null;
+  if (!row) return null;
+  if (edition !== DEFAULT_EDITION && row.translationText === null) noteSubstitutions(1);
+  return rowToVerse(row.verse, edition, row.translationText ?? undefined);
 }
 
 /** Batch lookup. Returns a map keyed by ref; missing refs are simply absent. */
@@ -74,7 +86,7 @@ export async function getVerses(refs: string[], edition?: string): Promise<Map<s
   if (refs.length === 0) return new Map();
   if (!edition) {
     const rows = await db.select().from(verses).where(inArray(verses.ref, refs));
-    return new Map(rows.map((r) => [r.ref, rowToVerse(r)]));
+    return new Map(rows.map((r) => [r.ref, rowToVerse(r, DEFAULT_EDITION)]));
   }
   const rows = await db
     .select({ verse: verses, translationText: verseTranslations.text })
@@ -84,8 +96,11 @@ export async function getVerses(refs: string[], edition?: string): Promise<Map<s
       and(eq(verseTranslations.ref, verses.ref), eq(verseTranslations.edition, edition))
     )
     .where(inArray(verses.ref, refs));
+  if (edition !== DEFAULT_EDITION) {
+    noteSubstitutions(rows.filter((r) => r.translationText === null).length);
+  }
   return new Map(
-    rows.map((r) => [r.verse.ref, rowToVerse(r.verse, r.translationText ?? undefined)])
+    rows.map((r) => [r.verse.ref, rowToVerse(r.verse, edition, r.translationText ?? undefined)])
   );
 }
 
