@@ -63,10 +63,39 @@ describe("verseContainsName", () => {
     expect(verseContainsName(V_112_1, allah)).toBe(true);
   });
 
-  it("accepts a word carrying the name's root when morphology provides it", () => {
-    expect(verseContainsName("يَغْفِرُ لَكُمْ", name("al-ghaffar"), ["غفر"])).toBe(true);
-    expect(verseContainsName("يَغْفِرُ لَكُمْ", name("al-ghaffar"))).toBe(false);
-    expect(verseContainsName("يَغْفِرُ لَكُمْ", name("al-ghaffar"), ["علم"])).toBe(false);
+  it("accepts a word with the name's root when that root belongs to no other divine name", () => {
+    // ق-و-م is carried by al-qayyum alone.
+    const verse = "وَمَا يَقُومُ";
+    expect(verseContainsName(verse, name("al-qayyum"))).toBe(false);
+    expect(verseContainsName(verse, name("al-qayyum"), [{ root: "قوم", lemma: null }])).toBe(true);
+  });
+
+  it("does not accept a shared root on its own: a sibling's word must not pass for the name", () => {
+    // ar-rahman and ar-rahim share ر-ح-م, al-ghaffar and al-ghafur share غ-ف-ر.
+    expect(
+      verseContainsName("ٱلرَّحْمَٰنُ", name("ar-rahim"), [{ root: "رحم", lemma: "رَّحْمَٰن" }])
+    ).toBe(false);
+    expect(
+      verseContainsName("يَغْفِرُ لَكُمْ", name("al-ghaffar"), [{ root: "غفر", lemma: null }])
+    ).toBe(false);
+    expect(
+      verseContainsName("غَفُورٌ", name("al-ghaffar"), [{ root: "غفر", lemma: "غَفُور" }])
+    ).toBe(false);
+  });
+
+  it("accepts a shared-root name when morphology gives the name itself as the lemma", () => {
+    expect(
+      verseContainsName("إِنَّهُۥ كَانَ غَفَّارًا", name("al-ghaffar"), [
+        { root: "غفر", lemma: "غَفَّار" },
+      ])
+    ).toBe(true);
+  });
+
+  it("keeps an explicit medial alef: مالك is not ملك", () => {
+    // al-malik is الْمَلِك (no alef); مَالِك "owner" and the dagger-alef مَـٰلِكِ are other words.
+    expect(verseContainsName("مَالِكِ يَوْمِ ٱلدِّينِ", name("al-malik"))).toBe(false);
+    expect(verseContainsName("مَـٰلِكِ يَوْمِ ٱلدِّينِ", name("al-malik"))).toBe(false);
+    expect(verseContainsName("ٱلْمَلِكُ ٱلْقُدُّوسُ", name("al-malik"))).toBe(true);
   });
 
   it("folds hamza forms when comparing roots", () => {
@@ -90,7 +119,12 @@ describe("verseMentionsName", () => {
   });
 
   it("falls back to the corpus root when the text does not spell the name", async () => {
-    mockSelect.mockReturnValue(rowsChain([{ root: "غفر" }, { root: null }]));
+    mockSelect.mockReturnValue(
+      rowsChain([
+        { root: "غفر", lemma: "غَفَّار" },
+        { root: null, lemma: null },
+      ])
+    );
     expect(await verseMentionsName("3:31", "يَغْفِرْ لَكُمْ", name("al-ghaffar"))).toBe(true);
   });
 

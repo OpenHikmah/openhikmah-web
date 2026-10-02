@@ -21,8 +21,10 @@ import type { VerseRef } from "@/types/quran";
 
 // Bump to force regeneration after a prompt/search change. 3: flushes
 // name_content entries cached with placeholder-only reasons before issue #665's
-// fix (name_verse_reasons is unversioned and is not flushed by this).
-export const VERSES_VERSION = 3;
+// fix (name_verse_reasons is unversioned and is not flushed by this). 4:
+// flushes selections cached before the AI-fallback verses had to contain the
+// name (verseMentionsName), so they regenerate under that check.
+export const VERSES_VERSION = 4;
 
 interface NameVerse {
   ref: VerseRef;
