@@ -82,6 +82,7 @@ vi.mock("@anthropic-ai/sdk", () => {
 });
 
 import { POST } from "@/app/api/connections/route";
+import { approveAllVerdicts, isVerificationPrompt } from "../test-utils/verification";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -131,9 +132,22 @@ describe("POST /api/connections", () => {
     mockConsume.mockResolvedValue(true);
     mockSelect.mockReturnValue(makeDbChain([])); // default: cache miss
     mockAnthropicCreate.mockReset();
-    mockAnthropicCreate.mockResolvedValue({
-      content: [{ type: "text", text: defaultAnthropicText }],
-    });
+    // The verification pass fails closed: answer its prompt with a verdict array.
+    mockAnthropicCreate.mockImplementation(
+      async (args: { messages: Array<{ content: string }> }) => {
+        const prompt = args.messages[0].content;
+        return {
+          content: [
+            {
+              type: "text",
+              text: isVerificationPrompt(prompt)
+                ? approveAllVerdicts(prompt)
+                : defaultAnthropicText,
+            },
+          ],
+        };
+      }
+    );
   });
 
   it("returns 400 when fromRef is missing", async () => {

@@ -51,8 +51,8 @@ export interface GenerateOpts {
   existingReasons?: string[];
   /** Batch job's spend guard for the extra verification call this module
    *  makes after the deterministic gate. Returns false when the run is out of
-   *  budget — verification is then skipped (candidates pass through
-   *  unverified) rather than blocking or throwing. Omitted for live traffic,
+   *  budget — {@link VerificationBudgetExhaustedError} is then thrown, because
+   *  candidates are never persisted unverified. Omitted for live traffic,
    *  which has no run-level cost budget. */
   spendBudget?: () => boolean;
   /** Batch job's pacer, so the verification call is spaced out from the main
@@ -239,6 +239,19 @@ export class ConnectionParseError extends Error {
   constructor(reason: string, sample: string) {
     super(`${reason}: ${sample.slice(0, 300)}`);
     this.name = "ConnectionParseError";
+  }
+}
+
+/**
+ * The verification pass was skipped because the batch job's call budget is
+ * spent. Candidates are never persisted unverified, so the cell is abandoned
+ * with nothing saved and retried by a later run; the batch treats this as a
+ * clean budget stop, not a cell failure.
+ */
+export class VerificationBudgetExhaustedError extends Error {
+  constructor() {
+    super("connection verification skipped: call budget exhausted");
+    this.name = "VerificationBudgetExhaustedError";
   }
 }
 
@@ -479,11 +492,12 @@ Reference: {{fromRef}}
 Arabic: {{arabicText}}
 Translation: {{translation}}
 
-Proposed {{kind}} connections to review:
+Proposed {{kind}} connections to review (each proposal is followed by the text of its target verse):
 {{proposals}}
 
 For EACH proposed connection, judge whether:
 - The reason genuinely and specifically justifies a {{kind}} connection between the two verses (not vague or generic).
+- The reason is accurate to the actual wording and meaning of the target verse as shown under its proposal. Judge from that text, not from your memory of the reference; a reason that misdescribes or misattributes the target verse is invalid.
 - The reason stays within strict Tanzih and does not imply any physical form, spatial location, or resemblance to created things for God.
 
 Return ONLY a valid JSON array, one entry per proposal in the same order, no prose, no markdown:
@@ -513,9 +527,19 @@ function parseVerifyVerdicts(text: string): VerifyVerdict[] {
   if (!Array.isArray(parsed)) {
     throw new ConnectionParseError("verification response JSON was not an array", jsonMatch[0]);
   }
-  return parsed.filter(
+  const verdicts = parsed.filter(
     (v): v is VerifyVerdict => v && typeof v.ref === "string" && typeof v.valid === "boolean"
   );
+  // Verification is only ever asked about a non-empty candidate set, so a
+  // response with no usable verdict at all (empty, or every entry the wrong
+  // shape) is a failed verification, not an approval of everything.
+  if (verdicts.length === 0) {
+    throw new ConnectionParseError(
+      "verification response had no well-formed verdicts",
+      jsonMatch[0]
+    );
+  }
+  return verdicts;
 }
 
 /**
@@ -523,11 +547,17 @@ function parseVerifyVerdicts(text: string): VerifyVerdict[] {
  * gate: one extra call (never one per candidate) asking the model to flag any
  * that don't genuinely justify the connection or that violate Tanzih.
  *
- * Fails OPEN, not closed: this is defense-in-depth layered on top of the other
- * checks, so a verifier call that errors or a response that doesn't parse must
- * not wipe out otherwise-valid connections — it just means this extra look
- * didn't happen for this batch. Skips the call entirely (no spend) when
- * there's nothing to verify, or when the batch job's budget is exhausted.
+ * Fails CLOSED: this is the theological/quality gate between generation and
+ * persistence, so a candidate that was not actually verified is never returned.
+ * A verifier call that errors, a response that doesn't parse (or carries no
+ * usable verdict) and an exhausted batch budget all throw — the caller persists
+ * nothing and the cell is retried by a later batch pass or request. (Returning
+ * [] instead would be indistinguishable from "the verifier rejected everything".)
+ * Within a completed verification, only an explicit approval keeps a
+ * candidate: rejected, unmentioned and contradictory refs are all dropped.
+ * Quota, key, rate-limit and cancel signals are rethrown unchanged for the
+ * batch's own handler. Skips the call entirely (no spend) when there's nothing
+ * to verify.
  */
 export async function verifyConnections(
   fromRef: string,
@@ -540,10 +570,19 @@ export async function verifyConnections(
   if (candidates.length === 0) return candidates;
   if (opts.spendBudget && !opts.spendBudget()) {
     incr("connection_verify_skipped_budget");
-    return candidates;
+    throw new VerificationBudgetExhaustedError();
   }
 
-  const proposals = candidates.map((c) => `- ${c.ref}: "${c.reason}"`).join("\n");
+  // The first line of each proposal keeps the `- <ref>: "<reason>"` shape the
+  // verdicts are keyed on. The target verse's own text (read from the corpus
+  // during hydration, never from the model) follows, so the verifier judges the
+  // reason against the verse rather than against its memory of the reference.
+  const proposals = candidates
+    .map(
+      (c) =>
+        `- ${c.ref}: "${c.reason}"\n  Target verse (Arabic): ${c.arabicText}\n  Target verse (Saheeh International): ${c.translation}`
+    )
+    .join("\n");
   const prompt =
     renderTemplate(VERIFY_TEMPLATE, { fromRef, arabicText, translation, kind, proposals }) +
     tanzihDirective();
@@ -573,9 +612,9 @@ export async function verifyConnections(
     ) {
       throw err;
     }
-    console.error("connection verification call failed, keeping candidates:", err);
+    console.error("connection verification call failed, discarding candidates:", err);
     incr("connection_verify_call_failed");
-    return candidates;
+    throw err;
   }
 
   // Best-effort audit log — never fail verification because logging failed.
@@ -595,15 +634,27 @@ export async function verifyConnections(
   try {
     verdicts = parseVerifyVerdicts(res.text);
   } catch (err) {
-    console.error("connection verification response unparseable, keeping candidates:", err);
+    console.error("connection verification response unparseable, discarding candidates:", err);
     incr("connection_verify_parse_failed");
-    return candidates;
+    throw err;
   }
 
-  const invalidRefs = new Set(verdicts.filter((v) => !v.valid).map((v) => v.ref));
-  const kept = candidates.filter((c) => !invalidRefs.has(c.ref));
-  if (kept.length < candidates.length) {
-    incr("connection_rejected_verification", candidates.length - kept.length);
+  // A candidate survives only on an explicit approval. A ref the verifier
+  // rejected, never mentioned, or contradicted (both approved and rejected)
+  // is dropped: silence is not approval.
+  const approved = new Set(verdicts.filter((v) => v.valid).map((v) => v.ref));
+  const rejected = new Set(verdicts.filter((v) => !v.valid).map((v) => v.ref));
+  const kept = candidates.filter((c) => approved.has(c.ref) && !rejected.has(c.ref));
+  const unmentioned = candidates.filter((c) => !approved.has(c.ref) && !rejected.has(c.ref));
+  if (unmentioned.length > 0) {
+    console.error(
+      `connection verification gave no verdict for ${unmentioned.map((c) => c.ref).join(", ")}; discarding them`
+    );
+    incr("connection_verify_missing_verdict", unmentioned.length);
+  }
+  const rejectedCount = candidates.length - kept.length - unmentioned.length;
+  if (rejectedCount > 0) {
+    incr("connection_rejected_verification", rejectedCount);
   }
   return kept;
 }

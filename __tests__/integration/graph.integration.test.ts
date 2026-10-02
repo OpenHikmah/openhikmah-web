@@ -5,23 +5,31 @@ import { and, eq, sql } from "drizzle-orm";
 // uses callAIDetailed; mockCallAI stays the text source so assertions on call
 // count / response body are unchanged.
 const { mockCallAI } = vi.hoisted(() => ({ mockCallAI: vi.fn() }));
-vi.mock("@/lib/ai/ai", () => ({
-  callAI: vi.fn((prompt: string) => mockCallAI(prompt)),
-  callAIDetailed: vi.fn(async (prompt: string) => ({
-    text: await mockCallAI(prompt),
-    usage: { inputTokens: 100, outputTokens: 20 },
-    provider: "claude" as const,
-    model: "claude-opus-4-7",
-  })),
-  resolveProvider: vi.fn(
-    async (_feature: string, override?: string) => (override ?? "claude") as "claude" | "gemini"
-  ),
-  resolveModel: vi.fn(
-    async (_feature: string, provider: string, override?: string) =>
-      override ?? (provider === "gemini" ? "gemini-3.5-flash-lite" : "claude-opus-4-7")
-  ),
-  defaultModelFor: (p: string) => (p === "gemini" ? "gemini-3.5-flash-lite" : "claude-opus-4-7"),
-}));
+// The verification pass fails closed, so its prompt is answered with a verdict
+// array (still routed through mockCallAI so call counts include it).
+vi.mock("@/lib/ai/ai", async () => {
+  const { approveAllVerdicts, isVerificationPrompt } = await import("../test-utils/verification");
+  return {
+    callAI: vi.fn((prompt: string) => mockCallAI(prompt)),
+    callAIDetailed: vi.fn(async (prompt: string) => {
+      const text = await mockCallAI(prompt);
+      return {
+        text: isVerificationPrompt(prompt) ? approveAllVerdicts(prompt) : text,
+        usage: { inputTokens: 100, outputTokens: 20 },
+        provider: "claude" as const,
+        model: "claude-opus-4-7",
+      };
+    }),
+    resolveProvider: vi.fn(
+      async (_feature: string, override?: string) => (override ?? "claude") as "claude" | "gemini"
+    ),
+    resolveModel: vi.fn(
+      async (_feature: string, provider: string, override?: string) =>
+        override ?? (provider === "gemini" ? "gemini-3.5-flash-lite" : "claude-opus-4-7")
+    ),
+    defaultModelFor: (p: string) => (p === "gemini" ? "gemini-3.5-flash-lite" : "claude-opus-4-7"),
+  };
+});
 // Guard against accidental network in the resolver fallback — everything must
 // resolve from the seeded corpus.
 vi.stubGlobal(
@@ -33,6 +41,7 @@ import { db } from "@/lib/infra/db";
 import { verses, connections, aiGenerations } from "@/lib/infra/db/schema";
 import { getConnections } from "@/lib/ai/graph-service";
 import { consume } from "@/lib/infra/rate-limit";
+import { isVerificationPrompt } from "../test-utils/verification";
 
 async function reset() {
   // word_morphology is included even though this file never seeds it — root
@@ -91,6 +100,33 @@ describe("connection graph (integration, real Postgres)", () => {
     });
     expect(mockCallAI).toHaveBeenCalledTimes(2);
     expect(await db.select().from(aiGenerations)).toHaveLength(2);
+  });
+
+  it("a verifier failure persists nothing and surfaces the error; a later request regenerates and verifies", async () => {
+    await seed("2:255");
+    await seed("3:18");
+    const generated = JSON.stringify([
+      { ref: "2:255", reason: "This verse describes the throne and vast divine knowledge." },
+      { ref: "3:18", reason: "Both verses bear witness to the absolute oneness of God." },
+    ]);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (isVerificationPrompt(prompt)) throw new Error("503 verifier unavailable");
+      return generated;
+    });
+    await expect(getConnections("1:1", "thematic", source)).rejects.toThrow(
+      "503 verifier unavailable"
+    );
+    errSpy.mockRestore();
+    // Unverified candidates are discarded: no rows, so nothing is served from cache.
+    expect(await db.select().from(connections)).toHaveLength(0);
+
+    mockCallAI.mockReset();
+    mockCallAI.mockResolvedValue(generated);
+    const retry = await getConnections("1:1", "thematic", source);
+    expect(retry).toHaveLength(2);
+    expect(await db.select().from(connections)).toHaveLength(2);
   });
 
   it("drops a hallucinated ref that is not in the corpus", async () => {

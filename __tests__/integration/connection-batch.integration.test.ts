@@ -6,15 +6,21 @@ import { sql } from "drizzle-orm";
 const { mockCallAI } = vi.hoisted(() => ({ mockCallAI: vi.fn() }));
 vi.mock("@/lib/ai/ai", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/ai/ai")>();
+  // The verification pass fails closed, so its prompt is answered with a verdict
+  // array (still routed through mockCallAI so call counts include it).
+  const { approveAllVerdicts, isVerificationPrompt } = await import("../test-utils/verification");
   return {
     ...actual,
     callAI: vi.fn((prompt: string) => mockCallAI(prompt)),
-    callAIDetailed: vi.fn(async (prompt: string) => ({
-      text: await mockCallAI(prompt),
-      usage: { inputTokens: 100, outputTokens: 20 },
-      provider: "claude" as const,
-      model: "claude-opus-4-7",
-    })),
+    callAIDetailed: vi.fn(async (prompt: string) => {
+      const text = await mockCallAI(prompt);
+      return {
+        text: isVerificationPrompt(prompt) ? approveAllVerdicts(prompt) : text,
+        usage: { inputTokens: 100, outputTokens: 20 },
+        provider: "claude" as const,
+        model: "claude-opus-4-7",
+      };
+    }),
   };
 });
 vi.stubGlobal(
@@ -39,6 +45,7 @@ import {
   GeminiRateLimitError,
 } from "@/lib/ai/gemini-errors";
 import { getCoverageReport } from "@/lib/admin/coverage-report";
+import { isVerificationPrompt } from "../test-utils/verification";
 import { counterSnapshot } from "@/lib/infra/metrics";
 
 async function reset() {
@@ -245,17 +252,76 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
       JSON.stringify([{ ref: "2:1", reason: "A well-formed placeholder reason for this test." }])
     );
 
+    // Two calls pay for one cell's generation + its verification.
     const summary = await runConnectionBatch(
-      { mode: "baseline", provider: "claude", locales: [], maxCalls: 1, maxCostUsd: 100 },
+      { mode: "baseline", provider: "claude", locales: [], maxCalls: 2, maxCostUsd: 100 },
       hooks
     );
 
     expect(summary.stoppedReason).toBe("call-budget");
-    expect(summary.callsUsed).toBe(1);
+    expect(summary.callsUsed).toBe(2);
     // The one processed cell's rows + coverage row are committed.
     expect((await db.select().from(connections)).length).toBeGreaterThan(0);
     expect((await db.select().from(connectionCoverage)).length).toBeGreaterThanOrEqual(1);
     expect((await db.select().from(aiGenerations)).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("spend guard: a budget that pays for generation but not verification persists nothing for that cell", async () => {
+    for (const r of ["1:1", "2:1"]) await seed(r);
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([{ ref: "2:1", reason: "A well-formed placeholder reason for this test." }])
+    );
+
+    const lines: string[] = [];
+    const summary = await runConnectionBatch(
+      { mode: "baseline", provider: "claude", locales: [], maxCalls: 1, maxCostUsd: 100 },
+      { onProgress: (l) => lines.push(l) }
+    );
+
+    // A clean budget stop, not a cell failure — and no unverified edge saved.
+    expect(summary.stoppedReason).toBe("call-budget");
+    expect(summary.cellsFailed).toBe(0);
+    expect(await db.select().from(connections)).toHaveLength(0);
+    expect(lines.some((l) => l.includes("budget exhausted before verifying"))).toBe(true);
+  });
+
+  it("verifier error: nothing is persisted, the cell is recorded as failed, and the next pass retries it", async () => {
+    await seed("1:1");
+    await seed("2:255");
+    const generated = JSON.stringify([
+      { ref: "2:255", reason: "This verse describes the throne and vast divine knowledge." },
+    ]);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Pass 1: generation works, the verifier is down.
+    mockCallAI.mockImplementation(async (prompt: string) => {
+      if (isVerificationPrompt(prompt)) throw new Error("503 verifier unavailable");
+      return generated;
+    });
+    const pass1 = await runConnectionBatch(
+      { mode: "baseline", provider: "claude", locales: [], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+    errSpy.mockRestore();
+
+    expect(pass1.generated).toBe(0);
+    expect(pass1.cellsFailed).toBeGreaterThan(0);
+    expect(pass1.stoppedReason).toBe("error");
+    expect(await db.select().from(connections)).toHaveLength(0);
+    // 2:255's only candidate is itself (filtered), so only the 1:1 cells reach the verifier.
+    const failed = (await db.select().from(connectionCoverage)).filter((c) => c.fromRef === "1:1");
+    expect(failed.length).toBeGreaterThan(0);
+    expect(failed.every((c) => c.lastError?.includes("503 verifier unavailable"))).toBe(true);
+
+    // Pass 2: the verifier is back — the same cells are generated and verified.
+    mockCallAI.mockReset();
+    mockCallAI.mockResolvedValue(generated);
+    const pass2 = await runConnectionBatch(
+      { mode: "baseline", provider: "claude", locales: [], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+    expect(pass2.generated).toBeGreaterThan(0);
+    expect((await db.select().from(connections)).length).toBeGreaterThan(0);
   });
 
   it("spend guard: refuses the call that would cross maxCostUsd (no overspend)", async () => {

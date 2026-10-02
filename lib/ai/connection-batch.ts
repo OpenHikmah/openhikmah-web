@@ -2,7 +2,10 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { verses, connections, connectionCoverage, aiGenerations } from "@/lib/infra/db/schema";
 import { generateConnectionsForCell } from "@/lib/ai/graph-service";
-import { ConnectionParseError } from "@/lib/ai/connection-generator";
+import {
+  ConnectionParseError,
+  VerificationBudgetExhaustedError,
+} from "@/lib/ai/connection-generator";
 import { translateReason } from "@/lib/ai/translate";
 import { estimateCostUsd } from "@/lib/ai/ai-cost";
 import { resolveModel, type Provider } from "@/lib/ai/ai";
@@ -646,6 +649,17 @@ export async function runConnectionBatch(
       // not a cell failure — don't poison the coverage row or trip fail-fast.
       if (signal?.aborted || (err instanceof Error && err.name === "AbortError")) {
         summary.stoppedReason = "cancelled";
+        break;
+      }
+      if (err instanceof VerificationBudgetExhaustedError) {
+        // The generation call went out but the budget has no room for its
+        // verification call, and unverified connections are never persisted.
+        // Nothing was saved for this cell; stop like any other budget stop and
+        // let a later run regenerate it. Not a cell failure.
+        summary.stoppedReason = budget.stoppedReason ?? "call-budget";
+        hooks.onProgress(
+          `[${opts.mode}] budget exhausted before verifying ${cell.fromRef} ${cell.kind} — nothing saved for it, stopping`
+        );
         break;
       }
       if (err instanceof GeminiDailyQuotaError) {

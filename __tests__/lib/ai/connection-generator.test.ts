@@ -46,8 +46,11 @@ import {
   generateConnections,
   generateGroundedConnections,
   ConnectionParseError,
+  VerificationBudgetExhaustedError,
 } from "@/lib/ai/connection-generator";
+import { counterSnapshot } from "@/lib/infra/metrics";
 import { getPrompt } from "@/lib/ai/prompt-registry";
+import { approveAllVerdicts, isVerificationPrompt } from "../../test-utils/verification";
 import { GeminiDailyQuotaError } from "@/lib/ai/gemini-errors";
 
 // Sacred-data rule (AGENTS.md): plausible Arabic + a real translation even in
@@ -68,12 +71,17 @@ function verse(ref: string): Verse {
   };
 }
 
-const defaultDetailed = async (prompt: string) => ({
-  text: await mockCallAI(prompt),
-  usage: { inputTokens: 100, outputTokens: 20 },
-  provider: "claude" as const,
-  model: "claude-opus-4-7",
-});
+// The verification pass fails closed, so its prompt is answered with a verdict
+// array (still routed through mockCallAI so call counts include it).
+const defaultDetailed = async (prompt: string) => {
+  const text = await mockCallAI(prompt);
+  return {
+    text: isVerificationPrompt(prompt) ? approveAllVerdicts(prompt) : text,
+    usage: { inputTokens: 100, outputTokens: 20 },
+    provider: "claude" as const,
+    model: "claude-opus-4-7",
+  };
+};
 
 describe("generateConnections", () => {
   beforeEach(() => {
@@ -406,18 +414,195 @@ describe("generateConnections — content quality gate", () => {
     expect(mockCallAIDetailed).toHaveBeenCalledTimes(2);
   });
 
-  it("skips verification (no extra call) when the batch job's budget is exhausted", async () => {
+  describe("verifier context", () => {
+    const ARABIC_2_255 = "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ";
+    const ARABIC_112_1 = "قُلْ هُوَ اللَّهُ أَحَدٌ";
+    const generation = {
+      text: JSON.stringify([
+        { ref: "2:255", reason: "Describes the throne verse and God's knowledge." },
+        { ref: "112:1", reason: "Both verses affirm the absolute oneness of God." },
+      ]),
+      usage: { inputTokens: 100, outputTokens: 20 },
+      provider: "claude" as const,
+      model: "claude-opus-4-7",
+    };
+
+    function seedDistinctVerses() {
+      mockGetVerses.mockImplementation(async (refs: string[]) => {
+        const texts: Record<string, [string, string]> = {
+          "2:255": [ARABIC_2_255, "Allah - there is no deity except Him, the Ever-Living."],
+          "112:1": [ARABIC_112_1, "Say, He is Allah, [who is] One."],
+        };
+        return new Map(
+          refs.map((r) => [r, { ...verse(r), arabicText: texts[r][0], translation: texts[r][1] }])
+        );
+      });
+    }
+
+    it("gives the verifier each target verse's Arabic and translation, not just its reference", async () => {
+      seedDistinctVerses();
+      mockCallAIDetailed
+        .mockResolvedValueOnce(generation)
+        .mockImplementationOnce(async (prompt: string) => ({
+          text: approveAllVerdicts(prompt),
+          usage: null,
+          provider: "claude" as const,
+          model: "claude-opus-4-7",
+        }));
+      const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+      expect(out.map((c) => c.ref)).toEqual(["2:255", "112:1"]);
+
+      const verificationPrompt = mockCallAIDetailed.mock.calls[1][0] as string;
+      expect(isVerificationPrompt(verificationPrompt)).toBe(true);
+      expect(verificationPrompt).toContain(ARABIC_2_255);
+      expect(verificationPrompt).toContain(
+        "Allah - there is no deity except Him, the Ever-Living."
+      );
+      expect(verificationPrompt).toContain(ARABIC_112_1);
+      expect(verificationPrompt).toContain("Say, He is Allah, [who is] One.");
+    });
+
+    it("keeps each target verse's text under its own proposal, and still verifies in a single call", async () => {
+      seedDistinctVerses();
+      mockCallAIDetailed
+        .mockResolvedValueOnce(generation)
+        .mockImplementationOnce(async (prompt: string) => ({
+          text: approveAllVerdicts(prompt),
+          usage: null,
+          provider: "claude" as const,
+          model: "claude-opus-4-7",
+        }));
+      await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+      expect(mockCallAIDetailed).toHaveBeenCalledTimes(2);
+
+      const prompt = mockCallAIDetailed.mock.calls[1][0] as string;
+      const first = prompt.indexOf('- 2:255: "');
+      const second = prompt.indexOf('- 112:1: "');
+      expect(first).toBeGreaterThan(-1);
+      expect(second).toBeGreaterThan(first);
+      const firstBlock = prompt.slice(first, second);
+      expect(firstBlock).toContain(ARABIC_2_255);
+      expect(firstBlock).not.toContain(ARABIC_112_1);
+      expect(prompt.slice(second)).toContain(ARABIC_112_1);
+    });
+
+    it("tells the verifier to judge the reason against the shown verse text, not memory", async () => {
+      seedDistinctVerses();
+      mockCallAIDetailed
+        .mockResolvedValueOnce(generation)
+        .mockImplementationOnce(async (prompt: string) => ({
+          text: approveAllVerdicts(prompt),
+          usage: null,
+          provider: "claude" as const,
+          model: "claude-opus-4-7",
+        }));
+      await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+      const prompt = mockCallAIDetailed.mock.calls[1][0] as string;
+      expect(prompt).toContain("not from your memory of the reference");
+      // The Tanzih criterion and constraint are still present.
+      expect(prompt).toContain("strict Tanzih");
+    });
+  });
+
+  describe("explicit approval only", () => {
+    const generation = {
+      text: JSON.stringify([
+        { ref: "2:255", reason: "A genuinely strong thematic connection here." },
+        { ref: "3:18", reason: "A second, distinct and well-formed connection." },
+        { ref: "112:1", reason: "A third connection about the oneness of God." },
+      ]),
+      usage: { inputTokens: 100, outputTokens: 20 },
+      provider: "claude" as const,
+      model: "claude-opus-4-7",
+    };
+    const verdictReply = (verdicts: unknown) => ({
+      text: JSON.stringify(verdicts),
+      usage: { inputTokens: 50, outputTokens: 10 },
+      provider: "claude" as const,
+      model: "claude-opus-4-7",
+    });
+
+    it("drops a candidate the verifier never mentions, keeping only the approved one", async () => {
+      mockCallAIDetailed
+        .mockResolvedValueOnce(generation)
+        .mockResolvedValueOnce(verdictReply([{ ref: "2:255", valid: true }]));
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const before = counterSnapshot()["connection_verify_missing_verdict"] ?? 0;
+      const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+      expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+      expect(counterSnapshot()["connection_verify_missing_verdict"]).toBe(before + 2);
+      errSpy.mockRestore();
+    });
+
+    it("drops a ref the verifier both approves and rejects", async () => {
+      mockCallAIDetailed.mockResolvedValueOnce(generation).mockResolvedValueOnce(
+        verdictReply([
+          { ref: "2:255", valid: true },
+          { ref: "2:255", valid: false },
+          { ref: "3:18", valid: true },
+          { ref: "112:1", valid: true },
+        ])
+      );
+      const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+      expect(out.map((c) => c.ref)).toEqual(["3:18", "112:1"]);
+    });
+
+    it("returns [] when every candidate is rejected or unmentioned", async () => {
+      mockCallAIDetailed
+        .mockResolvedValueOnce(generation)
+        .mockResolvedValueOnce(verdictReply([{ ref: "2:255", valid: false }]));
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      expect(await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic")).toEqual([]);
+      errSpy.mockRestore();
+    });
+
+    it("ignores a verdict for a ref that was never proposed", async () => {
+      mockCallAIDetailed.mockResolvedValueOnce(generation).mockResolvedValueOnce(
+        verdictReply([
+          { ref: "2:255", valid: true },
+          { ref: "9:99", valid: true },
+        ])
+      );
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+      expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+      errSpy.mockRestore();
+    });
+  });
+
+  it("throws, with no verification call, when the batch job's budget is exhausted — never returns unverified candidates", async () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([{ ref: "2:255", reason: "A well-formed connection worth persisting." }])
     );
-    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", "en", {
-      spendBudget: () => false,
-    });
-    expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+    await expect(
+      generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", "en", {
+        spendBudget: () => false,
+      })
+    ).rejects.toBeInstanceOf(VerificationBudgetExhaustedError);
     expect(mockCallAIDetailed).toHaveBeenCalledTimes(1);
   });
 
-  it("fails open — keeps candidates when the verification response can't be parsed", async () => {
+  it("fails closed — throws instead of keeping candidates when the verifier call errors", async () => {
+    mockCallAIDetailed
+      .mockResolvedValueOnce({
+        text: JSON.stringify([
+          { ref: "2:255", reason: "A well-formed connection worth persisting." },
+        ]),
+        usage: { inputTokens: 100, outputTokens: 20 },
+        provider: "claude" as const,
+        model: "claude-opus-4-7",
+      })
+      .mockRejectedValueOnce(new Error("503 upstream unavailable"));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const before = counterSnapshot()["connection_verify_call_failed"] ?? 0;
+    await expect(generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic")).rejects.toThrow(
+      "503 upstream unavailable"
+    );
+    expect(counterSnapshot()["connection_verify_call_failed"]).toBe(before + 1);
+    errSpy.mockRestore();
+  });
+
+  it("fails closed — throws ConnectionParseError when the verification response can't be parsed", async () => {
     mockCallAIDetailed
       .mockResolvedValueOnce({
         text: JSON.stringify([
@@ -433,8 +618,39 @@ describe("generateConnections — content quality gate", () => {
         provider: "claude" as const,
         model: "claude-opus-4-7",
       });
-    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
-    expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const before = counterSnapshot()["connection_verify_parse_failed"] ?? 0;
+    await expect(
+      generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic")
+    ).rejects.toBeInstanceOf(ConnectionParseError);
+    expect(counterSnapshot()["connection_verify_parse_failed"]).toBe(before + 1);
+    errSpy.mockRestore();
+  });
+
+  it.each([
+    ["an empty verdict array", "[]"],
+    ["verdicts of the wrong shape", JSON.stringify([{ ref: "2:255" }, { valid: true }])],
+  ])("fails closed — %s is not an approval", async (_label, verificationText) => {
+    mockCallAIDetailed
+      .mockResolvedValueOnce({
+        text: JSON.stringify([
+          { ref: "2:255", reason: "A well-formed connection worth persisting." },
+        ]),
+        usage: { inputTokens: 100, outputTokens: 20 },
+        provider: "claude" as const,
+        model: "claude-opus-4-7",
+      })
+      .mockResolvedValueOnce({
+        text: verificationText,
+        usage: null,
+        provider: "claude" as const,
+        model: "claude-opus-4-7",
+      });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(
+      generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic")
+    ).rejects.toBeInstanceOf(ConnectionParseError);
+    errSpy.mockRestore();
   });
 
   it("rethrows a daily-quota error from verification instead of keeping unverified candidates", async () => {
@@ -518,6 +734,24 @@ describe("generateGroundedConnections", () => {
       reason: "Describes the throne verse and God's knowledge.",
       kind: "thematic",
     });
+  });
+
+  it("fails closed on the grounded path too — a verifier error throws instead of returning unverified selections", async () => {
+    mockCallAIDetailed
+      .mockResolvedValueOnce({
+        text: JSON.stringify([
+          { ref: "2:255", reason: "Describes the throne verse and God's knowledge." },
+        ]),
+        usage: { inputTokens: 100, outputTokens: 20 },
+        provider: "claude" as const,
+        model: "claude-opus-4-7",
+      })
+      .mockRejectedValueOnce(new Error("503 upstream unavailable"));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(
+      generateGroundedConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", ["2:255", "3:18"])
+    ).rejects.toThrow("503 upstream unavailable");
+    errSpy.mockRestore();
   });
 
   it("collapses a candidate ref the model selects twice to its first occurrence", async () => {
