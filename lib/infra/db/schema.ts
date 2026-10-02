@@ -235,7 +235,13 @@ export const noteMentions = pgTable(
     read: boolean("read").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("note_mentions_mentioned_user_read_idx").on(t.mentionedUserId, t.read)]
+  (t) => [
+    index("note_mentions_mentioned_user_read_idx").on(t.mentionedUserId, t.read),
+    // The FK columns' cascades (and the joins back to a note / its author) scan
+    // without these.
+    index("note_mentions_note_id_idx").on(t.noteId),
+    index("note_mentions_mentioning_user_id_idx").on(t.mentioningUserId),
+  ]
 );
 
 // ─── Quran Corpus (local) ─────────────────────────────────────────────────────
@@ -385,11 +391,16 @@ export const aiGenerations = pgTable(
 // Fixed-window counter (no Redis). One row per (key, time-bucket); guards the
 // expensive AI generation path. See lib/rate-limit.ts.
 
-export const rateLimits = pgTable("rate_limits", {
-  key: text("key").primaryKey(),
-  count: integer("count").notNull().default(0),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const rateLimits = pgTable(
+  "rate_limits",
+  {
+    key: text("key").primaryKey(),
+    count: integer("count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  // Created by migration 0007; declared here so generated migrations don't try to drop it.
+  (t) => [index("rate_limits_created_idx").on(t.createdAt)]
+);
 
 // ─── Verse Embeddings (semantic search) ───────────────────────────────────────
 // One vector per verse, produced once by scripts/embed-corpus.mjs via Gemini.
