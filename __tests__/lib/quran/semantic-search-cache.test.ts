@@ -35,6 +35,7 @@ vi.mock("@/lib/infra/redis", () => ({ redisGet: mockRedisGet, redisSet: mockRedi
 vi.mock("@/lib/quran/quran-corpus", () => ({ getVerses: mockGetVerses }));
 
 import { searchByMeaning } from "@/lib/quran/semantic-search";
+import { counterSnapshot } from "@/lib/infra/metrics";
 
 describe("searchByMeaning — query embedding cache", () => {
   beforeEach(() => {
@@ -61,6 +62,19 @@ describe("searchByMeaning — query embedding cache", () => {
     mockRedisGet.mockResolvedValue("{not json");
     await searchByMeaning("the light");
     expect(mockEmbed).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs and meters a corrupt cache entry instead of swallowing it silently", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const before = counterSnapshot()["embed_cache_corrupt"] ?? 0;
+    mockRedisGet.mockResolvedValue("{not json");
+    await searchByMeaning("the light");
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining("not valid JSON"),
+      expect.anything()
+    );
+    expect(counterSnapshot()["embed_cache_corrupt"]).toBe(before + 1);
+    errSpy.mockRestore();
   });
 
   it("falls through to embed when the cached value is an empty array", async () => {

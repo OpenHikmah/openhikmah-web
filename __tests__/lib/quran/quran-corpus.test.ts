@@ -24,9 +24,13 @@ function makeDbChain(resolveWith: unknown = []) {
   return chain;
 }
 
-const { mockSelect } = vi.hoisted(() => ({ mockSelect: vi.fn(() => makeDbChain([])) }));
+const { mockSelect, mockIncr } = vi.hoisted(() => ({
+  mockSelect: vi.fn(() => makeDbChain([])),
+  mockIncr: vi.fn(),
+}));
 
 vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect } }));
+vi.mock("@/lib/infra/metrics", () => ({ incr: mockIncr }));
 
 import {
   getVerse,
@@ -54,7 +58,10 @@ function row(ref: string, surah: number, ayah: number) {
 }
 
 describe("quran-corpus", () => {
-  beforeEach(() => mockSelect.mockReset());
+  beforeEach(() => {
+    mockSelect.mockReset();
+    mockIncr.mockReset();
+  });
 
   describe("isValidRef", () => {
     it("accepts in-bounds refs", () => {
@@ -104,6 +111,39 @@ describe("quran-corpus", () => {
       expect(await getVerse("2:255")).toBeNull();
     });
 
+    it("reports en.sahih as the edition when none is requested", async () => {
+      mockSelect.mockReturnValue(makeDbChain([row("1:1", 1, 1)]));
+      expect((await getVerse("1:1"))?.edition).toBe("en.sahih");
+      expect(mockIncr).not.toHaveBeenCalled();
+    });
+
+    it("reports the requested edition when it has a translation row", async () => {
+      mockSelect.mockReturnValue(
+        makeDbChain([
+          { verse: row("1:1", 1, 1), translationText: "Rahman ve Rahim olan Allah'ın adıyla" },
+        ])
+      );
+      const verse = await getVerse("1:1", "tr.diyanet");
+      expect(verse?.edition).toBe("tr.diyanet");
+      expect(verse?.translation).toBe("Rahman ve Rahim olan Allah'ın adıyla");
+      expect(mockIncr).not.toHaveBeenCalled();
+    });
+
+    it("reports en.sahih and meters the substitution when the requested edition has no row", async () => {
+      mockSelect.mockReturnValue(makeDbChain([{ verse: row("1:1", 1, 1), translationText: null }]));
+      const verse = await getVerse("1:1", "tr.diyanet");
+      expect(verse?.edition).toBe("en.sahih");
+      expect(verse?.translation).toBe("text");
+      expect(mockIncr).toHaveBeenCalledWith("translation_edition_substituted", 1);
+    });
+
+    it("does not count an explicit en.sahih request as a substitution", async () => {
+      mockSelect.mockReturnValue(makeDbChain([{ verse: row("1:1", 1, 1), translationText: null }]));
+      const verse = await getVerse("1:1", "en.sahih");
+      expect(verse?.edition).toBe("en.sahih");
+      expect(mockIncr).not.toHaveBeenCalled();
+    });
+
     it("never calls fetch", async () => {
       const fetchSpy = vi.fn();
       vi.stubGlobal("fetch", fetchSpy);
@@ -111,6 +151,22 @@ describe("quran-corpus", () => {
       await getVerse("1:1");
       expect(fetchSpy).not.toHaveBeenCalled();
       vi.unstubAllGlobals();
+    });
+  });
+
+  describe("getVerses edition reporting", () => {
+    it("reports each verse's own edition and meters only the substituted ones", async () => {
+      mockSelect.mockReturnValue(
+        makeDbChain([
+          { verse: row("1:1", 1, 1), translationText: "Rahman ve Rahim olan Allah'ın adıyla" },
+          { verse: row("2:255", 2, 255), translationText: null },
+        ])
+      );
+      const map = await getVerses(["1:1", "2:255"], "tr.diyanet");
+      expect(map.get("1:1")?.edition).toBe("tr.diyanet");
+      expect(map.get("2:255")?.edition).toBe("en.sahih");
+      expect(mockIncr).toHaveBeenCalledTimes(1);
+      expect(mockIncr).toHaveBeenCalledWith("translation_edition_substituted", 1);
     });
   });
 

@@ -84,6 +84,18 @@ describe("rate-limit consume", () => {
     expect(await consume("ip:1", 20, 60)).toBe(true);
   });
 
+  it("logs and meters a failed opportunistic sweep without affecting the limit decision", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+    mockReturning.mockResolvedValue([{ count: 1 }]);
+    mockDeleteWhere.mockRejectedValueOnce(new Error("sweep boom"));
+    expect(await consume("ip:1", 20, 60)).toBe(true);
+    await vi.waitFor(() => expect(mockIncr).toHaveBeenCalledWith("rate_limit_sweep_failed"));
+    expect(errSpy).toHaveBeenCalledWith("Rate-limit sweep failed:", expect.any(Error));
+    randomSpy.mockRestore();
+    errSpy.mockRestore();
+  });
+
   it("buckets keys by time window so each window starts fresh", async () => {
     mockReturning.mockResolvedValue([{ count: 1 }]);
     await consume("ip:1", 20, 60);

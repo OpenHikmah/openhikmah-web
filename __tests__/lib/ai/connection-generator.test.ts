@@ -190,6 +190,33 @@ describe("generateConnections", () => {
     expect(out).toEqual([]);
   });
 
+  it("collapses a ref the model repeats to its first occurrence", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        { ref: "2:1", reason: "Shares the theme of guidance for the righteous." },
+        { ref: "2:1", reason: "A second, different explanation for the very same verse." },
+        { ref: "2:2", reason: "Shares the theme of certainty in the unseen." },
+      ])
+    );
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+    expect(out.map((c) => c.ref)).toEqual(["2:1", "2:2"]);
+    expect(out[0].reason).toBe("Shares the theme of guidance for the righteous.");
+  });
+
+  it("does not let a repeated ref crowd a distinct one out of the 3-connection cap", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        { ref: "2:1", reason: "Shares the theme of guidance for the righteous." },
+        { ref: "2:1", reason: "Another reading of the same verse for guidance." },
+        { ref: "2:1", reason: "Yet another reading of the same verse for guidance." },
+        { ref: "2:2", reason: "Shares the theme of certainty in the unseen." },
+        { ref: "2:3", reason: "Shares the theme of establishing regular prayer." },
+      ])
+    );
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+    expect(out.map((c) => c.ref)).toEqual(["2:1", "2:2", "2:3"]);
+  });
+
   it("caps at 3 connections even if the model returns more", async () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([
@@ -491,6 +518,22 @@ describe("generateGroundedConnections", () => {
       reason: "Describes the throne verse and God's knowledge.",
       kind: "thematic",
     });
+  });
+
+  it("collapses a candidate ref the model selects twice to its first occurrence", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        { ref: "2:255", reason: "Describes the throne verse and God's knowledge." },
+        { ref: "2:255", reason: "A second explanation of the very same throne verse." },
+        { ref: "3:18", reason: "Both verses bear witness to the oneness of God." },
+      ])
+    );
+    const out = await generateGroundedConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic", [
+      "2:255",
+      "3:18",
+    ]);
+    expect(out.map((c) => c.ref)).toEqual(["2:255", "3:18"]);
+    expect(out[0].reason).toBe("Describes the throne verse and God's knowledge.");
   });
 
   it("rejects any ref the model returns that was not in the candidate set", async () => {

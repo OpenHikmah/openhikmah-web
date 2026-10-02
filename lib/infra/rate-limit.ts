@@ -131,7 +131,10 @@ export async function sweepRateLimits(windowSeconds: number): Promise<void> {
 function maybeSweep(windowSeconds: number): void {
   try {
     if (Math.random() >= SWEEP_PROBABILITY) return;
-    void sweepRateLimits(windowSeconds).catch(() => {});
+    void sweepRateLimits(windowSeconds).catch((err) => {
+      console.error("Rate-limit sweep failed:", err);
+      incr("rate_limit_sweep_failed");
+    });
   } catch {
     // Never let cleanup affect rate limiting.
   }
