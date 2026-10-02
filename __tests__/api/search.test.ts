@@ -15,7 +15,7 @@ const {
   mockSearchByMeaning: vi.fn(),
   mockConsume: vi.fn(async (_key: string, _limit?: number, _windowSeconds?: number) => true),
   mockGetVerse: vi.fn(),
-  mockGetVerses: vi.fn(async () => new Map()),
+  mockGetVerses: vi.fn(async (_refs: string[], _edition?: string) => new Map()),
   mockLogSearchQuery: vi.fn(async () => undefined),
   mockGetQuranEdition: vi.fn(async () => "en.sahih"),
   mockGetUiLocale: vi.fn(async () => "en"),
@@ -93,7 +93,10 @@ describe("GET /api/search", () => {
     mockConsume.mockResolvedValue(true);
     mockGetVerse.mockReset();
     mockGetVerses.mockReset();
-    mockGetVerses.mockResolvedValue(new Map());
+    // A seeded corpus: every requested ref is present, with its snippet-independent text.
+    mockGetVerses.mockImplementation(
+      async (refs: string[]) => new Map(refs.map((r) => [r, verse(r, `Corpus text of ${r}`)]))
+    );
     mockLogSearchQuery.mockReset();
     mockLogSearchQuery.mockResolvedValue(undefined);
     mockGetQuranEdition.mockReset();
@@ -373,6 +376,75 @@ describe("GET /api/search", () => {
     expect(res.status).toBe(429);
     const body = await res.json();
     expect(body.error).toBe("Too many search requests");
+  });
+
+  it("rate-limits a ref-format query before it can reach resolveVerse's live fallback", async () => {
+    mockConsume.mockResolvedValue(false);
+    const res = await GET(makeSearchReq("2:255"));
+    expect(res.status).toBe(429);
+    expect(mockGetVerse).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("rate-limits an exact surah-name query", async () => {
+    mockConsume.mockResolvedValue(false);
+    const res = await GET(makeSearchReq("kahf"));
+    expect(res.status).toBe(429);
+    expect(mockFetchLocalizedChapterNames).not.toHaveBeenCalled();
+  });
+
+  it("bounds the quran.com keyword fetch with an abort signal", async () => {
+    mockFetch.mockResolvedValueOnce(quranComResponse([]));
+    await GET(makeSearchReq("mercy"));
+    const init = mockFetch.mock.calls[0][1] as RequestInit;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("flags a timed-out keyword fetch as unavailable and does not log it as a zero-result search", async () => {
+    mockFetch.mockRejectedValueOnce(new DOMException("timed out", "TimeoutError"));
+    const res = await GET(makeSearchReq("mercy"));
+    expect(res.headers.get("x-search-error")).toBe("keyword-unavailable");
+    expect(mockLogSearchQuery).not.toHaveBeenCalledWith("mercy", "keyword", expect.anything());
+  });
+
+  it("does not log a search-log entry when quran.com returns non-ok", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 503, statusText: "Unavailable" });
+    await GET(makeSearchReq("mercy"));
+    expect(mockLogSearchQuery).not.toHaveBeenCalledWith("mercy", "keyword", expect.anything());
+  });
+
+  it("clamps an enormous page before forwarding it to quran.com", async () => {
+    mockFetch.mockResolvedValueOnce(quranComResponse([]));
+    const res = await GET(makeSearchReq("mercy", "&page=99999999"));
+    const body = await res.json();
+    expect(body.page).toBe(100);
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining("page=100"), expect.anything());
+  });
+
+  it("hydrates a corpus miss through resolveVerse instead of returning empty Arabic", async () => {
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([{ verse_key: "2:255", translations: [{ text: "snippet" }] }])
+    );
+    mockGetVerses.mockResolvedValue(new Map());
+    mockGetVerse.mockResolvedValueOnce(verse("2:255", "Allah - there is no deity except Him."));
+    const res = await GET(makeSearchReq("throne"));
+    const body = await res.json();
+    expect(body.results).toHaveLength(1);
+    expect(body.results[0].arabicText).toBe(ARABIC_BY_REF["2:255"]);
+    expect(body.results[0].translation).toBe("Allah - there is no deity except Him.");
+  });
+
+  it("drops a result that resolves nowhere rather than showing an empty Arabic block", async () => {
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([{ verse_key: "2:255", translations: [{ text: "snippet" }] }])
+    );
+    mockGetVerses.mockResolvedValue(new Map());
+    mockGetVerse.mockResolvedValueOnce(null);
+    // Live fallback also finds nothing.
+    mockFetch.mockResolvedValue({ ok: false, status: 404, statusText: "Not Found" });
+    const res = await GET(makeSearchReq("throne"));
+    const body = await res.json();
+    expect(body.results).toEqual([]);
   });
 
   it("gates plain keyword search under its own bucket, distinct from the AI-generation budget the semantic lookup uses", async () => {
