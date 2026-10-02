@@ -387,6 +387,72 @@ describe("generateConnections — content quality gate", () => {
     expect(mockCallAIDetailed).toHaveBeenCalledTimes(2);
   });
 
+  describe("explicit approval only", () => {
+    const generation = {
+      text: JSON.stringify([
+        { ref: "2:255", reason: "A genuinely strong thematic connection here." },
+        { ref: "3:18", reason: "A second, distinct and well-formed connection." },
+        { ref: "112:1", reason: "A third connection about the oneness of God." },
+      ]),
+      usage: { inputTokens: 100, outputTokens: 20 },
+      provider: "claude" as const,
+      model: "claude-opus-4-7",
+    };
+    const verdictReply = (verdicts: unknown) => ({
+      text: JSON.stringify(verdicts),
+      usage: { inputTokens: 50, outputTokens: 10 },
+      provider: "claude" as const,
+      model: "claude-opus-4-7",
+    });
+
+    it("drops a candidate the verifier never mentions, keeping only the approved one", async () => {
+      mockCallAIDetailed
+        .mockResolvedValueOnce(generation)
+        .mockResolvedValueOnce(verdictReply([{ ref: "2:255", valid: true }]));
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const before = counterSnapshot()["connection_verify_missing_verdict"] ?? 0;
+      const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+      expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+      expect(counterSnapshot()["connection_verify_missing_verdict"]).toBe(before + 2);
+      errSpy.mockRestore();
+    });
+
+    it("drops a ref the verifier both approves and rejects", async () => {
+      mockCallAIDetailed.mockResolvedValueOnce(generation).mockResolvedValueOnce(
+        verdictReply([
+          { ref: "2:255", valid: true },
+          { ref: "2:255", valid: false },
+          { ref: "3:18", valid: true },
+          { ref: "112:1", valid: true },
+        ])
+      );
+      const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+      expect(out.map((c) => c.ref)).toEqual(["3:18", "112:1"]);
+    });
+
+    it("returns [] when every candidate is rejected or unmentioned", async () => {
+      mockCallAIDetailed
+        .mockResolvedValueOnce(generation)
+        .mockResolvedValueOnce(verdictReply([{ ref: "2:255", valid: false }]));
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      expect(await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic")).toEqual([]);
+      errSpy.mockRestore();
+    });
+
+    it("ignores a verdict for a ref that was never proposed", async () => {
+      mockCallAIDetailed.mockResolvedValueOnce(generation).mockResolvedValueOnce(
+        verdictReply([
+          { ref: "2:255", valid: true },
+          { ref: "9:99", valid: true },
+        ])
+      );
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+      expect(out.map((c) => c.ref)).toEqual(["2:255"]);
+      errSpy.mockRestore();
+    });
+  });
+
   it("throws, with no verification call, when the batch job's budget is exhausted — never returns unverified candidates", async () => {
     mockCallAI.mockResolvedValue(
       JSON.stringify([{ ref: "2:255", reason: "A well-formed connection worth persisting." }])

@@ -545,6 +545,8 @@ function parseVerifyVerdicts(text: string): VerifyVerdict[] {
  * usable verdict) and an exhausted batch budget all throw — the caller persists
  * nothing and the cell is retried by a later batch pass or request. (Returning
  * [] instead would be indistinguishable from "the verifier rejected everything".)
+ * Within a completed verification, only an explicit approval keeps a
+ * candidate: rejected, unmentioned and contradictory refs are all dropped.
  * Quota, key, rate-limit and cancel signals are rethrown unchanged for the
  * batch's own handler. Skips the call entirely (no spend) when there's nothing
  * to verify.
@@ -620,10 +622,22 @@ export async function verifyConnections(
     throw err;
   }
 
-  const invalidRefs = new Set(verdicts.filter((v) => !v.valid).map((v) => v.ref));
-  const kept = candidates.filter((c) => !invalidRefs.has(c.ref));
-  if (kept.length < candidates.length) {
-    incr("connection_rejected_verification", candidates.length - kept.length);
+  // A candidate survives only on an explicit approval. A ref the verifier
+  // rejected, never mentioned, or contradicted (both approved and rejected)
+  // is dropped: silence is not approval.
+  const approved = new Set(verdicts.filter((v) => v.valid).map((v) => v.ref));
+  const rejected = new Set(verdicts.filter((v) => !v.valid).map((v) => v.ref));
+  const kept = candidates.filter((c) => approved.has(c.ref) && !rejected.has(c.ref));
+  const unmentioned = candidates.filter((c) => !approved.has(c.ref) && !rejected.has(c.ref));
+  if (unmentioned.length > 0) {
+    console.error(
+      `connection verification gave no verdict for ${unmentioned.map((c) => c.ref).join(", ")}; discarding them`
+    );
+    incr("connection_verify_missing_verdict", unmentioned.length);
+  }
+  const rejectedCount = candidates.length - kept.length - unmentioned.length;
+  if (rejectedCount > 0) {
+    incr("connection_rejected_verification", rejectedCount);
   }
   return kept;
 }
