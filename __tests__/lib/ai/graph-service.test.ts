@@ -624,17 +624,18 @@ describe("getConnections — en-canonical localized reasons", () => {
   });
 
   it("never resolves the source verse when a locale repair translates already-cached en rows", async () => {
-    mockSelect.mockReturnValueOnce(makeSelectChain([])).mockReturnValue(
-      makeSelectChain([
-        {
-          fromRef: "1:1",
-          toRef: "2:255",
-          kind: "thematic",
-          reason: "en reason",
-          status: "active",
-        },
-      ])
-    );
+    const enRow = {
+      fromRef: "1:1",
+      toRef: "2:255",
+      kind: "thematic",
+      reason: "en reason",
+      status: "active",
+    };
+    mockSelect
+      .mockReturnValueOnce(makeSelectChain([]))
+      .mockReturnValueOnce(makeSelectChain([enRow]))
+      .mockReturnValueOnce(makeSelectChain([])) // flagged/retired locale rows
+      .mockReturnValue(makeSelectChain([enRow]));
     mockReturning.mockResolvedValue([{ toRef: "2:255" }]);
     mockTranslateReason.mockResolvedValue("ru reason");
     const loader = vi.fn(async () => {
@@ -649,17 +650,18 @@ describe("getConnections — en-canonical localized reasons", () => {
 
   it("translates the existing en rows without regenerating when they are already cached", async () => {
     // First select (tr cache read) misses; second (en cache read) hits.
-    mockSelect.mockReturnValueOnce(makeSelectChain([])).mockReturnValue(
-      makeSelectChain([
-        {
-          fromRef: "1:1",
-          toRef: "2:255",
-          kind: "thematic",
-          reason: "en reason",
-          status: "active",
-        },
-      ])
-    );
+    const enRow = {
+      fromRef: "1:1",
+      toRef: "2:255",
+      kind: "thematic",
+      reason: "en reason",
+      status: "active",
+    };
+    mockSelect
+      .mockReturnValueOnce(makeSelectChain([]))
+      .mockReturnValueOnce(makeSelectChain([enRow]))
+      .mockReturnValueOnce(makeSelectChain([])) // flagged/retired locale rows
+      .mockReturnValue(makeSelectChain([enRow]));
     mockReturning.mockResolvedValue([{ toRef: "2:255" }]); // tr insert wins its row, no conflict re-read
     mockTranslateReason.mockResolvedValue("ru reason");
 
@@ -722,6 +724,8 @@ describe("getConnections — en-canonical localized reasons", () => {
     ];
     mockSelect
       .mockReturnValueOnce(makeSelectChain(trRows))
+      .mockReturnValueOnce(makeSelectChain(enRows))
+      .mockReturnValueOnce(makeSelectChain([])) // flagged/retired locale rows
       .mockReturnValue(makeSelectChain(enRows));
 
     const out = await getConnections("1:1", "thematic", source, { locale: "tr" });
@@ -742,6 +746,8 @@ describe("getConnections — en-canonical localized reasons", () => {
     ];
     mockSelect
       .mockReturnValueOnce(makeSelectChain(trRows))
+      .mockReturnValueOnce(makeSelectChain(enRows))
+      .mockReturnValueOnce(makeSelectChain([])) // flagged/retired locale rows
       .mockReturnValue(makeSelectChain(enRows));
     mockTranslateReason.mockImplementation(async (reason: string) => `TR(${reason})`);
     mockReturning.mockResolvedValue([{ toRef: "3:18" }]);
@@ -792,6 +798,8 @@ describe("getConnections — en-canonical localized reasons", () => {
     ];
     mockSelect
       .mockReturnValueOnce(makeSelectChain(trRows))
+      .mockReturnValueOnce(makeSelectChain(enRows))
+      .mockReturnValueOnce(makeSelectChain([])) // flagged/retired locale rows
       .mockReturnValue(makeSelectChain(enRows));
     mockTranslateReason.mockImplementation(async (reason: string) => `TR(${reason})`);
     mockReturning.mockResolvedValue([{ toRef: "59:22" }]);
@@ -817,6 +825,8 @@ describe("getConnections — en-canonical localized reasons", () => {
     ];
     mockSelect
       .mockReturnValueOnce(makeSelectChain(trRows))
+      .mockReturnValueOnce(makeSelectChain(enRows))
+      .mockReturnValueOnce(makeSelectChain([])) // flagged/retired locale rows
       .mockReturnValue(makeSelectChain(enRows));
     mockConsume.mockResolvedValue(false); // client is over budget
 
@@ -828,6 +838,31 @@ describe("getConnections — en-canonical localized reasons", () => {
     expect(out.map((c) => c.reason)).toEqual(["tr A"]); // served what's cached, not an error
     expect(mockTranslateReason).not.toHaveBeenCalled();
     expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
+  it("serves English for a flagged translation and never re-translates it", async () => {
+    const enRows = [
+      { fromRef: "1:1", toRef: "2:255", kind: "thematic", reason: "en A", status: "active" },
+      { fromRef: "1:1", toRef: "3:18", kind: "thematic", reason: "en B", status: "active" },
+    ];
+    const trRows = [
+      { fromRef: "1:1", toRef: "2:255", kind: "thematic", reason: "tr A", status: "active" },
+    ];
+    mockSelect
+      .mockReturnValueOnce(makeSelectChain(trRows))
+      .mockReturnValueOnce(makeSelectChain(enRows))
+      .mockReturnValueOnce(makeSelectChain([{ toRef: "3:18" }])) // 3:18 is flagged in tr
+      .mockReturnValue(makeSelectChain(enRows));
+
+    const out = await getConnections("1:1", "thematic", source, {
+      locale: "tr",
+      clientKey: "9.9.9.9",
+    });
+
+    expect(mockTranslateReason).not.toHaveBeenCalled();
+    expect(mockConsume).not.toHaveBeenCalled();
+    expect(mockGenerate).not.toHaveBeenCalled();
+    expect(out.map((c) => c.reason)).toEqual(["tr A", "en B"]);
   });
 
   it("spends the client budget per translation and serves English once it is out", async () => {

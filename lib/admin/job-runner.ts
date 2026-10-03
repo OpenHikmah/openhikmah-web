@@ -15,6 +15,7 @@ import {
 import type { Provider } from "@/lib/ai/ai";
 import { runVerifyBatch, type VerifyOptions } from "@/lib/ai/connection-verify-batch";
 import { runVerifyLoop, type VerifyLoopOptions } from "@/lib/ai/connection-verify-loop";
+import { runTranslationVerifyBatch, TRANSLATIONS_VARIANT } from "@/lib/ai/translation-verify-batch";
 import { SELECTABLE_MODELS, isModelForProvider } from "@/lib/ai/models";
 import { LOCALES, type Locale } from "@/lib/i18n/config";
 import { tryAcquireJobLock, releaseJobLock } from "@/lib/admin/job-lock";
@@ -46,7 +47,8 @@ export type JobId =
   | "embed-corpus"
   | "seed-translations"
   | "backfill-connections"
-  | "verify-connections";
+  | "verify-connections"
+  | "verify-translations";
 
 export interface JobDefinition {
   id: JobId;
@@ -87,6 +89,12 @@ export const JOBS: readonly JobDefinition[] = [
   {
     id: "verify-connections",
     label: "Re-verify existing connections",
+    inProcess: true,
+    acceptsParams: true,
+  },
+  {
+    id: "verify-translations",
+    label: "Re-check existing translations",
     inProcess: true,
     acceptsParams: true,
   },
@@ -434,7 +442,9 @@ export async function startJob(
   if (job.acceptsParams) {
     if (!params) throw new Error(`Job "${job.id}" requires params`);
     if (job.id === "backfill-connections") backfill = parseBackfillParams(params);
-    if (job.id === "verify-connections") verify = parseVerifyParams(params);
+    if (job.id === "verify-connections" || job.id === "verify-translations") {
+      verify = parseVerifyParams(params);
+    }
   } else if (params) {
     throw new Error(`Job "${job.id}" does not accept params`);
   }
@@ -499,10 +509,15 @@ export async function startJob(
           error?: string;
           lastError?: string;
         };
+        const checkTranslations = state.jobId === "verify-translations";
         if (parsedVerify?.kind === "loop") {
-          summary = await runVerifyLoop(parsedVerify.opts, hooks, signal);
+          summary = checkTranslations
+            ? await runVerifyLoop(parsedVerify.opts, hooks, signal, TRANSLATIONS_VARIANT)
+            : await runVerifyLoop(parsedVerify.opts, hooks, signal);
         } else if (parsedVerify) {
-          summary = await runVerifyBatch(parsedVerify.opts, hooks, signal);
+          summary = checkTranslations
+            ? await runTranslationVerifyBatch(parsedVerify.opts, hooks, signal)
+            : await runVerifyBatch(parsedVerify.opts, hooks, signal);
         } else if (parsedBackfill?.kind === "loop") {
           summary = await runConnectionBatchLoop(parsedBackfill.opts, hooks, signal);
         } else {

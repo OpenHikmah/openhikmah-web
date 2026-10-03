@@ -183,6 +183,13 @@
       "when": 1790949464913,
       "tag": "0025_connection_coverage_verified_at",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790963562682,
+      "tag": "0026_connections_translation_checked_at",
+      "breakpoints": true
     }
   ]
 }

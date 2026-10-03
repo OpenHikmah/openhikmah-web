@@ -58,6 +58,12 @@ vi.mock("@/lib/admin/job-lock", () => ({
 const { mockRunConnectionBatch } = vi.hoisted(() => ({ mockRunConnectionBatch: vi.fn() }));
 vi.mock("@/lib/ai/connection-batch", () => ({ runConnectionBatch: mockRunConnectionBatch }));
 
+const { mockRunTranslationBatch } = vi.hoisted(() => ({ mockRunTranslationBatch: vi.fn() }));
+vi.mock("@/lib/ai/translation-verify-batch", () => ({
+  runTranslationVerifyBatch: mockRunTranslationBatch,
+  TRANSLATIONS_VARIANT: { marker: "translations-variant" },
+}));
+
 const { mockRunVerifyLoop } = vi.hoisted(() => ({ mockRunVerifyLoop: vi.fn() }));
 vi.mock("@/lib/ai/connection-verify-loop", () => ({ runVerifyLoop: mockRunVerifyLoop }));
 
@@ -92,6 +98,7 @@ beforeEach(() => {
   mockRunConnectionBatchLoop.mockReset().mockResolvedValue({ stoppedReason: "all-keys-daily" });
   mockRunVerifyBatch.mockReset().mockResolvedValue({ stoppedReason: "completed" });
   mockRunVerifyLoop.mockReset().mockResolvedValue({ stoppedReason: "work-exhausted" });
+  mockRunTranslationBatch.mockReset().mockResolvedValue({ stoppedReason: "completed" });
   mockTryAcquireJobLock.mockReset().mockResolvedValue(true);
   mockReleaseJobLock.mockReset().mockResolvedValue(undefined);
 });
@@ -214,6 +221,7 @@ describe("JOBS", () => {
       "seed-translations",
       "backfill-connections",
       "verify-connections",
+      "verify-translations",
     ]);
   });
 });
@@ -646,6 +654,80 @@ describe("startJob — verify-connections with the GEMINI_API1..5 key pool", () 
       expect(stopJob("qf-admin")).toEqual({ jobId: "verify-connections" });
       expect(signal.aborted).toBe(true);
     });
+  });
+});
+
+describe("startJob — verify-translations", () => {
+  const params = { provider: "claude", maxCalls: 40, maxCostUsd: 2 };
+
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
+    process.env.GEMINI_API1 = "key-1";
+    process.env.GEMINI_API2 = "key-2";
+  });
+  afterEach(() => {
+    delete process.env.GEMINI_API1;
+    delete process.env.GEMINI_API2;
+  });
+
+  it("requires params and validates them like the connection re-verification", async () => {
+    await expect(startJob("verify-translations", "qf-admin")).rejects.toThrow(/requires params/);
+    await expect(
+      startJob("verify-translations", "qf-admin", { ...params, maxCalls: 0 })
+    ).rejects.toThrow(/maxCalls/);
+    await expect(
+      startJob("verify-translations", "qf-admin", { ...params, provider: "openai" })
+    ).rejects.toThrow(/provider must be/);
+    expect(mockRunTranslationBatch).not.toHaveBeenCalled();
+  });
+
+  it("runs a one-pass translation check, not the connection verification", async () => {
+    await startJob("verify-translations", "qf-admin", params);
+    expect(mockRunTranslationBatch).toHaveBeenCalledWith(
+      { provider: "claude", model: undefined, maxCalls: 40, maxCostUsd: 2, callDelayMs: 0 },
+      expect.objectContaining({ onProgress: expect.any(Function) }),
+      expect.any(AbortSignal)
+    );
+    expect(mockRunVerifyBatch).not.toHaveBeenCalled();
+    expect(mockRunVerifyLoop).not.toHaveBeenCalled();
+  });
+
+  it("loop mode drives the shared key-rotation loop with the translations variant", async () => {
+    await startJob("verify-translations", "qf-admin", {
+      provider: "gemini",
+      loop: true,
+      keys: ["GEMINI_API1", "GEMINI_API2"],
+    });
+    expect(mockRunVerifyLoop).toHaveBeenCalledWith(
+      expect.objectContaining({ apiKeys: ["key-1", "key-2"] }),
+      expect.objectContaining({ onProgress: expect.any(Function) }),
+      expect.any(AbortSignal),
+      { marker: "translations-variant" }
+    );
+    expect(mockRunTranslationBatch).not.toHaveBeenCalled();
+  });
+
+  it("verify-connections still drives the loop with the default (connections) variant", async () => {
+    await startJob("verify-connections", "qf-admin", {
+      provider: "gemini",
+      loop: true,
+      keys: ["GEMINI_API1"],
+    });
+    expect(mockRunVerifyLoop.mock.calls[0][3]).toBeUndefined();
+  });
+
+  it("can be stopped like the other in-process jobs", async () => {
+    let signal!: AbortSignal;
+    mockRunTranslationBatch.mockImplementationOnce(
+      async (_o: unknown, _h: unknown, sig: AbortSignal) => {
+        signal = sig;
+        await new Promise<void>((resolve) => sig.addEventListener("abort", () => resolve()));
+        return { stoppedReason: "cancelled" };
+      }
+    );
+    await startJob("verify-translations", "qf-admin", params);
+    expect(stopJob("qf-admin")).toEqual({ jobId: "verify-translations" });
+    expect(signal.aborted).toBe(true);
   });
 });
 

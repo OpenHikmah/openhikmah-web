@@ -287,11 +287,10 @@ describe("connection graph (integration, real Postgres)", () => {
     expect(translationCalls).toBe(3);
   });
 
-  it("a retired locale translation is not resurrected — a repair serves the fresh text without reviving the old row", async () => {
+  it("a retired or flagged locale translation is settled: English is served, nothing is re-translated or revived", async () => {
     await seed("2:255");
     const REASON_A = "reason A: mercy and forgiveness are shown throughout this passage.";
     const OLD_TR = "old translated reason text here";
-    const NEW_TR = "new translated reason text here";
     mockCallAI.mockImplementation(async (prompt: string) => {
       if (prompt.startsWith("Translate the following sentence")) return OLD_TR;
       return JSON.stringify([{ ref: "2:255", reason: REASON_A }]);
@@ -301,30 +300,23 @@ describe("connection graph (integration, real Postgres)", () => {
     await getConnections("1:1", "thematic", source, { locale: "tr" });
     let rows = await db.select().from(connections).where(eq(connections.locale, "tr"));
     expect(rows).toMatchObject([{ toRef: "2:255", reason: OLD_TR, status: "active" }]);
+    const callsBefore = mockCallAI.mock.calls.length;
 
-    // An admin retires the (bad) translation — the English row is untouched.
-    await db
-      .update(connections)
-      .set({ status: "retired" })
-      .where(and(eq(connections.locale, "tr"), eq(connections.toRef, "2:255")));
+    for (const status of ["retired", "flagged"]) {
+      await db
+        .update(connections)
+        .set({ status })
+        .where(and(eq(connections.locale, "tr"), eq(connections.toRef, "2:255")));
 
-    // The retired row makes the locale incomplete again (no ACTIVE tr row for
-    // the canonical en ref), so the next request repairs it with a fresh
-    // translation — served in the response, but NOT persisted over the
-    // retired row (the unique key is still held by it).
-    mockCallAI.mockImplementation(async (prompt: string) => {
-      if (prompt.startsWith("Translate the following sentence")) return NEW_TR;
-      return JSON.stringify([{ ref: "2:255", reason: REASON_A }]);
-    });
-    const repaired = await getConnections("1:1", "thematic", source, { locale: "tr" });
-
-    expect(repaired.map((c) => c.reason)).toEqual([NEW_TR]); // fresh text served
-    rows = await db.select().from(connections).where(eq(connections.locale, "tr"));
-    expect(rows).toHaveLength(1); // no new row inserted, the retired one still holds the key
-    expect(rows[0]).toMatchObject({ reason: OLD_TR, status: "retired" }); // untouched, not resurrected
-    // One English generation + one batched verification call, only ever once
-    // across the whole test.
-    expect(await db.select().from(aiGenerations)).toHaveLength(2);
+      // The hidden row holds the unique key, so a fresh translation could never be
+      // cached: serve the English reason and make no provider call, on every request.
+      const served = await getConnections("1:1", "thematic", source, { locale: "tr" });
+      expect(served.map((c) => c.reason)).toEqual([REASON_A]);
+      rows = await db.select().from(connections).where(eq(connections.locale, "tr"));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ reason: OLD_TR, status });
+    }
+    expect(mockCallAI.mock.calls.length).toBe(callsBefore);
   });
 
   it("a cold non-en request generates English first, then translates it", async () => {

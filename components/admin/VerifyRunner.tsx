@@ -8,12 +8,75 @@ import { Field } from "@/components/admin/Field";
 import { SectionHeading } from "@/components/admin/SectionHeading";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { SELECTABLE_MODELS } from "@/lib/ai/models";
-import type { VerificationProgress } from "@/lib/ai/verification-progress";
+import type { TranslationProgress, VerificationProgress } from "@/lib/ai/verification-progress";
 
 const GEMINI_DEFAULT_DELAY_MS = 1500;
 const MAX_CALL_DELAY_MS = 60_000;
 
 const nf = new Intl.NumberFormat("en-US");
+
+type Variant = "connections" | "translations";
+const JOB_IDS = {
+  connections: "verify-connections",
+  translations: "verify-translations",
+} as const;
+
+/** The same panel for the translation re-check: one bar over all translated rows, plus per language. */
+function TranslationProgressBlock({
+  progress,
+  error,
+  onRefresh,
+}: {
+  progress: TranslationProgress | null;
+  error: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="mt-4 rounded border border-border p-3 text-xs" aria-live="polite">
+      <div className="flex items-center justify-between">
+        <span className="text-text-secondary">Translation check progress</span>
+        <button type="button" className="underline text-text-muted" onClick={onRefresh}>
+          Refresh
+        </button>
+      </div>
+      {progress ? (
+        <>
+          <progress
+            className="mt-2 h-2 w-full"
+            aria-label="Translations checked"
+            max={Math.max(progress.rows.total, 1)}
+            value={progress.rows.done}
+          />
+          <p className="mt-2 tabular-nums">
+            <span className="text-text-secondary">
+              {progress.rows.percent}% of translations checked
+            </span>
+            {": "}
+            {nf.format(progress.rows.done)} of {nf.format(progress.rows.total)}
+            {", "}
+            {nf.format(progress.rows.remaining)} remaining
+          </p>
+          <p className="mt-1 tabular-nums text-text-muted">
+            {Object.entries(progress.byLocale)
+              .map(
+                ([locale, v]) =>
+                  `${locale.toUpperCase()} ${nf.format(v.done)} of ${nf.format(v.total)}`
+              )
+              .join(" | ")}
+          </p>
+          <p className="mt-1 text-text-muted">
+            Translations the check flags are hidden (users see the English) and drop out of these
+            totals.
+          </p>
+        </>
+      ) : (
+        <p className="mt-2 text-text-muted">
+          {error ? "Could not load the progress. Try Refresh." : "Loading…"}
+        </p>
+      )}
+    </div>
+  );
+}
 
 /** How much of the backlog is verified: a bar plus the numbers, refreshable. */
 function ProgressBlock({
@@ -82,7 +145,13 @@ function ProgressBlock({
  * nothing is left to verify (the job log then says ALL DONE), every key is
  * spent, or the admin clicks Stop. Both budgets are then optional safety caps.
  */
-export function VerifyRunner({ onStarted }: { onStarted?: () => void }) {
+export function VerifyRunner({
+  onStarted,
+  variant = "connections",
+}: {
+  onStarted?: () => void;
+  variant?: Variant;
+}) {
   const api = useAdminFetch();
   const [provider, setProvider] = useState<"claude" | "gemini">("gemini");
   const [model, setModel] = useState("");
@@ -90,15 +159,18 @@ export function VerifyRunner({ onStarted }: { onStarted?: () => void }) {
   const [maxCostUsd, setMaxCostUsd] = useState<number | "">("");
   const [callDelayMs, setCallDelayMs] = useState<number | "">(GEMINI_DEFAULT_DELAY_MS);
 
-  const [progress, setProgress] = useState<VerificationProgress | null>(null);
+  const [progress, setProgress] = useState<VerificationProgress | TranslationProgress | null>(null);
   const [progressError, setProgressError] = useState(false);
   const fetchProgress = useCallback(
     () =>
-      api<{ connections?: VerificationProgress }>("/verification").then((r) => {
-        if (!r.connections) throw new Error("no progress in response");
-        return r.connections;
+      api<{ connections?: VerificationProgress; translations?: TranslationProgress }>(
+        "/verification"
+      ).then((r) => {
+        const slice = variant === "translations" ? r.translations : r.connections;
+        if (!slice) throw new Error("no progress in response");
+        return slice;
       }),
-    [api]
+    [api, variant]
   );
   useEffect(() => {
     let cancelled = false;
@@ -191,7 +263,7 @@ export function VerifyRunner({ onStarted }: { onStarted?: () => void }) {
       await api("/jobs", {
         method: "POST",
         json: {
-          jobId: "verify-connections",
+          jobId: JOB_IDS[variant],
           params: loop
             ? {
                 provider: "gemini",
@@ -217,19 +289,49 @@ export function VerifyRunner({ onStarted }: { onStarted?: () => void }) {
 
   return (
     <Panel>
-      <SectionHeading title="Re-verify existing connections" />
+      <SectionHeading
+        title={
+          variant === "translations"
+            ? "Re-check existing translations"
+            : "Re-verify existing connections"
+        }
+      />
       <p className="mt-1 text-xs text-text-muted">
-        Runs every active English connection that has not been verified yet through the verifier and
-        flags any it does not explicitly approve, in every language. Flagged connections are hidden
-        from users straight away and wait in the{" "}
+        {variant === "translations" ? (
+          <>
+            Runs every active Turkish, Russian and Azerbaijani connection that has not been checked
+            yet through the back-translation check (two LLM calls each: translate it back to
+            English, then compare with the English reason) and flags any whose meaning drifted.
+            Flagged translations are hidden, so users see the English reason instead, and wait in
+            the{" "}
+          </>
+        ) : (
+          <>
+            Runs every active English connection that has not been verified yet through the verifier
+            and flags any it does not explicitly approve, in every language. Flagged connections are
+            hidden from users straight away and wait in the{" "}
+          </>
+        )}
         <Link href="/admin/connections" className="underline">
           review queue
         </Link>{" "}
-        where a false positive can be restored. Resumable: a verified cell is never re-checked, and
-        a run that stops (budget, quota, Stop) continues where it left off the next time.
+        where a false positive can be restored. Resumable: a checked item is never re-checked, and a
+        run that stops (budget, quota, Stop) continues where it left off the next time.
       </p>
 
-      <ProgressBlock progress={progress} error={progressError} onRefresh={loadProgress} />
+      {variant === "translations" ? (
+        <TranslationProgressBlock
+          progress={progress as TranslationProgress | null}
+          error={progressError}
+          onRefresh={loadProgress}
+        />
+      ) : (
+        <ProgressBlock
+          progress={progress as VerificationProgress | null}
+          error={progressError}
+          onRefresh={loadProgress}
+        />
+      )}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label="Provider">

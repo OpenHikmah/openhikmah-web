@@ -435,6 +435,8 @@ async function translateCellReasons(
           reason: translated,
           locale,
           model,
+          // translateReason ran the back-translation meaning check on it.
+          translationCheckedAt: new Date(),
         })
         .onConflictDoNothing()
         .returning({ toRef: connections.toRef });

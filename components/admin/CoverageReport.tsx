@@ -211,6 +211,7 @@ export function CoverageReport() {
 
       <BackfillRunner onStarted={() => reload({ keepDataOnError: true })} />
       <VerifyRunner onStarted={() => reload({ keepDataOnError: true })} />
+      <VerifyRunner variant="translations" onStarted={() => reload({ keepDataOnError: true })} />
     </div>
   );
 }

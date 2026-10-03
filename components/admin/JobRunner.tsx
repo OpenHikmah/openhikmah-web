@@ -25,9 +25,13 @@ interface JobsResponse {
 const statusTone = (s: JobStatus["status"]) =>
   s === "running" ? "flagged" : s === "success" ? "active" : s === "failed" ? "retired" : "neutral";
 
-const STOPPABLE = new Set(["backfill-connections", "verify-connections"]);
+const STOPPABLE = new Set(["backfill-connections", "verify-connections", "verify-translations"]);
 // Jobs that take parameters, so they are started from their form on the Coverage page.
-const RUN_FROM_COVERAGE = new Set(["backfill-connections", "verify-connections"]);
+const RUN_FROM_COVERAGE = new Set([
+  "backfill-connections",
+  "verify-connections",
+  "verify-translations",
+]);
 
 export function JobRunner() {
   const api = useAdminFetch();
