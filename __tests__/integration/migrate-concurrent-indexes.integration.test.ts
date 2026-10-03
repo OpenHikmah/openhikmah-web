@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -40,6 +40,11 @@ async function markNewIndexInvalid() {
     WHERE indexrelid = 'connections_from_to_kind_locale_idx'::regclass
   `);
 }
+
+beforeEach(async () => {
+  // The unique (from_ref, to_ref, kind) index below fails on rows an earlier test file left behind.
+  await db.execute(sql`TRUNCATE connections RESTART IDENTITY CASCADE`);
+});
 
 afterEach(async () => {
   // Restore the final schema global-setup.ts established for other test files.
