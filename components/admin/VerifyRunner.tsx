@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Input, NativeSelect } from "@/components/ui";
 import { StateNote, ConfirmButton, Panel } from "@/components/admin/primitives";
@@ -202,27 +202,39 @@ export function VerifyRunner({
   }, [fetchProgress]);
 
   const [jobRunning, setJobRunning] = useState(false);
+  const [statusError, setStatusError] = useState(false);
+  const wasRunning = useRef(false);
   const refreshRunning = useCallback(
     () =>
       api<{ jobs: { id: string; status: string }[] }>("/jobs")
-        .then((r) =>
-          setJobRunning(r.jobs.some((j) => j.id === JOB_IDS[variant] && j.status === "running"))
-        )
-        .catch(() => setProgressError(true)),
-    [api, variant]
+        .then((r) => {
+          const running = r.jobs.some((j) => j.id === JOB_IDS[variant] && j.status === "running");
+          // The last tick's progress scan can finish before the job's final write.
+          if (wasRunning.current && !running) loadProgress();
+          wasRunning.current = running;
+          setJobRunning(running);
+          setStatusError(false);
+        })
+        .catch(() => setStatusError(true)),
+    [api, variant, loadProgress]
   );
   useEffect(() => {
     void refreshRunning();
   }, [refreshRunning]);
-  // Poll only while this job runs: the progress query scans every connection.
+  // Poll only while this job runs (the progress query scans every connection), and pause
+  // when the status check fails so a broken /jobs cannot keep hammering the database.
   useEffect(() => {
-    if (!jobRunning) return;
+    if (!jobRunning || statusError) return;
     const id = setInterval(() => {
       loadProgress();
       void refreshRunning();
     }, 4000);
     return () => clearInterval(id);
-  }, [jobRunning, loadProgress, refreshRunning]);
+  }, [jobRunning, statusError, loadProgress, refreshRunning]);
+  const refreshAll = useCallback(() => {
+    loadProgress();
+    void refreshRunning();
+  }, [loadProgress, refreshRunning]);
 
   const [loop, setLoop] = useState(false);
   const [geminiKeys, setGeminiKeys] = useState<string[] | null>(null);
@@ -308,6 +320,7 @@ export function VerifyRunner({
       setRunNote("Started. Watch progress on the Jobs page.");
       onStarted?.();
       loadProgress();
+      wasRunning.current = true;
       setJobRunning(true);
     } catch (e) {
       setRunError(e instanceof AdminApiError ? e.message : "Failed to start the verification job.");
@@ -348,17 +361,22 @@ export function VerifyRunner({
         run that stops (budget, quota, Stop) continues where it left off the next time.
       </p>
 
+      {statusError && (
+        <StateNote tone="error">
+          Could not check whether the job is running, so live updates are paused. Use Refresh.
+        </StateNote>
+      )}
       {variant === "translations" ? (
         <TranslationProgressBlock
           progress={progress as TranslationProgress | null}
           error={progressError}
-          onRefresh={loadProgress}
+          onRefresh={refreshAll}
         />
       ) : (
         <ProgressBlock
           progress={progress as VerificationProgress | null}
           error={progressError}
-          onRefresh={loadProgress}
+          onRefresh={refreshAll}
         />
       )}
 
