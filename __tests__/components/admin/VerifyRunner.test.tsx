@@ -1,4 +1,4 @@
-import { render, screen, act, fireEvent } from "@testing-library/react";
+import { render, screen, act, fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mockApi = vi.fn();
@@ -41,18 +41,26 @@ const TRANSLATIONS = {
   },
 };
 
-function mockApiImpl(keys: string[] = ["GEMINI_API1", "GEMINI_API2"], jobError?: Error) {
-  return (path: string) => {
+function mockApiImpl(
+  keys: string[] = ["GEMINI_API1", "GEMINI_API2"],
+  jobError?: Error,
+  runningJobId?: string
+) {
+  return (path: string, opts?: { method?: string }) => {
     if (path === "/verification")
       return Promise.resolve({ connections: PROGRESS, translations: TRANSLATIONS });
     if (path === "/gemini-keys") return Promise.resolve({ keys });
+    if (path === "/jobs" && !opts)
+      return Promise.resolve({
+        jobs: runningJobId ? [{ id: runningJobId, status: "running" }] : [],
+      });
     return jobError ? Promise.reject(jobError) : Promise.resolve({ runId: 1 });
   };
 }
 
-/** POST calls to /jobs only (excludes the /gemini-keys mount fetch). */
+/** POST calls to /jobs only (excludes the /gemini-keys and job-status fetches). */
 function jobPosts() {
-  return mockApi.mock.calls.filter((c) => c[0] === "/jobs");
+  return mockApi.mock.calls.filter((c) => c[0] === "/jobs" && c[1]?.method === "POST");
 }
 
 describe("VerifyRunner", () => {
@@ -274,6 +282,23 @@ describe("VerifyRunner progress", () => {
     render(<VerifyRunner />);
     expect(await screen.findByText(/Could not load the progress/)).toBeInTheDocument();
   });
+
+  it("keeps refreshing the progress on its own while the job is running", async () => {
+    mockApi.mockImplementation(mockApiImpl(undefined, undefined, "verify-connections"));
+    render(<VerifyRunner />);
+    await screen.findByText(/20\.4% of connections verified/);
+    const count = () => mockApi.mock.calls.filter((c) => c[0] === "/verification").length;
+    const before = count();
+    await waitFor(() => expect(count()).toBeGreaterThan(before), { timeout: 6000 });
+  }, 10000);
+
+  it("does not poll while the job is idle", async () => {
+    render(<VerifyRunner />);
+    await screen.findByText(/20\.4% of connections verified/);
+    const before = mockApi.mock.calls.length;
+    await new Promise((r) => setTimeout(r, 4500));
+    expect(mockApi.mock.calls.length).toBe(before);
+  }, 10000);
 
   it("reloads the progress after a run is started", async () => {
     render(<VerifyRunner />);
