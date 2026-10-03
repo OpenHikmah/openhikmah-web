@@ -146,7 +146,7 @@ describe("useCanvasPersistence flush-on-unload", () => {
     window.history.pushState({}, "", "/canvas");
   });
 
-  it("does not restore (or throw on) a fetched share that has no edges array", async () => {
+  it("restores nodes only from a fetched share that has no edges array", async () => {
     window.history.pushState({}, "", "/canvas?share=12345678-1234-1234-1234-123456789abc");
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
@@ -158,8 +158,9 @@ describe("useCanvasPersistence flush-on-unload", () => {
       await vi.advanceTimersByTimeAsync(0);
     });
 
-    expect(useCanvasStore.getState().nodes).toEqual([]);
-    expect(window.location.search).toContain("share=");
+    expect(useCanvasStore.getState().nodes).toHaveLength(1);
+    expect(useCanvasStore.getState().edges).toEqual([]);
+    expect(window.location.search).not.toContain("share=");
 
     fetchSpy.mockRestore();
     window.history.pushState({}, "", "/canvas");
