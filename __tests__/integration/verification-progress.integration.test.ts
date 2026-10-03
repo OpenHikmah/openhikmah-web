@@ -91,6 +91,10 @@ describe("toProgress", () => {
     expect(toProgress(0, 0)).toEqual({ total: 0, done: 0, remaining: 0, percent: 100 });
     expect(toProgress(3, 3).percent).toBe(100);
   });
+
+  it("never reads 100% while anything remains", () => {
+    expect(toProgress(10000, 9996).percent).toBe(99.9);
+  });
 });
 
 describe("getVerificationProgress (integration, real Postgres)", () => {
@@ -121,6 +125,7 @@ describe("getVerificationProgress (integration, real Postgres)", () => {
     expect(p.connections).toEqual(toProgress(6, 2));
     // Neither verse is fully verified: 1:1 still has an unverified root cell.
     expect(p.verses).toEqual(toProgress(2, 0));
+    expect(p.hidden).toBe(2);
   });
 
   it("counts a verse as verified only once every one of its cells is", async () => {

@@ -323,7 +323,12 @@ describe("getTranslationProgress (integration, real Postgres)", () => {
   it("is complete when there are no translations", async () => {
     const p = await getTranslationProgress();
     expect(p.rows).toEqual({ total: 0, done: 0, remaining: 0, percent: 100 });
-    expect(p.byLocale).toEqual({});
+    expect(p.byLocale).toEqual({
+      tr: { total: 0, done: 0, remaining: 0, percent: 100 },
+      ru: { total: 0, done: 0, remaining: 0, percent: 100 },
+      az: { total: 0, done: 0, remaining: 0, percent: 100 },
+    });
+    expect(p.hidden).toBe(0);
   });
 
   it("counts active translated rows overall and per locale, ignoring English and flagged rows", async () => {
@@ -343,5 +348,6 @@ describe("getTranslationProgress (integration, real Postgres)", () => {
     expect(p.rows).toEqual({ total: 2, done: 1, remaining: 1, percent: 50 });
     expect(p.byLocale.tr).toEqual({ total: 1, done: 1, remaining: 0, percent: 100 });
     expect(p.byLocale.ru).toEqual({ total: 1, done: 0, remaining: 1, percent: 0 });
+    expect(p.hidden).toBe(1);
   });
 });

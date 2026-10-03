@@ -66,7 +66,7 @@ function TranslationProgressBlock({
           </p>
           <p className="mt-1 text-text-muted">
             Translations the check flags are hidden (users see the English) and drop out of these
-            totals.
+            totals. Hidden so far: {nf.format(progress.hidden)}.
           </p>
         </>
       ) : (
@@ -118,8 +118,13 @@ function ProgressBlock({
             {nf.format(progress.verses.total)} ({progress.verses.percent}%),{" "}
             {nf.format(progress.verses.remaining)} remaining
           </p>
+          <p className="mt-1 tabular-nums text-text-muted">
+            Verifier calls (verse + kind): {nf.format(progress.cells.done)} of{" "}
+            {nf.format(progress.cells.total)} done, {nf.format(progress.cells.remaining)} remaining
+          </p>
           <p className="mt-1 text-text-muted">
-            Connections the verifier flags are hidden and drop out of these totals.
+            Connections the verifier flags are hidden and drop out of these totals. Hidden so far:{" "}
+            {nf.format(progress.hidden)}.
           </p>
         </>
       ) : (
@@ -195,6 +200,29 @@ export function VerifyRunner({
       })
       .catch(() => setProgressError(true));
   }, [fetchProgress]);
+
+  const [jobRunning, setJobRunning] = useState(false);
+  const refreshRunning = useCallback(
+    () =>
+      api<{ jobs: { id: string; status: string }[] }>("/jobs")
+        .then((r) =>
+          setJobRunning(r.jobs.some((j) => j.id === JOB_IDS[variant] && j.status === "running"))
+        )
+        .catch(() => setProgressError(true)),
+    [api, variant]
+  );
+  useEffect(() => {
+    void refreshRunning();
+  }, [refreshRunning]);
+  // Poll only while this job runs: the progress query scans every connection.
+  useEffect(() => {
+    if (!jobRunning) return;
+    const id = setInterval(() => {
+      loadProgress();
+      void refreshRunning();
+    }, 4000);
+    return () => clearInterval(id);
+  }, [jobRunning, loadProgress, refreshRunning]);
 
   const [loop, setLoop] = useState(false);
   const [geminiKeys, setGeminiKeys] = useState<string[] | null>(null);
@@ -280,6 +308,7 @@ export function VerifyRunner({
       setRunNote("Started. Watch progress on the Jobs page.");
       onStarted?.();
       loadProgress();
+      setJobRunning(true);
     } catch (e) {
       setRunError(e instanceof AdminApiError ? e.message : "Failed to start the verification job.");
     } finally {

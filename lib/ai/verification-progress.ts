@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
+import { LOCALES } from "@/lib/i18n/config";
 
 /** One measure of the re-verification backlog. */
 export interface Progress {
@@ -17,6 +18,8 @@ export interface VerificationProgress {
   cells: Progress;
   /** Active English connections. */
   connections: Progress;
+  /** English connections no longer served (flagged or retired); they are not in the totals above. */
+  hidden: number;
 }
 
 export function toProgress(total: number, done: number): Progress {
@@ -24,8 +27,14 @@ export function toProgress(total: number, done: number): Progress {
     total,
     done,
     remaining: Math.max(total - done, 0),
-    percent: total === 0 ? 100 : Math.round((done / total) * 1000) / 10,
+    percent: total === 0 ? 100 : percentOf(done, total),
   };
+}
+
+/** One decimal, but never 100 while anything is left (99.96% must not read as finished). */
+function percentOf(done: number, total: number): number {
+  const p = Math.round((done / total) * 1000) / 10;
+  return p >= 100 && done < total ? 99.9 : p;
 }
 
 interface Row extends Record<string, unknown> {
@@ -35,6 +44,7 @@ interface Row extends Record<string, unknown> {
   conns_verified: number;
   verses_total: number;
   verses_verified: number;
+  hidden: number;
 }
 
 /**
@@ -61,7 +71,8 @@ export async function getVerificationProgress(): Promise<VerificationProgress> {
       count(DISTINCT from_ref)::int AS verses_total,
       (count(DISTINCT from_ref) FILTER (
         WHERE from_ref NOT IN (SELECT from_ref FROM cells WHERE NOT verified)
-      ))::int AS verses_verified
+      ))::int AS verses_verified,
+      (SELECT count(*) FROM connections WHERE locale = 'en' AND status <> 'active')::int AS hidden
     FROM cells
   `);
   const r = rows[0];
@@ -69,6 +80,7 @@ export async function getVerificationProgress(): Promise<VerificationProgress> {
     verses: toProgress(r.verses_total, r.verses_verified),
     cells: toProgress(r.cells_total, r.cells_verified),
     connections: toProgress(r.conns_total, r.conns_verified),
+    hidden: r.hidden,
   };
 }
 
@@ -88,12 +100,15 @@ export interface TranslationProgress {
   rows: Progress;
   /** The same, per locale (tr, ru, az). */
   byLocale: Record<string, Progress>;
+  /** Translated rows no longer served (flagged or retired); they are not in the totals above. */
+  hidden: number;
 }
 
 interface LocaleRow extends Record<string, unknown> {
   locale: string;
   total: number;
   done: number;
+  hidden: number;
 }
 
 /**
@@ -104,22 +119,26 @@ interface LocaleRow extends Record<string, unknown> {
 export async function getTranslationProgress(): Promise<TranslationProgress> {
   const rows = await db.execute<LocaleRow>(sql`
     SELECT locale,
-           count(*)::int AS total,
-           (count(*) FILTER (WHERE translation_checked_at IS NOT NULL))::int AS done
+           (count(*) FILTER (WHERE status = 'active'))::int AS total,
+           (count(*) FILTER (WHERE status = 'active' AND translation_checked_at IS NOT NULL))::int AS done,
+           (count(*) FILTER (WHERE status <> 'active'))::int AS hidden
     FROM connections
-    WHERE locale <> 'en' AND status = 'active'
+    WHERE locale <> 'en'
     GROUP BY locale
-    ORDER BY locale
   `);
+  const byRow = new Map(rows.map((r) => [r.locale, r]));
   const byLocale: Record<string, Progress> = {};
   let total = 0;
   let done = 0;
-  for (const r of rows) {
-    byLocale[r.locale] = toProgress(r.total, r.done);
+  let hidden = 0;
+  for (const locale of LOCALES.filter((l) => l !== "en")) {
+    const r = byRow.get(locale) ?? { total: 0, done: 0, hidden: 0 };
+    byLocale[locale] = toProgress(r.total, r.done);
     total += r.total;
     done += r.done;
+    hidden += r.hidden;
   }
-  return { rows: toProgress(total, done), byLocale };
+  return { rows: toProgress(total, done), byLocale, hidden };
 }
 
 /** One log line, e.g. "412/1,800 translations (22.9%) | tr 150/600 ru 140/600 az 122/600 | 1,388 remaining". */
