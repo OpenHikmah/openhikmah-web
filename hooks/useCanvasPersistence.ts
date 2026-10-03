@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import { useCanvasStore, serializeCanvas, type SavedCanvas } from "@/store/canvas";
+import { parseSavedCanvas } from "@/lib/canvas/saved-canvas";
 import { toSharePayload } from "@/lib/canvas/share-payload";
 
 /** localStorage key for the in-progress canvas. Exported so the home screen can
@@ -43,10 +44,10 @@ export async function mergeGuestWorkspace(accessToken: string): Promise<void> {
     if (localStorage.getItem(MERGE_FLAG_KEY)) return;
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return;
-    const saved: SavedCanvas = JSON.parse(raw);
-    if (saved?.v !== 1 || !saved.nodes || saved.nodes.length === 0) return;
+    const parsed = parseSavedCanvas(JSON.parse(raw));
+    if (!parsed) return;
 
-    const count = saved.nodes.length;
+    const count = parsed.nodes.length;
     const date = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
     const name = `${count} verse${count === 1 ? "" : "s"} — ${date}`;
 
@@ -56,7 +57,7 @@ export async function mergeGuestWorkspace(accessToken: string): Promise<void> {
         "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ name, data: saved, nodeCount: count }),
+      body: JSON.stringify({ name, data: parsed, nodeCount: count }),
     });
 
     if (res.ok) {
@@ -93,14 +94,9 @@ export function useCanvasPersistence() {
     try {
       const raw = localStorage.getItem(LS_KEY);
       if (raw) {
-        const saved: SavedCanvas = JSON.parse(raw);
-        if (
-          saved?.v === 1 &&
-          Array.isArray(saved.nodes) &&
-          saved.nodes.length > 0 &&
-          Array.isArray(saved.edges)
-        ) {
-          restoreCanvas(saved);
+        const parsed = parseSavedCanvas(JSON.parse(raw));
+        if (parsed) {
+          restoreCanvas(parsed);
         }
       }
     } catch {
@@ -119,14 +115,10 @@ export function useCanvasPersistence() {
     if (shareId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(shareId)) {
       fetch(`/api/share/${shareId}`)
         .then((r) => (r.ok ? r.json() : null))
-        .then((saved: SavedCanvas | null) => {
-          if (
-            saved?.v === 1 &&
-            Array.isArray(saved.nodes) &&
-            saved.nodes.length > 0 &&
-            Array.isArray(saved.edges)
-          ) {
-            restoreCanvas(saved);
+        .then((saved: unknown) => {
+          const parsed = parseSavedCanvas(saved);
+          if (parsed) {
+            restoreCanvas(parsed);
             // Only clean the URL once we've successfully restored — preserves the
             // share link for retry if the fetch fails or returns invalid data.
             const cleanUrl = new URL(window.location.href);

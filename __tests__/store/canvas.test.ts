@@ -700,3 +700,68 @@ describe("appendWorkspace", () => {
     expect(incomingEdge.id).toBe(`edge-${incomingEdge.source}-${incomingEdge.target}`);
   });
 });
+
+describe("untrusted restore payloads (issue #692)", () => {
+  beforeEach(() => {
+    useCanvasStore.getState().reset();
+  });
+
+  it("restoreCanvas restores nodes only when edges are missing", () => {
+    const store = useCanvasStore.getState();
+    store.restoreCanvas({
+      v: 1,
+      nodes: [{ id: "node-1", x: 0, y: 0, verse: baseVerse }],
+    });
+
+    const s = useCanvasStore.getState();
+    expect(s.nodes).toHaveLength(1);
+    expect(s.edges).toHaveLength(0);
+  });
+
+  it("restoreCanvas drops duplicate and dangling edges", () => {
+    const store = useCanvasStore.getState();
+    store.restoreCanvas({
+      v: 1,
+      nodes: [
+        { id: "node-1", x: 0, y: 0, verse: baseVerse },
+        { id: "node-2", x: 300, y: 0, verse: { ...baseVerse, ref: "1:1", surah: 1, ayah: 1 } },
+      ],
+      edges: [
+        { id: "e1", source: "node-1", target: "node-2", kind: "thematic", label: "", reason: "" },
+        { id: "e2", source: "node-2", target: "node-1", kind: "root", label: "", reason: "" },
+        { id: "e3", source: "node-1", target: "missing", kind: "thematic", label: "", reason: "" },
+      ],
+    });
+
+    expect(useCanvasStore.getState().edges).toHaveLength(1);
+    expect(useCanvasStore.getState().edges[0].id).toBe("e1");
+  });
+
+  it("restoreCanvas ignores a payload with a non-finite position", () => {
+    const store = useCanvasStore.getState();
+    store.restoreCanvas({
+      v: 1,
+      nodes: [{ id: "node-1", x: NaN, y: 0, verse: baseVerse }],
+      edges: [],
+    });
+
+    expect(useCanvasStore.getState().nodes).toHaveLength(0);
+  });
+
+  it("appendWorkspace dedupes edges within the incoming set", () => {
+    const store = useCanvasStore.getState();
+    store.appendWorkspace({
+      v: 1,
+      nodes: [
+        { id: "node-1", x: 0, y: 0, verse: baseVerse },
+        { id: "node-2", x: 300, y: 0, verse: { ...baseVerse, ref: "1:1", surah: 1, ayah: 1 } },
+      ],
+      edges: [
+        { id: "e1", source: "node-1", target: "node-2", kind: "thematic", label: "", reason: "" },
+        { id: "e2", source: "node-2", target: "node-1", kind: "root", label: "", reason: "" },
+      ],
+    });
+
+    expect(useCanvasStore.getState().edges).toHaveLength(1);
+  });
+});

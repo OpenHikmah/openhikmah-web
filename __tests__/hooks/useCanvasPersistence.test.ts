@@ -1,7 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mergeGuestWorkspace, CANVAS_STORAGE_KEY } from "@/hooks/useCanvasPersistence";
+import type { Verse } from "@/types/quran";
 
 const MERGE_FLAG_KEY = "open-hikmah-guest-merged";
+
+const baseVerse: Verse = {
+  surah: 2,
+  ayah: 255,
+  ref: "2:255",
+  arabicText: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ",
+  translation: "Allah — there is no deity except Him.",
+  surahName: "Al-Baqarah",
+  surahNameArabic: "البقرة",
+};
+
+const savedNode = (id: string) => ({ id, x: 0, y: 0, verse: baseVerse });
 
 function setCanvas(data: unknown) {
   localStorage.setItem(CANVAS_STORAGE_KEY, JSON.stringify(data));
@@ -15,7 +28,7 @@ describe("mergeGuestWorkspace", () => {
 
   it("skips when merge flag already exists", async () => {
     localStorage.setItem(MERGE_FLAG_KEY, "1");
-    setCanvas({ v: 1, nodes: [{ id: "1" }] });
+    setCanvas({ v: 1, nodes: [savedNode("1")], edges: [] });
 
     const spy = vi.spyOn(globalThis, "fetch");
 
@@ -42,7 +55,7 @@ describe("mergeGuestWorkspace", () => {
   });
 
   it("skips when canvas version is not 1", async () => {
-    setCanvas({ v: 2, nodes: [{ id: "1" }] });
+    setCanvas({ v: 2, nodes: [savedNode("1")], edges: [] });
     const spy = vi.spyOn(globalThis, "fetch");
 
     await mergeGuestWorkspace("tok_abc");
@@ -60,7 +73,7 @@ describe("mergeGuestWorkspace", () => {
   });
 
   it("posts to /api/workspace and sets merge flag on success", async () => {
-    setCanvas({ v: 1, nodes: [{ id: "1" }, { id: "2" }] });
+    setCanvas({ v: 1, nodes: [savedNode("1"), savedNode("2")], edges: [] });
 
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
@@ -87,7 +100,7 @@ describe("mergeGuestWorkspace", () => {
   });
 
   it("does not set merge flag when response is not ok", async () => {
-    setCanvas({ v: 1, nodes: [{ id: "1" }] });
+    setCanvas({ v: 1, nodes: [savedNode("1")], edges: [] });
 
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: false,
@@ -100,7 +113,7 @@ describe("mergeGuestWorkspace", () => {
   });
 
   it("does not throw when fetch fails", async () => {
-    setCanvas({ v: 1, nodes: [{ id: "1" }] });
+    setCanvas({ v: 1, nodes: [savedNode("1")], edges: [] });
 
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network"));
 
@@ -108,7 +121,7 @@ describe("mergeGuestWorkspace", () => {
   });
 
   it("sends singular name for single node", async () => {
-    setCanvas({ v: 1, nodes: [{ id: "1" }] });
+    setCanvas({ v: 1, nodes: [savedNode("1")], edges: [] });
 
     vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true } as Response);
 
