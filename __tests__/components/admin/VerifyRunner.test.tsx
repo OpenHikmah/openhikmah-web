@@ -30,6 +30,7 @@ const PROGRESS = {
   verses: { total: 6236, done: 1204, remaining: 5032, percent: 19.3 },
   cells: { total: 18000, done: 3600, remaining: 14400, percent: 20 },
   connections: { total: 18708, done: 3812, remaining: 14896, percent: 20.4 },
+  hidden: 1234,
 };
 
 const TRANSLATIONS = {
@@ -39,6 +40,7 @@ const TRANSLATIONS = {
     ru: { total: 600, done: 140, remaining: 460, percent: 23.3 },
     tr: { total: 600, done: 150, remaining: 450, percent: 25 },
   },
+  hidden: 56,
 };
 
 function mockApiImpl(
@@ -263,6 +265,83 @@ describe("VerifyRunner progress", () => {
     const bar = screen.getByRole("progressbar", { name: "Connections verified" });
     expect(bar).toHaveAttribute("value", "3812");
     expect(bar).toHaveAttribute("max", "18708");
+    expect(
+      screen.getByText(/Verifier calls \(verse \+ kind\): 3,600 of 18,000 done, 14,400 remaining/)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Hidden so far: 1,234\./)).toBeInTheDocument();
+  });
+
+  it("says so, and pauses live updates, when the job status cannot be checked", async () => {
+    mockApi.mockImplementation((path: string) =>
+      path === "/jobs" ? Promise.reject(new Error("401")) : mockApiImpl()(path)
+    );
+    render(<VerifyRunner />);
+    expect(
+      await screen.findByText(/Could not check whether the job is running/)
+    ).toBeInTheDocument();
+    expect(await screen.findByText(/20\.4% of connections verified/)).toBeInTheDocument();
+  });
+
+  it("fetches the progress once more when the job finishes", async () => {
+    let jobsCalls = 0;
+    mockApi.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === "/jobs" && !opts) {
+        jobsCalls += 1;
+        return Promise.resolve({
+          jobs: jobsCalls === 1 ? [{ id: "verify-connections", status: "running" }] : [],
+        });
+      }
+      return mockApiImpl()(path, opts);
+    });
+    render(<VerifyRunner />);
+    await screen.findByText(/20\.4% of connections verified/);
+    const count = () => mockApi.mock.calls.filter((c) => c[0] === "/verification").length;
+    const before = count();
+    // One scan from the tick itself, one more after /jobs reports the job is done.
+    await waitFor(() => expect(count()).toBeGreaterThanOrEqual(before + 2), { timeout: 6000 });
+  }, 10000);
+
+  it("keeps the newest progress when an older scan resolves last", async () => {
+    let resolveFirst: (v: unknown) => void = () => {};
+    let verificationCalls = 0;
+    mockApi.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === "/verification") {
+        verificationCalls += 1;
+        if (verificationCalls === 1) return new Promise((r) => (resolveFirst = r));
+      }
+      return mockApiImpl()(path, opts);
+    });
+    render(<VerifyRunner />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    });
+    await screen.findByText(/20\.4% of connections verified/);
+    await act(async () => {
+      resolveFirst({
+        connections: { total: 18708, done: 100, remaining: 18608, percent: 0.5 },
+      });
+    });
+    expect(screen.getByText(/20\.4% of connections verified/)).toBeInTheDocument();
+    expect(screen.queryByText(/0\.5% of connections verified/)).not.toBeInTheDocument();
+  });
+
+  it("resumes status checks after a successful start when /jobs failed earlier", async () => {
+    let failJobs = true;
+    mockApi.mockImplementation((path: string, opts?: { method?: string }) =>
+      path === "/jobs" && !opts && failJobs
+        ? Promise.reject(new Error("401"))
+        : mockApiImpl()(path, opts)
+    );
+    render(<VerifyRunner />);
+    await screen.findByText(/Could not check whether the job is running/);
+    failJobs = false;
+    fillBudgets("40", "1.5");
+    await clickRun("Verify on gemini?");
+    await waitFor(() =>
+      expect(
+        screen.queryByText(/Could not check whether the job is running/)
+      ).not.toBeInTheDocument()
+    );
   });
 
   it("refreshes on demand", async () => {
@@ -331,6 +410,7 @@ describe("VerifyRunner translations variant", () => {
     const bar = screen.getByRole("progressbar", { name: "Translations checked" });
     expect(bar).toHaveAttribute("value", "412");
     expect(bar).toHaveAttribute("max", "1800");
+    expect(screen.getByText(/Hidden so far: 56\./)).toBeInTheDocument();
   });
 
   it("starts the verify-translations job with the entered params", async () => {
