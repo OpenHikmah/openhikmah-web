@@ -5,6 +5,7 @@ import type { Verse, CanvasEdge, SidebarContent, PendingExpand, EdgeKind } from 
 import type { Node, Edge, NodeChange, EdgeChange } from "@xyflow/react";
 import { applyNodeChanges, applyEdgeChanges } from "@xyflow/react";
 import { findFreeSlot, NODE_HEIGHT, NODE_GAP } from "@/lib/canvas/canvas-layout";
+import { parseSavedCanvas } from "@/lib/canvas/saved-canvas";
 
 // ─── Persistence helpers ───────────────────────────────────────────────────────
 
@@ -129,8 +130,8 @@ interface CanvasStore {
   getExpansionRefs: (nodeId: string, kind: EdgeKind) => string[];
   getExpansionCounts: (nodeId: string) => Partial<Record<EdgeKind, number>>;
   reset: () => void;
-  restoreCanvas: (saved: SavedCanvas) => void;
-  appendWorkspace: (saved: SavedCanvas) => void;
+  restoreCanvas: (saved: unknown) => void;
+  appendWorkspace: (saved: unknown) => void;
 }
 
 let nodeIdCounter = 0;
@@ -339,8 +340,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       expansionCountsByNode: {},
     }),
 
-  restoreCanvas: (saved: SavedCanvas) => {
-    const { nodes, edges } = deserializeCanvas(saved);
+  restoreCanvas: (saved: unknown) => {
+    const parsed = parseSavedCanvas(saved);
+    if (!parsed) return;
+    const { nodes, edges } = deserializeCanvas(parsed);
     const maxNum = nodes.reduce((max, n) => {
       const m = n.id.match(/^node-(\d+)$/);
       return m ? Math.max(max, parseInt(m[1], 10)) : max;
@@ -363,8 +366,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     }));
   },
 
-  appendWorkspace: (saved: SavedCanvas) => {
-    const { nodes: incoming, edges: incomingEdges } = deserializeCanvas(saved);
+  appendWorkspace: (saved: unknown) => {
+    const parsed = parseSavedCanvas(saved);
+    if (!parsed) return;
+    const { nodes: incoming, edges: incomingEdges } = deserializeCanvas(parsed);
 
     const maxNum = incoming.reduce((max, n) => {
       const m = n.id.match(/^node-(\d+)$/);

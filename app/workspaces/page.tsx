@@ -6,7 +6,8 @@ import Link from "next/link";
 import { FolderOpen, Loader2, Trash2, Upload, Network, TriangleAlert } from "lucide-react";
 import { useTranslations, useFormatter } from "next-intl";
 import { useAuthStore } from "@/store/auth";
-import { useCanvasStore, type SavedCanvas } from "@/store/canvas";
+import { useCanvasStore } from "@/store/canvas";
+import { parseSavedCanvas } from "@/lib/canvas/saved-canvas";
 import { Card, IconButton, Tooltip } from "@/components/ui";
 import { AuthShell } from "@/components/layout/AuthShell";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
@@ -132,9 +133,9 @@ export default function WorkspacesPage() {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (!res.ok) return;
-      const saved: SavedCanvas = await res.json();
-      if (saved?.v === 1) {
-        appendWorkspace(saved);
+      const parsed = parseSavedCanvas(await res.json());
+      if (parsed) {
+        appendWorkspace(parsed);
         router.push("/canvas");
       }
     } finally {
