@@ -301,6 +301,49 @@ describe("VerifyRunner progress", () => {
     await waitFor(() => expect(count()).toBeGreaterThanOrEqual(before + 2), { timeout: 6000 });
   }, 10000);
 
+  it("keeps the newest progress when an older scan resolves last", async () => {
+    let resolveFirst: (v: unknown) => void = () => {};
+    let verificationCalls = 0;
+    mockApi.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === "/verification") {
+        verificationCalls += 1;
+        if (verificationCalls === 1) return new Promise((r) => (resolveFirst = r));
+      }
+      return mockApiImpl()(path, opts);
+    });
+    render(<VerifyRunner />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    });
+    await screen.findByText(/20\.4% of connections verified/);
+    await act(async () => {
+      resolveFirst({
+        connections: { total: 18708, done: 100, remaining: 18608, percent: 0.5 },
+      });
+    });
+    expect(screen.getByText(/20\.4% of connections verified/)).toBeInTheDocument();
+    expect(screen.queryByText(/0\.5% of connections verified/)).not.toBeInTheDocument();
+  });
+
+  it("resumes status checks after a successful start when /jobs failed earlier", async () => {
+    let failJobs = true;
+    mockApi.mockImplementation((path: string, opts?: { method?: string }) =>
+      path === "/jobs" && !opts && failJobs
+        ? Promise.reject(new Error("401"))
+        : mockApiImpl()(path, opts)
+    );
+    render(<VerifyRunner />);
+    await screen.findByText(/Could not check whether the job is running/);
+    failJobs = false;
+    fillBudgets("40", "1.5");
+    await clickRun("Verify on gemini?");
+    await waitFor(() =>
+      expect(
+        screen.queryByText(/Could not check whether the job is running/)
+      ).not.toBeInTheDocument()
+    );
+  });
+
   it("refreshes on demand", async () => {
     render(<VerifyRunner />);
     await screen.findByText(/20\.4% of connections verified/);

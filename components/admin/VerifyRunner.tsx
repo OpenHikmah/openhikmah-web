@@ -177,29 +177,28 @@ export function VerifyRunner({
       }),
     [api, variant]
   );
-  useEffect(() => {
-    let cancelled = false;
+  // Scans overlap (poll tick + the final refresh); only the latest response may land.
+  const progressSeq = useRef(0);
+  const loadProgress = useCallback(() => {
+    const seq = ++progressSeq.current;
     fetchProgress()
       .then((p) => {
-        if (cancelled) return;
+        if (seq !== progressSeq.current) return;
         setProgress(p);
         setProgressError(false);
       })
       .catch(() => {
-        if (!cancelled) setProgressError(true);
+        if (seq === progressSeq.current) setProgressError(true);
       });
+  }, [fetchProgress]);
+  useEffect(() => {
+    loadProgress();
     return () => {
-      cancelled = true;
+      // Not a DOM ref: the latest counter value is what invalidates in-flight scans.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      progressSeq.current++;
     };
-  }, [fetchProgress]);
-  const loadProgress = useCallback(() => {
-    fetchProgress()
-      .then((p) => {
-        setProgress(p);
-        setProgressError(false);
-      })
-      .catch(() => setProgressError(true));
-  }, [fetchProgress]);
+  }, [loadProgress]);
 
   const [jobRunning, setJobRunning] = useState(false);
   const [statusError, setStatusError] = useState(false);
@@ -322,6 +321,8 @@ export function VerifyRunner({
       loadProgress();
       wasRunning.current = true;
       setJobRunning(true);
+      // A failed status check pauses polling; a successful start must retry it.
+      if (statusError) void refreshRunning();
     } catch (e) {
       setRunError(e instanceof AdminApiError ? e.message : "Failed to start the verification job.");
     } finally {
