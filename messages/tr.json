@@ -276,6 +276,15 @@
     "title": "Devam etmek için giriş yapın",
     "body": "Bu sayfayı görüntülemek için giriş yapmanız gerekiyor."
   },
+  "callback": {
+    "signInFailed": "Giriş başarısız oldu",
+    "backToHome": "Ana sayfaya dön",
+    "sessionExpired": "Oturum süresi doldu — lütfen tekrar giriş yapmayı deneyin.",
+    "stateMismatch": "Durum uyuşmazlığı — olası CSRF girişimi. Lütfen tekrar deneyin.",
+    "noAuthorizationCode": "Yetkilendirme kodu alınamadı.",
+    "providerError": "Giriş sağlayıcısı bir hata döndürdü: {error}",
+    "unexpectedError": "Giriş sırasında bir sorun oluştu. Lütfen tekrar deneyin."
+  },
   "social": {
     "page": {
       "pageTitle": "Sosyal",
