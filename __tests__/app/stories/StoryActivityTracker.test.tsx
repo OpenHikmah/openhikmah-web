@@ -35,7 +35,7 @@ describe("StoryActivityTracker", () => {
     const [url, init] = mockFetch.mock.calls[0];
     expect(url).toBe("/api/social/activity");
     expect(init.method).toBe("POST");
-    expect(init.headers.Authorization).toBe("Bearer test-token");
+    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer test-token");
     expect(JSON.parse(init.body)).toMatchObject({ type: "hadith_read" });
   });
 

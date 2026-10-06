@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/store/auth";
 import { Loader2, UserPlus, Check, Clock } from "lucide-react";
 import { Input, Card } from "@/components/ui";
+import { authFetch } from "@/lib/auth/auth-fetch";
 
 interface Props {
   onAdded: () => void;
@@ -39,8 +40,7 @@ export function AddFriendForm({ onAdded }: Props) {
     const timer = setTimeout(() => {
       setSearching(true);
       setResults([]);
-      fetch(`/api/social/users?q=${encodeURIComponent(q)}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      authFetch(`/api/social/users?q=${encodeURIComponent(q)}`, {
         signal: ctrl.signal,
       })
         .then((r) => (r.ok ? r.json() : []))
@@ -59,9 +59,9 @@ export function AddFriendForm({ onAdded }: Props) {
     setSendingId(user.id);
     setError(null);
     try {
-      const res = await fetch("/api/social/friends", {
+      const res = await authFetch("/api/social/friends", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: user.username }),
       });
       const data = await res.json().catch(() => ({}));

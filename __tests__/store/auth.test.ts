@@ -430,4 +430,55 @@ describe("auth store", () => {
     expect(s.bookmarks).toEqual(["2:255", "18:10"]);
     expect(s.pendingBookmarkAdds).toEqual(["2:255", "18:10"]);
   });
+
+  describe("expired access token", () => {
+    function expiredTokenServer() {
+      mockFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+        if (url === "/api/auth/refresh") {
+          return new Response(JSON.stringify({ accessToken: "fresh" }), { status: 200 });
+        }
+        const auth = new Headers(init?.headers).get("Authorization");
+        return auth === "Bearer fresh"
+          ? new Response(JSON.stringify({ refs: [] }), { status: 200 })
+          : new Response("{}", { status: 401 });
+      });
+    }
+
+    it("toggleBookmark refreshes the token and keeps the bookmark instead of rolling back", async () => {
+      expiredTokenServer();
+      useAuthStore.setState({ accessToken: "stale" });
+
+      useAuthStore.getState().toggleBookmark("2:255");
+
+      await vi.waitFor(() => expect(useAuthStore.getState().bookmarkBusy["2:255"]).toBeUndefined());
+      expect(useAuthStore.getState().bookmarks).toEqual(["2:255"]);
+      expect(useAuthStore.getState().pendingBookmarkAdds).toEqual([]);
+      expect(useAuthStore.getState().accessToken).toBe("fresh");
+    });
+
+    it("loadRemoteBookmarks refreshes the token instead of flagging a load error", async () => {
+      expiredTokenServer();
+      useAuthStore.setState({ accessToken: "stale" });
+
+      await useAuthStore.getState().loadRemoteBookmarks();
+
+      expect(useAuthStore.getState().bookmarksLoadError).toBe(false);
+      expect(useAuthStore.getState().accessToken).toBe("fresh");
+    });
+
+    it("signs the user out (token cleared) when the session is gone", async () => {
+      mockFetch.mockImplementation(async (url: string) =>
+        url === "/api/auth/refresh"
+          ? new Response("{}", { status: 401 })
+          : new Response("{}", { status: 401 })
+      );
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      useAuthStore.setState({ accessToken: "stale", bookmarks: ["2:255"] });
+
+      useAuthStore.getState().toggleBookmark("2:255");
+
+      await vi.waitFor(() => expect(useAuthStore.getState().accessToken).toBeNull());
+      expect(useAuthStore.getState().bookmarks).toEqual([]);
+    });
+  });
 });

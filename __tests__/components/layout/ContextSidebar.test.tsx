@@ -57,6 +57,87 @@ describe("ContextSidebar — notes textarea accessibility", () => {
   });
 });
 
+describe("ContextSidebar — notes load", () => {
+  const mockFetch = vi.fn();
+  const previousAuth = useAuthStore.getState();
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", mockFetch);
+    mockFetch.mockReset();
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }))
+    );
+    useAuthStore.setState({ accessToken: "stale" });
+    useCanvasStore.getState().setSidebarContent({ type: "node", verse: baseVerse });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    useAuthStore.setState(previousAuth);
+    useCanvasStore.getState().setSidebarContent(null);
+  });
+
+  it("shows existing notes after an expired token is refreshed, instead of an empty list", async () => {
+    const note = { id: 1, note: "a private note", createdAt: new Date().toISOString() };
+    mockFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === "/api/auth/refresh") {
+        return new Response(JSON.stringify({ accessToken: "fresh" }), { status: 200 });
+      }
+      return new Headers(init?.headers).get("Authorization") === "Bearer fresh"
+        ? new Response(JSON.stringify([note]), { status: 200 })
+        : new Response("{}", { status: 401 });
+    });
+
+    await act(async () => {
+      renderWithIntl(<ContextSidebar />);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+
+    expect(await screen.findByText("a private note")).toBeInTheDocument();
+  });
+
+  it("does not treat a failed notes load as 'no notes' and retries on the next open", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    let notesCalls = 0;
+    mockFetch.mockImplementation(async (url: string) => {
+      if (!url.startsWith("/api/notes")) return new Response("[]", { status: 200 });
+      notesCalls += 1;
+      return notesCalls === 1
+        ? new Response("{}", { status: 500 })
+        : new Response(
+            JSON.stringify([
+              { id: 1, note: "a private note", createdAt: new Date().toISOString() },
+            ]),
+            { status: 200 }
+          );
+    });
+
+    await act(async () => {
+      renderWithIntl(<ContextSidebar />);
+    });
+    const toggle = screen.getByRole("button", { name: "My Notes" });
+    fireEvent.click(toggle);
+    await vi.waitFor(() => expect(notesCalls).toBe(1));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(screen.queryByText("a private note")).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    fireEvent.click(toggle);
+
+    expect(await screen.findByText("a private note")).toBeInTheDocument();
+    expect(notesCalls).toBe(2);
+  });
+});
+
 describe("ContextSidebar — note delete checks response status", () => {
   const mockFetch = vi.fn();
   const previousAuth = useAuthStore.getState();

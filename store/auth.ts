@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useSocialStore } from "@/store/social";
 import { resetActivityQueue } from "@/lib/social/post-activity";
+import { authFetch } from "@/lib/auth/auth-fetch";
 
 interface AuthStore {
   // Access token kept in memory — restored on page load via /api/auth/refresh (HttpOnly cookie)
@@ -52,7 +53,6 @@ const BOOKMARK_SYNC_CONCURRENCY = 3;
 // from `pendingBookmarkAdds` (a failed ref stays pending and is retried next load).
 async function syncLocalOnlyBookmarks(
   refs: string[],
-  accessToken: string,
   onSynced: (ref: string) => void
 ): Promise<void> {
   let failedCount = 0;
@@ -60,12 +60,9 @@ async function syncLocalOnlyBookmarks(
     const chunk = refs.slice(i, i + BOOKMARK_SYNC_CONCURRENCY);
     const results = await Promise.allSettled(
       chunk.map(async (ref) => {
-        const r = await fetch("/api/bookmarks", {
+        const r = await authFetch("/api/bookmarks", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ref }),
         });
         if (!r.ok) throw new Error(`sync POST returned ${r.status}`);
@@ -167,22 +164,16 @@ export const useAuthStore = create<AuthStore>()(
           });
 
         if (wasBookmarked) {
-          fetch(`/api/bookmarks/${encodeURIComponent(ref)}`, {
-            method: "DELETE",
-            headers: { Authorization: `Bearer ${accessToken}` },
-          })
+          authFetch(`/api/bookmarks/${encodeURIComponent(ref)}`, { method: "DELETE" })
             .then((r) => {
               if (!r.ok) rollback();
             })
             .catch(rollback)
             .finally(clearBusy);
         } else {
-          fetch("/api/bookmarks", {
+          authFetch("/api/bookmarks", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${accessToken}`,
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ref }),
           })
             .then((r) => {
@@ -203,9 +194,7 @@ export const useAuthStore = create<AuthStore>()(
         // response can't stomp the next session's bookmarks or error flag.
         const isStale = () => get().bookmarkGeneration !== generation;
         try {
-          const res = await fetch("/api/bookmarks", {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          });
+          const res = await authFetch("/api/bookmarks");
           if (isStale()) return;
           if (!res.ok) {
             console.error(`loadRemoteBookmarks: /api/bookmarks returned ${res.status}`);
@@ -226,7 +215,7 @@ export const useAuthStore = create<AuthStore>()(
             bookmarksLoadError: false,
           });
           if (stillPending.length > 0) {
-            void syncLocalOnlyBookmarks(stillPending, accessToken, (ref) =>
+            void syncLocalOnlyBookmarks(stillPending, (ref) =>
               set((s) => {
                 if (s.bookmarkGeneration !== generation) return s;
                 return { pendingBookmarkAdds: s.pendingBookmarkAdds.filter((r) => r !== ref) };

@@ -8,6 +8,7 @@ import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { AuthShell } from "@/components/layout/AuthShell";
 import { Card, Tooltip, iconButtonVariants } from "@/components/ui";
+import { authFetch } from "@/lib/auth/auth-fetch";
 
 interface Mention {
   id: number;
@@ -33,9 +34,7 @@ export default function MentionsPage() {
     if (!accessToken) return;
     let cancelled = false;
 
-    fetch("/api/social/mentions", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
+    authFetch("/api/social/mentions")
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("load failed"))))
       .then((data: { items: Mention[] }) => {
         if (cancelled) return;
@@ -51,9 +50,8 @@ export default function MentionsPage() {
 
     // Mark everything read now that the user has opened this page, and clear
     // the header badge immediately rather than waiting for the next poll.
-    fetch("/api/social/mentions", {
+    authFetch("/api/social/mentions", {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${accessToken}` },
     })
       .then((r) => {
         if (cancelled) return;

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { authFetch } from "@/lib/auth/auth-fetch";
 
 interface PagedResponse<T> {
   items: T[];
@@ -6,7 +7,7 @@ interface PagedResponse<T> {
 }
 
 interface Options<T> {
-  /** Bearer token; fetching is skipped entirely while this is falsy. */
+  /** Fetching is skipped entirely while this is falsy; requests go through `authFetch`, which attaches (and refreshes) the token. */
   accessToken: string | null;
   /** Extra gate on top of `accessToken` (e.g. the profile hasn't resolved yet). */
   enabled: boolean;
@@ -63,8 +64,7 @@ export function usePaginatedSocialList<T>({ accessToken, enabled, baseUrl, onDat
       if (mode === "replace") setLoading(true);
       else setLoadingMore(true);
       try {
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${accessToken}` },
+        const res = await authFetch(url, {
           signal: ctrl.signal,
         });
         if (!isCurrent()) return;

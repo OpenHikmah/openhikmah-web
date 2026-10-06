@@ -9,6 +9,7 @@ import { useSignIn } from "@/hooks/useSignIn";
 import { BookOpen, Loader2, LogIn } from "lucide-react";
 import { Card, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { authFetch } from "@/lib/auth/auth-fetch";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -68,11 +69,10 @@ export default function OnboardingPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/social/me", {
+      const res = await authFetch("/api/social/me", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ username: trimmed }),
       });

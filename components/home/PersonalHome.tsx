@@ -11,6 +11,7 @@ import { VerseOfDayCard } from "@/components/today/VerseOfDayCard";
 import { CANVAS_STORAGE_KEY } from "@/hooks/useCanvasPersistence";
 import type { Verse } from "@/types/quran";
 import type { SavedCanvas } from "@/store/canvas";
+import { authFetch } from "@/lib/auth/auth-fetch";
 
 /** A compact destination row: icon, title, supporting count, and a hover arrow. */
 function QuickLink({
@@ -68,7 +69,7 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
 
   useEffect(() => {
     if (!accessToken) return;
-    fetch("/api/workspace", { headers: { Authorization: `Bearer ${accessToken}` } })
+    authFetch("/api/workspace")
       .then((r) => {
         if (!r.ok) throw new Error("workspace fetch failed");
         return r.json();

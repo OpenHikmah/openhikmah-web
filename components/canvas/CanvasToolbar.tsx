@@ -33,6 +33,7 @@ import {
 import { ExportMenu } from "./ExportMenu";
 import type { AudioVerse } from "@/store/audio";
 import type { Verse } from "@/types/quran";
+import { authFetch } from "@/lib/auth/auth-fetch";
 
 function ToolbarBtn({
   onClick,
@@ -154,9 +155,9 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
       const count = nodes.length;
       const date = format.dateTime(new Date(), { month: "short", day: "numeric" });
       const name = t("workspaceName", { count, date });
-      const res = await fetch("/api/workspace", {
+      const res = await authFetch("/api/workspace", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, data: serializeCanvas(nodes, edges), nodeCount: count }),
       });
       if (!mountedRef.current) return;

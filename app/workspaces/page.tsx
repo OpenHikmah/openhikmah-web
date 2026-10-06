@@ -11,6 +11,7 @@ import { parseSavedCanvas } from "@/lib/canvas/saved-canvas";
 import { Card, IconButton, Tooltip } from "@/components/ui";
 import { AuthShell } from "@/components/layout/AuthShell";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
+import { authFetch } from "@/lib/auth/auth-fetch";
 
 interface WorkspaceMeta {
   id: number;
@@ -103,9 +104,7 @@ export default function WorkspacesPage() {
     if (!accessToken) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/workspace", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const res = await authFetch("/api/workspace");
       if (res.ok) {
         setWorkspaces(await res.json());
         setLoadError(false);
@@ -129,9 +128,7 @@ export default function WorkspacesPage() {
     if (!accessToken || loadingId) return;
     setLoadingId(id);
     try {
-      const res = await fetch(`/api/workspace/${id}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const res = await authFetch(`/api/workspace/${id}`);
       if (!res.ok) return;
       const parsed = parseSavedCanvas(await res.json());
       if (parsed) {
@@ -147,9 +144,8 @@ export default function WorkspacesPage() {
     if (!accessToken || deletingId) return;
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/workspace/${id}`, {
+      const res = await authFetch(`/api/workspace/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (res.ok || res.status === 204) {
         setWorkspaces((prev) => prev.filter((w) => w.id !== id));

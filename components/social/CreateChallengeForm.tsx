@@ -6,6 +6,7 @@ import { useAuthStore } from "@/store/auth";
 import { Loader2, Swords, X } from "lucide-react";
 import { Button, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { authFetch } from "@/lib/auth/auth-fetch";
 
 interface AcceptedFriend {
   id: number;
@@ -67,9 +68,9 @@ export function CreateChallengeForm({
     setSuccess(null);
 
     try {
-      const res = await fetch("/api/social/challenges", {
+      const res = await authFetch("/api/social/challenges", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           challengedUsername: selectedFriend,
           duration,
