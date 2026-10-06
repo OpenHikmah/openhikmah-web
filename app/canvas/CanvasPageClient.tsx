@@ -50,7 +50,14 @@ export function VerseLoader() {
 
   useEffect(() => {
     const verseRef = searchParams.get("verse");
-    if (!verseRef || handledRef.current === verseRef) return;
+    // The param is gone once handled (the URL is cleaned) or the user navigated
+    // away — forget it so following the same link again (e.g. after Clear) loads
+    // the verse again instead of being treated as already handled.
+    if (!verseRef) {
+      handledRef.current = null;
+      return;
+    }
+    if (handledRef.current === verseRef) return;
     if (!/^\d+:\d+$/.test(verseRef)) return;
 
     handledRef.current = verseRef;
@@ -59,7 +66,10 @@ export function VerseLoader() {
     fetch(`/api/verse/${surah}/${ayah}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((verse: Verse | null) => {
-        if (!verse) return;
+        if (!verse) {
+          handledRef.current = null;
+          return;
+        }
         // Already on the canvas (re-opened from a bookmark, journey, or a
         // concordance link)? Don't stack a duplicate — just clean the URL.
         const url0 = new URL(window.location.href);
@@ -78,12 +88,19 @@ export function VerseLoader() {
         url.searchParams.delete("verse");
         window.history.replaceState(null, "", url.toString());
       })
-      .catch((e) => console.error("canvas: incoming verse fetch failed", e));
+      .catch((e) => {
+        handledRef.current = null;
+        console.error("canvas: incoming verse fetch failed", e);
+      });
   }, [searchParams, addVerseNode, setPendingAutoExpand]);
 
   useEffect(() => {
     const surahParam = searchParams.get("surah");
-    if (!surahParam || handledSurahRef.current === surahParam) return;
+    if (!surahParam) {
+      handledSurahRef.current = null;
+      return;
+    }
+    if (handledSurahRef.current === surahParam) return;
     if (!/^\d+$/.test(surahParam)) return;
     const surahNum = parseInt(surahParam, 10);
     if (surahNum < 1 || surahNum > 114) return;
@@ -117,7 +134,10 @@ export function VerseLoader() {
         requestFit();
         cleanUrl();
       })
-      .catch((e) => console.error("canvas: incoming surah fetch failed", e));
+      .catch((e) => {
+        handledSurahRef.current = null;
+        console.error("canvas: incoming surah fetch failed", e);
+      });
   }, [searchParams, addSurahNodes, requestFit]);
 
   return null;
