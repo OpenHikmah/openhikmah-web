@@ -5,10 +5,14 @@ import Link from "next/link";
 import { Heart, Trash2, Network, AlertCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/store/auth";
+import { usePreferencesStore } from "@/store/preferences";
+import { DEFAULT_EDITION_BY_LOCALE } from "@/lib/i18n/config";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { Card, IconButton, Tooltip, iconButtonVariants } from "@/components/ui";
 import type { Verse } from "@/types/quran";
 
+// Keyed by edition + ref: /api/verse/* returns the translation for the edition in
+// the user's cookie, so a ref-only key would keep serving the previous language.
 const verseCache = new Map<string, Verse>();
 
 export default function BookmarksPage() {
@@ -18,6 +22,9 @@ export default function BookmarksPage() {
   const bookmarksLoadError = useAuthStore((s) => s.bookmarksLoadError);
   const bookmarkBusy = useAuthStore((s) => s.bookmarkBusy);
   const toggleBookmark = useAuthStore((s) => s.toggleBookmark);
+  const edition = usePreferencesStore(
+    (s) => s.quranEditionByLocale[s.uiLocale] ?? DEFAULT_EDITION_BY_LOCALE[s.uiLocale]
+  );
   const [verses, setVerses] = useState<Map<string, Verse>>(new Map());
   const [loading, setLoading] = useState(bookmarks.length > 0);
 
@@ -27,28 +34,34 @@ export default function BookmarksPage() {
       setLoading(false);
       return;
     }
+    let cancelled = false;
     setLoading(true);
     Promise.all(
       bookmarks.map(async (ref) => {
-        const cached = verseCache.get(ref);
+        const cacheKey = `${edition}:${ref}`;
+        const cached = verseCache.get(cacheKey);
         if (cached) return [ref, cached] as const;
         try {
           const [surah, ayah] = ref.split(":");
           const res = await fetch(`/api/verse/${surah}/${ayah}`);
           if (!res.ok) return [ref, null] as const;
           const verse = (await res.json()) as Verse;
-          verseCache.set(ref, verse);
+          verseCache.set(cacheKey, verse);
           return [ref, verse] as const;
         } catch {
           return [ref, null] as const;
         }
       })
     ).then((entries) => {
+      if (cancelled) return;
       setVerses(new Map(entries.filter((e): e is [string, Verse] => e[1] !== null)));
       setLoading(false);
     });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookmarks.join(",")]);
+  }, [bookmarks.join(","), edition]);
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
