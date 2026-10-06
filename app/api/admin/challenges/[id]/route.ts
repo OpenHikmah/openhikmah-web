@@ -59,7 +59,11 @@ async function patchChallenge(
       return NextResponse.json({ error: "Only active challenges can be ended" }, { status: 409 });
     }
     const now = new Date();
-    const ended = { ...challenge, endsAt: now };
+    // A challenge whose real end already passed but hasn't been lazily resolved yet
+    // must be scored (and stored) at that end, not at `now`, or activity after the
+    // real end would count and the stored endsAt would move later.
+    const endsAt = challenge.endsAt < now ? challenge.endsAt : now;
+    const ended = { ...challenge, endsAt };
     const [challengerScore, challengedScore] = await Promise.all([
       scoreChallenge(challenge.challengerId, ended),
       scoreChallenge(challenge.challengedId, ended),
@@ -70,7 +74,7 @@ async function patchChallenge(
     // the race cleanly instead of silently clobbering the other write.
     const [updated] = await db
       .update(challenges)
-      .set({ status: "completed", winnerId, endsAt: now })
+      .set({ status: "completed", winnerId, endsAt })
       .where(and(eq(challenges.id, challengeId), eq(challenges.status, "active")))
       .returning();
     if (!updated) {

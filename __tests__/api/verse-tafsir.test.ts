@@ -60,4 +60,18 @@ describe("GET /api/verse/[surah]/[ayah]/tafsir", () => {
     expect(body.blocks.length).toBeGreaterThan(0);
     expect(body.source).toBe("Ibn Kathir (Abridged)");
   });
+
+  it("passes an abort signal to the upstream fetch so a stalled request is bounded", async () => {
+    await call("1", "1");
+    const init = vi.mocked(fetch).mock.calls[0][1] as RequestInit;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("returns empty blocks (200) when the upstream fetch is aborted by the timeout", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(fetch).mockRejectedValue(new DOMException("timed out", "TimeoutError"));
+    const res = await call("1", "1");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ blocks: [] });
+  });
 });
