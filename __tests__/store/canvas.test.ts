@@ -140,6 +140,30 @@ describe("canvas store", () => {
     expect(useCanvasStore.getState().edges).toHaveLength(1);
   });
 
+  it('addConnectionEdge rejects an edge whose source or target node is missing, and reports "missing-endpoint"', () => {
+    const sourceId = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+    const data = { kind: "thematic" as const, label: "theme", reason: "test" };
+
+    const missingTarget = useCanvasStore.getState().addConnectionEdge({
+      id: "e-1",
+      source: sourceId,
+      target: "node-gone",
+      type: "hikmah",
+      data,
+    });
+    const missingSource = useCanvasStore.getState().addConnectionEdge({
+      id: "e-2",
+      source: "node-gone",
+      target: sourceId,
+      type: "hikmah",
+      data,
+    });
+
+    expect(missingTarget).toBe("missing-endpoint");
+    expect(missingSource).toBe("missing-endpoint");
+    expect(useCanvasStore.getState().edges).toHaveLength(0);
+  });
+
   it('addConnectionEdge does not add a duplicate of the same kind, and reports "duplicate-same-kind"', () => {
     const id1 = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
     const id2 = useCanvasStore
