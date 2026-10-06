@@ -41,7 +41,7 @@
     "postcss": "^8.5.23"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.96.0",
+    "@anthropic-ai/sdk": "^0.131.0",
     "@google/generative-ai": "^0.24.1",
     "@next/third-parties": "^16.3.5",
     "@radix-ui/react-dialog": "^1.1.19",
