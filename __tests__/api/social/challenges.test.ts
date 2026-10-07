@@ -71,6 +71,9 @@ const { mockSelect, mockInsert, mockUpdate, mockDelete, mockRateLimitOrNull } = 
 
 vi.mock("@/lib/infra/db", () => ({
   db: {
+    // The create path runs check + insert in one transaction (advisory lock per pair).
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({ select: mockSelect, insert: mockInsert, update: mockUpdate, execute: async () => [] }),
     select: mockSelect,
     insert: mockInsert,
     update: mockUpdate,
