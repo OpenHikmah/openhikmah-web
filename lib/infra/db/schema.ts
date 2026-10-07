@@ -70,6 +70,12 @@ export const friendships = pgTable(
   },
   (t) => [
     uniqueIndex("friendships_pair_idx").on(t.requesterId, t.addresseeId),
+    // One row per UNORDERED pair: the directional index above lets A→B and B→A
+    // both insert when sent concurrently.
+    uniqueIndex("friendships_unordered_pair_idx").on(
+      sql`least(${t.requesterId}, ${t.addresseeId})`,
+      sql`greatest(${t.requesterId}, ${t.addresseeId})`
+    ),
     index("friendships_addressee_status_idx").on(t.addresseeId, t.status),
     index("friendships_requester_status_idx").on(t.requesterId, t.status),
     check("no_self_friendship", sql`${t.requesterId} != ${t.addresseeId}`),

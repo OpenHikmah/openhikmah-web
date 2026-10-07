@@ -121,34 +121,43 @@ export async function POST(req: NextRequest) {
 
   const friend = { id: target.id, username: target.username };
 
-  // Check for an existing friendship in either direction
-  const [existing] = await db
-    .select({
-      id: friendships.id,
-      status: friendships.status,
-      requesterId: friendships.requesterId,
-    })
-    .from(friendships)
-    .where(
-      or(
-        and(eq(friendships.requesterId, userId), eq(friendships.addresseeId, target.id)),
-        and(eq(friendships.requesterId, target.id), eq(friendships.addresseeId, userId))
+  // The pair can change under us (the other side's request, a decline, a delete),
+  // so each step below is conditional and the whole check-then-act is retried a
+  // couple of times against fresh state instead of assuming the first read held.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    // Check for an existing friendship in either direction
+    const [existing] = await db
+      .select({
+        id: friendships.id,
+        status: friendships.status,
+        requesterId: friendships.requesterId,
+      })
+      .from(friendships)
+      .where(
+        or(
+          and(eq(friendships.requesterId, userId), eq(friendships.addresseeId, target.id)),
+          and(eq(friendships.requesterId, target.id), eq(friendships.addresseeId, userId))
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  if (existing) {
-    if (existing.status === "accepted") {
-      return NextResponse.json({ error: "Already friends" }, { status: 409 });
-    }
-    if (existing.status === "pending") {
-      // They already requested us — accept it instead of stacking a second row.
-      if (existing.requesterId === target.id) {
+    if (existing) {
+      if (existing.status === "accepted") {
+        return NextResponse.json({ error: "Already friends" }, { status: 409 });
+      }
+      if (existing.status === "pending") {
+        if (existing.requesterId !== target.id) {
+          return NextResponse.json({ error: "Request already sent" }, { status: 409 });
+        }
+        // They already requested us — accept it instead of stacking a second row.
+        // Guarded on still-pending: if they cancelled or it was resolved since the
+        // read, nothing matches and we re-read rather than dereference a missing row.
         const [accepted] = await db
           .update(friendships)
           .set({ status: "accepted", updatedAt: new Date() })
-          .where(eq(friendships.id, existing.id))
+          .where(and(eq(friendships.id, existing.id), eq(friendships.status, "pending")))
           .returning();
+        if (!accepted) continue;
         return NextResponse.json({
           id: accepted.id,
           status: accepted.status,
@@ -156,26 +165,28 @@ export async function POST(req: NextRequest) {
           mutual: true,
         });
       }
-      return NextResponse.json({ error: "Request already sent" }, { status: 409 });
+      // A "declined" row here is historical data from before declines were
+      // deleted outright (see PATCH .../[friendId]) — remove it first so it
+      // can't collide with the unique pair index below; a fresh request should
+      // behave identically to a first-time request.
+      await db.delete(friendships).where(eq(friendships.id, existing.id));
     }
-    // A "declined" row here is historical data from before declines were
-    // deleted outright (see PATCH .../[friendId]) — remove it first so it
-    // can't collide with the unique (requesterId, addresseeId) index below;
-    // a fresh request should behave identically to a first-time request.
-    await db.delete(friendships).where(eq(friendships.id, existing.id));
-  }
 
-  try {
-    const [inserted] = await db
-      .insert(friendships)
-      .values({ requesterId: userId, addresseeId: target.id })
-      .returning();
-    return NextResponse.json({ id: inserted.id, status: inserted.status, friend }, { status: 201 });
-  } catch (err) {
-    // A concurrent request inserted the same pair first — treat as already sent.
-    if (isUniqueViolation(err)) {
-      return NextResponse.json({ error: "Request already sent" }, { status: 409 });
+    try {
+      const [inserted] = await db
+        .insert(friendships)
+        .values({ requesterId: userId, addresseeId: target.id })
+        .returning();
+      return NextResponse.json(
+        { id: inserted.id, status: inserted.status, friend },
+        { status: 201 }
+      );
+    } catch (err) {
+      // The unique pair index is on the UNORDERED pair, so a concurrent request in
+      // either direction lands here. Re-read: if it was the opposite direction it
+      // is auto-accepted above, if it was ours it is "already sent".
+      if (!isUniqueViolation(err)) throw err;
     }
-    throw err;
   }
+  return NextResponse.json({ error: "Request already sent" }, { status: 409 });
 }
