@@ -69,13 +69,21 @@ export function PersonalHome({ verse }: { verse: Verse | null }) {
 
   useEffect(() => {
     if (!accessToken) return;
+    let cancelled = false;
     authFetch("/api/workspace")
       .then((r) => {
         if (!r.ok) throw new Error("workspace fetch failed");
         return r.json();
       })
-      .then((ws: unknown[]) => setSavedCount(Array.isArray(ws) ? ws.length : 0))
-      .catch(() => setSavedCountError(true));
+      .then((ws: unknown[]) => {
+        if (!cancelled) setSavedCount(Array.isArray(ws) ? ws.length : 0);
+      })
+      .catch(() => {
+        if (!cancelled) setSavedCountError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [accessToken]);
 
   const hasContinue = continueCount !== null && continueCount > 0;

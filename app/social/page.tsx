@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
@@ -57,6 +57,10 @@ export default function SocialPage() {
 
   const [tab, setTab] = useState<Tab>("leaderboard");
   const [challengesList, setChallengesList] = useState<EnrichedChallenge[]>([]);
+  // Two paths load challenges (the mount effect and fetchChallenges after a
+  // create/respond). Only the most recently started request may apply its result,
+  // so an older response can't land after a newer one.
+  const challengesSeq = useRef(0);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [prefill, setPrefill] = useState<ChallengePrefill | null>(null);
   const [prefillKey, setPrefillKey] = useState(0);
@@ -120,11 +124,15 @@ export default function SocialPage() {
 
   const fetchChallenges = useCallback(async () => {
     if (!accessToken) return;
+    const seq = ++challengesSeq.current;
+    const isLatest = () => seq === challengesSeq.current;
     setLoadingChallenges(true);
     try {
       const res = await authFetch("/api/social/challenges");
+      if (!isLatest()) return;
       if (res.ok) {
         const data: EnrichedChallenge[] = await res.json();
+        if (!isLatest()) return;
         setChallengesList(data);
         setPendingChallengeCount(countIncomingChallenges(data, userId));
         setChallengesError(false);
@@ -132,9 +140,9 @@ export default function SocialPage() {
         setChallengesError(true);
       }
     } catch {
-      setChallengesError(true);
+      if (isLatest()) setChallengesError(true);
     } finally {
-      setLoadingChallenges(false);
+      if (isLatest()) setLoadingChallenges(false);
     }
   }, [accessToken, userId, setPendingChallengeCount]);
 
@@ -164,23 +172,35 @@ export default function SocialPage() {
     const ctrl = new AbortController();
     const { signal } = ctrl;
 
+    const seq = ++challengesSeq.current;
+    const isLatest = () => seq === challengesSeq.current && !signal.aborted;
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingChallenges(true);
     authFetch("/api/social/challenges", { signal })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: EnrichedChallenge[]) => {
+        if (!isLatest()) return;
         setChallengesList(data);
         setPendingChallengeCount(countIncomingChallenges(data, userId));
       })
-      .catch((e) => console.error("social: challenges fetch failed", e))
-      .finally(() => setLoadingChallenges(false));
+      .catch((e) => {
+        if (!signal.aborted) console.error("social: challenges fetch failed", e);
+      })
+      .finally(() => {
+        if (isLatest()) setLoadingChallenges(false);
+      });
 
     authFetch("/api/social/challenge-suggestions", {
       signal,
     })
       .then((r) => (r.ok ? r.json() : { suggestions: [] }))
-      .then((data: { suggestions: Suggestion[] }) => setSuggestions(data.suggestions))
-      .catch((e) => console.error("social: challenge-suggestions fetch failed", e));
+      .then((data: { suggestions: Suggestion[] }) => {
+        if (!signal.aborted) setSuggestions(data.suggestions);
+      })
+      .catch((e) => {
+        if (!signal.aborted) console.error("social: challenge-suggestions fetch failed", e);
+      });
 
     return () => ctrl.abort();
   }, [accessToken, userId, setPendingChallengeCount]);

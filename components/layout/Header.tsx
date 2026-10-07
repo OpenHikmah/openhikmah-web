@@ -215,7 +215,9 @@ export function Header({ onSearchOpen }: HeaderProps) {
   const accessToken = useAuthStore((s) => s.accessToken);
 
   const userId = useSocialStore((s) => s.userId);
-  const { bumpStreak, setPendingFriendCount, setPendingMentionCount } = useSocialStore();
+  const bumpStreak = useSocialStore((s) => s.bumpStreak);
+  const setPendingFriendCount = useSocialStore((s) => s.setPendingFriendCount);
+  const setPendingMentionCount = useSocialStore((s) => s.setPendingMentionCount);
 
   const playGraph = useAudioStore((s) => s.playGraph);
   const audioCurrentRef = useAudioStore((s) => s.currentRef);

@@ -50,6 +50,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Challenge is no longer pending" }, { status: 409 });
     }
 
+    // An invite past its endsAt is lazily declined on GET; accepting it here would
+    // otherwise start a fresh active window from an expired invite.
+    if (action === "accept" && challenge.endsAt < new Date()) {
+      await db
+        .update(challenges)
+        .set({ status: "declined" })
+        .where(and(eq(challenges.id, challengeId), eq(challenges.status, "pending")));
+      return NextResponse.json({ error: "Challenge invite has expired" }, { status: 409 });
+    }
+
     // On accept, reset the clock from acceptance time so both parties compete the same
     // window. Decline/cancel just flip the status (cancelled = challenger withdrew).
     const now = new Date();

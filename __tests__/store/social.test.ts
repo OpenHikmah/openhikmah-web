@@ -193,6 +193,22 @@ describe("social store", () => {
     });
   });
 
+  it("migrates a pre-versioned persisted payload, filling any missing keys with defaults", async () => {
+    localStorage.setItem(
+      "open-hikmah-social",
+      JSON.stringify({ state: { userId: 7, username: "hikmah_seeker", streak: 4 }, version: 0 })
+    );
+    await useSocialStore.persist.rehydrate();
+    expect(useSocialStore.getState()).toMatchObject({
+      userId: 7,
+      username: "hikmah_seeker",
+      streak: 4,
+      longestStreak: 0,
+      streakAsOf: null,
+    });
+    expect(JSON.parse(localStorage.getItem("open-hikmah-social")!).version).toBe(1);
+  });
+
   it("persists userId, username, streak, and longestStreak to localStorage, but not the pending-* counts", () => {
     useSocialStore.setState({
       userId: 42,

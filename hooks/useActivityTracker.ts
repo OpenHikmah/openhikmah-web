@@ -25,7 +25,6 @@ export function useActivityTracker() {
 
   const nodeCount = useCanvasStore((s) => s.nodes.length);
   const edgeCount = useCanvasStore((s) => s.edges.length);
-  const nodes = useCanvasStore((s) => s.nodes);
   const restoreToken = useCanvasStore((s) => s.restoreToken);
 
   useEffect(() => {
@@ -58,7 +57,7 @@ export function useActivityTracker() {
       if (nodeAdded) {
         inputs.push({
           type: "verse_added",
-          verseRef: (nodes[nodes.length - 1]?.data as { ref?: string })?.ref ?? null,
+          verseRef: lastAddedRef(),
         });
       }
       if (edgeAdded) inputs.push({ type: "connection_made" });
@@ -86,5 +85,13 @@ export function useActivityTracker() {
       buffered.forEach(deliver);
       void flushQueue(accessToken);
     }
-  }, [nodeCount, edgeCount, restoreToken, accessToken, nodes, applyActivityResult]);
+  }, [nodeCount, edgeCount, restoreToken, accessToken, applyActivityResult]);
+}
+
+// Read at the moment a node is added rather than subscribing to `nodes`: the
+// array is replaced on every drag tick, which would re-run the tracking effect
+// many times a second for no change in node/edge counts.
+function lastAddedRef(): string | null {
+  const nodes = useCanvasStore.getState().nodes;
+  return (nodes[nodes.length - 1]?.data as { ref?: string })?.ref ?? null;
 }

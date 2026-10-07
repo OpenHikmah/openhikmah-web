@@ -5,13 +5,25 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useCanvasStore } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useSyncExternalStore } from "react";
 import { useSidebarResize } from "@/hooks/useSidebarResize";
 import type { EdgeKind } from "@/types/quran";
 import { Card } from "@/components/ui";
 import { InteractiveArabic } from "@/components/morphology/InteractiveArabic";
 import type { TafsirBlock } from "@/lib/quran/tafsir";
 import { authFetch } from "@/lib/auth/auth-fetch";
+
+const DESKTOP_QUERY = "(min-width: 640px)";
+
+function subscribeToDesktopQuery(onChange: () => void) {
+  const mql = window.matchMedia(DESKTOP_QUERY);
+  mql.addEventListener("change", onChange);
+  return () => mql.removeEventListener("change", onChange);
+}
+
+function getIsDesktop() {
+  return window.matchMedia(DESKTOP_QUERY).matches;
+}
 
 function TafsirSection({ surah, ayah }: { surah: number; ayah: number }) {
   const t = useTranslations("canvas.contextSidebar");
@@ -321,15 +333,8 @@ export function ContextSidebar() {
   const setSidebarContent = useCanvasStore((s) => s.setSidebarContent);
   const { width, onHandlePointerDown, isResizing } = useSidebarResize();
 
-  const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(min-width: 640px)").matches
-  );
-  useEffect(() => {
-    const mql = window.matchMedia("(min-width: 640px)");
-    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, []);
+  // Server snapshot is `false` so first paint never mismatches hydration.
+  const isDesktop = useSyncExternalStore(subscribeToDesktopQuery, getIsDesktop, () => false);
 
   // Keep the last content rendered through the 150ms close transition, then
   // unmount — a CSS stand-in for AnimatePresence's exit-before-unmount.
