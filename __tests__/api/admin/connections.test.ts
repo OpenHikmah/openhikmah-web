@@ -36,7 +36,14 @@ const { mockSelect, mockUpdate } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
   mockUpdate: vi.fn(() => makeDbChain([])),
 }));
-vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect, update: mockUpdate } }));
+vi.mock("@/lib/infra/db", () => ({
+  db: {
+    select: mockSelect,
+    update: mockUpdate,
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({ select: mockSelect, update: mockUpdate }),
+  },
+}));
 
 import { GET, PATCH } from "@/app/api/admin/connections/route";
 import { requireAdmin } from "@/lib/admin/admin-auth";

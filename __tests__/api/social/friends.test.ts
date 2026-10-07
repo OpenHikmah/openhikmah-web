@@ -375,12 +375,43 @@ describe("POST /api/social/friends", () => {
     authedAs(makeUser({ id: 1 }));
     mockSelect
       .mockReturnValueOnce(makeDbChain([{ id: 2, username: "friend99" }]))
-      .mockReturnValueOnce(makeDbChain([]));
+      .mockReturnValueOnce(makeDbChain([]))
+      // re-read after the conflict: our own request won the race
+      .mockReturnValueOnce(makeDbChain([{ id: 9, status: "pending", requesterId: 1 }]));
     mockInsert.mockReturnValueOnce({
       values: () => ({ returning: () => Promise.reject({ code: "23505" }) }),
     } as unknown as ReturnType<typeof mockInsert>);
     const res = await POST(makePostReq({ username: "friend99" }));
     expect(res.status).toBe(409);
+  });
+
+  it("auto-accepts when the unique conflict was the OTHER side's concurrent request", async () => {
+    authedAs(makeUser({ id: 1 }));
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([{ id: 2, username: "friend99" }]))
+      .mockReturnValueOnce(makeDbChain([]))
+      .mockReturnValueOnce(makeDbChain([{ id: 9, status: "pending", requesterId: 2 }]));
+    mockInsert.mockReturnValueOnce({
+      values: () => ({ returning: () => Promise.reject({ code: "23505" }) }),
+    } as unknown as ReturnType<typeof mockInsert>);
+    mockUpdate.mockReturnValue(makeDbChain([{ id: 9, status: "accepted" }]));
+    const res = await POST(makePostReq({ username: "friend99" }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ id: 9, status: "accepted", mutual: true });
+  });
+
+  it("does not throw a TypeError when the request it tries to auto-accept vanished (re-reads and proceeds)", async () => {
+    authedAs(makeUser({ id: 1 }));
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([{ id: 2, username: "friend99" }]))
+      .mockReturnValueOnce(makeDbChain([{ id: 9, status: "pending", requesterId: 2 }]))
+      .mockReturnValueOnce(makeDbChain([])); // gone on the re-read
+    mockUpdate.mockReturnValue(makeDbChain([])); // guarded update matched nothing
+    mockInsert.mockReturnValue(
+      makeDbChain([{ id: 10, status: "pending", requesterId: 1, addresseeId: 2 }])
+    );
+    const res = await POST(makePostReq({ username: "friend99" }));
+    expect(res.status).toBe(201);
   });
 
   it("returns 201 with friendship data on success", async () => {
