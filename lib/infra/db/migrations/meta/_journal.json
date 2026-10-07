@@ -190,6 +190,13 @@
       "when": 1790963562682,
       "tag": "0026_connections_translation_checked_at",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1791346582714,
+      "tag": "0027_challenge_final_scores",
+      "breakpoints": true
     }
   ]
 }

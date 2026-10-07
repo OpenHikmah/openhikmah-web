@@ -9,6 +9,8 @@ vi.mock("@/lib/admin/admin-auth", () => ({
 vi.mock("@/lib/admin/admin-audit", () => ({ logAdminAction: vi.fn() }));
 vi.mock("@/lib/social/challenges", () => ({
   scoreChallenge: vi.fn(async () => 0),
+  scoreBoth: vi.fn(async () => ({ challengerScore: 0, challengedScore: 0 })),
+  scoresForDisplay: vi.fn(async () => new Map()),
   pickWinner: vi.fn(() => 1),
   resolveEndedChallenges: vi.fn(
     async () => new Map([[1, { challengerScore: 1, challengedScore: 0 }]])
@@ -49,7 +51,7 @@ vi.mock("@/lib/infra/db", () => ({
 import { PATCH, DELETE } from "@/app/api/admin/challenges/[id]/route";
 import { POST as FINALIZE } from "@/app/api/admin/challenges/finalize/route";
 import { requireAdmin } from "@/lib/admin/admin-auth";
-import { scoreChallenge } from "@/lib/social/challenges";
+import { scoreBoth } from "@/lib/social/challenges";
 
 const admin = { userId: 1, user: { qfId: "qf-admin" } as User };
 const challenge = { id: 1, challengerId: 1, challengedId: 2, status: "active", endsAt: new Date() };
@@ -85,7 +87,7 @@ describe("admin challenges [id]", () => {
   });
 
   describe("end scores at the real end time", () => {
-    beforeEach(() => vi.mocked(scoreChallenge).mockClear());
+    beforeEach(() => vi.mocked(scoreBoth).mockClear());
 
     function captureSet() {
       const set = vi.fn(() => makeDbChain([{ ...challenge, status: "completed" }]));
@@ -101,11 +103,10 @@ describe("admin challenges [id]", () => {
       const res = await PATCH(req("PATCH", { action: "end" }), params);
       expect(res.status).toBe(200);
 
-      expect(vi.mocked(scoreChallenge).mock.calls.map((c) => c[1].endsAt)).toEqual([
-        pastEnd,
-        pastEnd,
-      ]);
-      expect(set).toHaveBeenCalledWith(expect.objectContaining({ endsAt: pastEnd }));
+      expect(vi.mocked(scoreBoth).mock.calls.map((c) => c[0].endsAt)).toEqual([pastEnd]);
+      expect(set).toHaveBeenCalledWith(
+        expect.objectContaining({ endsAt: pastEnd, challengerScore: 0, challengedScore: 0 })
+      );
     });
 
     it("ends a not-yet-due challenge at now", async () => {
@@ -120,7 +121,7 @@ describe("admin challenges [id]", () => {
       const persisted = (set.mock.calls[0] as unknown as [{ endsAt: Date }])[0].endsAt;
       expect(persisted.getTime()).toBeGreaterThanOrEqual(before);
       expect(persisted.getTime()).toBeLessThan(futureEnd.getTime());
-      expect(vi.mocked(scoreChallenge).mock.calls[0][1].endsAt).toBe(persisted);
+      expect(vi.mocked(scoreBoth).mock.calls[0][0].endsAt).toBe(persisted);
     });
   });
 

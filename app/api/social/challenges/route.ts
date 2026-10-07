@@ -5,9 +5,7 @@ import { challenges, challengeSuggestions, friendships, users } from "@/lib/infr
 import { requireUser } from "@/lib/auth/social-auth";
 import {
   DURATIONS,
-  RESOLVE_CONCURRENCY,
-  mapWithConcurrency,
-  scoreChallenge,
+  scoresForDisplay,
   resolveEndedChallenges,
   resolveExpiredPending,
 } from "@/lib/social/challenges";
@@ -63,24 +61,9 @@ export async function GET(req: NextRequest) {
         : [];
     const userMap = new Map(userRows.map((u) => [u.id, u.username]));
 
-    // Build a complete scores map: cached from the self-heal above, plus freshly
-    // computed for any active/completed challenge the self-heal didn't touch
-    // (e.g. a challenge still in progress). Using mapWithConcurrency keeps the
-    // round trips bounded instead of N*2 concurrent queries.
-    const needsScoring = rows.filter(
-      (c) => (c.status === "active" || c.status === "completed") && !resolvedScores.has(c.id)
-    );
-    const computedScores = new Map<number, { challengerScore: number; challengedScore: number }>();
-    if (needsScoring.length > 0) {
-      await mapWithConcurrency(needsScoring, RESOLVE_CONCURRENCY, async (c) => {
-        const [challengerScore, challengedScore] = await Promise.all([
-          scoreChallenge(c.challengerId, c),
-          scoreChallenge(c.challengedId, c),
-        ]);
-        computedScores.set(c.id, { challengerScore, challengedScore });
-      });
-    }
-    const allScores = new Map([...resolvedScores, ...computedScores]);
+    // Completed challenges read their persisted final scores; only in-progress ones
+    // (and legacy completed rows, filled once) are counted.
+    const allScores = await scoresForDisplay(rows, resolvedScores);
 
     const enriched = rows.map((c) => {
       const s = allScores.get(c.id) ?? { challengerScore: 0, challengedScore: 0 };

@@ -30,6 +30,7 @@ vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect, update: mockUpdate 
 
 import {
   pickWinner,
+  scoresForDisplay,
   resolveEndedChallenges,
   resolveExpiredPending,
   isDuration,
@@ -48,6 +49,8 @@ function makeChallenge(overrides: Partial<Challenge> = {}): Challenge {
     startsAt: new Date(Date.now() - 86_400_000),
     endsAt: new Date(Date.now() - 1000),
     winnerId: null,
+    challengerScore: null,
+    challengedScore: null,
     createdAt: new Date(),
     ...overrides,
   } as Challenge;
@@ -96,6 +99,23 @@ describe("resolveEndedChallenges", () => {
     expect(rows[0].status).toBe("completed");
     expect(rows[0].winnerId).toBe(1);
     expect(resolved.get(7)).toEqual({ challengerScore: 4, challengedScore: 1 });
+  });
+
+  it("persists both final scores with the completion update, so reads never re-count", async () => {
+    const set = vi.fn(() => makeDbChain([{ id: 7 }]));
+    mockUpdate.mockReturnValue({ set } as unknown as ReturnType<typeof mockUpdate>);
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([{ score: 4 }]))
+      .mockReturnValueOnce(makeDbChain([{ score: 1 }]));
+    const rows = [makeChallenge({ id: 7 })];
+    await resolveEndedChallenges(rows, new Date());
+    expect(set).toHaveBeenCalledWith({
+      status: "completed",
+      winnerId: 1,
+      challengerScore: 4,
+      challengedScore: 1,
+    });
+    expect(rows[0]).toMatchObject({ challengerScore: 4, challengedScore: 1 });
   });
 
   it("ignores active challenges that have not ended", async () => {
@@ -171,5 +191,57 @@ describe("resolveExpiredPending", () => {
     const count = await resolveExpiredPending(rows, new Date());
     expect(rows[0].status).toBe("pending"); // left untouched, not clobbered
     expect(count).toBe(0);
+  });
+});
+
+describe("scoresForDisplay", () => {
+  beforeEach(() => {
+    mockSelect.mockReset();
+    mockUpdate.mockReset();
+    mockSelect.mockReturnValue(makeDbChain([{ score: 0 }]));
+    mockUpdate.mockReturnValue(makeDbChain([]));
+  });
+
+  it("reads a completed challenge's persisted scores without counting activity", async () => {
+    const rows = [
+      makeChallenge({ id: 1, status: "completed", challengerScore: 9, challengedScore: 2 }),
+    ];
+    const scores = await scoresForDisplay(rows);
+    expect(scores.get(1)).toEqual({ challengerScore: 9, challengedScore: 2 });
+    expect(mockSelect).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("scores a legacy completed challenge (NULL scores) once and persists them", async () => {
+    const set = vi.fn(() => makeDbChain([]));
+    mockUpdate.mockReturnValue({ set } as unknown as ReturnType<typeof mockUpdate>);
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([{ score: 6 }]))
+      .mockReturnValueOnce(makeDbChain([{ score: 3 }]));
+    const scores = await scoresForDisplay([makeChallenge({ id: 2, status: "completed" })]);
+    expect(scores.get(2)).toEqual({ challengerScore: 6, challengedScore: 3 });
+    expect(set).toHaveBeenCalledWith({ challengerScore: 6, challengedScore: 3 });
+  });
+
+  it("counts an in-progress challenge live and does not persist", async () => {
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([{ score: 2 }]))
+      .mockReturnValueOnce(makeDbChain([{ score: 5 }]));
+    const scores = await scoresForDisplay([
+      makeChallenge({ id: 3, status: "active", endsAt: new Date(Date.now() + 3_600_000) }),
+    ]);
+    expect(scores.get(3)).toEqual({ challengerScore: 2, challengedScore: 5 });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("gives pending/declined challenges no score entry and reuses already-resolved scores", async () => {
+    const already = new Map([[4, { challengerScore: 1, challengedScore: 1 }]]);
+    const scores = await scoresForDisplay(
+      [makeChallenge({ id: 4, status: "completed" }), makeChallenge({ id: 5, status: "pending" })],
+      already
+    );
+    expect(scores.get(4)).toEqual({ challengerScore: 1, challengedScore: 1 });
+    expect(scores.has(5)).toBe(false);
+    expect(mockSelect).not.toHaveBeenCalled();
   });
 });

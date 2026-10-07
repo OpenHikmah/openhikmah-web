@@ -142,6 +142,11 @@ export const challenges = pgTable(
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     winnerId: integer("winner_id").references(() => users.id),
+    // Final scores, written once when the challenge completes so reads never
+    // re-count activity_log. NULL while active, and on completed rows from before
+    // these columns existed (lazily filled on first read).
+    challengerScore: integer("challenger_score"),
+    challengedScore: integer("challenged_score"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

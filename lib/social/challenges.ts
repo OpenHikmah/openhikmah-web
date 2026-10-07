@@ -1,4 +1,5 @@
-import { and, count, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
+import { QueryBuilder } from "drizzle-orm/pg-core";
 import { db } from "@/lib/infra/db";
 import { activityLog, challenges } from "@/lib/infra/db/schema";
 import type { Challenge } from "@/lib/infra/db/schema";
@@ -25,13 +26,24 @@ export function isDuration(d: string): d is DurationKey {
 }
 
 /**
- * Score for one contestant: the number of matching activity_log rows within the
- * challenge window [startsAt, endsAt]. PG returns COUNT as a bigint string, so
- * we cast to number.
+ * Most activity_log rows of the challenge's type that count toward one
+ * contestant's score per UTC day. Activity is reported by the client
+ * (POST /api/social/activity), so challenges are honor-system: this cap only
+ * bounds how much a scripted loop of pings can inflate a score, it does not
+ * prove the activity happened. Generous enough that real use never reaches it.
+ */
+export const CHALLENGE_DAILY_SCORE_CAP = 100;
+
+/**
+ * Score for one contestant: matching activity_log rows within the challenge
+ * window [startsAt, endsAt], each UTC day contributing at most
+ * CHALLENGE_DAILY_SCORE_CAP. PG returns SUM as a bigint string, so we cast.
  */
 export async function scoreChallenge(userId: number, challenge: Challenge): Promise<number> {
-  const [row] = await db
-    .select({ score: count() })
+  // A detached query builder so the subquery isn't itself a `db.select()` call:
+  // scoring stays exactly one round trip.
+  const daily = new QueryBuilder()
+    .select({ n: sql<number>`count(*)`.as("n") })
     .from(activityLog)
     .where(
       and(
@@ -40,8 +52,67 @@ export async function scoreChallenge(userId: number, challenge: Challenge): Prom
         gte(activityLog.occurredAt, challenge.startsAt),
         lte(activityLog.occurredAt, challenge.endsAt)
       )
-    );
+    )
+    .groupBy(sql`date_trunc('day', ${activityLog.occurredAt} at time zone 'UTC')`)
+    .as("daily");
+  const [row] = await db
+    .select({
+      score: sql<number>`coalesce(sum(least(${daily.n}, ${CHALLENGE_DAILY_SCORE_CAP})), 0)`,
+    })
+    .from(daily);
   return Number(row?.score ?? 0);
+}
+
+export type ChallengeScores = { challengerScore: number; challengedScore: number };
+
+/** Scores both contestants of a challenge. */
+export async function scoreBoth(challenge: Challenge): Promise<ChallengeScores> {
+  const [challengerScore, challengedScore] = await Promise.all([
+    scoreChallenge(challenge.challengerId, challenge),
+    scoreChallenge(challenge.challengedId, challenge),
+  ]);
+  return { challengerScore, challengedScore };
+}
+
+/**
+ * Scores for display. A completed challenge reads its persisted final scores —
+ * nothing is re-counted. A completed row from before the score columns existed
+ * is scored once and persisted (guarded on the columns still being NULL, so a
+ * concurrent reader can't clobber a value). An in-progress challenge has no final
+ * score yet and is counted live.
+ */
+export async function scoresForDisplay(
+  rows: Challenge[],
+  alreadyScored: ResolvedScores = new Map()
+): Promise<ResolvedScores> {
+  const out: ResolvedScores = new Map(alreadyScored);
+  const todo: Challenge[] = [];
+  for (const c of rows) {
+    if (out.has(c.id)) continue;
+    if (c.status === "completed" && c.challengerScore !== null && c.challengedScore !== null) {
+      out.set(c.id, { challengerScore: c.challengerScore, challengedScore: c.challengedScore });
+    } else if (c.status === "active" || c.status === "completed") {
+      todo.push(c);
+    }
+  }
+
+  await mapWithConcurrency(todo, RESOLVE_CONCURRENCY, async (c) => {
+    const scores = await scoreBoth(c);
+    out.set(c.id, scores);
+    if (c.status === "completed") {
+      await db
+        .update(challenges)
+        .set(scores)
+        .where(
+          and(
+            eq(challenges.id, c.id),
+            eq(challenges.status, "completed"),
+            isNull(challenges.challengerScore)
+          )
+        );
+    }
+  });
+  return out;
 }
 
 /** The winner of a finished challenge, or null for a draw. */
@@ -102,10 +173,7 @@ export async function resolveEndedChallenges(
   const candidates = rows.filter((c) => c.status === "active" && c.endsAt < now);
 
   await mapWithConcurrency(candidates, RESOLVE_CONCURRENCY, async (c) => {
-    const [challengerScore, challengedScore] = await Promise.all([
-      scoreChallenge(c.challengerId, c),
-      scoreChallenge(c.challengedId, c),
-    ]);
+    const { challengerScore, challengedScore } = await scoreBoth(c);
     const winnerId = pickWinner(c, challengerScore, challengedScore);
     // Scope the write to the state just checked — a concurrent admin "end"
     // (or a second caller racing this same self-heal) may have already
@@ -113,12 +181,14 @@ export async function resolveEndedChallenges(
     // of unconditionally overwriting whatever it raced against.
     const [updated] = await db
       .update(challenges)
-      .set({ status: "completed", winnerId })
+      .set({ status: "completed", winnerId, challengerScore, challengedScore })
       .where(and(eq(challenges.id, c.id), eq(challenges.status, "active")))
       .returning();
     if (updated) {
       c.status = "completed";
       c.winnerId = winnerId;
+      c.challengerScore = challengerScore;
+      c.challengedScore = challengedScore;
       resolved.set(c.id, { challengerScore, challengedScore });
     }
   });
