@@ -301,13 +301,17 @@ export async function GET(req: NextRequest) {
     ...(related.length > 0 ? { related } : {}),
     ...(matchedSurahs.length > 0 ? { matchedSurahs } : {}),
   };
-  // An upstream failure is not a zero-result search; logging it would record an
-  // outage as many failed queries.
-  if (!failed) {
-    await maybeLogSearchQuery(req, q, "keyword", total);
-  }
-  if (related.length > 0) {
-    await maybeLogSearchQuery(req, q, "meaning", related.length);
+  // Paging is the same search, not a new one — only page 1 is logged so popular-query
+  // counts and the per-client log budget aren't inflated by pages 2..N. An upstream
+  // failure is not a zero-result search either; logging it would record an outage as
+  // many failed queries.
+  if (page === 1) {
+    if (!failed) {
+      await maybeLogSearchQuery(req, q, "keyword", total);
+    }
+    if (related.length > 0) {
+      await maybeLogSearchQuery(req, q, "meaning", related.length);
+    }
   }
   return NextResponse.json(response, {
     headers: failed ? { "x-search-error": "keyword-unavailable" } : {},

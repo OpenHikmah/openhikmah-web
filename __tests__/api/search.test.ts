@@ -325,6 +325,15 @@ describe("GET /api/search", () => {
     expect(body.results.map((r: { ref: string }) => r.ref)).toEqual(["1:3"]);
   });
 
+  it("does not log the query for pages beyond page 1", async () => {
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([{ verse_key: "2:1", translations: [{ text: "Alif Lam Mim" }] }])
+    );
+    const res = await GET(makeSearchReq("mercy", "&page=2"));
+    expect(res.status).toBe(200);
+    expect(mockLogSearchQuery).not.toHaveBeenCalled();
+  });
+
   it("does not attempt semantic search beyond page 1", async () => {
     mockFetch.mockResolvedValueOnce(quranComResponse([]));
     await GET(makeSearchReq("mercy", "&page=2"));

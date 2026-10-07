@@ -14,6 +14,9 @@ const IBN_KATHIR_EN = 169;
 const TAFSIR_LIMIT = 60;
 const TAFSIR_WINDOW_SECONDS = 60;
 
+// Bounds how long a stalled upstream can hold a request (and its rate-limit slot) open.
+const TAFSIR_FETCH_TIMEOUT_MS = 5000;
+
 /**
  * English Ibn Kathir tafsir for a verse, sourced from quran.com and returned as
  * ordered plain-text blocks (see lib/tafsir). Returns `{ blocks: [] }` (200) when
@@ -44,7 +47,10 @@ export async function GET(
   try {
     const res = await fetch(
       `https://api.quran.com/api/v4/tafsirs/${IBN_KATHIR_EN}/by_ayah/${ref}`,
-      { next: { revalidate: 604800 } } // tafsir is static — cache for a week
+      {
+        next: { revalidate: 604800 }, // tafsir is static — cache for a week
+        signal: AbortSignal.timeout(TAFSIR_FETCH_TIMEOUT_MS),
+      }
     );
     if (!res.ok) return NextResponse.json({ blocks: [] }, { status: 200 });
 

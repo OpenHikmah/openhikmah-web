@@ -49,6 +49,7 @@ vi.mock("@/lib/infra/db", () => ({
 import { PATCH, DELETE } from "@/app/api/admin/challenges/[id]/route";
 import { POST as FINALIZE } from "@/app/api/admin/challenges/finalize/route";
 import { requireAdmin } from "@/lib/admin/admin-auth";
+import { scoreChallenge } from "@/lib/social/challenges";
 
 const admin = { userId: 1, user: { qfId: "qf-admin" } as User };
 const challenge = { id: 1, challengerId: 1, challengedId: 2, status: "active", endsAt: new Date() };
@@ -81,6 +82,46 @@ describe("admin challenges [id]", () => {
     const res = await PATCH(req("PATCH", { action: "end" }), params);
     expect(res.status).toBe(200);
     expect(mockUpdate).toHaveBeenCalled();
+  });
+
+  describe("end scores at the real end time", () => {
+    beforeEach(() => vi.mocked(scoreChallenge).mockClear());
+
+    function captureSet() {
+      const set = vi.fn(() => makeDbChain([{ ...challenge, status: "completed" }]));
+      mockUpdate.mockReturnValue({ set } as unknown as ReturnType<typeof mockUpdate>);
+      return set;
+    }
+
+    it("keeps an already-passed endsAt for scoring and persistence instead of moving it to now", async () => {
+      const pastEnd = new Date(Date.now() - 60 * 60 * 1000);
+      mockSelect.mockReturnValue(makeDbChain([{ ...challenge, endsAt: pastEnd }]));
+      const set = captureSet();
+
+      const res = await PATCH(req("PATCH", { action: "end" }), params);
+      expect(res.status).toBe(200);
+
+      expect(vi.mocked(scoreChallenge).mock.calls.map((c) => c[1].endsAt)).toEqual([
+        pastEnd,
+        pastEnd,
+      ]);
+      expect(set).toHaveBeenCalledWith(expect.objectContaining({ endsAt: pastEnd }));
+    });
+
+    it("ends a not-yet-due challenge at now", async () => {
+      const futureEnd = new Date(Date.now() + 60 * 60 * 1000);
+      mockSelect.mockReturnValue(makeDbChain([{ ...challenge, endsAt: futureEnd }]));
+      const set = captureSet();
+      const before = Date.now();
+
+      const res = await PATCH(req("PATCH", { action: "end" }), params);
+      expect(res.status).toBe(200);
+
+      const persisted = (set.mock.calls[0] as unknown as [{ endsAt: Date }])[0].endsAt;
+      expect(persisted.getTime()).toBeGreaterThanOrEqual(before);
+      expect(persisted.getTime()).toBeLessThan(futureEnd.getTime());
+      expect(vi.mocked(scoreChallenge).mock.calls[0][1].endsAt).toBe(persisted);
+    });
   });
 
   it("rejects ending a non-active challenge", async () => {
