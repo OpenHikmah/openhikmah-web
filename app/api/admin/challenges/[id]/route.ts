@@ -5,7 +5,7 @@ import type { AuthedUser } from "@/lib/auth/social-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { challenges } from "@/lib/infra/db/schema";
-import { scoreChallenge, pickWinner } from "@/lib/social/challenges";
+import { scoreBoth, pickWinner } from "@/lib/social/challenges";
 
 /**
  * Moderate a single challenge:
@@ -64,17 +64,14 @@ async function patchChallenge(
     // real end would count and the stored endsAt would move later.
     const endsAt = challenge.endsAt < now ? challenge.endsAt : now;
     const ended = { ...challenge, endsAt };
-    const [challengerScore, challengedScore] = await Promise.all([
-      scoreChallenge(challenge.challengerId, ended),
-      scoreChallenge(challenge.challengedId, ended),
-    ]);
+    const { challengerScore, challengedScore } = await scoreBoth(ended);
     const winnerId = pickWinner(challenge, challengerScore, challengedScore);
     // Scope the WHERE to the state we just checked, so a concurrent "end" (or
     // the lazy expiry resolver) that already completed this challenge loses
     // the race cleanly instead of silently clobbering the other write.
     const [updated] = await db
       .update(challenges)
-      .set({ status: "completed", winnerId, endsAt })
+      .set({ status: "completed", winnerId, endsAt, challengerScore, challengedScore })
       .where(and(eq(challenges.id, challengeId), eq(challenges.status, "active")))
       .returning();
     if (!updated) {
@@ -120,9 +117,18 @@ async function patchChallenge(
     // also pin the previously-read winnerId — otherwise two concurrent
     // corrections would both match and the second would silently clobber the
     // first's winnerId with no 409.
+    // Overriding an in-progress challenge completes it, so it needs final scores
+    // like any other completion; a completed one keeps the scores it already has.
+    const scores =
+      challenge.status === "active"
+        ? await scoreBoth({
+            ...challenge,
+            endsAt: challenge.endsAt < new Date() ? challenge.endsAt : new Date(),
+          })
+        : {};
     const [updated] = await db
       .update(challenges)
-      .set({ status: "completed", winnerId })
+      .set({ status: "completed", winnerId, ...scores })
       .where(
         and(
           eq(challenges.id, challengeId),

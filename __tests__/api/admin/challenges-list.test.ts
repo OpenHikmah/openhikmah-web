@@ -16,6 +16,11 @@ const { mockResolveEndedChallenges, mockResolveExpiredPending } = vi.hoisted(() 
 }));
 vi.mock("@/lib/social/challenges", () => ({
   scoreChallenge: vi.fn(async () => 0),
+  scoreBoth: vi.fn(async () => ({ challengerScore: 0, challengedScore: 0 })),
+  scoresForDisplay: vi.fn(
+    async (rows: Array<{ id: number }>) =>
+      new Map(rows.map((r) => [r.id, { challengerScore: 0, challengedScore: 0 }]))
+  ),
   pickWinner: vi.fn(() => 1),
   resolveEndedChallenges: mockResolveEndedChallenges,
   resolveExpiredPending: mockResolveExpiredPending,

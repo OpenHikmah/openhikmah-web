@@ -23,7 +23,7 @@ export const users = pgTable(
   {
     id: serial("id").primaryKey(),
     qfId: text("qf_id").notNull().unique(),
-    username: text("username").notNull().unique(),
+    username: text("username").notNull(),
     displayName: text("display_name"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     lastActiveAt: timestamp("last_active_at", { withTimezone: true }).notNull().defaultNow(),
@@ -43,7 +43,10 @@ export const users = pgTable(
   },
   (t) => [
     uniqueIndex("users_qf_id_idx").on(t.qfId),
-    uniqueIndex("users_username_idx").on(t.username),
+    // Case-insensitive: every username lookup compares lower(username), so
+    // uniqueness must too ("Alice" and "alice" cannot both exist). Replaces the
+    // case-sensitive column UNIQUE + users_username_idx, which this implies.
+    uniqueIndex("users_username_lower_idx").on(sql`lower(${t.username})`),
     index("users_last_active_idx").on(t.lastActiveAt),
   ]
 );
@@ -67,6 +70,12 @@ export const friendships = pgTable(
   },
   (t) => [
     uniqueIndex("friendships_pair_idx").on(t.requesterId, t.addresseeId),
+    // One row per UNORDERED pair: the directional index above lets A→B and B→A
+    // both insert when sent concurrently.
+    uniqueIndex("friendships_unordered_pair_idx").on(
+      sql`least(${t.requesterId}, ${t.addresseeId})`,
+      sql`greatest(${t.requesterId}, ${t.addresseeId})`
+    ),
     index("friendships_addressee_status_idx").on(t.addresseeId, t.status),
     index("friendships_requester_status_idx").on(t.requesterId, t.status),
     check("no_self_friendship", sql`${t.requesterId} != ${t.addresseeId}`),
@@ -142,6 +151,11 @@ export const challenges = pgTable(
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     winnerId: integer("winner_id").references(() => users.id),
+    // Final scores, written once when the challenge completes so reads never
+    // re-count activity_log. NULL while active, and on completed rows from before
+    // these columns existed (lazily filled on first read).
+    challengerScore: integer("challenger_score"),
+    challengedScore: integer("challenged_score"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -479,6 +493,11 @@ export const nameContent = pgTable(
     data: text("data").notNull(),
     model: text("model"),
     version: integer("version").notNull().default(1),
+    // Hash of the English source a non-English row was translated from (see
+    // hashNameSource). A mismatch with the current source means the row is stale.
+    // NULL on English rows and on rows written before this column existed (those
+    // are served as before — the source they came from is unknown).
+    sourceHash: text("source_hash"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -499,6 +518,8 @@ export const nameVerseReasons = pgTable(
     locale: text("locale").notNull(),
     reason: text("reason").notNull(),
     model: text("model"),
+    // Hash of the English reason this was translated from; see name_content.source_hash.
+    sourceHash: text("source_hash"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.slug, t.ref, t.locale] })]

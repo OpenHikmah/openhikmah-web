@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { users } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
@@ -56,7 +56,7 @@ export async function PATCH(req: NextRequest) {
     const [collision] = await db
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.username, u))
+      .where(sql`lower(${users.username}) = lower(${u})`)
       .limit(1);
     if (collision && collision.id !== authed.userId) {
       return NextResponse.json({ error: "Username already taken" }, { status: 409 });

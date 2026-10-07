@@ -5,13 +5,10 @@ import { db } from "@/lib/infra/db";
 import { challenges, users } from "@/lib/infra/db/schema";
 import { parsePagination } from "@/lib/infra/http";
 import {
-  scoreChallenge,
+  scoresForDisplay,
   resolveEndedChallenges,
   resolveExpiredPending,
-  mapWithConcurrency,
 } from "@/lib/social/challenges";
-
-const SCORE_CONCURRENCY = 8;
 
 const STATUSES = ["pending", "active", "completed", "declined", "cancelled"] as const;
 
@@ -109,40 +106,16 @@ export async function GET(req: NextRequest) {
       : [];
     const userMap = new Map(userRows.map((u) => [u.id, u.username]));
 
-    // Bounded concurrency instead of an unbounded Promise.all — at limit=200
-    // that would fire up to 400 concurrent score queries in one request and
-    // risk exhausting the DB connection pool.
-    const list: Array<
-      (typeof rows)[number] & {
-        challengerUsername: string | null;
-        challengedUsername: string | null;
-        challengerScore: number;
-        challengedScore: number;
-      }
-    > = new Array(rows.length);
-    await mapWithConcurrency(
-      rows.map((c, i) => ({ c, i })),
-      SCORE_CONCURRENCY,
-      async ({ c, i }) => {
-        const needsScores = c.status === "active" || c.status === "completed";
-        const cached = resolved.get(c.id);
-        const [challengerScore, challengedScore] = cached
-          ? [cached.challengerScore, cached.challengedScore]
-          : needsScores
-            ? await Promise.all([
-                scoreChallenge(c.challengerId, c),
-                scoreChallenge(c.challengedId, c),
-              ])
-            : [0, 0];
-        list[i] = {
-          ...c,
-          challengerUsername: userMap.get(c.challengerId) ?? null,
-          challengedUsername: userMap.get(c.challengedId) ?? null,
-          challengerScore,
-          challengedScore,
-        };
-      }
-    );
+    // Completed rows read their persisted scores; in-progress ones are counted live
+    // with bounded concurrency (see scoresForDisplay).
+    const scores = await scoresForDisplay(rows, resolved);
+    const list = rows.map((c) => ({
+      ...c,
+      challengerUsername: userMap.get(c.challengerId) ?? null,
+      challengedUsername: userMap.get(c.challengedId) ?? null,
+      challengerScore: scores.get(c.id)?.challengerScore ?? 0,
+      challengedScore: scores.get(c.id)?.challengedScore ?? 0,
+    }));
 
     return NextResponse.json({ stats, challenges: list, hasMore });
   } catch (err) {

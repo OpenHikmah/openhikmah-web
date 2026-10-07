@@ -14,7 +14,7 @@ import { NameVerses } from "./NameVerses";
 import { NameReflection } from "./NameReflection";
 import { NamePairings, type Pairing } from "./NamePairings";
 import { NameMeta } from "./NameMeta";
-import { getCachedNameContent } from "@/lib/names/name-content";
+import { getCachedNameContent, hashNameSource } from "@/lib/names/name-content";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
 import { REFLECTION_VERSION } from "@/app/api/names/[slug]/reflection/route";
 import { PAIRINGS_VERSION } from "@/app/api/names/[slug]/pairings/route";
@@ -34,8 +34,13 @@ export async function generateMetadata({ params }: Props) {
   const description =
     locale === "en"
       ? name.description
-      : ((await getCachedNameContent<string>(slug, "description", locale, META_VERSION)) ??
-        name.description);
+      : ((await getCachedNameContent<string>(
+          slug,
+          "description",
+          locale,
+          META_VERSION,
+          hashNameSource(name.description)
+        )) ?? name.description);
   return {
     title: `${name.transliteration} — Open Hikmah`,
     description,
@@ -73,16 +78,52 @@ export default async function NameDetailPage({ params }: Props) {
   // miss leaves the value undefined and the client components fall back to
   // their existing fetch-and-generate behavior unchanged.
   const locale = await getUiLocale();
+  // A translated reflection/pairings row is only valid for the English it was
+  // translated from, so non-English reads fetch that English source to check it
+  // (the English rows themselves are keyed only by version).
+  const [englishReflection, englishPairings] =
+    locale === "en"
+      ? [null, null]
+      : await Promise.all([
+          getCachedNameContent<string>(slug, "reflection", "en", REFLECTION_VERSION),
+          getCachedNameContent<Pairing[]>(slug, "pairings", "en", PAIRINGS_VERSION),
+        ]);
   const [initialReflection, initialPairings, initialMeaning, initialDescription] =
     await Promise.all([
-      getCachedNameContent<string>(slug, "reflection", locale, REFLECTION_VERSION),
-      getCachedNameContent<Pairing[]>(slug, "pairings", locale, PAIRINGS_VERSION),
+      getCachedNameContent<string>(
+        slug,
+        "reflection",
+        locale,
+        REFLECTION_VERSION,
+        englishReflection != null ? hashNameSource(englishReflection) : undefined
+      ),
+      getCachedNameContent<Pairing[]>(
+        slug,
+        "pairings",
+        locale,
+        PAIRINGS_VERSION,
+        englishPairings != null
+          ? hashNameSource(englishPairings.map((p) => p.explanation))
+          : undefined
+      ),
       locale === "en"
         ? Promise.resolve(null)
-        : getCachedNameContent<string>(slug, "meaning", locale, META_VERSION),
+        : getCachedNameContent<string>(
+            slug,
+            "meaning",
+            locale,
+            META_VERSION,
+            hashNameSource(name.meaning)
+          ),
       locale === "en"
         ? Promise.resolve(null)
-        : getCachedNameContent<string>(slug, "description", locale, META_VERSION),
+        : getCachedNameContent<string>(
+            slug,
+            "description",
+            locale,
+            META_VERSION,
+            hashNameSource(name.description)
+          ),
     ]);
   // Only trust the pair when BOTH fields hit the cache — a lone hit would
   // otherwise render one translated field next to a stale/English other one.
