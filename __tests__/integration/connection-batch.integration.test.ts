@@ -93,6 +93,10 @@ beforeEach(async () => {
   await reset();
 });
 
+// Real target-language text: translations are checked for the locale's script.
+const TR_REASON = "Bu ayet tahtı ve geniş ilahi bilgiyi anlatır.";
+const RU_REASON = "Этот аят описывает трон и обширное божественное знание.";
+
 describe("runConnectionBatch (integration, real Postgres)", () => {
   it("baseline: generates + persists en rows and translates them per locale", async () => {
     await seed("1:1");
@@ -102,7 +106,7 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     // single localized sentence.
     mockCallAI.mockImplementation(async (prompt: string) => {
       if (prompt.startsWith("Translate the following sentence"))
-        return "localized reason text for testing purposes";
+        return prompt.includes("into Russian") ? RU_REASON : TR_REASON;
       return JSON.stringify([
         { ref: "2:255", reason: "This verse describes the throne and vast divine knowledge." },
         { ref: "3:18", reason: "Both verses bear witness to the absolute oneness of God." },
@@ -138,7 +142,7 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
         sql`${connections.locale} = 'tr' and ${connections.fromRef} = '1:1' and ${connections.kind} = 'thematic'`
       );
     expect(trRows.length).toBe(2);
-    expect(trRows[0].reason).toBe("localized reason text for testing purposes");
+    expect(trRows[0].reason).toBe(TR_REASON);
     expect(enRows.map((r) => r.toRef).sort()).toEqual(trRows.map((r) => r.toRef).sort());
     expect(trRows.every((r) => r.reviewedAt === null)).toBe(true);
 

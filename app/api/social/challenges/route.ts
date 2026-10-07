@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq, gte, inArray, lt, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { challenges, challengeSuggestions, friendships, users } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
@@ -10,6 +10,9 @@ import {
   resolveExpiredPending,
 } from "@/lib/social/challenges";
 import { rateLimitOrNull } from "@/lib/infra/rate-limit";
+
+// First key of the two-int per-pair advisory lock taken while creating a challenge.
+const CHALLENGE_LOCK_NAMESPACE = 668;
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
@@ -122,7 +125,7 @@ export async function POST(req: NextRequest) {
   const [target] = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.username, challengedUsername.trim()))
+    .where(sql`lower(${users.username}) = lower(${challengedUsername.trim()})`)
     .limit(1);
 
   if (!target) {
@@ -151,32 +154,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "You must be friends to send a challenge" }, { status: 409 });
   }
 
-  // Block if an active or still-live pending challenge already exists between
-  // them. A pending row whose endsAt has passed is a stale, un-actioned
-  // invite — treat it as already expired here too, even if the lazy resolver
-  // (GET) hasn't written the "declined" status back yet.
-  const now = new Date();
-  const [existing] = await db
-    .select({ id: challenges.id })
-    .from(challenges)
-    .where(
-      and(
-        or(
-          and(eq(challenges.challengerId, userId), eq(challenges.challengedId, target.id)),
-          and(eq(challenges.challengerId, target.id), eq(challenges.challengedId, userId))
-        ),
-        or(
-          eq(challenges.status, "active"),
-          and(eq(challenges.status, "pending"), gte(challenges.endsAt, now))
-        )
-      )
-    )
-    .limit(1);
-
-  if (existing) {
-    return NextResponse.json({ error: "A challenge already exists between you" }, { status: 409 });
-  }
-
   // Only attribute to a suggestion that actually exists and is active — an
   // arbitrary/stale id would otherwise fail the FK insert (or mis-attribute).
   let suggestionId: number | null = null;
@@ -194,20 +171,59 @@ export async function POST(req: NextRequest) {
     suggestionId = s?.id ?? null;
   }
 
-  const startsAt = new Date();
-  const endsAt = new Date(startsAt.getTime() + DURATIONS[duration]);
+  // The "no challenge already exists" check and the insert must be one atomic
+  // step per pair, or two concurrent requests (either direction) both pass the
+  // check and create duplicate challenges. There is no unique index to lean on —
+  // an expired pending invite legitimately coexists with a new one, and "expired"
+  // depends on `now` — so serialize per pair with a transaction-scoped advisory lock.
+  const pairKey = `${Math.min(userId, target.id)}:${Math.max(userId, target.id)}`;
+  const inserted = await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(${CHALLENGE_LOCK_NAMESPACE}, hashtext(${pairKey}))`
+    );
 
-  const [inserted] = await db
-    .insert(challenges)
-    .values({
-      challengerId: userId,
-      challengedId: target.id,
-      verseRef: verseRef?.trim() || null,
-      suggestionId,
-      startsAt,
-      endsAt,
-    })
-    .returning();
+    // Block if an active or still-live pending challenge already exists between
+    // them. A pending row whose endsAt has passed is a stale, un-actioned
+    // invite — treat it as already expired here too, even if the lazy resolver
+    // (GET) hasn't written the "declined" status back yet.
+    const now = new Date();
+    const [existing] = await tx
+      .select({ id: challenges.id })
+      .from(challenges)
+      .where(
+        and(
+          or(
+            and(eq(challenges.challengerId, userId), eq(challenges.challengedId, target.id)),
+            and(eq(challenges.challengerId, target.id), eq(challenges.challengedId, userId))
+          ),
+          or(
+            eq(challenges.status, "active"),
+            and(eq(challenges.status, "pending"), gte(challenges.endsAt, now))
+          )
+        )
+      )
+      .limit(1);
+    if (existing) return null;
+
+    const startsAt = new Date();
+    const endsAt = new Date(startsAt.getTime() + DURATIONS[duration]);
+    const [row] = await tx
+      .insert(challenges)
+      .values({
+        challengerId: userId,
+        challengedId: target.id,
+        verseRef: verseRef?.trim() || null,
+        suggestionId,
+        startsAt,
+        endsAt,
+      })
+      .returning();
+    return row;
+  });
+
+  if (!inserted) {
+    return NextResponse.json({ error: "A challenge already exists between you" }, { status: 409 });
+  }
 
   // Probabilistic cleanup of very old declined/completed challenges (5%)
   if (Math.random() < 0.05) {

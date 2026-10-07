@@ -1,5 +1,9 @@
 import { translateReason } from "@/lib/ai/translate";
-import { getOrGenerateNameContent, type GenerationContext } from "@/lib/names/name-content";
+import {
+  getOrGenerateNameContent,
+  hashNameSource,
+  type GenerationContext,
+} from "@/lib/names/name-content";
 import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
 import { incr } from "@/lib/infra/metrics";
 
@@ -66,7 +70,8 @@ export async function getLocalizedNameField(
         return "";
       }),
     (s) => s.trim() === "",
-    onBeforeGenerate
+    onBeforeGenerate,
+    hashNameSource(canonical)
   );
 
   // A blank/failed translation must never silently replace an already-vetted

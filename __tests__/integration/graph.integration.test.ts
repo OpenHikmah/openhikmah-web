@@ -322,7 +322,7 @@ describe("connection graph (integration, real Postgres)", () => {
   it("a cold non-en request generates English first, then translates it", async () => {
     await seed("2:255");
     const WITNESS_REASON = "Both verses bear witness to the absolute oneness of God.";
-    const RU_TRANSLATION = "witness of oneness translated into Russian for this test (ru)";
+    const RU_TRANSLATION = "Оба аята свидетельствуют об абсолютном единстве Бога.";
     mockCallAI.mockImplementation(async (prompt: string) => {
       if (prompt.startsWith("Translate the following sentence")) return RU_TRANSLATION;
       return JSON.stringify([{ ref: "2:255", reason: WITNESS_REASON }]);
@@ -341,7 +341,7 @@ describe("connection graph (integration, real Postgres)", () => {
   it("a translation whose meaning drifted is not persisted: the English reason is served and a later request retries", async () => {
     await seed("2:255");
     const WITNESS_REASON = "Both verses bear witness to the absolute oneness of God.";
-    const RU_TRANSLATION = "witness of oneness translated into Russian for this test (ru)";
+    const RU_TRANSLATION = "Оба аята свидетельствуют об абсолютном единстве Бога.";
     mockCallAI.mockImplementation(async (prompt: string) => {
       if (prompt.startsWith("Translate the following sentence")) return RU_TRANSLATION;
       return JSON.stringify([{ ref: "2:255", reason: WITNESS_REASON }]);

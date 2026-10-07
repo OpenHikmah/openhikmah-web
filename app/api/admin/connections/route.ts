@@ -91,53 +91,62 @@ export async function PATCH(req: NextRequest) {
 
   try {
     if (status !== undefined) {
-      const [prior] = await db
-        .select({ status: connections.status })
-        .from(connections)
-        .where(eq(connections.id, id as number));
+      // The transition and the counter move must be one atomic step. Reading the
+      // prior status outside a transaction let two concurrent retire/flag requests
+      // both see "active" and both decrement the coverage counter. FOR UPDATE makes
+      // the second wait, then see the already-moved status and skip the counter.
+      const outcome = await db.transaction(async (tx) => {
+        const [prior] = await tx
+          .select({ status: connections.status })
+          .from(connections)
+          .where(eq(connections.id, id as number))
+          .for("update");
+        if (!prior) return null;
 
-      if (!prior) {
+        const [row] = await tx
+          .update(connections)
+          .set({ status, reviewedAt: new Date(), reviewedBy: auth.user.qfId })
+          .where(eq(connections.id, id as number))
+          .returning();
+
+        // Keep the coverage cell's activeCount honest, and only move it on a real
+        // transition — re-submitting `retired` on an already-retired row, or
+        // flipping flagged↔retired, must not double-decrement. The cell keys on
+        // the English locale (see upsertCoverage, which only writes `en`).
+        const wasActive = prior.status === "active";
+        const nowActive = status === "active";
+        const coverageWhere = and(
+          eq(connectionCoverage.fromRef, row.fromRef),
+          eq(connectionCoverage.kind, row.kind),
+          eq(connectionCoverage.locale, "en")
+        );
+        if (wasActive && !nowActive) {
+          // Lost an active connection: un-strand the cell so the backfill job
+          // reconsiders this verse instead of skipping it forever.
+          await tx
+            .update(connectionCoverage)
+            .set({
+              exhaustedAt: null,
+              activeCount: sql`GREATEST(${connectionCoverage.activeCount} - 1, 0)`,
+              updatedAt: new Date(),
+            })
+            .where(coverageWhere);
+        } else if (!wasActive && nowActive) {
+          await tx
+            .update(connectionCoverage)
+            .set({
+              exhaustedAt: null,
+              activeCount: sql`${connectionCoverage.activeCount} + 1`,
+              updatedAt: new Date(),
+            })
+            .where(coverageWhere);
+        }
+        return row;
+      });
+      if (!outcome) {
         return NextResponse.json({ error: "Connection not found" }, { status: 404 });
       }
-
-      const [updated] = await db
-        .update(connections)
-        .set({ status, reviewedAt: new Date(), reviewedBy: auth.user.qfId })
-        .where(eq(connections.id, id as number))
-        .returning();
-
-      // Keep the coverage cell's activeCount honest, and only move it on a real
-      // transition — re-submitting `retired` on an already-retired row, or
-      // flipping flagged↔retired, must not double-decrement. The cell keys on
-      // the English locale (see upsertCoverage, which only writes `en`).
-      const wasActive = prior.status === "active";
-      const nowActive = status === "active";
-      const coverageWhere = and(
-        eq(connectionCoverage.fromRef, updated.fromRef),
-        eq(connectionCoverage.kind, updated.kind),
-        eq(connectionCoverage.locale, "en")
-      );
-      if (wasActive && !nowActive) {
-        // Lost an active connection: un-strand the cell so the backfill job
-        // reconsiders this verse instead of skipping it forever.
-        await db
-          .update(connectionCoverage)
-          .set({
-            exhaustedAt: null,
-            activeCount: sql`GREATEST(${connectionCoverage.activeCount} - 1, 0)`,
-            updatedAt: new Date(),
-          })
-          .where(coverageWhere);
-      } else if (!wasActive && nowActive) {
-        await db
-          .update(connectionCoverage)
-          .set({
-            exhaustedAt: null,
-            activeCount: sql`${connectionCoverage.activeCount} + 1`,
-            updatedAt: new Date(),
-          })
-          .where(coverageWhere);
-      }
+      const updated = outcome;
 
       await logAdminAction({
         adminQfId: auth.user.qfId,

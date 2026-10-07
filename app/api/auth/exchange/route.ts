@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { users } from "@/lib/infra/db/schema";
 import { resolveQfId } from "@/lib/auth/social-auth";
@@ -180,7 +180,7 @@ export async function POST(req: NextRequest) {
             const collision = await db
               .select({ id: users.id })
               .from(users)
-              .where(eq(users.username, newUsername))
+              .where(sql`lower(${users.username}) = lower(${newUsername})`)
               .limit(1);
             if (collision.length === 0) break;
             newUsername = generateUsername();

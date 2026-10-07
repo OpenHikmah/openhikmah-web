@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { callAI } from "@/lib/ai/ai";
 import { looksLikeRefusal } from "@/lib/ai/refusal";
 import { getNameBySlug } from "@/lib/names/divine-names";
-import { getOrGenerateNameContent } from "@/lib/names/name-content";
+import { getOrGenerateNameContent, hashNameSource } from "@/lib/names/name-content";
 import { verifyReflection } from "@/lib/names/name-verify";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
@@ -130,7 +130,8 @@ async function getReflection(
         return "";
       }),
     isBlank,
-    onBeforeGenerateOnce
+    onBeforeGenerateOnce,
+    hashNameSource(english)
   );
   // Same as verses/route.ts: a failed translation (uncached, so retried on the
   // next request) falls back to the already-scanned English, never to blank.
