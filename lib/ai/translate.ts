@@ -35,12 +35,60 @@ export type TranslationRejection =
   | "refusal"
   | "tashbih"
   | "english_echo"
+  | "wrong_script"
   | "length_ratio"
   | "meaning_drift"
   | "verification_failed";
 
 export type TranslationVerdict =
   { ok: true; text: string } | { ok: false; reason: TranslationRejection };
+
+/**
+ * Share of a translation's letters that must be in the target locale's script.
+ * Loose on purpose: real output legitimately mixes in a few foreign letters
+ * (a transliterated Arabic name inside a Russian sentence, a Latin acronym),
+ * while a wrong-language answer is overwhelmingly the wrong script.
+ */
+const MIN_TARGET_SCRIPT_SHARE = 0.6;
+
+const SCRIPT_RULES: Record<string, RegExp> = {
+  // Cyrillic for ru.
+  russian: /\p{Script=Cyrillic}/u,
+  // Latin (with the diacritics tr/az use) for tr/az — rejects Cyrillic/Arabic/CJK answers.
+  turkish: /\p{Script=Latin}/u,
+  azerbaijani: /\p{Script=Latin}/u,
+};
+
+/**
+ * Letters Turkish and Azerbaijani use that English does not. Real prose of
+ * MIN_LETTERS_FOR_DIACRITIC_CHECK+ letters in either language contains at least
+ * one; plain English (a paraphrase, not an exact echo) contains none.
+ */
+const TR_AZ_DIACRITICS = /[çğıöşüəÇĞİÖŞÜƏ]/u;
+const MIN_LETTERS_FOR_DIACRITIC_CHECK = 60;
+
+/**
+ * Whether `text` is written in the script expected for `language` (the English
+ * language name passed to translateReason). A language with no rule is not
+ * checked. Pure letters only: digits, punctuation and spaces are ignored, and a
+ * text with no letters at all fails (nothing was actually translated).
+ */
+export function isInTargetScript(text: string, language: string): boolean {
+  const rule = SCRIPT_RULES[language.trim().toLowerCase()];
+  if (!rule) return true;
+  const letters = [...text].filter((ch) => /\p{L}/u.test(ch));
+  if (letters.length === 0) return false;
+  const inScript = letters.filter((ch) => rule.test(ch)).length;
+  if (inScript / letters.length < MIN_TARGET_SCRIPT_SHARE) return false;
+  const lang = language.trim().toLowerCase();
+  if (
+    (lang === "turkish" || lang === "azerbaijani") &&
+    letters.length >= MIN_LETTERS_FOR_DIACRITIC_CHECK
+  ) {
+    return TR_AZ_DIACRITICS.test(text);
+  }
+  return true;
+}
 
 /** Case- and punctuation-insensitive form, so an echo that only re-punctuates or
  *  re-cases the English source is still caught. */
@@ -67,11 +115,13 @@ function normalizeForEcho(s: string): string {
  * would reject a perfectly good translation as junk. The min-ratio floor is
  * unaffected (it already only applies at `MIN_SOURCE_LEN_FOR_MIN_RATIO`+ chars,
  * so it never engages for these short sources).
+ *
+ * `language` (the English name, e.g. "Russian") enables the target-script check.
  */
 export function validateTranslation(
   source: string,
   translated: string,
-  opts: { maxLengthRatio?: number } = {}
+  opts: { maxLengthRatio?: number; language?: string } = {}
 ): TranslationVerdict {
   const hadLabel = LABEL_PREFIX.test(translated);
   const stripped = translated.replace(LABEL_PREFIX, "").trim();
@@ -87,6 +137,12 @@ export function validateTranslation(
     // translateReason is only ever called cross-language, so an echo of the
     // English source is always a failed translation.
     return { ok: false, reason: "english_echo" };
+  }
+
+  // A wrong-language answer (English returned for a Russian request, Latin
+  // letters where Cyrillic is expected) is not an exact echo, so it needs its own check.
+  if (opts.language && !isInTargetScript(stripped, opts.language)) {
+    return { ok: false, reason: "wrong_script" };
   }
 
   const maxLengthRatio = opts.maxLengthRatio ?? MAX_LENGTH_RATIO;
@@ -248,7 +304,7 @@ Sentence: "${reason}"`;
   verifyHooks?.pacer?.noteRequest();
   if (translated === "") return "";
 
-  const verdict = validateTranslation(reason, translated, validationOpts);
+  const verdict = validateTranslation(reason, translated, { ...validationOpts, language });
   if (!verdict.ok) {
     console.error(`translateReason: rejected translation into ${language} (${verdict.reason})`);
     incr(`translation_rejected_${verdict.reason}`);

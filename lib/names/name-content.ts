@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { nameContent, nameVerseReasons, type NameContentKind } from "@/lib/infra/db/schema";
@@ -164,6 +165,27 @@ async function resolveAndGenerate<T>(
 
 export type { NameContentKind };
 
+/**
+ * Stable fingerprint of the English source text(s) a translation was derived
+ * from. Stored next to the translation; a mismatch with the current source means
+ * the English changed (an edit, or a regenerated reflection/reason) and the
+ * translation is stale. An array (e.g. the explanations of a pairings set) is
+ * hashed as one ordered unit.
+ */
+export function hashNameSource(source: string | string[]): string {
+  return createHash("sha256").update(JSON.stringify(source)).digest("hex").slice(0, 16);
+}
+
+/**
+ * Whether a stored row is still valid for the caller's current source. No
+ * expectation (English rows, callers without a source) always matches, and a row
+ * with no stored hash predates the column — its source is unknown, so it is
+ * served rather than mass-retranslated; only a known, different hash is stale.
+ */
+function sourceMatches(stored: string | null, expected: string | undefined): boolean {
+  return expected === undefined || !stored || stored === expected;
+}
+
 // Per-process single-flight: concurrent first-loads of the same (slug, kind,
 // version) share one generation instead of each calling the AI (mirrors
 // graph-service). The value is `Promise<unknown>` because the map is shared
@@ -197,18 +219,24 @@ export async function getOrGenerateNameContent<T>(
   version: number,
   generate: (ctx: GenerationContext) => Promise<T>,
   isEmpty: (value: T) => boolean,
-  onBeforeGenerate?: () => Promise<void>
+  onBeforeGenerate?: () => Promise<void>,
+  sourceHash?: string
 ): Promise<T> {
-  // 1. Durable cache hit (only when the stored version matches the current one).
+  // 1. Durable cache hit (only when the stored version AND, for a translation,
+  // the English source it was derived from still match).
   const [row] = await db
-    .select({ data: nameContent.data, version: nameContent.version })
+    .select({
+      data: nameContent.data,
+      version: nameContent.version,
+      sourceHash: nameContent.sourceHash,
+    })
     .from(nameContent)
     .where(
       and(eq(nameContent.slug, slug), eq(nameContent.kind, kind), eq(nameContent.locale, locale))
     )
     .limit(1);
 
-  if (row && row.version === version) {
+  if (row && row.version === version && sourceMatches(row.sourceHash, sourceHash)) {
     try {
       return JSON.parse(row.data) as T;
     } catch (err) {
@@ -225,11 +253,11 @@ export async function getOrGenerateNameContent<T>(
   // can't both become the leader. `version` is part of the key so a follower can
   // never join a generation running under a different version (defensive — the
   // version is a per-route constant, so this only differs across a deploy).
-  const key = `${slug}:${kind}:${locale}:${version}`;
+  const key = `${slug}:${kind}:${locale}:${version}:${sourceHash ?? ""}`;
   const pending = inFlight.get(key);
   if (pending) return pending as Promise<T>;
 
-  const work = generateAndPersist(slug, kind, locale, version, generate, isEmpty);
+  const work = generateAndPersist(slug, kind, locale, version, generate, isEmpty, sourceHash);
   inFlight.set(key, work);
   try {
     return await work;
@@ -248,12 +276,17 @@ export async function getCachedNameContent<T>(
   slug: string,
   kind: NameContentKind,
   locale: Locale,
-  version: number
+  version: number,
+  sourceHash?: string
 ): Promise<T | null> {
-  let row: { data: string; version: number } | undefined;
+  let row: { data: string; version: number; sourceHash: string | null } | undefined;
   try {
     [row] = await db
-      .select({ data: nameContent.data, version: nameContent.version })
+      .select({
+        data: nameContent.data,
+        version: nameContent.version,
+        sourceHash: nameContent.sourceHash,
+      })
       .from(nameContent)
       .where(
         and(eq(nameContent.slug, slug), eq(nameContent.kind, kind), eq(nameContent.locale, locale))
@@ -267,7 +300,7 @@ export async function getCachedNameContent<T>(
     return null;
   }
 
-  if (!row || row.version !== version) return null;
+  if (!row || row.version !== version || !sourceMatches(row.sourceHash, sourceHash)) return null;
   try {
     return JSON.parse(row.data) as T;
   } catch (err) {
@@ -288,15 +321,21 @@ export async function getCachedNameContentBulk<T>(
   slugs: string[],
   kind: NameContentKind,
   locale: Locale,
-  version: number
+  version: number,
+  sourceHashes?: Map<string, string>
 ): Promise<Map<string, T>> {
   const out = new Map<string, T>();
   if (slugs.length === 0) return out;
 
-  let rows: Array<{ slug: string; data: string; version: number }>;
+  let rows: Array<{ slug: string; data: string; version: number; sourceHash: string | null }>;
   try {
     rows = await db
-      .select({ slug: nameContent.slug, data: nameContent.data, version: nameContent.version })
+      .select({
+        slug: nameContent.slug,
+        data: nameContent.data,
+        version: nameContent.version,
+        sourceHash: nameContent.sourceHash,
+      })
       .from(nameContent)
       .where(
         and(
@@ -312,6 +351,7 @@ export async function getCachedNameContentBulk<T>(
 
   for (const row of rows) {
     if (row.version !== version) continue;
+    if (!sourceMatches(row.sourceHash, sourceHashes?.get(row.slug))) continue;
     try {
       out.set(row.slug, JSON.parse(row.data) as T);
     } catch (err) {
@@ -327,7 +367,8 @@ async function generateAndPersist<T>(
   locale: Locale,
   version: number,
   generate: (ctx: GenerationContext) => Promise<T>,
-  isEmpty: (value: T) => boolean
+  isEmpty: (value: T) => boolean,
+  sourceHash?: string
 ): Promise<T> {
   const { result, model } = await resolveAndGenerate(`${slug}/${kind}`, generate, isEmpty);
 
@@ -336,10 +377,10 @@ async function generateAndPersist<T>(
     try {
       await db
         .insert(nameContent)
-        .values({ slug, kind, locale, data, model, version })
+        .values({ slug, kind, locale, data, model, version, sourceHash: sourceHash ?? null })
         .onConflictDoUpdate({
           target: [nameContent.slug, nameContent.kind, nameContent.locale],
-          set: { data, model, version, updatedAt: new Date() },
+          set: { data, model, version, sourceHash: sourceHash ?? null, updatedAt: new Date() },
         });
     } catch (err) {
       // Best-effort cache write — never fail the request because caching failed.
@@ -367,10 +408,11 @@ export async function getOrGenerateVerseReason(
   ref: string,
   locale: Locale,
   generate: (ctx: GenerationContext) => Promise<string>,
-  onBeforeGenerate?: () => Promise<void>
+  onBeforeGenerate?: () => Promise<void>,
+  sourceHash?: string
 ): Promise<string> {
   const [row] = await db
-    .select({ reason: nameVerseReasons.reason })
+    .select({ reason: nameVerseReasons.reason, sourceHash: nameVerseReasons.sourceHash })
     .from(nameVerseReasons)
     .where(
       and(
@@ -381,11 +423,14 @@ export async function getOrGenerateVerseReason(
     )
     .limit(1);
 
-  if (row) return row.reason;
+  if (row && sourceMatches(row.sourceHash, sourceHash)) return row.reason;
+  // A row whose English source changed is overwritten below instead of being
+  // left to win the unique key (DO NOTHING) and keep serving the stale text.
+  const replacing = row !== undefined;
 
   if (onBeforeGenerate) await onBeforeGenerate();
 
-  const key = `${slug}:${ref}:${locale}`;
+  const key = `${slug}:${ref}:${locale}:${sourceHash ?? ""}`;
   const pending = reasonInFlight.get(key);
   if (pending) return pending;
 
@@ -403,9 +448,20 @@ export async function getOrGenerateVerseReason(
       // locale) row first. RETURNING is empty exactly when DO NOTHING
       // discarded our insert; re-read in that case so this call returns the
       // translation that's actually persisted, not the one that lost.
+      const values = { slug, ref, locale, reason, model, sourceHash: sourceHash ?? null };
+      if (replacing) {
+        await db
+          .insert(nameVerseReasons)
+          .values(values)
+          .onConflictDoUpdate({
+            target: [nameVerseReasons.slug, nameVerseReasons.ref, nameVerseReasons.locale],
+            set: { reason, model, sourceHash: sourceHash ?? null },
+          });
+        return reason;
+      }
       const inserted = await db
         .insert(nameVerseReasons)
-        .values({ slug, ref, locale, reason, model })
+        .values(values)
         .onConflictDoNothing()
         .returning({ reason: nameVerseReasons.reason });
       if (inserted.length === 0) {

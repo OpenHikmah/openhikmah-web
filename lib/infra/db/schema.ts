@@ -484,6 +484,11 @@ export const nameContent = pgTable(
     data: text("data").notNull(),
     model: text("model"),
     version: integer("version").notNull().default(1),
+    // Hash of the English source a non-English row was translated from (see
+    // hashNameSource). A mismatch with the current source means the row is stale.
+    // NULL on English rows and on rows written before this column existed (those
+    // are served as before — the source they came from is unknown).
+    sourceHash: text("source_hash"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -504,6 +509,8 @@ export const nameVerseReasons = pgTable(
     locale: text("locale").notNull(),
     reason: text("reason").notNull(),
     model: text("model"),
+    // Hash of the English reason this was translated from; see name_content.source_hash.
+    sourceHash: text("source_hash"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.slug, t.ref, t.locale] })]

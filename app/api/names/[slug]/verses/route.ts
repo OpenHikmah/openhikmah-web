@@ -9,6 +9,7 @@ import { resolveVerse } from "@/lib/quran/verse-resolver";
 import {
   getOrGenerateNameContent,
   getOrGenerateVerseReason,
+  hashNameSource,
   type GenerationContext,
 } from "@/lib/names/name-content";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
@@ -386,7 +387,8 @@ async function getVersesBySlug(
             incr("names_ai_call_error");
             return "";
           }),
-        onBeforeGenerateOnce
+        onBeforeGenerateOnce,
+        hashNameSource(v.reason)
       );
       // A blank/failed translation must never silently replace an
       // already-generated, already-Tanzih-checked English reason — fall back

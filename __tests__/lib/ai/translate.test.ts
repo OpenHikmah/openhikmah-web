@@ -8,6 +8,7 @@ vi.mock("@/lib/ai/ai", async (importOriginal) => ({
 
 import {
   validateTranslation,
+  isInTargetScript,
   translateReason,
   TranslationBudgetExhaustedError,
 } from "@/lib/ai/translate";
@@ -85,6 +86,76 @@ describe("validateTranslation", () => {
       ok: true,
       text: "Yakın.",
     });
+  });
+});
+
+describe("target-script check", () => {
+  const RU = "Верующий успокаивает сердце в уверенности тонкого ведения Аллаха.";
+  const AZ = "Möminin ürəyi Allahın incə xəbərdarlığının yəqinliyində rahatlıq tapır.";
+  const TR = "Mümin kalbini Allah'ın latif ilminin yakinine bırakır ve huzur bulur.";
+
+  it("accepts text in the expected script", () => {
+    expect(isInTargetScript(RU, "Russian")).toBe(true);
+    expect(isInTargetScript(AZ, "Azerbaijani")).toBe(true);
+    expect(isInTargetScript(TR, "Turkish")).toBe(true);
+  });
+
+  it("rejects Russian written in Latin letters", () => {
+    expect(isInTargetScript("Veruyushchiy uspokaivaet serdtse v uverennosti", "Russian")).toBe(
+      false
+    );
+    expect(
+      validateTranslation(EN, "Veruyushchiy uspokaivaet serdtse v uverennosti Allaha.", {
+        language: "Russian",
+      })
+    ).toEqual({ ok: false, reason: "wrong_script" });
+  });
+
+  it("rejects English returned for a Russian request (not an exact echo)", () => {
+    expect(
+      validateTranslation(EN, "The believer calms the heart in certainty of Allah's awareness.", {
+        language: "Russian",
+      })
+    ).toEqual({ ok: false, reason: "wrong_script" });
+  });
+
+  it("rejects Cyrillic or Arabic script where Latin is expected for tr/az", () => {
+    expect(isInTargetScript(RU, "Turkish")).toBe(false);
+    expect(isInTargetScript(RU, "Azerbaijani")).toBe(false);
+    expect(isInTargetScript("المؤمن يطمئن قلبه بيقين علم الله اللطيف الخبير", "Turkish")).toBe(
+      false
+    );
+  });
+
+  it("rejects a long English paraphrase for Turkish/Azerbaijani (no tr/az letters), but not a short ASCII-only name", () => {
+    const longEnglish =
+      "The believer calms the heart in the certainty of the subtle awareness of God.";
+    expect(isInTargetScript(longEnglish, "Turkish")).toBe(false);
+    expect(isInTargetScript(longEnglish, "Azerbaijani")).toBe(false);
+    expect(isInTargetScript("Rahman", "Turkish")).toBe(true);
+  });
+
+  it("tolerates a few foreign letters inside correct-script prose (a transliterated name)", () => {
+    expect(
+      isInTargetScript("Аллах — ар-Рахман, милосердный к Своим рабам (Al-Rahman).", "Russian")
+    ).toBe(true);
+  });
+
+  it("fails text with no letters, and does not check languages without a rule", () => {
+    expect(isInTargetScript("123 — …", "Russian")).toBe(false);
+    expect(isInTargetScript("anything at all", "French")).toBe(true);
+  });
+
+  it("translateReason rejects, meters and reports a wrong-script result", async () => {
+    mockCallAI.mockReset();
+    const incrSpy = vi.spyOn(metrics, "incr");
+    const onRejected = vi.fn();
+    mockCallAI.mockResolvedValue("Veruyushchiy uspokaivaet serdtse v uverennosti Allaha.");
+
+    await expect(translateReason(EN, "Russian", {}, onRejected)).resolves.toBe("");
+
+    expect(incrSpy).toHaveBeenCalledWith("translation_rejected_wrong_script");
+    expect(onRejected).toHaveBeenCalledWith("wrong_script");
   });
 });
 

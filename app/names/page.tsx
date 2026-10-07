@@ -8,7 +8,7 @@ import {
 } from "@/lib/names/divine-names";
 import { LandingHeader } from "@/components/layout/LandingHeader";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
-import { getCachedNameContentBulk } from "@/lib/names/name-content";
+import { getCachedNameContentBulk, hashNameSource } from "@/lib/names/name-content";
 import { getUiLocale } from "@/lib/i18n/request-prefs";
 import { META_VERSION } from "@/lib/names/name-meta";
 
@@ -58,7 +58,8 @@ export default async function NamesPage() {
           DIVINE_NAMES.map((n) => n.slug),
           "meaning",
           locale,
-          META_VERSION
+          META_VERSION,
+          new Map(DIVINE_NAMES.map((n) => [n.slug, hashNameSource(n.meaning)]))
         );
 
   return (

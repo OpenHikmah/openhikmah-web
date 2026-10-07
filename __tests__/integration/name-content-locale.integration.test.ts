@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { sql, and, eq } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { nameContent, nameVerseReasons } from "@/lib/infra/db/schema";
-import { getOrGenerateNameContent, getOrGenerateVerseReason } from "@/lib/names/name-content";
+import {
+  getCachedNameContent,
+  getCachedNameContentBulk,
+  getOrGenerateNameContent,
+  getOrGenerateVerseReason,
+  hashNameSource,
+} from "@/lib/names/name-content";
 
 async function reset() {
   await db.execute(sql`TRUNCATE name_content, name_verse_reasons RESTART IDENTITY CASCADE`);
@@ -98,5 +104,176 @@ describe("name_content locale PK + name_verse_reasons (integration, real Postgre
     await getOrGenerateVerseReason("al-malik", "1:1", "tr", generate);
 
     expect(calls).toBe(1);
+  });
+
+  describe("translation source hash", () => {
+    const notEmpty = (s: string) => s.trim() === "";
+
+    it("serves a translation while its English source is unchanged, without regenerating", async () => {
+      const src = hashNameSource("The Most Merciful");
+      let calls = 0;
+      const gen = async () => {
+        calls++;
+        return "En Merhametli";
+      };
+      await getOrGenerateNameContent(
+        "ar-rahman",
+        "meaning",
+        "tr",
+        1,
+        gen,
+        notEmpty,
+        undefined,
+        src
+      );
+      const again = await getOrGenerateNameContent(
+        "ar-rahman",
+        "meaning",
+        "tr",
+        1,
+        gen,
+        notEmpty,
+        undefined,
+        src
+      );
+      expect(again).toBe("En Merhametli");
+      expect(calls).toBe(1);
+      const [row] = await db.select().from(nameContent).where(eq(nameContent.locale, "tr"));
+      expect(row.sourceHash).toBe(src);
+    });
+
+    it("treats a changed English source as a miss and overwrites the stale translation", async () => {
+      await getOrGenerateNameContent(
+        "ar-rahman",
+        "meaning",
+        "tr",
+        1,
+        async () => "eski çeviri",
+        notEmpty,
+        undefined,
+        hashNameSource("The Most Merciful")
+      );
+      const fresh = await getOrGenerateNameContent(
+        "ar-rahman",
+        "meaning",
+        "tr",
+        1,
+        async () => "yeni çeviri",
+        notEmpty,
+        undefined,
+        hashNameSource("The All-Compassionate")
+      );
+      expect(fresh).toBe("yeni çeviri");
+      const rows = await db.select().from(nameContent).where(eq(nameContent.locale, "tr"));
+      expect(rows).toHaveLength(1);
+      expect(JSON.parse(rows[0].data)).toBe("yeni çeviri");
+      expect(rows[0].sourceHash).toBe(hashNameSource("The All-Compassionate"));
+    });
+
+    it("cache-only readers (single and bulk) treat a stale translation as a miss", async () => {
+      await getOrGenerateNameContent(
+        "ar-rahman",
+        "meaning",
+        "tr",
+        1,
+        async () => "çeviri",
+        notEmpty,
+        undefined,
+        hashNameSource("old source")
+      );
+      expect(
+        await getCachedNameContent<string>(
+          "ar-rahman",
+          "meaning",
+          "tr",
+          1,
+          hashNameSource("old source")
+        )
+      ).toBe("çeviri");
+      expect(
+        await getCachedNameContent<string>(
+          "ar-rahman",
+          "meaning",
+          "tr",
+          1,
+          hashNameSource("new source")
+        )
+      ).toBeNull();
+
+      const bulkFresh = await getCachedNameContentBulk<string>(
+        ["ar-rahman"],
+        "meaning",
+        "tr",
+        1,
+        new Map([["ar-rahman", hashNameSource("old source")]])
+      );
+      expect(bulkFresh.get("ar-rahman")).toBe("çeviri");
+      const bulkStale = await getCachedNameContentBulk<string>(
+        ["ar-rahman"],
+        "meaning",
+        "tr",
+        1,
+        new Map([["ar-rahman", hashNameSource("new source")]])
+      );
+      expect(bulkStale.size).toBe(0);
+    });
+
+    it("keeps serving a legacy translation with no stored hash (source unknown) instead of mass-retranslating", async () => {
+      await db.execute(
+        sql`INSERT INTO name_content (slug, kind, locale, data, version) VALUES ('ar-rahman', 'meaning', 'tr', ${JSON.stringify("eski kayıt")}, 1)`
+      );
+      let calls = 0;
+      const out = await getOrGenerateNameContent(
+        "ar-rahman",
+        "meaning",
+        "tr",
+        1,
+        async () => {
+          calls++;
+          return "yeni";
+        },
+        notEmpty,
+        undefined,
+        hashNameSource("The Most Merciful")
+      );
+      expect(out).toBe("eski kayıt");
+      expect(calls).toBe(0);
+    });
+
+    it("regenerates a verse reason whose English source changed, and replaces the stale row", async () => {
+      await getOrGenerateVerseReason(
+        "ar-rahman",
+        "1:3",
+        "tr",
+        async () => "eski sebep",
+        undefined,
+        hashNameSource("old english reason")
+      );
+      const same = await getOrGenerateVerseReason(
+        "ar-rahman",
+        "1:3",
+        "tr",
+        async () => "should not run",
+        undefined,
+        hashNameSource("old english reason")
+      );
+      expect(same).toBe("eski sebep");
+
+      const fresh = await getOrGenerateVerseReason(
+        "ar-rahman",
+        "1:3",
+        "tr",
+        async () => "yeni sebep",
+        undefined,
+        hashNameSource("new english reason")
+      );
+      expect(fresh).toBe("yeni sebep");
+      const rows = await db.select().from(nameVerseReasons);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        reason: "yeni sebep",
+        sourceHash: hashNameSource("new english reason"),
+      });
+    });
   });
 });
