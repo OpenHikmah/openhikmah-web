@@ -319,6 +319,30 @@ describe("connection graph (integration, real Postgres)", () => {
     expect(mockCallAI.mock.calls.length).toBe(callsBefore);
   });
 
+  it("a retired or flagged en edge is not regenerated or served again, and no AI call is made for it", async () => {
+    await seed("2:255");
+    const REASON = "reason A: mercy and forgiveness are shown throughout this passage.";
+    mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: REASON }]));
+    await getConnections("1:1", "thematic", source);
+    const callsBefore = mockCallAI.mock.calls.length;
+
+    for (const status of ["retired", "flagged"]) {
+      await db
+        .update(connections)
+        .set({ status })
+        .where(and(eq(connections.locale, "en"), eq(connections.toRef, "2:255")));
+
+      // The moderated row holds the unique key; the same pair must not be proposed
+      // again, so the fresh text is never served and the model is not called.
+      const served = await getConnections("1:1", "thematic", source);
+      expect(served).toEqual([]);
+      const rows = await db.select().from(connections).where(eq(connections.locale, "en"));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ reason: REASON, status });
+    }
+    expect(mockCallAI.mock.calls.length).toBe(callsBefore);
+  });
+
   it("a cold non-en request generates English first, then translates it", async () => {
     await seed("2:255");
     const WITNESS_REASON = "Both verses bear witness to the absolute oneness of God.";
