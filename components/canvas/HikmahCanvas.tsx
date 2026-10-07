@@ -167,6 +167,9 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
         for (let i = 0; i < connections.length; i++) {
           await new Promise<void>((resolve) => setTimeout(resolve, 350));
           if (!mountedRef.current) break;
+          // The source may have been removed (Clear) while the fetch or a previous
+          // stagger was in flight — adding more nodes would orphan them.
+          if (!useCanvasStore.getState().getNodeById(nodeId)) return;
 
           const conn = connections[i];
           if (hasNode(conn.ref)) {

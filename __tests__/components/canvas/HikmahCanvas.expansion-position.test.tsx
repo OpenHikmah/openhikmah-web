@@ -101,4 +101,67 @@ describe("HikmahCanvas expansion node placement", () => {
     expect(newNode!.position.x).toBeGreaterThan(1000);
     expect(newNode!.position.y).toBeGreaterThan(1000);
   });
+
+  it("stops adding nodes and edges once the source node is cleared mid-expansion", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve([connection("2:256"), connection("2:257"), connection("3:2")]),
+      })
+    );
+
+    render(<HikmahCanvas onSearchOpen={vi.fn()} />);
+
+    act(() => {
+      useCanvasStore.getState().setPendingExpand({ nodeId: "n1", ref: "1:1", kind: "thematic" });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    act(() => {
+      useCanvasStore.getState().reset();
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+
+    expect(useCanvasStore.getState().nodes).toHaveLength(0);
+    expect(useCanvasStore.getState().edges).toHaveLength(0);
+  });
+
+  it("stops the remaining stagger when the source is cleared after some nodes were added", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve([connection("2:256"), connection("2:257"), connection("3:2")]),
+      })
+    );
+
+    render(<HikmahCanvas onSearchOpen={vi.fn()} />);
+
+    act(() => {
+      useCanvasStore.getState().setPendingExpand({ nodeId: "n1", ref: "1:1", kind: "thematic" });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(350);
+    });
+    expect(useCanvasStore.getState().nodes).toHaveLength(2);
+
+    act(() => {
+      useCanvasStore.getState().reset();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+
+    expect(useCanvasStore.getState().nodes).toHaveLength(0);
+    expect(useCanvasStore.getState().edges).toHaveLength(0);
+  });
 });

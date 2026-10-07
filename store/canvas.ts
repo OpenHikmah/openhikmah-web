@@ -160,7 +160,8 @@ function computeExpansionCountsMap(
   return map;
 }
 
-export type AddConnectionEdgeResult = "added" | "duplicate-same-kind" | "duplicate-different-kind";
+export type AddConnectionEdgeResult =
+  "added" | "duplicate-same-kind" | "duplicate-different-kind" | "missing-endpoint";
 
 export const DEFAULT_SIDEBAR_WIDTH = 288;
 
@@ -256,6 +257,15 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   addConnectionEdge: (edge) => {
     let result: AddConnectionEdgeResult = "added";
     set((s) => {
+      // An in-flight expansion can outlive its source (Clear) — never persist an
+      // edge that points at a node that no longer exists.
+      if (
+        !s.nodes.some((n) => n.id === edge.source) ||
+        !s.nodes.some((n) => n.id === edge.target)
+      ) {
+        result = "missing-endpoint";
+        return s;
+      }
       const existingEdge = s.edges.find(
         (e) =>
           (e.source === edge.source && e.target === edge.target) ||
