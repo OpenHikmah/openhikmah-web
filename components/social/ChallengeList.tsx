@@ -7,6 +7,7 @@ import { useSocialStore } from "@/store/social";
 import { Loader2, Trophy, Clock, Minus, Swords } from "lucide-react";
 import { Card, Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { authFetch } from "@/lib/auth/auth-fetch";
 
 export interface EnrichedChallenge {
   id: number;
@@ -144,9 +145,9 @@ function ChallengeCard({
     setActing(action);
     setError(null);
     try {
-      const res = await fetch(`/api/social/challenges/${c.id}`, {
+      const res = await authFetch(`/api/social/challenges/${c.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       });
       if (!res.ok) {

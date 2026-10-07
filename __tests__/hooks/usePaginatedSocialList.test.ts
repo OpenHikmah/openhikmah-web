@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { usePaginatedSocialList } from "@/hooks/usePaginatedSocialList";
+import { useAuthStore } from "@/store/auth";
 
 interface Item {
   id: number;
@@ -19,6 +20,7 @@ describe("usePaginatedSocialList", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", mockFetch);
     mockFetch.mockReset();
+    useAuthStore.setState({ accessToken: "t" });
   });
 
   afterEach(() => {
@@ -33,10 +35,9 @@ describe("usePaginatedSocialList", () => {
     );
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(mockFetch).toHaveBeenCalledWith(
-      "/api/x",
-      expect.objectContaining({ headers: { Authorization: "Bearer t" } })
-    );
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe("/api/x");
+    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer t");
     expect(result.current.items).toHaveLength(2);
     expect(result.current.hasMore).toBe(true);
   });

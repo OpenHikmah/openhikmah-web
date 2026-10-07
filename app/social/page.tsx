@@ -18,6 +18,7 @@ import Link from "next/link";
 import { AuthShell } from "@/components/layout/AuthShell";
 import { usePaginatedSocialList } from "@/hooks/usePaginatedSocialList";
 import { countPendingReceived } from "@/lib/social/friends";
+import { authFetch } from "@/lib/auth/auth-fetch";
 
 type Tab = "friends" | "leaderboard" | "challenges";
 
@@ -121,9 +122,7 @@ export default function SocialPage() {
     if (!accessToken) return;
     setLoadingChallenges(true);
     try {
-      const res = await fetch("/api/social/challenges", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const res = await authFetch("/api/social/challenges");
       if (res.ok) {
         const data: EnrichedChallenge[] = await res.json();
         setChallengesList(data);
@@ -142,9 +141,7 @@ export default function SocialPage() {
   const fetchSuggestions = useCallback(async () => {
     if (!accessToken) return;
     try {
-      const res = await fetch("/api/social/challenge-suggestions", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const res = await authFetch("/api/social/challenge-suggestions");
       if (res.ok) {
         const data = (await res.json()) as { suggestions: Suggestion[] };
         setSuggestions(data.suggestions);
@@ -169,7 +166,7 @@ export default function SocialPage() {
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingChallenges(true);
-    fetch("/api/social/challenges", { headers: { Authorization: `Bearer ${accessToken}` }, signal })
+    authFetch("/api/social/challenges", { signal })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: EnrichedChallenge[]) => {
         setChallengesList(data);
@@ -178,8 +175,7 @@ export default function SocialPage() {
       .catch((e) => console.error("social: challenges fetch failed", e))
       .finally(() => setLoadingChallenges(false));
 
-    fetch("/api/social/challenge-suggestions", {
-      headers: { Authorization: `Bearer ${accessToken}` },
+    authFetch("/api/social/challenge-suggestions", {
       signal,
     })
       .then((r) => (r.ok ? r.json() : { suggestions: [] }))

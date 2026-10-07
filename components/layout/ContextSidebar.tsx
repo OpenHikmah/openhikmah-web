@@ -11,6 +11,7 @@ import type { EdgeKind } from "@/types/quran";
 import { Card } from "@/components/ui";
 import { InteractiveArabic } from "@/components/morphology/InteractiveArabic";
 import type { TafsirBlock } from "@/lib/quran/tafsir";
+import { authFetch } from "@/lib/auth/auth-fetch";
 
 function TafsirSection({ surah, ayah }: { surah: number; ayah: number }) {
   const t = useTranslations("canvas.contextSidebar");
@@ -104,10 +105,13 @@ function NotesSection({ verseRef }: { verseRef: string }) {
 
   useEffect(() => {
     if (!open || !accessToken || loaded) return;
-    fetch(`/api/notes?ref=${encodeURIComponent(verseRef)}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-      .then((r) => (r.ok ? r.json() : []))
+    authFetch(`/api/notes?ref=${encodeURIComponent(verseRef)}`)
+      .then((r) => {
+        // A failed load must not look like "no notes" — leaving `loaded` false
+        // lets the next open/token change retry instead of showing an empty list.
+        if (!r.ok) throw new Error(`notes load returned ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
         setNotes(data);
         setLoaded(true);
@@ -120,9 +124,9 @@ function NotesSection({ verseRef }: { verseRef: string }) {
     setSaving(true);
     setSaveError(false);
     try {
-      const res = await fetch("/api/notes", {
+      const res = await authFetch("/api/notes", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ref: verseRef, note: draft.trim() }),
       });
       if (!mountedRef.current) return;
@@ -154,9 +158,8 @@ function NotesSection({ verseRef }: { verseRef: string }) {
     if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
     setDeleteErrorId(null);
     try {
-      const res = await fetch(`/api/notes/${id}`, {
+      const res = await authFetch(`/api/notes/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (!mountedRef.current) return;
       if (res.ok) {

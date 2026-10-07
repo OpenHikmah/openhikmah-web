@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Card, IconButton, Tooltip } from "@/components/ui";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
+import { authFetch } from "@/lib/auth/auth-fetch";
 
 interface FriendEntry {
   id: number;
@@ -69,11 +70,10 @@ export function FriendList({ friends, onUpdate }: Props) {
     setBusy(id);
     setError(null);
     try {
-      const res = await fetch(`/api/social/friends/${id}`, {
+      const res = await authFetch(`/api/social/friends/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ action }),
       });
@@ -94,9 +94,8 @@ export function FriendList({ friends, onUpdate }: Props) {
     setBusy(id);
     setError(null);
     try {
-      const res = await fetch(`/api/social/friends/${id}`, {
+      const res = await authFetch(`/api/social/friends/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (!res.ok) {
         setError(t("couldntRemoveTryAgain"));

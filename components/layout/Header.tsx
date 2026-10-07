@@ -38,6 +38,7 @@ import { Wordmark } from "./Wordmark";
 import { HeaderNavLinks } from "./HeaderNavLinks";
 import { LanguagePopover } from "./LanguagePopover";
 import { CANVAS_LEGEND_ITEMS } from "@/components/canvas/CanvasLegend";
+import { authFetch } from "@/lib/auth/auth-fetch";
 
 interface HeaderProps {
   onSearchOpen: () => void;
@@ -223,9 +224,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
   // Hydrate streak from server after sign-in
   useEffect(() => {
     if (!accessToken || !userId) return;
-    fetch("/api/social/activity", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
+    authFetch("/api/social/activity")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.streak !== undefined)
@@ -245,9 +244,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
     // client-side — a user with more pending requests than any single page
     // would otherwise have their badge silently undercount.
     const load = () =>
-      fetch("/api/social/friends/pending-count", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      })
+      authFetch("/api/social/friends/pending-count")
         // A failed poll keeps the previously-displayed count rather than
         // resetting it to 0 — a transient 5xx/network hiccup shouldn't make
         // an already-shown badge disappear.
@@ -268,9 +265,7 @@ export function Header({ onSearchOpen }: HeaderProps) {
   useEffect(() => {
     if (!accessToken || !userId) return;
     const load = () =>
-      fetch("/api/social/mentions?limit=1", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      })
+      authFetch("/api/social/mentions?limit=1")
         // Same reasoning as the friend-request poll above: keep the
         // previously-displayed count on failure instead of zeroing it.
         .then((r) => (r.ok ? r.json() : null))
@@ -339,9 +334,9 @@ export function Header({ onSearchOpen }: HeaderProps) {
       const count = nodes.length;
       const date = format.dateTime(new Date(), { month: "short", day: "numeric" });
       const name = t("workspaceName", { count, date });
-      const res = await fetch("/api/workspace", {
+      const res = await authFetch("/api/workspace", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, data: serializeCanvas(nodes, edges), nodeCount: count }),
       });
       if (res.ok) {

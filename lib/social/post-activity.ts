@@ -1,3 +1,5 @@
+import { authFetch } from "@/lib/auth/auth-fetch";
+
 /**
  * Client-side activity POSTs with retry + an in-memory failure queue.
  *
@@ -56,9 +58,9 @@ function enqueueDispatch(task: () => Promise<void>): Promise<void> {
  * stops immediately without sending or shifting — the entries now in `queue`
  * belong to a different session and must not go out under this token.
  */
-async function drainQueue(accessToken: string, gen: number): Promise<void> {
+async function drainQueue(gen: number): Promise<void> {
   while (queue.length > 0 && generation === gen) {
-    const { result } = await sendWithRetry(accessToken, queue[0]);
+    const { result } = await sendWithRetry(queue[0]);
     if (generation !== gen || !result) return;
     queue.shift();
   }
@@ -82,16 +84,12 @@ function delay(ms: number): Promise<void> {
 }
 
 async function sendOnce(
-  accessToken: string,
   input: QueuedActivity
 ): Promise<{ result: ActivityResult | null; retryable: boolean }> {
   try {
-    const res = await fetch("/api/social/activity", {
+    const res = await authFetch("/api/social/activity", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         type: input.type,
         verse_ref: input.verseRef ?? undefined,
@@ -113,14 +111,13 @@ async function sendOnce(
 }
 
 async function sendWithRetry(
-  accessToken: string,
   input: QueuedActivity
 ): Promise<{ result: ActivityResult | null; exhausted: boolean }> {
   for (let attempt = 0; attempt < RETRY_BACKOFF_MS.length; attempt++) {
     if (attempt > 0) {
       await delay(RETRY_BACKOFF_MS[attempt] + Math.random() * 250);
     }
-    const { result, retryable } = await sendOnce(accessToken, input);
+    const { result, retryable } = await sendOnce(input);
     if (result) return { result, exhausted: false };
     if (!retryable) return { result: null, exhausted: false };
   }
@@ -144,7 +141,7 @@ export async function postActivity(
     lastToken = accessToken;
     // Older queued events go first. If the backlog can't clear, this event joins
     // the tail rather than jumping ahead of it.
-    await drainQueue(accessToken, gen);
+    await drainQueue(gen);
     // A sign-out landed while this task was in flight — the token and any queued
     // events belong to a session that no longer exists; drop this one silently.
     if (generation !== gen) return;
@@ -153,7 +150,7 @@ export async function postActivity(
       return;
     }
 
-    const { result, exhausted } = await sendWithRetry(accessToken, queued);
+    const { result, exhausted } = await sendWithRetry(queued);
     if (generation !== gen) return;
     if (result) {
       outcome = result;
@@ -173,7 +170,7 @@ export async function flushQueue(accessToken: string): Promise<void> {
   const gen = generation;
   await enqueueDispatch(async () => {
     lastToken = accessToken;
-    await drainQueue(accessToken, gen);
+    await drainQueue(gen);
   });
 }
 
