@@ -1,4 +1,4 @@
-import { screen, fireEvent, act } from "@testing-library/react";
+import { screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { renderWithIntl } from "../../test-utils/render-with-intl";
 
@@ -41,6 +41,8 @@ describe("ContextSidebar — notes textarea accessibility", () => {
   });
 
   afterEach(() => {
+    // Unmount before the matchMedia stub is removed — the sidebar reads it on every render.
+    cleanup();
     vi.unstubAllGlobals();
     useAuthStore.setState(previousAuth);
     useCanvasStore.getState().setSidebarContent(null);
@@ -78,6 +80,8 @@ describe("ContextSidebar — notes load", () => {
   });
 
   afterEach(() => {
+    // Unmount before the matchMedia stub is removed — the sidebar reads it on every render.
+    cleanup();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     useAuthStore.setState(previousAuth);
@@ -170,6 +174,8 @@ describe("ContextSidebar — note delete checks response status", () => {
   });
 
   afterEach(() => {
+    // Unmount before the matchMedia stub is removed — the sidebar reads it on every render.
+    cleanup();
     vi.unstubAllGlobals();
     useAuthStore.setState(previousAuth);
     useCanvasStore.getState().setSidebarContent(null);
@@ -325,5 +331,35 @@ describe("ContextSidebar — note delete checks response status", () => {
 
     expect(screen.getByText("a private note")).toBeInTheDocument();
     expect(await screen.findByText("Delete failed")).toBeInTheDocument();
+  });
+});
+
+describe("ContextSidebar — server render does not read matchMedia", () => {
+  afterEach(() => {
+    // Unmount before the matchMedia stub is removed — the sidebar reads it on every render.
+    cleanup();
+    vi.unstubAllGlobals();
+    useCanvasStore.getState().setSidebarContent(null);
+  });
+
+  it("uses a false desktop snapshot for server/first render instead of calling matchMedia", async () => {
+    const { renderToString } = await import("react-dom/server");
+    const { NextIntlClientProvider } = await import("next-intl");
+    const en = (await import("@/messages/en.json")).default;
+    const matchMedia = vi.fn().mockReturnValue({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+    vi.stubGlobal("matchMedia", matchMedia);
+    useCanvasStore.getState().setSidebarContent({ type: "node", verse: baseVerse });
+
+    renderToString(
+      <NextIntlClientProvider locale="en" messages={en}>
+        <ContextSidebar />
+      </NextIntlClientProvider>
+    );
+
+    expect(matchMedia).not.toHaveBeenCalled();
   });
 });

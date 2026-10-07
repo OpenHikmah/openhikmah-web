@@ -503,6 +503,36 @@ describe("PATCH /api/social/challenges/[id]", () => {
     expect(body.status).toBe("active");
   });
 
+  it("rejects accepting a pending invite past its endsAt and lazily declines it", async () => {
+    mockUpdate.mockClear();
+    authedAs(makeUser({ id: 2 }));
+    mockSelect.mockReturnValue(
+      makeDbChain([
+        makeChallenge({ status: "pending", endsAt: new Date(Date.now() - 60 * 60 * 1000) }),
+      ])
+    );
+    const res = await PATCH(makePatchReq("1", { action: "accept" }), {
+      params: Promise.resolve({ id: "1" }),
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "Challenge invite has expired" });
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("still lets the challenged user decline an expired pending invite", async () => {
+    authedAs(makeUser({ id: 2 }));
+    mockSelect.mockReturnValue(
+      makeDbChain([
+        makeChallenge({ status: "pending", endsAt: new Date(Date.now() - 60 * 60 * 1000) }),
+      ])
+    );
+    mockUpdate.mockReturnValue(makeDbChain([makeChallenge({ status: "declined" })]));
+    const res = await PATCH(makePatchReq("1", { action: "decline" }), {
+      params: Promise.resolve({ id: "1" }),
+    });
+    expect(res.status).toBe(200);
+  });
+
   it("returns 500 instead of throwing when the db errors", async () => {
     authedAs(makeUser({ id: 2 }));
     mockSelect.mockReturnValue(makeDbChain(Promise.reject(new Error("db unavailable"))));

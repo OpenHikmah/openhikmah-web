@@ -110,6 +110,27 @@ describe("useActivityTracker restore vs. genuine activity", () => {
     expect(bodies.some((b) => b.includes("connection_made"))).toBe(true);
   });
 
+  it("does not re-run (or flush the queue) when a node is only dragged", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+    vi.stubGlobal("fetch", fetchMock);
+    const id = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+
+    renderHook(() => useActivityTracker());
+    const callsAfterMount = fetchMock.mock.calls.length;
+
+    await act(async () => {
+      for (let x = 1; x <= 20; x++) {
+        useCanvasStore.setState({
+          nodes: useCanvasStore
+            .getState()
+            .nodes.map((n) => (n.id === id ? { ...n, position: { x, y: 0 } } : n)),
+        });
+      }
+    });
+
+    expect(fetchMock.mock.calls.length).toBe(callsAfterMount);
+  });
+
   it("does not fire an activity POST when appendWorkspace merges a loaded workspace", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
     vi.stubGlobal("fetch", fetchMock);

@@ -103,6 +103,25 @@ export const useSocialStore = create<SocialStore>()(
     }),
     {
       name: "open-hikmah-social",
+      // Bump when a persisted key is renamed/removed/reshaped and add a branch to
+      // `migrate`, so stale shapes don't rehydrate as `undefined`.
+      version: 1,
+      migrate: (persisted) => {
+        const p = (persisted ?? {}) as Partial<{
+          userId: number | null;
+          username: string | null;
+          streak: number;
+          longestStreak: number;
+          streakAsOf: string | null;
+        }>;
+        return {
+          userId: p.userId ?? null,
+          username: p.username ?? null,
+          streak: p.streak ?? 0,
+          longestStreak: p.longestStreak ?? 0,
+          streakAsOf: p.streakAsOf ?? null,
+        };
+      },
       // Persist the streak too so it shows immediately on reload (then refreshes
       // from /api/social/me) instead of flashing to 0.
       partialize: (s) => ({
