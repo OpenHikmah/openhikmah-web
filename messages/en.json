@@ -276,6 +276,15 @@
     "title": "Sign in to continue",
     "body": "You need to be signed in to view this page."
   },
+  "callback": {
+    "signInFailed": "Sign-in failed",
+    "backToHome": "Back to home",
+    "sessionExpired": "Session expired — please try signing in again.",
+    "stateMismatch": "State mismatch — possible CSRF attempt. Please try again.",
+    "noAuthorizationCode": "No authorization code received.",
+    "providerError": "The sign-in provider returned an error: {error}",
+    "unexpectedError": "Something went wrong during sign-in. Please try again."
+  },
   "social": {
     "page": {
       "pageTitle": "Social",

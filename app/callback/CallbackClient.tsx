@@ -2,10 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { mergeGuestWorkspace } from "@/hooks/useCanvasPersistence";
 import { Loader2 } from "lucide-react";
+
+type FailReason =
+  | { key: "sessionExpired" | "stateMismatch" | "noAuthorizationCode" | "unexpectedError" }
+  | { key: "providerError"; error: string };
 
 interface Props {
   code?: string;
@@ -15,10 +20,12 @@ interface Props {
 
 export function CallbackClient({ code, state, error }: Props) {
   const router = useRouter();
+  const t = useTranslations("callback");
+  const tCommon = useTranslations("common");
   const { setTokens, loadRemoteBookmarks } = useAuthStore();
   const { setProfile } = useSocialStore();
   const didRun = useRef(false);
-  const [failReason, setFailReason] = useState<string | null>(null);
+  const [failReason, setFailReason] = useState<FailReason | null>(null);
 
   useEffect(() => {
     if (didRun.current) return;
@@ -26,7 +33,7 @@ export function CallbackClient({ code, state, error }: Props) {
 
     if (error || !code) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFailReason(error ?? "No authorization code received.");
+      setFailReason(error ? { key: "providerError", error } : { key: "noAuthorizationCode" });
       return;
     }
 
@@ -35,7 +42,7 @@ export function CallbackClient({ code, state, error }: Props) {
     const nonce = sessionStorage.getItem("pkce_nonce");
 
     if (!codeVerifier || !expectedState || !nonce) {
-      setFailReason("Session expired — please try signing in again.");
+      setFailReason({ key: "sessionExpired" });
       sessionStorage.removeItem("pkce_code_verifier");
       sessionStorage.removeItem("pkce_state");
       sessionStorage.removeItem("pkce_nonce");
@@ -43,7 +50,7 @@ export function CallbackClient({ code, state, error }: Props) {
     }
 
     if (expectedState !== state) {
-      setFailReason("State mismatch — possible CSRF attempt. Please try again.");
+      setFailReason({ key: "stateMismatch" });
       sessionStorage.removeItem("pkce_code_verifier");
       sessionStorage.removeItem("pkce_state");
       sessionStorage.removeItem("pkce_nonce");
@@ -80,9 +87,8 @@ export function CallbackClient({ code, state, error }: Props) {
         router.replace(isNewUser ? "/onboarding" : "/");
       })
       .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : "Unknown error during sign-in.";
-        console.error("Auth callback failed:", msg);
-        setFailReason(msg);
+        console.error("Auth callback failed:", err instanceof Error ? err.message : err);
+        setFailReason({ key: "unexpectedError" });
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -91,12 +97,16 @@ export function CallbackClient({ code, state, error }: Props) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg">
         <div className="flex max-w-sm flex-col items-center gap-4 px-4 text-center">
-          <p className="font-mono text-sm text-text-muted">Sign-in failed</p>
-          <p className="rounded border border-border bg-surface px-3 py-2 font-mono text-xs text-text-muted">
-            {failReason}
-          </p>
+          <div role="alert" className="flex flex-col items-center gap-4">
+            <p className="font-mono text-sm text-text-muted">{t("signInFailed")}</p>
+            <p className="rounded border border-border bg-surface px-3 py-2 font-mono text-xs text-text-muted">
+              {failReason.key === "providerError"
+                ? t("providerError", { error: failReason.error })
+                : t(failReason.key)}
+            </p>
+          </div>
           <button onClick={() => router.replace("/")} className="text-xs text-teal underline">
-            Back to home
+            {t("backToHome")}
           </button>
         </div>
       </div>
@@ -105,9 +115,9 @@ export function CallbackClient({ code, state, error }: Props) {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg">
-      <div className="flex items-center gap-2.5">
-        <Loader2 className="h-4 w-4 animate-spin text-teal" />
-        <p className="font-mono text-sm text-text-muted">Signing in…</p>
+      <div role="status" className="flex items-center gap-2.5">
+        <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-teal" />
+        <p className="font-mono text-sm text-text-muted">{tCommon("signingIn")}</p>
       </div>
     </div>
   );

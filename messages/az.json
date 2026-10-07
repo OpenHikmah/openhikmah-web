@@ -276,6 +276,15 @@
     "title": "Davam etmək üçün daxil olun",
     "body": "Bu səhifəyə baxmaq üçün daxil olmalısınız."
   },
+  "callback": {
+    "signInFailed": "Daxil olmaq alınmadı",
+    "backToHome": "Ana səhifəyə qayıt",
+    "sessionExpired": "Sessiyanın vaxtı bitdi — zəhmət olmasa yenidən daxil olmağa çalışın.",
+    "stateMismatch": "Vəziyyət uyğunsuzluğu — mümkün CSRF cəhdi. Zəhmət olmasa yenidən cəhd edin.",
+    "noAuthorizationCode": "Avtorizasiya kodu alınmadı.",
+    "providerError": "Giriş provayderi xəta qaytardı: {error}",
+    "unexpectedError": "Daxil olarkən xəta baş verdi. Zəhmət olmasa yenidən cəhd edin."
+  },
   "social": {
     "page": {
       "pageTitle": "Sosial",
