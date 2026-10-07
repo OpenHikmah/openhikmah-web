@@ -96,3 +96,105 @@ describe("VerseLoader — surah bulk-loading effect", () => {
     expect(refs).toEqual(["1:1", "1:2", "1:3"]);
   });
 });
+
+describe("VerseLoader — verse param handled-ref reset", () => {
+  beforeEach(() => {
+    useCanvasStore.getState().reset();
+    mockFetch.mockReset();
+    mockSearchParams = new URLSearchParams();
+    window.history.replaceState(null, "", "/canvas");
+  });
+
+  it("adds the verse again when the same ?verse= link is followed after Clear", async () => {
+    mockSearchParams = new URLSearchParams("verse=2:255");
+    window.history.replaceState(null, "", "/canvas?verse=2:255");
+    mockFetch.mockResolvedValue(jsonResponse(verse("2:255")));
+
+    const { rerender } = render(<VerseLoader />);
+    await waitFor(() => expect(useCanvasStore.getState().nodes).toHaveLength(1));
+
+    mockSearchParams = new URLSearchParams();
+    rerender(<VerseLoader />);
+    useCanvasStore.getState().reset();
+    expect(useCanvasStore.getState().nodes).toHaveLength(0);
+
+    mockSearchParams = new URLSearchParams("verse=2:255");
+    window.history.replaceState(null, "", "/canvas?verse=2:255");
+    rerender(<VerseLoader />);
+
+    await waitFor(() => expect(useCanvasStore.getState().nodes).toHaveLength(1));
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries the same ?verse= link after a failed fetch", async () => {
+    mockSearchParams = new URLSearchParams("verse=2:255");
+    window.history.replaceState(null, "", "/canvas?verse=2:255");
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockFetch.mockRejectedValueOnce(new Error("network error"));
+
+    const { rerender } = render(<VerseLoader />);
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    expect(useCanvasStore.getState().nodes).toHaveLength(0);
+
+    mockFetch.mockResolvedValueOnce(jsonResponse(verse("2:255")));
+    mockSearchParams = new URLSearchParams("verse=2:255");
+    rerender(<VerseLoader />);
+
+    await waitFor(() => expect(useCanvasStore.getState().nodes).toHaveLength(1));
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries the same ?verse= link after a non-OK response", async () => {
+    mockSearchParams = new URLSearchParams("verse=2:255");
+    window.history.replaceState(null, "", "/canvas?verse=2:255");
+    mockFetch.mockResolvedValueOnce({ ok: false, json: async () => null });
+
+    const { rerender } = render(<VerseLoader />);
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+
+    mockFetch.mockResolvedValueOnce(jsonResponse(verse("2:255")));
+    mockSearchParams = new URLSearchParams("verse=2:255");
+    rerender(<VerseLoader />);
+
+    await waitFor(() => expect(useCanvasStore.getState().nodes).toHaveLength(1));
+  });
+
+  it("does not refetch while the same ?verse= param is still being handled", async () => {
+    mockSearchParams = new URLSearchParams("verse=2:255");
+    window.history.replaceState(null, "", "/canvas?verse=2:255");
+    mockFetch.mockResolvedValue(jsonResponse(verse("2:255")));
+
+    const { rerender } = render(<VerseLoader />);
+    mockSearchParams = new URLSearchParams("verse=2:255");
+    rerender(<VerseLoader />);
+
+    await waitFor(() => expect(useCanvasStore.getState().nodes).toHaveLength(1));
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-handles the same ?surah= link after Clear and after a failed fetch", async () => {
+    mockSearchParams = new URLSearchParams("surah=1");
+    window.history.replaceState(null, "", "/canvas?surah=1");
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockFetch.mockRejectedValueOnce(new Error("network error"));
+
+    const { rerender } = render(<VerseLoader />);
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+
+    mockFetch.mockResolvedValueOnce(jsonResponse([verse("1:1"), verse("1:2")]));
+    mockSearchParams = new URLSearchParams("surah=1");
+    window.history.replaceState(null, "", "/canvas?surah=1");
+    rerender(<VerseLoader />);
+    await waitFor(() => expect(useCanvasStore.getState().nodes).toHaveLength(2));
+
+    mockSearchParams = new URLSearchParams();
+    rerender(<VerseLoader />);
+    useCanvasStore.getState().reset();
+
+    mockFetch.mockResolvedValueOnce(jsonResponse([verse("1:1"), verse("1:2")]));
+    mockSearchParams = new URLSearchParams("surah=1");
+    rerender(<VerseLoader />);
+    await waitFor(() => expect(useCanvasStore.getState().nodes).toHaveLength(2));
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+});
