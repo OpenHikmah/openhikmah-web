@@ -62,6 +62,7 @@ function makeSelectChain(resolveWith: unknown[] | ((whereArg: unknown) => unknow
 }
 
 const {
+  insertedRows,
   mockSelect,
   mockInsert,
   mockValues,
@@ -80,10 +81,16 @@ const {
   // `returning` resolves with the rows actually inserted (empty by default here,
   // matching every existing test's assumption that no row won a genuine
   // conflict-race; individual tests override this).
-  const mockReturning = vi.fn().mockResolvedValue([]);
+  const inserting = { rows: [] as { toRef: string }[] };
+  const insertedRows = () => inserting.rows.map((r) => ({ toRef: r.toRef }));
+  const mockReturning = vi.fn().mockImplementation(async () => insertedRows());
   const mockOnConflict = vi.fn(() => ({ returning: mockReturning }));
-  const mockValues = vi.fn((..._args: unknown[]) => ({ onConflictDoNothing: mockOnConflict }));
+  const mockValues = vi.fn((rows: unknown) => {
+    inserting.rows = rows as { toRef: string }[];
+    return { onConflictDoNothing: mockOnConflict };
+  });
   return {
+    insertedRows,
     mockSelect: vi.fn(),
     mockInsert: vi.fn(() => ({ values: mockValues })),
     mockValues,
@@ -158,7 +165,7 @@ describe("getConnections", () => {
     mockInsert.mockClear();
     mockValues.mockClear();
     mockOnConflict.mockClear();
-    mockReturning.mockReset().mockResolvedValue([]);
+    mockReturning.mockReset().mockImplementation(async () => insertedRows());
     mockIncr.mockClear();
     mockMarkCellVerified.mockReset().mockResolvedValue(undefined);
     mockGenerate.mockReset();
@@ -280,9 +287,9 @@ describe("getConnections", () => {
 
     await getConnections("1:1", "thematic", source);
 
-    // Only the getConnections cache-read select — generateConnectionsForCell
-    // must not issue a second select when excludeRefs is empty.
-    expect(mockSelect).toHaveBeenCalledTimes(1);
+    // The getConnections cache-read select plus the retired/flagged-targets read —
+    // but NOT the existing-reasons read, which only a "get more" request needs.
+    expect(mockSelect).toHaveBeenCalledTimes(2);
   });
 
   it("marks a first-time cell verified after persisting it", async () => {
@@ -349,30 +356,97 @@ describe("getConnections", () => {
     expect(mockIncr).toHaveBeenCalledWith("gen_persist_failed");
   });
 
-  it("on an insert conflict, falls back to the freshly generated reason when no ACTIVE row exists for it", async () => {
-    // Simulates a retired row occupying the same (fromRef, toRef, kind, locale)
-    // unique key: onConflictDoNothing() discards the insert (empty `returning`),
-    // and the re-read must filter on status = "active" so a retired row is
-    // never adopted as if it were the winning generation. The mock actually
-    // inspects the where(...) predicate rather than stubbing a fixed empty
-    // result — so dropping `eq(connections.status, "active")` from the source
-    // re-read would make this test fail, not pass vacuously.
+  it("on an insert conflict with a retired/flagged row, does not serve or return the freshly generated text", async () => {
+    // A retired row occupies the same (fromRef, toRef, kind, locale) unique key:
+    // onConflictDoNothing() discards the insert (empty `returning`) and the
+    // re-read filters on status = "active" so it finds no winner. The fresh,
+    // unreviewed text must be dropped — not served, not counted as generated.
+    // The mock inspects the where(...) predicate, so dropping the
+    // `eq(connections.status, "active")` filter from the re-read would resurrect
+    // the retired reason and fail this test.
     const retiredReason = "retired reason — must not be served";
-    mockSelect.mockReturnValueOnce(makeSelectChain([])).mockReturnValue(
-      makeSelectChain(
-        (whereArg) =>
+    mockSelect
+      .mockReturnValueOnce(makeSelectChain([])) // readActiveRows: miss
+      .mockReturnValueOnce(makeSelectChain([])) // readBlockedRefs: race — not yet visible
+      .mockReturnValue(
+        makeSelectChain((whereArg) =>
           whereFilters(whereArg, "status", "active")
             ? [] // correctly filtered: the retired row is excluded
-            : [{ toRef: "2:255", reason: retiredReason }] // bug: it would be resurrected
-      )
-    );
+            : [{ toRef: "2:255", reason: retiredReason }]
+        )
+      );
     mockGenerate.mockResolvedValue([result("2:255")]);
     mockReturning.mockResolvedValue([]); // insert conflicted, nothing won the race
 
     const out = await getConnections("1:1", "thematic", source);
 
-    expect(out[0]).toMatchObject({ ref: "2:255", reason: "because" });
-    expect(out[0].reason).not.toBe(retiredReason);
+    expect(out).toEqual([]);
+  });
+
+  it("on an insert conflict with a concurrent ACTIVE winner, returns the persisted winner's text", async () => {
+    mockSelect
+      .mockReturnValueOnce(makeSelectChain([])) // readActiveRows: miss
+      .mockReturnValueOnce(makeSelectChain([])) // readBlockedRefs
+      .mockReturnValue(
+        makeSelectChain([{ toRef: "2:255", reason: "winner reason", confidence: 0.9 }])
+      );
+    mockGenerate.mockResolvedValue([result("2:255")]);
+    mockReturning.mockResolvedValue([]);
+
+    const out = await getConnections("1:1", "thematic", source);
+
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ ref: "2:255", reason: "winner reason" });
+  });
+
+  it("excludes the cell's retired/flagged targets from discovery so they are not proposed again", async () => {
+    mockSelect
+      .mockReturnValueOnce(makeSelectChain([])) // readActiveRows: miss
+      .mockReturnValueOnce(makeSelectChain([])) // existing reasons (get-more request)
+      .mockReturnValueOnce(makeSelectChain([{ toRef: "2:255" }])) // readBlockedRefs
+      .mockReturnValue(makeSelectChain([]));
+    mockDiscover.mockResolvedValue(["3:18"]);
+    mockGenerateGrounded.mockResolvedValue([result("3:18")]);
+
+    await getConnections("1:1", "thematic", source, { excludeRefs: ["9:1"] });
+
+    expect(mockDiscover).toHaveBeenCalledWith(
+      "1:1",
+      "thematic",
+      undefined,
+      expect.arrayContaining(["9:1", "2:255"])
+    );
+  });
+
+  it("does not run the AI at all for a cell whose only edges were retired and whose pool is drained", async () => {
+    mockSelect
+      .mockReturnValueOnce(makeSelectChain([])) // readActiveRows: no active edges
+      .mockReturnValueOnce(makeSelectChain([{ toRef: "2:255" }])) // readBlockedRefs: one retired
+      .mockReturnValue(makeSelectChain([]));
+    mockDiscover.mockResolvedValue([]);
+
+    const out = await getConnections("1:1", "thematic", source);
+
+    expect(out).toEqual([]);
+    expect(mockGenerate).not.toHaveBeenCalled();
+    expect(mockGenerateGrounded).not.toHaveBeenCalled();
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("never falls back to ungrounded generation for a cell that has retired edges", async () => {
+    mockSelect
+      .mockReturnValueOnce(makeSelectChain([])) // readActiveRows: miss
+      .mockReturnValueOnce(makeSelectChain([{ toRef: "2:255" }])) // readBlockedRefs
+      .mockReturnValue(makeSelectChain([]));
+    mockDiscover.mockResolvedValue([]);
+    mockGenerate.mockResolvedValue([result("2:255"), result("3:18")]);
+
+    const out = await getConnections("1:1", "thematic", source);
+
+    // A cell with moderated edges is never a first-time miss, so the ungrounded
+    // path is not even attempted.
+    expect(out).toEqual([]);
+    expect(mockGenerate).not.toHaveBeenCalled();
   });
 
   it("on a miss that generates nothing, does not write to the DB", async () => {
@@ -576,7 +650,7 @@ describe("getConnections — en-canonical localized reasons", () => {
     mockInsert.mockClear();
     mockValues.mockClear();
     mockOnConflict.mockClear();
-    mockReturning.mockReset().mockResolvedValue([]);
+    mockReturning.mockReset().mockImplementation(async () => insertedRows());
     mockIncr.mockClear();
     mockGenerate.mockReset();
     mockGenerateGrounded.mockReset();
@@ -896,7 +970,7 @@ describe("getConnections — single-flight de-duplication", () => {
     mockInsert.mockClear();
     mockValues.mockClear();
     mockOnConflict.mockClear();
-    mockReturning.mockReset().mockResolvedValue([]);
+    mockReturning.mockReset().mockImplementation(async () => insertedRows());
     mockIncr.mockClear();
     mockDiscover.mockReset().mockResolvedValue([]); // no grounding → legacy generate path
     mockResolveVerse.mockReset().mockImplementation(async (ref: string) => verse(ref));

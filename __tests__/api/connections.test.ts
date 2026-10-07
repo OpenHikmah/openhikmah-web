@@ -25,7 +25,23 @@ function makeDbChain(resolveWith: unknown = []) {
 
 const { mockSelect, mockInsert, mockConsume, mockAnthropicCreate } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])), // no stored edges → cache miss
-  mockInsert: vi.fn(() => makeDbChain([])),
+  // `.values(rows).onConflictDoNothing().returning()` resolves with the rows
+  // "actually inserted" (every row wins — no conflict), like real Postgres.
+  mockInsert: vi.fn(() => {
+    let rows: unknown[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chain: any = {
+      values: (r: unknown) => {
+        rows = Array.isArray(r) ? r : [r];
+        return chain;
+      },
+      onConflictDoNothing: () => chain,
+      returning: async () => rows,
+      then: (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+        Promise.resolve([]).then(res, rej),
+    };
+    return chain;
+  }),
   mockConsume: vi.fn(async () => true),
   mockAnthropicCreate: vi.fn(),
 }));

@@ -513,8 +513,18 @@ export async function generateConnectionsForCell(
       pacer: gen.pacer,
     },
   ] as const;
-  const candidates = await discoverCandidates(fromRef, kind, undefined, excludeRefs);
-  const calledAI = candidates.length > 0 || excludeRefs.length === 0;
+  // A flagged/retired `en` edge is a moderation decision. The unique index
+  // ignores status, so without excluding these targets here the generator would
+  // propose the same (fromRef, toRef, kind) again and the fresh, unreviewed text
+  // would be served — and the AI re-run on every request for the cell.
+  const blockedRefs = await readBlockedRefs(fromRef, kind, "en");
+  const candidates = await discoverCandidates(fromRef, kind, undefined, [
+    ...new Set([...excludeRefs, ...blockedRefs]),
+  ]);
+  // A cell with moderated edges is never a "first-time miss": an empty pool means
+  // the grounded data is exhausted, not that the verse has no grounding yet.
+  const hasPriorEdges = excludeRefs.length > 0 || blockedRefs.size > 0;
+  const calledAI = candidates.length > 0 || !hasPriorEdges;
   // The legacy ungrounded path has no notion of excludeRefs — it would just
   // regenerate a similar set from memory, defeating the point of "get more."
   // Only fall back to it on a true first-time miss (no grounding data seeded
@@ -534,7 +544,7 @@ export async function generateConnectionsForCell(
       "en",
       ...genOpts
     );
-  } else if (excludeRefs.length > 0) {
+  } else if (hasPriorEdges) {
     generated = [];
   } else {
     const src = await resolveSource(source);
@@ -547,6 +557,9 @@ export async function generateConnectionsForCell(
       ...genOpts
     );
   }
+
+  // Belt and braces for the ungrounded path, which has no exclusion list.
+  generated = generated.filter((g) => !blockedRefs.has(g.ref));
 
   if (generated.length > 0) {
     // Attribute the row to the exact model that generated it — the caller
@@ -608,13 +621,18 @@ export async function generateConnectionsForCell(
             )
           );
         const persistedByRef = new Map(persisted.map((r) => [r.toRef, r]));
+        // Only rows that are actually persisted as active may be returned. A
+        // conflicted ref with no active winner collided with a flagged/retired row
+        // (a moderation race the discovery exclusion above can't see) — its fresh,
+        // unreviewed text must not be served or counted as generated.
         return {
           calledAI,
-          results: generated.map((g) => {
+          results: generated.flatMap((g) => {
+            if (!conflicted.includes(g)) return [g];
             const winner = persistedByRef.get(g.ref);
             return winner !== undefined
-              ? { ...g, reason: winner.reason, confidence: winner.confidence ?? undefined }
-              : g;
+              ? [{ ...g, reason: winner.reason, confidence: winner.confidence ?? undefined }]
+              : [];
           }),
         };
       }

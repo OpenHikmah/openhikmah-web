@@ -628,7 +628,7 @@ export async function runConnectionBatch(
         // candidates present (quality gate / verification rejected everything)
         // still has calledAI === true and must NOT be recorded as exhausted —
         // that pool isn't actually empty and deserves a future retry.
-        if (opts.mode === "topup" && excludeRefs.length > 0 && !calledAI) {
+        if (opts.mode === "topup" && !calledAI) {
           // Grounded pool is genuinely empty for this cell — record it so no
           // future run pays for it again.
           await upsertCoverage(cell.fromRef, cell.kind, {
