@@ -23,7 +23,7 @@ export const users = pgTable(
   {
     id: serial("id").primaryKey(),
     qfId: text("qf_id").notNull().unique(),
-    username: text("username").notNull().unique(),
+    username: text("username").notNull(),
     displayName: text("display_name"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     lastActiveAt: timestamp("last_active_at", { withTimezone: true }).notNull().defaultNow(),
@@ -43,7 +43,10 @@ export const users = pgTable(
   },
   (t) => [
     uniqueIndex("users_qf_id_idx").on(t.qfId),
-    uniqueIndex("users_username_idx").on(t.username),
+    // Case-insensitive: every username lookup compares lower(username), so
+    // uniqueness must too ("Alice" and "alice" cannot both exist). Replaces the
+    // case-sensitive column UNIQUE + users_username_idx, which this implies.
+    uniqueIndex("users_username_lower_idx").on(sql`lower(${t.username})`),
     index("users_last_active_idx").on(t.lastActiveAt),
   ]
 );

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq, gte, inArray, lt, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { challenges, challengeSuggestions, friendships, users } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
   const [target] = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.username, challengedUsername.trim()))
+    .where(sql`lower(${users.username}) = lower(${challengedUsername.trim()})`)
     .limit(1);
 
   if (!target) {

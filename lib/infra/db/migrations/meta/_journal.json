@@ -204,6 +204,13 @@
       "when": 1791348223302,
       "tag": "0028_name_translation_source_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791364582981,
+      "tag": "0029_username_case_insensitive_unique",
+      "breakpoints": true
     }
   ]
 }
