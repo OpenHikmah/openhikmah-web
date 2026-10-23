@@ -5,7 +5,7 @@ import { isValidRef } from "@/lib/quran/quran-corpus";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
 import { RateLimitError } from "@/lib/infra/rate-limit";
 import { clientKey } from "@/lib/infra/http";
-import { getUiLocale } from "@/lib/i18n/request-prefs";
+import { getQuranEdition, getUiLocale } from "@/lib/i18n/request-prefs";
 import type { EdgeKind } from "@/types/quran";
 
 const MAX_EXCLUDE_REFS = 100;
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const locale = await getUiLocale();
+    const [locale, edition] = await Promise.all([getUiLocale(), getQuranEdition()]);
     const results = await getConnections(
       fromRef,
       kind as EdgeKind,
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
         if (!verse) throw new Error(`Source verse ${fromRef} did not resolve`);
         return { arabicText: verse.arabicText, translation: verse.translation };
       },
-      { clientKey: clientKey(req), excludeRefs, locale }
+      { clientKey: clientKey(req), excludeRefs, locale, edition }
     );
 
     // Empty results are not a server error, whether this is a "get more" request

@@ -1074,3 +1074,99 @@ describe("getConnections — single-flight de-duplication", () => {
     expect(mockGenerate).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("getConnections — verse text follows the Quran edition", () => {
+  const AZ = "az.mammadaliyev";
+  const row = (kind: string, locale: string, reason: string) => ({
+    fromRef: "1:1",
+    toRef: "2:255",
+    kind,
+    locale,
+    reason,
+    status: "active",
+  });
+
+  beforeEach(() => {
+    mockSelect.mockReset();
+    mockInsert.mockClear();
+    mockValues.mockClear();
+    mockReturning.mockReset().mockImplementation(async () => insertedRows());
+    mockGenerate.mockReset();
+    mockGenerateGrounded.mockReset();
+    mockDiscover.mockReset().mockResolvedValue([]);
+    mockConsume.mockReset().mockResolvedValue(true);
+    mockTranslateReason.mockReset();
+    mockResolveVerse.mockReset().mockImplementation(async (ref: string, edition?: string) => ({
+      ...verse(ref),
+      translation: edition ? `[${edition}] ${ref}` : "text",
+    }));
+  });
+
+  it.each(["thematic", "root", "contrast"] as const)(
+    "serves a cached %s cell's verses in the requested edition",
+    async (kind) => {
+      mockSelect
+        .mockReturnValueOnce(makeSelectChain([row(kind, "az", "az reason")]))
+        .mockReturnValueOnce(makeSelectChain([row(kind, "en", "en reason")]));
+
+      const out = await getConnections("1:1", kind, source, { locale: "az", edition: AZ });
+
+      expect(out[0]).toMatchObject({
+        ref: "2:255",
+        kind,
+        reason: "az reason",
+        translation: `[${AZ}] 2:255`,
+      });
+    }
+  );
+
+  it("keeps the edition independent of the reason locale", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([row("thematic", "en", "en reason")]));
+
+    const out = await getConnections("1:1", "thematic", source, { locale: "en", edition: AZ });
+
+    expect(out[0]).toMatchObject({ reason: "en reason", translation: `[${AZ}] 2:255` });
+  });
+
+  it("serves freshly generated verses in the requested edition", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockGenerate.mockResolvedValue([result("2:255")]);
+
+    const out = await getConnections("1:1", "thematic", source, { edition: AZ });
+
+    expect(out[0]).toMatchObject({ reason: "because", translation: `[${AZ}] 2:255` });
+  });
+
+  it("leaves generated en.sahih text as-is without re-resolving it", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockGenerate.mockResolvedValue([result("2:255")]);
+
+    const out = await getConnections("1:1", "thematic", source, { edition: "en.sahih" });
+
+    expect(out[0].translation).toBe("text");
+    expect(mockResolveVerse).not.toHaveBeenCalled();
+  });
+
+  it("does not leak one reader's edition into another sharing the same generation", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    let release: (v: ConnectionResult[]) => void = () => {};
+    mockGenerate.mockImplementation(
+      () =>
+        new Promise<ConnectionResult[]>((res) => {
+          release = res;
+        })
+    );
+
+    const both = Promise.all([
+      getConnections("1:1", "thematic", source, { edition: "en.sahih" }),
+      getConnections("1:1", "thematic", source, { edition: AZ }),
+    ]);
+    await new Promise((r) => setTimeout(r, 0));
+    release([result("2:255")]);
+    const [en, az] = await both;
+
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
+    expect(en[0].translation).toBe("text");
+    expect(az[0].translation).toBe(`[${AZ}] 2:255`);
+  });
+});
