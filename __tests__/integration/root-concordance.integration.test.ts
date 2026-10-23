@@ -8,6 +8,9 @@ vi.stubGlobal(
   "fetch",
   vi.fn(async () => ({ ok: false }))
 );
+// The route reads the reader's Quran edition from cookies(), which only exists
+// inside a Next request scope. No cookie resolves to the en.sahih default.
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
 
 import { db } from "@/lib/infra/db";
 import { verses, wordMorphology } from "@/lib/infra/db/schema";
