@@ -5,7 +5,7 @@ import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
 import { useTranslations } from "next-intl";
 import { useShallow } from "zustand/shallow";
 import type { Verse, EdgeKind } from "@/types/quran";
-import { useCanvasStore, selectFocus, connectionsOf } from "@/store/canvas";
+import { useCanvasStore, selectFocus } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import { usePreferencesStore } from "@/store/preferences";
 import { cn } from "@/lib/utils";
@@ -48,7 +48,6 @@ function VerseNodeInner({ id, data }: NodeProps) {
     const e = s.hoveredEdgeId ? s.edges.find((x) => x.id === s.hoveredEdgeId) : undefined;
     return !!e && (e.source === id || e.target === id);
   });
-  const connectionCount = useCanvasStore((s) => connectionsOf(s.edges, id).length);
   const sidebarIsThisNode = useCanvasStore(
     (s) => s.sidebarContent?.type === "node" && s.sidebarContent.nodeId === id
   );
@@ -234,18 +233,6 @@ function VerseNodeInner({ id, data }: NodeProps) {
           <span role="status" className="font-mono text-[11.5px] text-[color:var(--kc)]">
             {t("findingVerses", { kind: t(`kindWord.${expandingKind}`) })}
           </span>
-        ) : connectionCount > 0 ? (
-          <button
-            type="button"
-            onMouseDown={stop}
-            onClick={(e) => {
-              e.stopPropagation();
-              setSidebarContent({ type: "node", nodeId: id });
-            }}
-            className="rounded-full border border-teal/30 bg-teal/10 px-2.5 py-0.5 font-mono text-[11px] text-teal-bright transition-colors hover:bg-teal/20"
-          >
-            {t("connectedCount", { count: connectionCount })}
-          </button>
         ) : (
           <span />
         )}

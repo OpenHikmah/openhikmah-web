@@ -65,14 +65,12 @@ describe("VerseNode — reacts to derived-index changes with no prop change", ()
     expect(screen.getByRole("button", { name: /jump to duplicate/i })).toBeInTheDocument();
   });
 
-  it("shows a live connection count that opens the verse thread", () => {
+  it("shows no connection count label on the card", () => {
     const sourceId = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
     const targetId = useCanvasStore
       .getState()
       .addVerseNode({ ...baseVerse, ref: "1:1" as const, surah: 1, ayah: 1 }, { x: 300, y: 0 });
     renderNode(nodeProps(sourceId, baseVerse));
-
-    expect(screen.queryByRole("button", { name: /connected/i })).not.toBeInTheDocument();
 
     act(() => {
       useCanvasStore.getState().addConnectionEdge({
@@ -84,8 +82,7 @@ describe("VerseNode — reacts to derived-index changes with no prop change", ()
       });
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "1 connected" }));
-    expect(useCanvasStore.getState().sidebarContent).toEqual({ type: "node", nodeId: sourceId });
+    expect(screen.queryByText(/connected/i)).not.toBeInTheDocument();
   });
 });
 
