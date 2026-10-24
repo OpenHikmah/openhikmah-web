@@ -67,7 +67,7 @@ describe("ContextSidebar — notes textarea accessibility", () => {
       );
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Notes" }));
 
     expect(await screen.findByRole("textbox", { name: /add a private note/i })).toBeInTheDocument();
   });
@@ -120,12 +120,12 @@ describe("ContextSidebar — notes load", () => {
         </TooltipProvider>
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Notes" }));
 
     expect(await screen.findByText("a private note")).toBeInTheDocument();
   });
 
-  it("does not treat a failed notes load as 'no notes' and retries on the next open", async () => {
+  it("does not treat a failed notes load as 'no notes' and retries on the next visit", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     let notesCalls = 0;
     mockFetch.mockImplementation(async (url: string) => {
@@ -148,7 +148,7 @@ describe("ContextSidebar — notes load", () => {
         </TooltipProvider>
       );
     });
-    const toggle = screen.getByRole("button", { name: "My Notes" });
+    const toggle = screen.getByRole("tab", { name: "Notes" });
     fireEvent.click(toggle);
     await vi.waitFor(() => expect(notesCalls).toBe(1));
     await act(async () => {
@@ -156,7 +156,8 @@ describe("ContextSidebar — notes load", () => {
     });
     expect(screen.queryByText("a private note")).not.toBeInTheDocument();
 
-    fireEvent.click(toggle);
+    // Leaving the tab and coming back retries the load.
+    fireEvent.click(screen.getByRole("tab", { name: /^Connections/ }));
     fireEvent.click(toggle);
 
     expect(await screen.findByText("a private note")).toBeInTheDocument();
@@ -211,7 +212,7 @@ describe("ContextSidebar — note delete checks response status", () => {
         </TooltipProvider>
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Notes" }));
     expect(await screen.findByText("a private note")).toBeInTheDocument();
 
     await act(async () => {
@@ -231,7 +232,7 @@ describe("ContextSidebar — note delete checks response status", () => {
         </TooltipProvider>
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Notes" }));
     expect(await screen.findByText("a private note")).toBeInTheDocument();
 
     await act(async () => {
@@ -259,7 +260,7 @@ describe("ContextSidebar — note delete checks response status", () => {
         </TooltipProvider>
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Notes" }));
     expect(await screen.findByText("note A")).toBeInTheDocument();
     const [deleteA, deleteB] = screen.getAllByRole("button", { name: "Delete note" });
 
@@ -316,7 +317,7 @@ describe("ContextSidebar — note delete checks response status", () => {
         </TooltipProvider>
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Notes" }));
     expect(await screen.findByText("note A")).toBeInTheDocument();
     const [deleteAButton, deleteBButton] = screen.getAllByRole("button", { name: "Delete note" });
 
@@ -364,7 +365,7 @@ describe("ContextSidebar — note delete checks response status", () => {
         </TooltipProvider>
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Notes" }));
     expect(await screen.findByText("a private note")).toBeInTheDocument();
 
     await act(async () => {
