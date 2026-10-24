@@ -443,6 +443,7 @@ export function toResult(
     ref: verse.ref,
     arabicText: verse.arabicText,
     translation: verse.translation,
+    edition: verse.edition,
     surahName: verse.surahName,
     surahNameArabic: verse.surahNameArabic,
     reason,

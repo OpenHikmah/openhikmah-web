@@ -140,6 +140,7 @@ async function hydrate(
         ref: verse.ref,
         arabicText: verse.arabicText,
         translation: verse.translation,
+        edition: verse.edition,
         surahName: verse.surahName,
         surahNameArabic: verse.surahNameArabic,
         reason: r.reason,
@@ -161,7 +162,7 @@ async function inEdition(
   const resolved = await Promise.all(results.map((r) => resolveVerse(r.ref, edition)));
   return results.map((r, i) => {
     const verse = resolved[i];
-    return verse ? { ...r, translation: verse.translation } : r;
+    return verse ? { ...r, translation: verse.translation, edition: verse.edition } : r;
   });
 }
 

@@ -32,6 +32,8 @@ export interface ConnectionResult {
   ref: VerseRef;
   arabicText: string;
   translation: string;
+  /** The edition `translation` carries, copied from the resolved `Verse`. */
+  edition?: string;
   surahName: string;
   surahNameArabic: string;
   reason: string;
