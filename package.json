@@ -57,7 +57,7 @@
     "html-to-image": "^1.11.13",
     "ioredis": "^6.0.0",
     "jspdf": "^4.2.1",
-    "lucide-react": "^1.41.0",
+    "lucide-react": "^1.60.0",
     "next": "16.4.1",
     "next-intl": "^4.13.4",
     "postgres": "^3.4.9",
