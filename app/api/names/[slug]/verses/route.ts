@@ -6,6 +6,7 @@ import { getNameBySlug } from "@/lib/names/divine-names";
 import { verseMentionsName } from "@/lib/names/name-verse-match";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
+import { stripTags } from "@/lib/quran/html-text";
 import {
   getOrGenerateNameContent,
   getOrGenerateVerseReason,
@@ -202,10 +203,6 @@ Return ONLY a JSON array:
   }
 }
 
-function stripHtml(text: string): string {
-  return text.replace(/<[^>]*>/g, "");
-}
-
 // Not worth caching: nothing found, or every reason is the default placeholder
 // (the reason call failed). Persisting the latter would freeze placeholder
 // content for this name until VERSES_VERSION is bumped. A result where only
@@ -224,7 +221,7 @@ async function getVersesBySlug(
   const name = getNameBySlug(slug);
   if (!name) return [];
 
-  const verses = await getOrGenerateNameContent(
+  const selected = await getOrGenerateNameContent(
     slug,
     "verses",
     // Verse selection is always cached/generated as "en" regardless of the
@@ -248,7 +245,7 @@ async function getVersesBySlug(
             if (!vd) return null;
             return {
               ...vd,
-              translation: stripHtml(vd.translation),
+              translation: stripTags(vd.translation),
               reason: reasonMap.get(ref) ?? defaultReason(name.transliteration),
             } as NameVerse;
           })
@@ -287,7 +284,7 @@ async function getVersesBySlug(
           // is cached and rendered.
           return {
             ...vd,
-            translation: stripHtml(vd.translation),
+            translation: stripTags(vd.translation),
             reason: item.reason,
           } as NameVerse;
         })
@@ -297,6 +294,12 @@ async function getVersesBySlug(
     (v) => isUncacheable(v, name.transliteration),
     onBeforeGenerate
   );
+
+  // Rows cached under this VERSES_VERSION before stripTags replaced a
+  // single-pass tag regex can still hold markup, and the en.sahih path below
+  // serves them as stored. Re-sanitizing on read covers them without
+  // regenerating every name's selection.
+  const verses = selected.map((v) => ({ ...v, translation: stripTags(v.translation) }));
 
   if (verses.length === 0) return verses;
 
@@ -323,7 +326,7 @@ async function getVersesBySlug(
             }
             return {
               ...v,
-              translation: stripHtml(localized.translation),
+              translation: stripTags(localized.translation),
             };
           })
         );
