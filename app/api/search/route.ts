@@ -6,6 +6,7 @@ import { SURAH_LENGTHS } from "@/lib/quran/audio";
 import { searchByMeaning, type SemanticMatch } from "@/lib/quran/semantic-search";
 import { getVerses, isValidRef } from "@/lib/quran/quran-corpus";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
+import { stripTags } from "@/lib/quran/html-text";
 import {
   consume,
   SEARCH_LOG_LIMIT,
@@ -32,10 +33,13 @@ const KEYWORD_FETCH_TIMEOUT_MS = 5000;
 // quran.com paginates far below this; a larger value is only ever abuse.
 const MAX_PAGE = 100;
 
-function stripHtml(text: string): string {
-  // Strip angle brackets directly so partial/unterminated tags (e.g. "<script")
-  // cannot survive sanitization.
-  return text.replace(/[<>]/g, "");
+// quran.com wraps a translator's footnote marker in <sup> (e.g. Bridges' "pl" for
+// plural, numbered notes elsewhere). The marker is not verse text, so it goes
+// with its tag; a space it carried is kept so the words around it don't merge.
+const FOOTNOTE = /<sup\b[^>]*>([\s\S]*?)<\/sup>/gi;
+
+function snippetText(html: string): string {
+  return stripTags(html.replace(FOOTNOTE, (_m, inner: string) => (/\s$/.test(inner) ? " " : "")));
 }
 
 interface KeywordSearchResult {
@@ -78,7 +82,7 @@ async function fetchQuranComSearch(
       const [surahStr] = r.verse_key.split(":");
       const surahNum = parseInt(surahStr, 10);
       const [surahName, surahNameArabic] = getSurahName(surahNum);
-      const snippet = stripHtml(r.translations?.[0]?.text ?? "").slice(0, 140);
+      const snippet = snippetText(r.translations?.[0]?.text ?? "").slice(0, 140);
       return {
         ref: r.verse_key as VerseRef,
         surahName,
