@@ -7,6 +7,7 @@ import { resolveModel, resolveProvider, type Provider } from "@/lib/ai/ai";
 import { translateReason } from "@/lib/ai/translate";
 import { discoverCandidates } from "@/lib/ai/connection-discovery";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
+import { DEFAULT_EDITION } from "@/lib/quran/quran-corpus";
 import { consume, RateLimitError } from "@/lib/infra/rate-limit";
 import { incr } from "@/lib/infra/metrics";
 import { LOCALE_LANGUAGE_NAME, type Locale } from "@/lib/i18n/config";
@@ -71,6 +72,10 @@ interface GetConnectionsOptions {
    *  canonical `en` one; a non-`en` value translates each `en` reason and caches
    *  the result under that locale. Defaults to "en". */
   locale?: Locale;
+  /** Quran translation edition the verse text is served in (e.g.
+   *  "az.mammadaliyev"). Independent of `locale`, which only governs the reason
+   *  text. Defaults to en.sahih. */
+  edition?: string;
   /** Forces a specific LLM provider for the miss-path generation (the admin
    *  batch job's per-run pick). Unset for live traffic, which uses the
    *  feature/global provider flags. */
@@ -121,9 +126,10 @@ async function singleFlight(
 /** Hydrate stored edges (which carry only refs + reason) into full results. */
 async function hydrate(
   rows: Pick<Connection, "toRef" | "reason">[],
-  kind: EdgeKind
+  kind: EdgeKind,
+  edition?: string
 ): Promise<ConnectionResult[]> {
-  const resolved = await Promise.all(rows.map((r) => resolveVerse(r.toRef)));
+  const resolved = await Promise.all(rows.map((r) => resolveVerse(r.toRef, edition)));
   return rows
     .map((r, i) => {
       const verse = resolved[i];
@@ -142,6 +148,21 @@ async function hydrate(
       return result;
     })
     .filter((c): c is ConnectionResult => c !== null);
+}
+
+/** Swap each result's verse text into `edition`. Miss-path results carry en.sahih
+ *  text and come out of a single-flight shared by readers who may want different
+ *  editions, so this runs per caller after the shared work settles. */
+async function inEdition(
+  results: ConnectionResult[],
+  edition?: string
+): Promise<ConnectionResult[]> {
+  if (!edition || edition === DEFAULT_EDITION) return results;
+  const resolved = await Promise.all(results.map((r) => resolveVerse(r.ref, edition)));
+  return results.map((r, i) => {
+    const verse = resolved[i];
+    return verse ? { ...r, translation: verse.translation } : r;
+  });
 }
 
 /** Raw active cached edges for one cell+locale (not hydrated — a cell whose
@@ -207,6 +228,7 @@ export async function getConnections(
 ): Promise<ConnectionResult[]> {
   const excludeRefs = options.excludeRefs ?? [];
   const locale = options.locale ?? "en";
+  const edition = options.edition;
 
   const existing = await readActiveRows(fromRef, kind, locale, excludeRefs);
   // The canonical `en` rows for the same cell: needed to decide whether a
@@ -217,20 +239,21 @@ export async function getConnections(
 
   let blocked = new Set<string>();
   if (locale === "en") {
-    if (existing.length > 0) return hydrate(existing, kind);
+    if (existing.length > 0) return hydrate(existing, kind, edition);
   } else if (enRows.length > 0) {
     // A translation hidden by moderation is settled, not missing: the reader
     // gets the canonical English reason for that pair, and it is never
     // re-translated (that would be fresh provider work on every request and
     // would bypass the quarantine).
     const localeRefs = new Set(existing.map((r) => r.toRef));
-    if (enRows.every((r) => localeRefs.has(r.toRef))) return hydrate(existing, kind);
+    if (enRows.every((r) => localeRefs.has(r.toRef))) return hydrate(existing, kind, edition);
     blocked = await readBlockedRefs(fromRef, kind, locale);
     if (enRows.every((r) => localeRefs.has(r.toRef) || blocked.has(r.toRef))) {
       const byRef = new Map(existing.map((r) => [r.toRef, r]));
       return hydrate(
         enRows.map((r) => byRef.get(r.toRef) ?? r),
-        kind
+        kind,
+        edition
       );
     }
   } else if (existing.length > 0) {
@@ -244,7 +267,7 @@ export async function getConnections(
     // rows — so serve what is there.
     const localeRefs = new Set(existing.map((r) => r.toRef));
     if (enRows.length === 0 || enRows.every((r) => localeRefs.has(r.toRef))) {
-      return hydrate(existing, kind);
+      return hydrate(existing, kind, edition);
     }
   }
 
@@ -257,7 +280,7 @@ export async function getConnections(
       // An incomplete non-`en` cell we can't repair right now: serve the
       // (partial) rows we already have rather than erroring — a later request
       // with budget, or the backfill, finishes the translation.
-      if (locale !== "en" && existing.length > 0) return hydrate(existing, kind);
+      if (locale !== "en" && existing.length > 0) return hydrate(existing, kind, edition);
       throw new RateLimitError();
     }
   }
@@ -292,7 +315,7 @@ export async function getConnections(
           ),
     locale === "en"
   );
-  return result.results;
+  return inEdition(result.results, edition);
 }
 
 /**

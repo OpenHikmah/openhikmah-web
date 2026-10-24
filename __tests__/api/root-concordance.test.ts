@@ -22,15 +22,18 @@ function makeDbChain(resolveWith: unknown = []) {
   return chain;
 }
 
-const { mockSelect, mockGetVerses } = vi.hoisted(() => ({
+const { mockSelect, mockGetVerses, mockGetQuranEdition } = vi.hoisted(() => ({
   mockSelect: vi.fn(() => makeDbChain([])),
   mockGetVerses: vi.fn(async () => new Map()),
+  mockGetQuranEdition: vi.fn(async () => "en.sahih"),
 }));
 vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect } }));
 vi.mock("@/lib/quran/quran-corpus", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/quran/quran-corpus")>();
   return { ...actual, getVerses: mockGetVerses };
 });
+
+vi.mock("@/lib/i18n/request-prefs", () => ({ getQuranEdition: mockGetQuranEdition }));
 
 import { GET } from "@/app/api/root/[root]/route";
 
@@ -45,6 +48,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockSelect.mockReturnValue(makeDbChain([]));
   mockGetVerses.mockResolvedValue(new Map());
+  mockGetQuranEdition.mockResolvedValue("en.sahih");
 });
 
 describe("GET /api/root/[root]", () => {
@@ -90,6 +94,15 @@ describe("GET /api/root/[root]", () => {
     expect(body.root).toBe("رحم");
     expect(body.count).toBe(2);
     expect(body.verses.map((v: { ref: string }) => v.ref)).toEqual(["2:255", "10:5"]);
+  });
+
+  it("reads snippets in the reader's Quran edition", async () => {
+    mockGetQuranEdition.mockResolvedValue("az.mammadaliyev");
+    mockSelect.mockReturnValue(makeDbChain([{ ref: "2:255" }]));
+
+    await GET(req(), params("رحم"));
+
+    expect(mockGetVerses).toHaveBeenCalledWith(["2:255"], "az.mammadaliyev");
   });
 
   it("truncates each verse's translation to a short snippet", async () => {

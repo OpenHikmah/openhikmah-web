@@ -27,15 +27,23 @@ function makeDbChain(resolveWith: unknown = []) {
   return chain;
 }
 
-const { mockSelect, mockInsert, mockDelete, mockRateLimitOrNull, mockGetVerses, mockResolveVerse } =
-  vi.hoisted(() => ({
-    mockGetVerses: vi.fn(async (): Promise<Map<string, unknown>> => new Map()),
-    mockResolveVerse: vi.fn(async (): Promise<unknown> => null),
-    mockSelect: vi.fn(() => makeDbChain([])),
-    mockInsert: vi.fn(() => makeDbChain([])),
-    mockDelete: vi.fn(() => makeDbChain([])),
-    mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
-  }));
+const {
+  mockSelect,
+  mockInsert,
+  mockDelete,
+  mockRateLimitOrNull,
+  mockGetVerses,
+  mockResolveVerse,
+  mockGetQuranEdition,
+} = vi.hoisted(() => ({
+  mockGetVerses: vi.fn(async (): Promise<Map<string, unknown>> => new Map()),
+  mockResolveVerse: vi.fn(async (): Promise<unknown> => null),
+  mockSelect: vi.fn(() => makeDbChain([])),
+  mockInsert: vi.fn(() => makeDbChain([])),
+  mockDelete: vi.fn(() => makeDbChain([])),
+  mockRateLimitOrNull: vi.fn(async (): Promise<NextResponse | null> => null),
+  mockGetQuranEdition: vi.fn(async () => "en.sahih"),
+}));
 
 vi.mock("@/lib/infra/db", () => ({
   db: {
@@ -52,6 +60,7 @@ vi.mock("@/lib/quran/verse-resolver", () => ({ resolveVerse: mockResolveVerse })
 vi.mock("@/lib/infra/rate-limit", () => ({
   rateLimitOrNull: mockRateLimitOrNull,
 }));
+vi.mock("@/lib/i18n/request-prefs", () => ({ getQuranEdition: mockGetQuranEdition }));
 
 import { POST } from "@/app/api/share/route";
 import { GET } from "@/app/api/share/[id]/route";
@@ -130,6 +139,7 @@ beforeEach(() => {
     ])
   );
   mockResolveVerse.mockReset().mockResolvedValue(null);
+  mockGetQuranEdition.mockReset().mockResolvedValue("en.sahih");
 });
 
 describe("POST /api/share", () => {
@@ -332,7 +342,20 @@ describe("GET /api/share/[id]", () => {
       .mockReturnValueOnce(makeDbChain([activeConnection]));
     const res = await getReq(VALID_ID);
     expect(res.status).toBe(200);
-    expect(mockResolveVerse).toHaveBeenCalledWith("112:1");
+    expect(mockResolveVerse).toHaveBeenCalledWith("112:1", "en.sahih");
+  });
+
+  it("rehydrates verse text in the viewer's Quran edition", async () => {
+    mockGetQuranEdition.mockResolvedValue("az.mammadaliyev");
+    mockGetVerses.mockResolvedValue(new Map([["2:255", ayatAlKursi]]));
+    mockResolveVerse.mockResolvedValue(ikhlas);
+    mockSelect
+      .mockReturnValueOnce(makeDbChain([storedRow(validPayload)]))
+      .mockReturnValueOnce(makeDbChain([activeConnection]));
+    const res = await getReq(VALID_ID);
+    expect(res.status).toBe(200);
+    expect(mockGetVerses).toHaveBeenCalledWith(["2:255", "112:1"], "az.mammadaliyev");
+    expect(mockResolveVerse).toHaveBeenCalledWith("112:1", "az.mammadaliyev");
   });
 
   it("returns 500 when a verse resolves nowhere", async () => {

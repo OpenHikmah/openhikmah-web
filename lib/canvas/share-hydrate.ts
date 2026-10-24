@@ -35,17 +35,20 @@ export async function loadSharePayload(id: string): Promise<LoadedShare> {
 
 /**
  * Rebuilds a full canvas from a structural share payload: verse text comes from
- * the corpus (live fetch only for refs the corpus lacks) and edge kind/reason
- * from the active connection graph. An edge with no active graph row is
- * dropped rather than shown with client-supplied text. Returns null when a verse
- * cannot be resolved.
+ * the corpus in the viewer's `edition` (live fetch only for refs the corpus
+ * lacks) and edge kind/reason from the active connection graph. An edge with no
+ * active graph row is dropped rather than shown with client-supplied text.
+ * Returns null when a verse cannot be resolved.
  */
-export async function hydrateSharePayload(payload: SharePayload): Promise<SavedCanvas | null> {
+export async function hydrateSharePayload(
+  payload: SharePayload,
+  edition?: string
+): Promise<SavedCanvas | null> {
   const refs = [...new Set(payload.nodes.map((n) => n.ref))];
-  const byRef = new Map<string, Verse>(await getVerses(refs));
+  const byRef = new Map<string, Verse>(await getVerses(refs, edition));
   for (const ref of refs) {
     if (byRef.has(ref)) continue;
-    const verse = await resolveVerse(ref);
+    const verse = await resolveVerse(ref, edition);
     if (!verse) return null;
     byRef.set(ref, verse);
   }
