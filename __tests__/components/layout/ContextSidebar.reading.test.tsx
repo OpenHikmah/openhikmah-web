@@ -219,6 +219,29 @@ describe("ContextSidebar — reading views", () => {
     expect(screen.getByText("AI reflection")).toBeInTheDocument();
   });
 
+  it("drops the canvas hover when a focused row opens its pair", () => {
+    openNode("a");
+    renderPanel();
+
+    const row = screen.getByRole("button", { name: "Read 2:153 and 2:45 together" });
+    fireEvent.focus(row);
+    expect(useCanvasStore.getState().hoveredEdgeId).toBe("e1");
+    fireEvent.click(row);
+
+    expect(useCanvasStore.getState().sidebarContent?.type).toBe("edge");
+    expect(useCanvasStore.getState().hoveredEdgeId).toBeNull();
+  });
+
+  it("drops the canvas hover when keyboard focus leaves a row", () => {
+    openNode("a");
+    renderPanel();
+
+    const row = screen.getByRole("button", { name: "Read 2:153 and 2:45 together" });
+    fireEvent.focus(row);
+    fireEvent.blur(row);
+    expect(useCanvasStore.getState().hoveredEdgeId).toBeNull();
+  });
+
   it("puts the other end first when the pair is opened from that verse", () => {
     openEdge("e1", "b");
     renderPanel();

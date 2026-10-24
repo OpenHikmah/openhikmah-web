@@ -478,6 +478,9 @@ function ThreadView({
     row?.querySelector<HTMLButtonElement>(".open-pair")?.focus({ preventScroll: true });
   }, [returnEdgeId]);
 
+  // Opening a pair unmounts the list with no mouseleave, so the hover would stick on the canvas.
+  useEffect(() => () => setHoveredEdge(null), [setHoveredEdge]);
+
   const verse = verseOf(nodes.find((n) => n.id === nodeId));
   if (!verse) return null;
   const all = connectionsOf(edges, nodeId);
@@ -648,6 +651,11 @@ function ThreadView({
                           setSidebarContent({ type: "edge", edgeId: e.id, contextNodeId: nodeId })
                         }
                         onFocus={() => setHoveredEdge(e.id)}
+                        onBlur={(ev) => {
+                          if (!ev.currentTarget.closest("li")?.matches(":hover")) {
+                            setHoveredEdge(null);
+                          }
+                        }}
                         className="open-pair flex min-w-0 items-center gap-2 font-mono text-xs text-text-secondary outline-none after:absolute after:inset-0 after:rounded-[10px]"
                       >
                         <span className="font-medium text-text-primary">{other.ref}</span>
