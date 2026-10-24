@@ -213,9 +213,71 @@ describe("GET /api/search", () => {
     const req = makeSearchReq("alif");
     const res = await GET(req);
     const body = await res.json();
-    expect(body.results[0].snippet).not.toContain("<em>");
-    expect(body.results[0].snippet).not.toContain("<strong>");
-    expect(body.results[0].snippet).toContain("Alif");
+    expect(body.results[0].snippet).toBe("Alif Lam Mim.");
+  });
+
+  it("removes match highlights whole instead of leaving tag names in the text", async () => {
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([
+        {
+          verse_key: "55:4",
+          translations: [{ text: "He has taught him speech (and <em>intelligence</em>)." }],
+        },
+      ])
+    );
+
+    const body = await (await GET(makeSearchReq("most intelligent"))).json();
+    expect(body.results[0].snippet).toBe("He has taught him speech (and intelligence).");
+  });
+
+  it("drops a translator's footnote marker without merging the words around it", async () => {
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([
+        {
+          verse_key: "20:54",
+          translations: [
+            {
+              text: 'Eat<a class="sup"><sup>pl </sup></a>and pasture your livestock. <em>Most</em> surely, in that are signs for ones endowed with <em>intelligence</em>.',
+            },
+          ],
+        },
+      ])
+    );
+
+    const body = await (await GET(makeSearchReq("most intelligent"))).json();
+    expect(body.results[0].snippet).toBe(
+      "Eat and pasture your livestock. Most surely, in that are signs for ones endowed with intelligence."
+    );
+  });
+
+  it("drops a numbered footnote marker that sits against punctuation", async () => {
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([
+        {
+          verse_key: "1:2",
+          translations: [
+            { text: "[All] praise is [due] to Allah<sup foot_note=1>1</sup>, Lord of the worlds." },
+          ],
+        },
+      ])
+    );
+
+    const body = await (await GET(makeSearchReq("praise"))).json();
+    expect(body.results[0].snippet).toBe("[All] praise is [due] to Allah, Lord of the worlds.");
+  });
+
+  it("decodes entities in snippets without letting an encoded tag through", async () => {
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([
+        {
+          verse_key: "2:255",
+          translations: [{ text: "Allah &amp; &lt;script&gt;none&lt;/script&gt; besides Him" }],
+        },
+      ])
+    );
+
+    const body = await (await GET(makeSearchReq("allah"))).json();
+    expect(body.results[0].snippet).toBe("Allah & none besides Him");
   });
 
   it("strips unclosed tags that a single well-formed-tag pass would miss", async () => {
