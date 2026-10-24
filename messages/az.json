@@ -132,6 +132,8 @@
       "connected": "Əlaqəli",
       "aiExplanation": "Süni intellektin yazdığı izah",
       "aiFootnote": "süni intellektin yazdığı, ayə korpusu ilə yoxlanılmış izahı göstərir.",
+      "showFullExplanation": "Daha çox",
+      "showLessExplanation": "Daha az",
       "previousConnection": "Əvvəlki əlaqə",
       "nextConnection": "Növbəti əlaqə",
       "connectionPosition": "{current} / {total}",

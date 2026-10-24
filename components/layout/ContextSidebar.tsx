@@ -17,7 +17,7 @@ import type { Edge, Node } from "@xyflow/react";
 import { useCanvasStore, connectionsOf } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import { useAudioStore } from "@/store/audio";
-import { useState, useEffect, useRef, useSyncExternalStore } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useSyncExternalStore } from "react";
 import { useSidebarResize } from "@/hooks/useSidebarResize";
 import type { EdgeKind, Verse } from "@/types/quran";
 import { Card, IconButton, Tooltip } from "@/components/ui";
@@ -371,14 +371,33 @@ function KindChip({ kind, count }: { kind: EdgeKind; count?: number }) {
   );
 }
 
-/** AI-written text is always set apart from scripture: teal box, sparkle mark. */
-function AiNote({ text, compact }: { text: string; compact?: boolean }) {
+/** AI-written text is always set apart from scripture: teal box, sparkle mark.
+ *  `preview` shows one line first, with a toggle when the text runs longer. */
+function AiNote({ text, preview }: { text: string; preview?: boolean }) {
   const t = useTranslations("canvas.contextSidebar");
+  const textRef = useRef<HTMLParagraphElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  const clamped = preview && !expanded;
+
+  useLayoutEffect(() => {
+    if (!clamped) return;
+    const el = textRef.current;
+    if (!el) return;
+    // A panel resize can push a fitting line into overflow, so re-measure.
+    const measure = () => setOverflows(el.scrollHeight - el.clientHeight > 1);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [clamped, text]);
+
   return (
     <div
       className={cn(
         "flex items-start gap-2.5 rounded-[10px] border border-teal/40 bg-teal/[0.07]",
-        compact ? "px-3 py-2.5" : "px-3.5 py-3"
+        preview ? "px-3 py-2" : "px-3.5 py-3"
       )}
     >
       <Tooltip label={t("aiExplanation")}>
@@ -392,13 +411,29 @@ function AiNote({ text, compact }: { text: string; compact?: boolean }) {
         </span>
       </Tooltip>
       <p
+        ref={textRef}
         className={cn(
-          "leading-relaxed text-text-primary",
-          compact ? "text-[13px]" : "text-[13.5px]"
+          "min-w-0 flex-1 leading-relaxed text-text-primary",
+          preview ? "text-[13px]" : "text-[13.5px]",
+          clamped && "line-clamp-1"
         )}
       >
         {text}
       </p>
+      {preview && (expanded || overflows) && (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={(e) => {
+            // The connection card around this note opens the pair view on click.
+            e.stopPropagation();
+            setExpanded((v) => !v);
+          }}
+          className="mt-px shrink-0 rounded px-1 text-xs font-medium text-teal-bright transition-colors hover:bg-teal/10"
+        >
+          {expanded ? t("showLessExplanation") : t("showFullExplanation")}
+        </button>
+      )}
     </div>
   );
 }
@@ -580,7 +615,7 @@ function ThreadView({ nodeId }: { nodeId: string }) {
                     <span className="font-medium text-text-primary">{refOf(e.target)}</span>
                     <span>{other.surahName}</span>
                   </div>
-                  <AiNote text={edgeReason(e)} compact />
+                  <AiNote text={edgeReason(e)} preview />
                   <p className="text-sm leading-[1.6] text-text-primary">{other.translation}</p>
                   <p
                     lang="ar"

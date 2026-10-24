@@ -132,6 +132,8 @@
       "connected": "Связанный",
       "aiExplanation": "Пояснение, написанное ИИ",
       "aiFootnote": "отмечает пояснение, написанное ИИ и проверенное по корпусу аятов.",
+      "showFullExplanation": "Ещё",
+      "showLessExplanation": "Свернуть",
       "previousConnection": "Предыдущая связь",
       "nextConnection": "Следующая связь",
       "connectionPosition": "{current} из {total}",

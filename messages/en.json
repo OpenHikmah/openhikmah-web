@@ -132,6 +132,8 @@
       "connected": "Connected",
       "aiExplanation": "AI-written explanation",
       "aiFootnote": "marks an AI-written explanation, checked against the verse corpus.",
+      "showFullExplanation": "More",
+      "showLessExplanation": "Less",
       "previousConnection": "Previous connection",
       "nextConnection": "Next connection",
       "connectionPosition": "{current} of {total}",

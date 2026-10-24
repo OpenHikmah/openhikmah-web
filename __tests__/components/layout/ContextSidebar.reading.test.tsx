@@ -102,6 +102,37 @@ describe("ContextSidebar — reading views", () => {
     expect(screen.getAllByRole("img", { name: "AI-written explanation" })).toHaveLength(2);
   });
 
+  it("shows each reason as a one-line preview that opens in place", () => {
+    // jsdom has no layout, so stub a reason that runs past its one-line clamp.
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(80);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(20);
+    act(() => useCanvasStore.getState().setSidebarContent({ type: "node", nodeId: "a" }));
+    renderPanel();
+
+    expect(screen.getByText(REASON_45)).toHaveClass("line-clamp-1");
+    const card = screen.getByRole("button", { name: "Connection 2:153 to 2:45" });
+    fireEvent.click(within(card).getByRole("button", { name: "More" }));
+
+    expect(screen.getByText(REASON_45)).not.toHaveClass("line-clamp-1");
+    expect(within(card).getByRole("button", { name: "Less" })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
+    // Opening the reason must not open the pair view.
+    expect(useCanvasStore.getState().sidebarContent).toEqual({ type: "node", nodeId: "a" });
+    vi.restoreAllMocks();
+  });
+
+  it("shows no toggle when the reason fits on one line", () => {
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(20);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(20);
+    act(() => useCanvasStore.getState().setSidebarContent({ type: "node", nodeId: "a" }));
+    renderPanel();
+
+    expect(screen.queryByRole("button", { name: "More" })).not.toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+
   it("opens the connection view with both verses and the reason between them", () => {
     act(() => useCanvasStore.getState().setSidebarContent({ type: "node", nodeId: "a" }));
     renderPanel();

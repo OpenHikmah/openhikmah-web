@@ -132,6 +132,8 @@
       "connected": "Bağlantılı",
       "aiExplanation": "Yapay zekanın yazdığı açıklama",
       "aiFootnote": "yapay zekanın yazdığı ve ayet derlemiyle doğrulanan açıklamayı gösterir.",
+      "showFullExplanation": "Devamı",
+      "showLessExplanation": "Daha az",
       "previousConnection": "Önceki bağlantı",
       "nextConnection": "Sonraki bağlantı",
       "connectionPosition": "{current} / {total}",
