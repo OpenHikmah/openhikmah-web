@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderWithIntl as render } from "../../test-utils/render-with-intl";
 import { useCanvasStore } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
+import { useAudioStore } from "@/store/audio";
 import type { Verse, VerseRef } from "@/types/quran";
 import type { Node } from "@xyflow/react";
 
@@ -26,64 +27,60 @@ function verseNode(): Node {
   return { id: "n1", type: "verse", position: { x: 0, y: 0 }, data: { ...verse } } as Node;
 }
 
-describe("CanvasToolbar export menu", () => {
+function chooseFromMore(name: string | RegExp) {
+  fireEvent.click(screen.getByRole("button", { name: "More" }));
+  fireEvent.click(screen.getByRole("button", { name }));
+}
+
+describe("CanvasToolbar layout", () => {
   beforeEach(() => {
     useCanvasStore.setState({ nodes: [verseNode()], edges: [] });
+    useAuthStore.setState({ accessToken: null });
   });
 
-  it("opens the export menu on click", () => {
+  it("keeps only Search, Listen, Share and More in the bar", () => {
     render(<CanvasToolbar onSearchOpen={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: /export/i }));
-    expect(screen.getByRole("button", { name: /PNG/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /search/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Listen" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "More" })).toBeInTheDocument();
+    for (const gone of [/export/i, /^fit$/i, /^clear$/i, /sign in to save/i]) {
+      expect(screen.queryByRole("button", { name: gone })).not.toBeInTheDocument();
+    }
   });
 
-  it("closes the export menu on an outside click", () => {
-    render(
-      <div>
-        <div data-testid="outside">outside</div>
-        <CanvasToolbar onSearchOpen={vi.fn()} />
-      </div>
-    );
-    fireEvent.click(screen.getByRole("button", { name: /export/i }));
-    expect(screen.getByRole("button", { name: /PNG/ })).toBeInTheDocument();
-
-    fireEvent.mouseDown(screen.getByTestId("outside"));
-    expect(screen.queryByRole("button", { name: /PNG/ })).not.toBeInTheDocument();
-  });
-
-  it("stays open on a click inside the menu itself", () => {
+  it("puts saving, downloads and Clear canvas in the More menu", () => {
     render(<CanvasToolbar onSearchOpen={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: /export/i }));
-    fireEvent.mouseDown(screen.getByRole("button", { name: /PNG/ }));
-    expect(screen.getByRole("button", { name: /PNG/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    for (const item of ["Sign in to save", "Download image", "Download PDF", "Clear canvas"]) {
+      expect(screen.getByRole("button", { name: item })).toBeInTheDocument();
+    }
   });
 
-  it("re-clicking the export toggle button still closes the menu", () => {
+  it("clears the canvas at once and keeps a snapshot for Undo", () => {
     render(<CanvasToolbar onSearchOpen={vi.fn()} />);
-    const toggle = screen.getByRole("button", { name: /export/i });
-    fireEvent.click(toggle);
-    expect(screen.getByRole("button", { name: /PNG/ })).toBeInTheDocument();
-
-    fireEvent.click(toggle);
-    expect(screen.queryByRole("button", { name: /PNG/ })).not.toBeInTheDocument();
-  });
-});
-
-describe("CanvasToolbar clear confirmation", () => {
-  beforeEach(() => {
-    useCanvasStore.setState({ nodes: [verseNode()], edges: [] });
-  });
-
-  it("requires a second click before clearing the canvas", () => {
-    render(<CanvasToolbar onSearchOpen={vi.fn()} />);
-    const clearButton = screen.getByRole("button", { name: "Clear" });
-
-    fireEvent.click(clearButton);
-    expect(useCanvasStore.getState().nodes).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "Confirm clear?" })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Confirm clear?" }));
+    chooseFromMore("Clear canvas");
     expect(useCanvasStore.getState().nodes).toHaveLength(0);
+    expect(useCanvasStore.getState().clearedSnapshot?.nodes).toHaveLength(1);
+  });
+
+  it("reads every verse aloud in Qur'an order", () => {
+    const playGraph = vi.fn();
+    useAudioStore.setState({ playGraph, currentRef: null });
+    useCanvasStore.setState({
+      nodes: [
+        {
+          ...verseNode(),
+          id: "a",
+          data: { ...verseNode().data, ref: "2:255", surah: 2, ayah: 255 },
+        },
+        verseNode(),
+      ],
+      edges: [],
+    });
+    render(<CanvasToolbar onSearchOpen={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Listen" }));
+    expect(playGraph.mock.calls[0][0].map((v: { ref: string }) => v.ref)).toEqual(["1:1", "2:255"]);
   });
 });
 
@@ -99,11 +96,35 @@ describe("CanvasToolbar save workspace name", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<CanvasToolbar onSearchOpen={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+    chooseFromMore("Save to my canvases");
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.name).toMatch(/^1 verse — /);
+    expect(await screen.findByRole("status")).toHaveTextContent("Saved");
+
+    vi.unstubAllGlobals();
+  });
+
+  it("sends one save at a time, so a second click can't create a duplicate canvas", async () => {
+    useCanvasStore.setState({ nodes: [verseNode()], edges: [] });
+    let settle: (v: { ok: boolean }) => void = () => {};
+    const fetchMock = vi.fn().mockReturnValue(new Promise((r) => (settle = r)));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<CanvasToolbar onSearchOpen={vi.fn()} />);
+    chooseFromMore("Save to my canvases");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    const save = screen.getByRole("button", { name: "Save to my canvases" });
+    expect(save).toBeDisabled();
+    fireEvent.click(save);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    settle({ ok: true });
+    expect(await screen.findByRole("status")).toHaveTextContent("Saved");
+    expect(screen.getByRole("button", { name: "Save to my canvases" })).toBeEnabled();
 
     vi.unstubAllGlobals();
   });
@@ -117,7 +138,7 @@ describe("CanvasToolbar save workspace name", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<CanvasToolbar onSearchOpen={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+    chooseFromMore("Save to my canvases");
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);

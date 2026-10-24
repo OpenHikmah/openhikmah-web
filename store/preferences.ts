@@ -3,17 +3,18 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEFAULT_RECITER } from "@/lib/quran/audio";
+import { CARD_HEIGHT_WITH_ARABIC, CARD_HEIGHT_WITHOUT_ARABIC } from "@/lib/canvas/canvas-layout";
 import { LOCALE_COOKIE, EDITION_COOKIE, type Locale } from "@/lib/i18n/config";
 
 export { LOCALE_COOKIE, EDITION_COOKIE };
 export type UiLocale = Locale;
 
 export interface CanvasPrefs {
-  /** Whether the minimap panel renders on the canvas once nodes exist. */
-  showMinimap: boolean;
+  /** Whether verse cards on the canvas show the Arabic text. The reading panel always does. */
+  showArabic: boolean;
 }
 
-const DEFAULT_CANVAS_PREFS: CanvasPrefs = { showMinimap: true };
+const DEFAULT_CANVAS_PREFS: CanvasPrefs = { showArabic: true };
 
 interface PreferencesStore {
   uiLocale: UiLocale;
@@ -79,6 +80,15 @@ export const usePreferencesStore = create<PreferencesStore>()(
         reciter: s.reciter,
         canvasPrefs: s.canvasPrefs,
       }),
+      // Stored canvasPrefs may predate a field — fill any missing one from the defaults.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<PreferencesStore>;
+        return {
+          ...current,
+          ...p,
+          canvasPrefs: { ...DEFAULT_CANVAS_PREFS, ...p.canvasPrefs },
+        };
+      },
       // localStorage is the source of truth; re-sync cookies (read by server
       // components via next/headers) whenever a persisted value rehydrates.
       onRehydrateStorage: () => (state) => {
@@ -89,3 +99,10 @@ export const usePreferencesStore = create<PreferencesStore>()(
     }
   )
 );
+
+/** Height the canvas layout assumes for a card React Flow hasn't measured yet. */
+export function fallbackCardHeight(): number {
+  return usePreferencesStore.getState().canvasPrefs.showArabic
+    ? CARD_HEIGHT_WITH_ARABIC
+    : CARD_HEIGHT_WITHOUT_ARABIC;
+}

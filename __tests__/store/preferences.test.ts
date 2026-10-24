@@ -21,7 +21,7 @@ describe("preferences store", () => {
       uiLocale: "en",
       quranEditionByLocale: {},
       reciter: DEFAULT_RECITER,
-      canvasPrefs: { showMinimap: true },
+      canvasPrefs: { showArabic: true },
     });
   });
 
@@ -29,7 +29,7 @@ describe("preferences store", () => {
     const s = usePreferencesStore.getState();
     expect(s.uiLocale).toBe("en");
     expect(s.reciter).toBe(DEFAULT_RECITER);
-    expect(s.canvasPrefs.showMinimap).toBe(true);
+    expect(s.canvasPrefs.showArabic).toBe(true);
   });
 
   it("setUiLocale updates state and mirrors to a cookie", () => {
@@ -64,7 +64,25 @@ describe("preferences store", () => {
   });
 
   it("setCanvasPrefs merges partial updates", () => {
-    usePreferencesStore.getState().setCanvasPrefs({ showMinimap: false });
-    expect(usePreferencesStore.getState().canvasPrefs).toEqual({ showMinimap: false });
+    usePreferencesStore.getState().setCanvasPrefs({ showArabic: false });
+    expect(usePreferencesStore.getState().canvasPrefs).toEqual({ showArabic: false });
+  });
+
+  it("gives older saved preferences the Arabic-on-cards default", async () => {
+    localStorage.setItem(
+      "open-hikmah-preferences",
+      JSON.stringify({ state: { uiLocale: "en", canvasPrefs: { showMinimap: false } }, version: 0 })
+    );
+    await usePreferencesStore.persist.rehydrate();
+    expect(usePreferencesStore.getState().canvasPrefs.showArabic).toBe(true);
+  });
+
+  it("keeps a saved Arabic-on-cards choice across reloads", async () => {
+    localStorage.setItem(
+      "open-hikmah-preferences",
+      JSON.stringify({ state: { uiLocale: "en", canvasPrefs: { showArabic: false } }, version: 0 })
+    );
+    await usePreferencesStore.persist.rehydrate();
+    expect(usePreferencesStore.getState().canvasPrefs.showArabic).toBe(false);
   });
 });

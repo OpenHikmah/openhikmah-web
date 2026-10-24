@@ -3,6 +3,7 @@ import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import type { NodeProps } from "@xyflow/react";
 import { renderWithIntl } from "@/__tests__/test-utils/render-with-intl";
 import { useCanvasStore } from "@/store/canvas";
+import { usePreferencesStore } from "@/store/preferences";
 import type { Verse } from "@/types/quran";
 import { VerseNode } from "@/components/canvas/VerseNode";
 import { TooltipProvider } from "@/components/ui";
@@ -64,15 +65,14 @@ describe("VerseNode — reacts to derived-index changes with no prop change", ()
     expect(screen.getByRole("button", { name: /jump to duplicate/i })).toBeInTheDocument();
   });
 
-  it("updates the expand menu's found-count once an edge is added after mount", () => {
+  it("shows a live connection count that opens the verse thread", () => {
     const sourceId = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
     const targetId = useCanvasStore
       .getState()
       .addVerseNode({ ...baseVerse, ref: "1:1" as const, surah: 1, ayah: 1 }, { x: 300, y: 0 });
     renderNode(nodeProps(sourceId, baseVerse));
 
-    fireEvent.click(screen.getByRole("button", { name: /expand connections/i }));
-    expect(screen.getByText(/by theme/i).textContent).not.toMatch(/found/i);
+    expect(screen.queryByRole("button", { name: /connected/i })).not.toBeInTheDocument();
 
     act(() => {
       useCanvasStore.getState().addConnectionEdge({
@@ -84,6 +84,56 @@ describe("VerseNode — reacts to derived-index changes with no prop change", ()
       });
     });
 
-    expect(screen.getByText(/by theme/i).textContent).toMatch(/1 found/i);
+    fireEvent.click(screen.getByRole("button", { name: "1 connected" }));
+    expect(useCanvasStore.getState().sidebarContent).toEqual({ type: "node", nodeId: sourceId });
+  });
+});
+
+describe("VerseNode — reading layout", () => {
+  beforeEach(() => {
+    useCanvasStore.getState().reset();
+    usePreferencesStore.getState().setCanvasPrefs({ showArabic: true });
+  });
+
+  afterEach(() => {
+    cleanup();
+    usePreferencesStore.getState().setCanvasPrefs({ showArabic: true });
+  });
+
+  it("hides the Arabic text when Arabic on cards is off, keeping the translation", () => {
+    const id = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+    renderNode(nodeProps(id, baseVerse));
+    expect(screen.getByText(baseVerse.arabicText)).toBeInTheDocument();
+
+    act(() => usePreferencesStore.getState().setCanvasPrefs({ showArabic: false }));
+
+    expect(screen.queryByText(baseVerse.arabicText)).not.toBeInTheDocument();
+    expect(screen.getByText(baseVerse.translation)).toBeInTheDocument();
+  });
+
+  it("opens the verse thread on click and closes it on a second click", () => {
+    const id = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+    renderNode(nodeProps(id, baseVerse));
+    const card = screen.getByRole("button", { name: "Al-Baqarah 2:255" });
+
+    fireEvent.click(card);
+    expect(useCanvasStore.getState().sidebarContent).toEqual({ type: "node", nodeId: id });
+    expect(card).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(card);
+    expect(useCanvasStore.getState().sidebarContent).toBeNull();
+  });
+
+  it("fades when the reading panel shows a verse it is not connected to", () => {
+    const id = useCanvasStore.getState().addVerseNode(baseVerse, { x: 0, y: 0 });
+    const otherId = useCanvasStore
+      .getState()
+      .addVerseNode({ ...baseVerse, ref: "1:1" as const, surah: 1, ayah: 1 }, { x: 300, y: 0 });
+    renderNode(nodeProps(id, baseVerse));
+    const card = screen.getByRole("button", { name: "Al-Baqarah 2:255" });
+    expect(card.className).not.toMatch(/opacity-30/);
+
+    act(() => useCanvasStore.getState().setSidebarContent({ type: "node", nodeId: otherId }));
+    expect(card.className).toMatch(/opacity-30/);
   });
 });
