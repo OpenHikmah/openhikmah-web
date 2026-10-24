@@ -20,6 +20,11 @@ vi.mock("@/lib/canvas/canvas-export", () => ({
 
 import { CanvasToolbar } from "@/components/canvas/CanvasToolbar";
 
+function chooseFromMore(name: string) {
+  fireEvent.click(screen.getByRole("button", { name: "More" }));
+  fireEvent.click(screen.getByRole("button", { name }));
+}
+
 function verseNode(): Node {
   // en.sahih (Saheeh International, alquran.cloud) — Al-Fatihah 1:1.
   const verse: Verse = {
@@ -52,15 +57,15 @@ describe("CanvasToolbar unmount while a request is in flight", () => {
     const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
 
     const { unmount } = render(<CanvasToolbar onSearchOpen={vi.fn()} />);
-    const saveButton = screen.getByRole("button", { name: /save/i });
-    fireEvent.click(saveButton);
+    chooseFromMore("Save to my canvases");
 
     // Let the first failed save settle and schedule its error-reset timeout.
-    await waitFor(() => expect(saveButton).not.toBeDisabled());
+    expect(await screen.findByText("Save failed — try again")).toBeInTheDocument();
 
     // A second failed save must clear the first timeout before scheduling its own.
-    fireEvent.click(saveButton);
-    await waitFor(() => expect(saveButton).not.toBeDisabled());
+    clearTimeoutSpy.mockClear();
+    chooseFromMore("Save to my canvases");
+    expect(await screen.findByText("Save failed — try again")).toBeInTheDocument();
 
     expect(clearTimeoutSpy).toHaveBeenCalled();
     clearTimeoutSpy.mockClear();
@@ -95,19 +100,16 @@ describe("CanvasToolbar unmount while a request is in flight", () => {
     Object.assign(navigator, { clipboard: originalClipboard });
   });
 
-  it("clears the previous export-error timeout when a second export fails, and clears it again on unmount", async () => {
+  it("clears the previous download-error timeout when a second download fails, and clears it again on unmount", async () => {
     const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
 
     const { unmount } = render(<CanvasToolbar onSearchOpen={vi.fn()} />);
-    const exportButton = screen.getByRole("button", { name: /export/i });
-    fireEvent.click(exportButton);
-    fireEvent.click(screen.getByRole("button", { name: /PNG/ }));
+    chooseFromMore("Download image");
+    expect(await screen.findByText("Failed")).toBeInTheDocument();
 
-    await waitFor(() => expect(exportButton).not.toBeDisabled());
-
-    fireEvent.click(exportButton);
-    fireEvent.click(screen.getByRole("button", { name: /PNG/ }));
-    await waitFor(() => expect(exportButton).not.toBeDisabled());
+    clearTimeoutSpy.mockClear();
+    chooseFromMore("Download image");
+    await waitFor(() => expect(clearTimeoutSpy).toHaveBeenCalled());
 
     expect(clearTimeoutSpy).toHaveBeenCalled();
     clearTimeoutSpy.mockClear();
@@ -129,7 +131,7 @@ describe("CanvasToolbar unmount while a request is in flight", () => {
     );
 
     const { unmount } = render(<CanvasToolbar onSearchOpen={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+    chooseFromMore("Save to my canvases");
 
     unmount();
 

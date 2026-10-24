@@ -53,6 +53,8 @@ function connection(ref: string) {
   };
 }
 
+const verseCards = () => useCanvasStore.getState().nodes.filter((n) => n.type === "verse");
+
 describe("HikmahCanvas entrance stagger", () => {
   beforeEach(() => {
     useCanvasStore.setState({
@@ -88,27 +90,27 @@ describe("HikmahCanvas entrance stagger", () => {
       await vi.advanceTimersByTimeAsync(0);
     });
 
-    expect(useCanvasStore.getState().nodes).toHaveLength(1); // just the source node so far
+    expect(verseCards()).toHaveLength(1); // just the source node so far
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(349);
     });
-    expect(useCanvasStore.getState().nodes).toHaveLength(1); // not yet at 350ms
+    expect(verseCards()).toHaveLength(1); // not yet at 350ms
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1);
     });
-    expect(useCanvasStore.getState().nodes).toHaveLength(2); // first connection lands at 350ms
+    expect(verseCards()).toHaveLength(2); // first connection lands at 350ms
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(349);
     });
-    expect(useCanvasStore.getState().nodes).toHaveLength(2); // not yet at the next 350ms gap
+    expect(verseCards()).toHaveLength(2); // not yet at the next 350ms gap
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1);
     });
-    expect(useCanvasStore.getState().nodes).toHaveLength(3); // second connection lands exactly 350ms later, not 700ms
+    expect(verseCards()).toHaveLength(3); // second connection lands exactly 350ms later, not 700ms
   });
 });
 
@@ -182,7 +184,7 @@ describe("HikmahCanvas expansion-notice timeout", () => {
     });
 
     expect(screen.getByRole("status")).toHaveTextContent(
-      "These verses are already connected a different way."
+      "Found 2:255, already linked to 1:1 by theme. No new line added."
     );
     // The pre-existing thematic edge is untouched — no second edge was added.
     expect(useCanvasStore.getState().edges).toHaveLength(1);

@@ -114,14 +114,14 @@ export default function SettingsPage() {
 
         <SettingsSection title={t("canvas")}>
           <div className="flex items-center justify-between">
-            <label htmlFor="canvas-minimap" className="text-sm text-text-secondary">
-              {t("showMinimap")}
+            <label htmlFor="canvas-arabic" className="text-sm text-text-secondary">
+              {t("arabicOnCards")}
             </label>
             <Switch
-              id="canvas-minimap"
-              aria-label={t("showCanvasMinimap")}
-              checked={canvasPrefs.showMinimap}
-              onCheckedChange={(checked) => setCanvasPrefs({ showMinimap: checked })}
+              id="canvas-arabic"
+              aria-label={t("showArabicOnCards")}
+              checked={canvasPrefs.showArabic}
+              onCheckedChange={(checked) => setCanvasPrefs({ showArabic: checked })}
             />
           </div>
         </SettingsSection>

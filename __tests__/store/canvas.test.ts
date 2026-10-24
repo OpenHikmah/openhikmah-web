@@ -238,8 +238,8 @@ describe("canvas store", () => {
   });
 
   it("setSidebarContent stores sidebar content", () => {
-    useCanvasStore.getState().setSidebarContent({ type: "node", verse: baseVerse });
-    expect(useCanvasStore.getState().sidebarContent).toMatchObject({ type: "node" });
+    useCanvasStore.getState().setSidebarContent({ type: "node", nodeId: "n1" });
+    expect(useCanvasStore.getState().sidebarContent).toEqual({ type: "node", nodeId: "n1" });
   });
 
   it("setPendingExpand stores pending expand action", () => {
@@ -498,7 +498,7 @@ describe("deserializeCanvas", () => {
     expect(nodes[0].position).toEqual({ x: 50, y: 80 });
   });
 
-  it("restores edges with correct type and animated flag", () => {
+  it("restores edges with the hikmah type and their kind", () => {
     const saved = {
       v: 1 as const,
       nodes: [],
@@ -516,7 +516,8 @@ describe("deserializeCanvas", () => {
     const { edges } = deserializeCanvas(saved);
     expect(edges).toHaveLength(1);
     expect(edges[0].type).toBe("hikmah");
-    expect(edges[0].animated).toBe(true);
+    // Line motion is drawn by HikmahEdge only for the open connection, not by React Flow.
+    expect(edges[0].animated).toBeUndefined();
     expect((edges[0].data as { kind: string }).kind).toBe("root");
   });
 
@@ -559,7 +560,7 @@ describe("restoreCanvas", () => {
   it("loads saved state and clears UI state", () => {
     const store = useCanvasStore.getState();
     store.setSelectedNode("old-node");
-    store.setSidebarContent({ type: "node", verse: baseVerse });
+    store.setSidebarContent({ type: "node", nodeId: "old-node" });
 
     store.restoreCanvas({
       v: 1,

@@ -1,7 +1,7 @@
 import { test, expect } from "./fixtures/auth";
 
 test.describe("canvas", () => {
-  test("adding a seed verse shows it on the canvas, and Clear removes it", async ({
+  test("adding a seed verse shows it on the canvas, Clear removes it, and Undo brings it back", async ({
     authenticatedPage: page,
   }) => {
     await page.goto("/canvas");
@@ -11,11 +11,13 @@ test.describe("canvas", () => {
 
     await expect(page.getByText("2:255")).toBeVisible();
 
-    const clearButton = page.getByRole("button", { name: /clear/i });
-    await clearButton.click();
-    await clearButton.click();
+    await page.getByRole("button", { name: "More" }).click();
+    await page.getByRole("button", { name: "Clear canvas" }).click();
 
     await expect(page.getByRole("button", { name: /search verses/i })).toBeVisible();
     await expect(page.getByText("2:255")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect(page.getByText("2:255").first()).toBeVisible();
   });
 });

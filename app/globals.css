@@ -167,8 +167,42 @@
     border-color: var(--color-gold) !important;
   }
 
+  /* A card running an expansion: border and a sweeping bar in the kind's colour. */
   .node-expanding {
-    border-color: var(--color-teal) !important;
+    border-color: color-mix(
+      in srgb,
+      var(--kc, var(--color-teal)) 60%,
+      var(--color-border)
+    ) !important;
+  }
+
+  .node-expanding::after {
+    content: "";
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: -1px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--kc, var(--color-teal)), transparent)
+      no-repeat;
+    background-size: 40% 100%;
+    animation: nodeSweep 1.1s var(--ease-standard) infinite;
+  }
+
+  /* Dotted lines move only when they matter: the open connection, a hovered
+     line, or a line to a placeholder still being filled. */
+  .hikmah-edge-flow {
+    animation: edgeFlow 0.5s linear infinite;
+  }
+
+  /* An open "find linked verses" menu must sit above neighbouring cards. */
+  .react-flow__node:has([data-expand-open]) {
+    z-index: 1000 !important;
+  }
+
+  /* Cards glide when a layout re-run (Arabic toggle, Reset layout) moves them. */
+  .canvas-relayout .react-flow__node {
+    transition: transform var(--duration-slow) var(--ease-standard);
   }
 
   .node-entrance {
@@ -190,6 +224,24 @@
 
   .wave-ocean-3 {
     animation: ocean-drift-3 18s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes nodeSweep {
+  from {
+    background-position: -60% 0;
+  }
+  to {
+    background-position: 160% 0;
+  }
+}
+
+@keyframes edgeFlow {
+  from {
+    stroke-dashoffset: 10;
+  }
+  to {
+    stroke-dashoffset: 0;
   }
 }
 
