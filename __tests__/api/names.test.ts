@@ -43,9 +43,11 @@ function makeDbChain(resolveWith: unknown[] = []) {
   );
   return chain;
 }
+// A test can put a name_content row here to simulate a cache hit.
+const { cacheRows } = vi.hoisted(() => ({ cacheRows: { value: [] as unknown[] } }));
 vi.mock("@/lib/infra/db", () => ({
   db: {
-    select: () => makeDbChain([]), // cache miss
+    select: () => makeDbChain(cacheRows.value), // cache miss by default
     insert: () => ({
       values: () => ({
         onConflictDoUpdate: async () => undefined,
@@ -86,7 +88,7 @@ vi.mock("@anthropic-ai/sdk", () => {
 
 // Static imports — must come after vi.mock declarations so mocks are active
 import { GET as getAllNames } from "@/app/api/names/route";
-import { GET as getNameVerses } from "@/app/api/names/[slug]/verses/route";
+import { GET as getNameVerses, VERSES_VERSION } from "@/app/api/names/[slug]/verses/route";
 import { TANZIH_CONSTRAINT } from "@/lib/ai/theological-constraints";
 
 // Stub fetch AFTER static imports so vi.stubGlobal wins over any fetch patch
@@ -128,6 +130,7 @@ describe("GET /api/names", () => {
 
 describe("GET /api/names/[slug]/verses", () => {
   beforeEach(() => {
+    cacheRows.value = [];
     mockFetch.mockReset();
     mockGetUiLocale.mockReset();
     mockGetUiLocale.mockResolvedValue("en");
@@ -246,6 +249,40 @@ describe("GET /api/names/[slug]/verses", () => {
         expect(verse.translation).not.toMatch(/[<>]/);
         expect(verse.translation).toContain("the Ever-Living.");
       }
+    }
+  );
+
+  it.each(["en.sahih", "tr.diyanet"])(
+    "re-sanitizes a translation cached before the stripTags fix (%s, hydration unavailable)",
+    async (edition) => {
+      mockGetQuranEdition.mockResolvedValue(edition);
+      cacheRows.value = [
+        {
+          data: JSON.stringify([
+            {
+              ref: "2:255",
+              surah: 2,
+              ayah: 255,
+              arabicText: "ٱللَّهُ لَآ إِلَٰهَ إِلَّا هُوَ ٱلْحَىُّ ٱلْقَيُّومُ",
+              translation: HOSTILE_TRANSLATION,
+              surahName: "Al-Baqarah",
+              surahNameArabic: "البقرة",
+              reason: "The Verse of the Throne names Al-Hayy and Al-Qayyum.",
+            },
+          ]),
+          version: VERSES_VERSION,
+          sourceHash: null,
+        },
+      ];
+      mockFetch.mockResolvedValue({ ok: false });
+
+      const req = new NextRequest("http://localhost/api/names/al-hayy/verses");
+      const res = await getNameVerses(req, params("al-hayy"));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toHaveLength(1);
+      expect(body[0].translation).not.toMatch(/[<>]/);
+      expect(body[0].translation).toContain("the Ever-Living.");
     }
   );
 

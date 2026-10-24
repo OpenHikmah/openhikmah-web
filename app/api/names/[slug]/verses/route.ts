@@ -221,7 +221,7 @@ async function getVersesBySlug(
   const name = getNameBySlug(slug);
   if (!name) return [];
 
-  const verses = await getOrGenerateNameContent(
+  const selected = await getOrGenerateNameContent(
     slug,
     "verses",
     // Verse selection is always cached/generated as "en" regardless of the
@@ -294,6 +294,12 @@ async function getVersesBySlug(
     (v) => isUncacheable(v, name.transliteration),
     onBeforeGenerate
   );
+
+  // Rows cached under this VERSES_VERSION before stripTags replaced a
+  // single-pass tag regex can still hold markup, and the en.sahih path below
+  // serves them as stored. Re-sanitizing on read covers them without
+  // regenerating every name's selection.
+  const verses = selected.map((v) => ({ ...v, translation: stripTags(v.translation) }));
 
   if (verses.length === 0) return verses;
 
