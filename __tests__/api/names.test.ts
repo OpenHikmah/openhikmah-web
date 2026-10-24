@@ -213,6 +213,42 @@ describe("GET /api/names/[slug]/verses", () => {
     }
   });
 
+  // CodeQL js/incomplete-multi-character-sanitization: a single
+  // `/<[^>]*>/g` pass leaves `ipt>` from a nested tag and keeps an
+  // unterminated `<script` untouched.
+  const HOSTILE_TRANSLATION =
+    "Allah - there is no deity except Him<scr<script>ipt>alert(1)</script>, the Ever-Living.<script src=x";
+
+  it.each([
+    { path: "search", searchResults: [{ verse_key: "2:255" }], edition: "en.sahih" },
+    { path: "AI-fallback", searchResults: [], edition: "en.sahih" },
+    { path: "edition hydration", searchResults: [{ verse_key: "2:255" }], edition: "tr.diyanet" },
+  ])(
+    "leaves no angle brackets in $path translations with nested or unterminated tags",
+    async ({ searchResults, edition }) => {
+      mockGetQuranEdition.mockResolvedValue(edition);
+      mockFetch.mockImplementation(async (url: string) => {
+        if (typeof url !== "string") return { ok: false };
+        if (new URL(url).hostname === "api.quran.com")
+          return { ok: true, json: async () => ({ search: { results: searchResults } }) };
+        if (url.includes("ar.alafasy")) return arabicResp();
+        if (url.includes(edition)) return transResp(HOSTILE_TRANSLATION);
+        if (url.includes("en.sahih")) return transResp("English translation");
+        return { ok: false };
+      });
+
+      const req = new NextRequest("http://localhost/api/names/ar-rahman/verses");
+      const res = await getNameVerses(req, params("ar-rahman"));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.length).toBeGreaterThan(0);
+      for (const verse of body) {
+        expect(verse.translation).not.toMatch(/[<>]/);
+        expect(verse.translation).toContain("the Ever-Living.");
+      }
+    }
+  );
+
   it("quran.com search fetch passes an abort signal so a hung upstream fails fast", async () => {
     mockFetch.mockImplementation(async (url: string) => {
       if (typeof url !== "string") return { ok: false };

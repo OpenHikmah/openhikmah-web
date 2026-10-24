@@ -6,6 +6,7 @@ import { getNameBySlug } from "@/lib/names/divine-names";
 import { verseMentionsName } from "@/lib/names/name-verse-match";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
+import { stripTags } from "@/lib/quran/html-text";
 import {
   getOrGenerateNameContent,
   getOrGenerateVerseReason,
@@ -202,10 +203,6 @@ Return ONLY a JSON array:
   }
 }
 
-function stripHtml(text: string): string {
-  return text.replace(/<[^>]*>/g, "");
-}
-
 // Not worth caching: nothing found, or every reason is the default placeholder
 // (the reason call failed). Persisting the latter would freeze placeholder
 // content for this name until VERSES_VERSION is bumped. A result where only
@@ -248,7 +245,7 @@ async function getVersesBySlug(
             if (!vd) return null;
             return {
               ...vd,
-              translation: stripHtml(vd.translation),
+              translation: stripTags(vd.translation),
               reason: reasonMap.get(ref) ?? defaultReason(name.transliteration),
             } as NameVerse;
           })
@@ -287,7 +284,7 @@ async function getVersesBySlug(
           // is cached and rendered.
           return {
             ...vd,
-            translation: stripHtml(vd.translation),
+            translation: stripTags(vd.translation),
             reason: item.reason,
           } as NameVerse;
         })
@@ -323,7 +320,7 @@ async function getVersesBySlug(
             }
             return {
               ...v,
-              translation: stripHtml(localized.translation),
+              translation: stripTags(localized.translation),
             };
           })
         );
