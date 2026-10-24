@@ -585,6 +585,12 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       }
       placed.push({ ...node, id, position: pos });
     }
+    // A child card names its source by id, so follow the source's new id.
+    for (let i = 0; i < placed.length; i++) {
+      const from = (placed[i].data as unknown as Verse).placedFrom;
+      const remapped = from ? idRemap.get(from) : undefined;
+      if (remapped) placed[i] = { ...placed[i], data: { ...placed[i].data, placedFrom: remapped } };
+    }
 
     const finalEdges = incomingEdges
       .map((e) => {

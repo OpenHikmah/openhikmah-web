@@ -78,6 +78,7 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
   const { copied, copy } = useCopyFeedback();
 
   const [sharing, setSharing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [shareError, setShareError] = useState(false);
   const [status, setStatus] = useState<Status>(null);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -140,7 +141,9 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
   };
 
   const handleSave = async () => {
-    if (!accessToken || nodes.length === 0) return;
+    // Each accepted POST creates a new saved canvas, so one save at a time.
+    if (saving || !accessToken || nodes.length === 0) return;
+    setSaving(true);
     flashStatus({ text: t("saving"), tone: "busy" });
     try {
       const count = nodes.length;
@@ -156,6 +159,8 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
       );
     } catch {
       flashStatus({ text: t("saveFailedRetry"), tone: "error" });
+    } finally {
+      if (mountedRef.current) setSaving(false);
     }
   };
 
@@ -248,7 +253,12 @@ export function CanvasToolbar({ onSearchOpen }: { onSearchOpen: () => void }) {
               className="z-50 flex min-w-56 flex-col rounded-xl border border-border bg-surface-overlay p-1.5 shadow-floating"
             >
               {accessToken ? (
-                <button type="button" className={MENU_ITEM} onClick={() => runFromMenu(handleSave)}>
+                <button
+                  type="button"
+                  className={MENU_ITEM}
+                  disabled={saving}
+                  onClick={() => runFromMenu(handleSave)}
+                >
                   <Save />
                   {t("saveToCanvases")}
                 </button>

@@ -168,6 +168,44 @@ describe("HikmahCanvas expansion node placement", () => {
     expect(useCanvasStore.getState().edges).toHaveLength(0);
   });
 
+  it("still adds every verse when Clear → Undo runs mid-expansion", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve([connection("2:256"), connection("2:257"), connection("3:2")]),
+      })
+    );
+
+    render(<HikmahCanvas onSearchOpen={vi.fn()} />);
+
+    act(() => {
+      useCanvasStore.getState().setPendingExpand({ nodeId: "n1", ref: "1:1", kind: "thematic" });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(350);
+    });
+
+    // Undo restores the source and the first verse, but not the placeholders.
+    act(() => {
+      useCanvasStore.getState().clearCanvas();
+      useCanvasStore.getState().undoClear();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+
+    const refs = useCanvasStore
+      .getState()
+      .nodes.filter((n) => n.type === "verse")
+      .map((n) => (n.data as unknown as Verse).ref);
+    expect(refs.sort()).toEqual(["1:1", "2:256", "2:257", "3:2"]);
+    expect(useCanvasStore.getState().edges.filter((e) => e.source === "n1")).toHaveLength(3);
+  });
+
   it("shows placeholders in a column beside the source while the AI works", async () => {
     vi.stubGlobal(
       "fetch",

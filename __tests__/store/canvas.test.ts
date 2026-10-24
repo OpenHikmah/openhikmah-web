@@ -617,6 +617,40 @@ describe("appendWorkspace", () => {
     useCanvasStore.getState().reset();
   });
 
+  it("points a child card's placedFrom at its source's new id after a remap", () => {
+    useCanvasStore.setState({
+      nodes: [
+        { id: "node-1", type: "verse", position: { x: 0, y: 0 }, data: { ...baseVerse } } as Node,
+      ],
+      edges: [],
+    });
+
+    useCanvasStore.getState().appendWorkspace({
+      v: 1,
+      nodes: [
+        {
+          id: "node-1",
+          x: 0,
+          y: 0,
+          verse: { ...baseVerse, ref: "1:1" as const, surah: 1, ayah: 1 },
+        },
+        {
+          id: "node-9",
+          x: 400,
+          y: 0,
+          verse: { ...baseVerse, ref: "112:1" as const, surah: 112, ayah: 1, placedFrom: "node-1" },
+        },
+      ],
+      edges: [],
+    });
+
+    const nodes = useCanvasStore.getState().nodes;
+    const source = nodes.find((n) => (n.data as unknown as Verse).ref === "1:1")!;
+    const child = nodes.find((n) => n.id === "node-9")!;
+    expect(source.id).not.toBe("node-1");
+    expect((child.data as unknown as Verse).placedFrom).toBe(source.id);
+  });
+
   it("merges a duplicate verse and a remapped expansion edge, updating both derived-index maps", () => {
     const store = useCanvasStore.getState();
     const existingId = store.addVerseNode(baseVerse, { x: 0, y: 0 });

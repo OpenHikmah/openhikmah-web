@@ -106,6 +106,29 @@ describe("CanvasToolbar save workspace name", () => {
     vi.unstubAllGlobals();
   });
 
+  it("sends one save at a time, so a second click can't create a duplicate canvas", async () => {
+    useCanvasStore.setState({ nodes: [verseNode()], edges: [] });
+    let settle: (v: { ok: boolean }) => void = () => {};
+    const fetchMock = vi.fn().mockReturnValue(new Promise((r) => (settle = r)));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<CanvasToolbar onSearchOpen={vi.fn()} />);
+    chooseFromMore("Save to my canvases");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    const save = screen.getByRole("button", { name: "Save to my canvases" });
+    expect(save).toBeDisabled();
+    fireEvent.click(save);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    settle({ ok: true });
+    expect(await screen.findByRole("status")).toHaveTextContent("Saved");
+    expect(screen.getByRole("button", { name: "Save to my canvases" })).toBeEnabled();
+
+    vi.unstubAllGlobals();
+  });
+
   it("uses the plural form for more than one verse", async () => {
     useCanvasStore.setState({
       nodes: [verseNode(), { ...verseNode(), id: "n2" }],

@@ -298,7 +298,8 @@ function CanvasInner({ onSearchOpen }: { onSearchOpen: () => void }) {
             if (ph) store().removePlaceholders([ph]);
           } else {
             let ph = remaining.shift();
-            if (!ph) {
+            // Clear → Undo restores the source but not its placeholders.
+            if (!ph || !store().getNodeById(ph)) {
               [ph] = store().addPlaceholders(nodeId, kind, 1, fallbackCardHeight());
             }
             const newId = store().fillPlaceholder(ph, conn as unknown as Verse, nodeId);
