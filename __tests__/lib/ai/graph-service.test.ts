@@ -1099,7 +1099,50 @@ describe("getConnections — verse text follows the Quran edition", () => {
     mockResolveVerse.mockReset().mockImplementation(async (ref: string, edition?: string) => ({
       ...verse(ref),
       translation: edition ? `[${edition}] ${ref}` : "text",
+      edition: edition ?? "en.sahih",
     }));
+  });
+
+  const fallBackToSahih = () =>
+    mockResolveVerse.mockImplementation(async (ref: string) => ({
+      ...verse(ref),
+      edition: "en.sahih",
+    }));
+
+  it("tags a cached cell's verses with the edition served", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([row("thematic", "en", "en reason")]));
+
+    const out = await getConnections("1:1", "thematic", source, { edition: AZ });
+
+    expect(out[0]).toMatchObject({ translation: `[${AZ}] 2:255`, edition: AZ });
+  });
+
+  it("tags a cached cell's verses en.sahih when the requested edition has no text", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([row("thematic", "en", "en reason")]));
+    fallBackToSahih();
+
+    const out = await getConnections("1:1", "thematic", source, { edition: AZ });
+
+    expect(out[0]).toMatchObject({ translation: "text", edition: "en.sahih" });
+  });
+
+  it("tags freshly generated verses with the edition served", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockGenerate.mockResolvedValue([{ ...result("2:255"), edition: "en.sahih" }]);
+
+    const out = await getConnections("1:1", "thematic", source, { edition: AZ });
+
+    expect(out[0]).toMatchObject({ translation: `[${AZ}] 2:255`, edition: AZ });
+  });
+
+  it("tags freshly generated verses en.sahih when the requested edition has no text", async () => {
+    mockSelect.mockReturnValue(makeSelectChain([]));
+    mockGenerate.mockResolvedValue([result("2:255")]);
+    fallBackToSahih();
+
+    const out = await getConnections("1:1", "thematic", source, { edition: AZ });
+
+    expect(out[0]).toMatchObject({ translation: "text", edition: "en.sahih" });
   });
 
   it.each(["thematic", "root", "contrast"] as const)(

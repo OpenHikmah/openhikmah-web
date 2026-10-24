@@ -115,6 +115,19 @@ describe("generateConnections", () => {
     });
   });
 
+  it("carries the corpus verse's edition into each result", async () => {
+    mockGetVerses.mockImplementation(
+      async (refs: string[]) => new Map(refs.map((r) => [r, { ...verse(r), edition: "en.sahih" }]))
+    );
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        { ref: "2:255", reason: "Describes God's throne and encompassing knowledge." },
+      ])
+    );
+    const out = await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "thematic");
+    expect(out[0]).toMatchObject({ ref: "2:255", edition: "en.sahih" });
+  });
+
   it("logs exactly one ai_generations row per generation", async () => {
     mockCallAI.mockResolvedValue(JSON.stringify([{ ref: "2:255", reason: "x" }]));
     await generateConnections("1:1", SOURCE_AR, SOURCE_TR, "root");
