@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { FocusScope } from "@radix-ui/react-focus-scope";
 import { useTranslations } from "next-intl";
 import type { EdgeKind, VerseRef } from "@/types/quran";
+import { cn } from "@/lib/utils";
 
 interface ExpandMenuProps {
   verseRef: VerseRef;
@@ -42,9 +43,55 @@ const OPTIONS: Array<{
   },
 ];
 
-/** Opens beside the card, on the side where the new verses will appear. */
+type Box = { top: number; right: number; bottom: number; left: number };
+export interface MenuPlacement {
+  side: "right" | "left";
+  /** Upward shift in the card's own (unzoomed) pixels, so the menu stays above the canvas's bottom edge. */
+  shiftUp: number;
+}
+
+const GAP = 12;
+const EDGE_MARGIN = 8;
+
+/**
+ * Where the menu fits inside the visible canvas. All boxes are screen pixels;
+ * `scale` is the canvas zoom, since the menu lives inside the zoomed card.
+ */
+export function placeMenu(
+  card: Box,
+  menu: { width: number; height: number },
+  bounds: Box,
+  scale: number
+): MenuPlacement {
+  const needed = GAP * scale + menu.width + EDGE_MARGIN;
+  const roomRight = bounds.right - card.right;
+  const roomLeft = card.left - bounds.left;
+  const side =
+    roomRight >= needed || (roomLeft < needed && roomRight >= roomLeft) ? "right" : "left";
+  const overflowBottom = card.top + menu.height - (bounds.bottom - EDGE_MARGIN);
+  const roomAbove = Math.max(0, card.top - (bounds.top + EDGE_MARGIN));
+  const shiftUp = overflowBottom > 0 ? Math.min(overflowBottom, roomAbove) / scale : 0;
+  return { side, shiftUp };
+}
+
+/** Opens beside the card, on the side where the new verses will appear — unless the
+ *  canvas edge is too close, then on the other side, moved up if it would run off the bottom. */
 export function ExpandMenu({ verseRef, onSelect, onClose }: ExpandMenuProps) {
   const t = useTranslations("canvas");
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [placement, setPlacement] = useState<MenuPlacement>({ side: "right", shiftUp: 0 });
+
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    const card = menu?.parentElement;
+    if (!menu || !card) return;
+    const bounds = (
+      menu.closest(".react-flow") ?? document.documentElement
+    ).getBoundingClientRect();
+    const rect = menu.getBoundingClientRect();
+    const scale = menu.offsetWidth ? rect.width / menu.offsetWidth : 1;
+    setPlacement(placeMenu(card.getBoundingClientRect(), rect, bounds, scale));
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -60,9 +107,15 @@ export function ExpandMenu({ verseRef, onSelect, onClose }: ExpandMenuProps) {
   return (
     <FocusScope asChild trapped loop>
       <div
+        ref={menuRef}
         role="menu"
         aria-label={t("findLinkedVerses")}
-        className="nodrag nowheel absolute top-0 left-full z-50 ml-3 w-64 cursor-default rounded-[14px] border border-border bg-surface-overlay p-1.5 shadow-floating"
+        data-side={placement.side}
+        style={{ top: -placement.shiftUp }}
+        className={cn(
+          "nodrag nowheel absolute z-50 w-64 cursor-default rounded-[14px] border border-border bg-surface-overlay p-1.5 shadow-floating",
+          placement.side === "right" ? "left-full ml-3" : "right-full mr-3"
+        )}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
