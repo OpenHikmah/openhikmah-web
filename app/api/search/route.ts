@@ -35,11 +35,27 @@ const MAX_PAGE = 100;
 
 // quran.com wraps a translator's footnote marker in <sup> (e.g. Bridges' "pl" for
 // plural, numbered notes elsewhere). The marker is not verse text, so it goes
-// with its tag; a space it carried is kept so the words around it don't merge.
-const FOOTNOTE = /<sup\b[^>]*>([\s\S]*?)<\/sup>/gi;
+// with its tag, leaving a space only where removing it would join two words.
+// Some markers arrive entity-encoded (`&lt;sup&gt;1&lt;/sup&gt;`); stripTags
+// decodes those into tags and would then keep the marker text, so they go here too.
+const FOOTNOTE = /<sup\b[^>]*>[\s\S]*?<\/sup>|&lt;sup\b[\s\S]*?&gt;[\s\S]*?&lt;\/sup&gt;/gi;
+const TAGS_AT_END = /(?:<[^>]*>|&lt;\/?[a-z](?:(?!&[lg]t;)[^<>])*&gt;)+$/i;
+const TAGS_AT_START = /^(?:<[^>]*>|&lt;\/?[a-z](?:(?!&[lg]t;)[^<>])*&gt;)+/i;
+// Bridges' translation keeps a word's trailing space inside the closing tag
+// (`silk<i class="s">(garments) </i>;`), which would leave "silk(garments) ;".
+const SPACE_BEFORE_PUNCT_AT_TAG = /\s+((?:<\/[^>]+>)+)(?=[,.;:!?])/g;
+const WORD_CHAR = /[\p{L}\p{N}]/u;
 
 function snippetText(html: string): string {
-  return stripTags(html.replace(FOOTNOTE, (_m, inner: string) => (/\s$/.test(inner) ? " " : "")));
+  const withoutFootnotes = html.replace(FOOTNOTE, (marker: string, offset: number) => {
+    const before = html.slice(0, offset).replace(TAGS_AT_END, "").slice(-1);
+    const after = html
+      .slice(offset + marker.length)
+      .replace(TAGS_AT_START, "")
+      .charAt(0);
+    return WORD_CHAR.test(before) && WORD_CHAR.test(after) ? " " : "";
+  });
+  return stripTags(withoutFootnotes.replace(SPACE_BEFORE_PUNCT_AT_TAG, "$1"));
 }
 
 interface KeywordSearchResult {
