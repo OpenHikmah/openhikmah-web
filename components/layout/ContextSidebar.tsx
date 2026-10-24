@@ -615,7 +615,6 @@ function ThreadView({ nodeId }: { nodeId: string }) {
                     <span className="font-medium text-text-primary">{refOf(e.target)}</span>
                     <span>{other.surahName}</span>
                   </div>
-                  <AiNote text={edgeReason(e)} preview />
                   <p className="text-sm leading-[1.6] text-text-primary">{other.translation}</p>
                   <p
                     lang="ar"
@@ -624,6 +623,7 @@ function ThreadView({ nodeId }: { nodeId: string }) {
                   >
                     {other.arabicText}
                   </p>
+                  <AiNote text={edgeReason(e)} preview />
                   <span className="inline-flex items-center gap-1.5 self-end rounded-md px-1.5 py-1 text-xs font-medium text-teal-bright">
                     <BookOpen className="size-3.5" />
                     {t("readSideBySide")}

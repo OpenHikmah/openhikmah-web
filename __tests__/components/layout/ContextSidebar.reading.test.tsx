@@ -102,6 +102,18 @@ describe("ContextSidebar — reading views", () => {
     expect(screen.getAllByRole("img", { name: "AI-written explanation" })).toHaveLength(2);
   });
 
+  it("puts the verse before the AI reason in each connection card", () => {
+    act(() => useCanvasStore.getState().setSidebarContent({ type: "node", nodeId: "a" }));
+    renderPanel();
+
+    const card = screen.getByRole("button", { name: "Connection 2:153 to 8:46" });
+    const translation = within(card).getByText(V846.translation);
+    const arabic = within(card).getByText(V846.arabicText);
+    const reason = within(card).getByText(REASON_846);
+    expect(translation.compareDocumentPosition(reason)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(arabic.compareDocumentPosition(reason)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
   it("shows each reason as a one-line preview that opens in place", () => {
     // jsdom has no layout, so stub a reason that runs past its one-line clamp.
     vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(80);
