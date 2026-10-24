@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { clientKey } from "@/lib/infra/http";
 import { rateLimitOrNull } from "@/lib/infra/rate-limit";
 import { hydrateSharePayload, loadSharePayload } from "@/lib/canvas/share-hydrate";
+import { getQuranEdition } from "@/lib/i18n/request-prefs";
 
 // Public, unauthenticated route over a UUID keyspace — rate limit per-IP to
 // bound both DB load and brute-force ID guessing, matching POST /api/share.
@@ -32,7 +33,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Corrupted canvas data" }, { status: 500 });
     }
 
-    const canvas = await hydrateSharePayload(loaded.payload);
+    const canvas = await hydrateSharePayload(loaded.payload, await getQuranEdition());
     if (!canvas) {
       return NextResponse.json({ error: "Could not load verses" }, { status: 500 });
     }

@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { wordMorphology } from "@/lib/infra/db/schema";
 import { getVerses } from "@/lib/quran/quran-corpus";
+import { getQuranEdition } from "@/lib/i18n/request-prefs";
 
 /**
  * Concordance for an Arabic root: other verses that contain a word sharing it.
@@ -38,7 +39,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ roo
       .limit(MAX_VERSES);
 
     const refs = rows.map((r) => r.ref);
-    const verseMap = await getVerses(refs);
+    const verseMap = await getVerses(refs, await getQuranEdition());
 
     const verses = refs
       .map((ref) => {
