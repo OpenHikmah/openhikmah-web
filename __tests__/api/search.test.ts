@@ -250,6 +250,136 @@ describe("GET /api/search", () => {
     );
   });
 
+  it("keeps a space when a footnote marker without one sits between two words", async () => {
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([
+        {
+          verse_key: "20:54",
+          translations: [{ text: "Eat<sup>pl</sup>and pasture your livestock." }],
+        },
+      ])
+    );
+
+    const body = await (await GET(makeSearchReq("pasture"))).json();
+    expect(body.results[0].snippet).toBe("Eat and pasture your livestock.");
+  });
+
+  it.each([
+    [
+      "63:1",
+      'When the hypocrites come to you<a class="sup"><sup>sg </sup></a>, they say, “We bear witness that you are <em>most</em> surely Allah’s Messenger.”',
+      "When the hypocrites come to you, they say, “We bear witness that you are most surely Allah’s Messenger.”",
+    ],
+    [
+      "76:12",
+      'and repaid them for their <em>patience</em> with a Garden<i class="s">(in paradise) </i>and silk<i class="s">(garments) </i>;',
+      "and repaid them for their patience with a Garden(in paradise) and silk(garments);",
+    ],
+    [
+      "17:95",
+      '<span class="h">Say<sup foot_note="80459" class="qiraat">1</sup> </span>, “If there were <em>angels</em> on earth walking around in peace, We would have bestowed upon them from heaven an <em>angel</em> messenger.”',
+      "Say, “If there were angels on earth walking around in peace, We would have bestowed upon them from heaven an angel messenger.”",
+    ],
+  ])(
+    "leaves no space before punctuation where a tag carried it (%s)",
+    async (ref, text, expected) => {
+      mockFetch.mockResolvedValueOnce(
+        quranComResponse([{ verse_key: ref, translations: [{ text }] }])
+      );
+
+      const body = await (await GET(makeSearchReq("most"))).json();
+      expect(body.results[0].snippet).toBe(expected);
+    }
+  );
+
+  it.each([
+    [
+      "1:2",
+      "[All] praise is [due] to Allah&lt;sup foot_note=&quot;1&quot;&gt;1&lt;/sup&gt;, Lord of the worlds.",
+      "[All] praise is [due] to Allah, Lord of the worlds.",
+    ],
+    [
+      "20:54",
+      "Eat&lt;sup&gt;pl&lt;/sup&gt;and pasture your livestock.",
+      "Eat and pasture your livestock.",
+    ],
+    [
+      "20:54",
+      'Eat&lt;a class="sup"&gt;&lt;sup&gt;pl &lt;/sup&gt;&lt;/a&gt;and pasture your livestock.',
+      "Eat and pasture your livestock.",
+    ],
+    [
+      "112:1",
+      "Say, &lt;SUP&gt;2&lt;/SUP&gt; He is Allah, [who is] One.",
+      "Say, He is Allah, [who is] One.",
+    ],
+  ])("drops an entity-encoded footnote marker and its number (%s)", async (ref, text, expected) => {
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([{ verse_key: ref, translations: [{ text }] }])
+    );
+
+    const body = await (await GET(makeSearchReq("allah"))).json();
+    expect(body.results[0].snippet).toBe(expected);
+  });
+
+  it("treats a decomposed accent as part of the word before a footnote marker", async () => {
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([
+        {
+          verse_key: "2:255",
+          translations: [{ text: "Allah! Point de divinité<sup>1</sup>à part Lui." }],
+        },
+      ])
+    );
+
+    const body = await (await GET(makeSearchReq("allah"))).json();
+    expect(body.results[0].snippet).toBe("Allah! Point de divinité à part Lui.");
+  });
+
+  it.each([
+    [
+      "1:2",
+      "[All] praise is [due] to Allah<sup foot_note=1>1</sup><sup foot_note=2>2</sup>, Lord of the worlds.",
+      "[All] praise is [due] to Allah, Lord of the worlds.",
+    ],
+    [
+      "63:1",
+      'When the hypocrites come to you<a class="sup"><sup>sg </sup></a><a class="sup"><sup>1</sup></a>, they say, “We bear witness that you are <em>most</em> surely Allah’s Messenger.”',
+      "When the hypocrites come to you, they say, “We bear witness that you are most surely Allah’s Messenger.”",
+    ],
+    [
+      "20:54",
+      'Eat<a class="sup"><sup>pl</sup></a><a class="sup"><sup>1</sup></a>and pasture your livestock.',
+      "Eat and pasture your livestock.",
+    ],
+  ])(
+    "drops adjacent footnote markers as one, with no space before punctuation (%s)",
+    async (ref, text, expected) => {
+      mockFetch.mockResolvedValueOnce(
+        quranComResponse([{ verse_key: ref, translations: [{ text }] }])
+      );
+
+      const body = await (await GET(makeSearchReq("allah"))).json();
+      expect(body.results[0].snippet).toBe(expected);
+    }
+  );
+
+  it("keeps an out-of-range numeric entity as text instead of failing the search", async () => {
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([
+        {
+          verse_key: "2:255",
+          translations: [{ text: "Allah &#1114112; &#x110000; &#65;" }],
+        },
+      ])
+    );
+
+    const res = await GET(makeSearchReq("allah"));
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.results[0].snippet).toBe("Allah &#1114112; &#x110000; A");
+  });
+
   it("drops a numbered footnote marker that sits against punctuation", async () => {
     mockFetch.mockResolvedValueOnce(
       quranComResponse([

@@ -35,11 +35,30 @@ const MAX_PAGE = 100;
 
 // quran.com wraps a translator's footnote marker in <sup> (e.g. Bridges' "pl" for
 // plural, numbered notes elsewhere). The marker is not verse text, so it goes
-// with its tag; a space it carried is kept so the words around it don't merge.
-const FOOTNOTE = /<sup\b[^>]*>([\s\S]*?)<\/sup>/gi;
+// with its tag, leaving a space only where removing it would join two words.
+// Some markers arrive entity-encoded (`&lt;sup&gt;1&lt;/sup&gt;`); stripTags
+// decodes those into tags and would then keep the marker text, so they go here too.
+const FOOTNOTE = /<sup\b[^>]*>[\s\S]*?<\/sup>|&lt;sup\b[\s\S]*?&gt;[\s\S]*?&lt;\/sup&gt;/gi;
+const TAGS_AT_END = /(?:<[^>]*>|&lt;\/?[a-z](?:(?!&[lg]t;)[^<>])*&gt;)+$/i;
+const TAGS_AT_START = /^(?:<[^>]*>|&lt;\/?[a-z](?:(?!&[lg]t;)[^<>])*&gt;)+/i;
+// Bridges' translation keeps a word's trailing space inside the closing tag
+// (`silk<i class="s">(garments) </i>;`), which would leave "silk(garments) ;".
+const SPACE_BEFORE_PUNCT_AT_TAG = /\s+((?:<\/[^>]+>)+)(?=[,.;:!?])/g;
+// \p{M} so a decomposed accent (e + U+0301) still ends a word.
+const WORD_AT_END = /[\p{L}\p{M}\p{N}]$/u;
+const WORD_AT_START = /^[\p{L}\p{M}\p{N}]/u;
 
+// Each marker is judged by the text after it and by the output built so far, so in
+// a run of adjacent markers only the last one sees real text on both sides.
 function snippetText(html: string): string {
-  return stripTags(html.replace(FOOTNOTE, (_m, inner: string) => (/\s$/.test(inner) ? " " : "")));
+  const [first, ...rest] = html.split(FOOTNOTE);
+  const withoutFootnotes = rest.reduce((out, part) => {
+    const joinsWords =
+      WORD_AT_END.test(out.replace(TAGS_AT_END, "")) &&
+      WORD_AT_START.test(part.replace(TAGS_AT_START, ""));
+    return out + (joinsWords ? " " : "") + part;
+  }, first);
+  return stripTags(withoutFootnotes.replace(SPACE_BEFORE_PUNCT_AT_TAG, "$1"));
 }
 
 interface KeywordSearchResult {
