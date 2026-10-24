@@ -44,17 +44,20 @@ const TAGS_AT_START = /^(?:<[^>]*>|&lt;\/?[a-z](?:(?!&[lg]t;)[^<>])*&gt;)+/i;
 // Bridges' translation keeps a word's trailing space inside the closing tag
 // (`silk<i class="s">(garments) </i>;`), which would leave "silk(garments) ;".
 const SPACE_BEFORE_PUNCT_AT_TAG = /\s+((?:<\/[^>]+>)+)(?=[,.;:!?])/g;
-const WORD_CHAR = /[\p{L}\p{N}]/u;
+// \p{M} so a decomposed accent (e + U+0301) still ends a word.
+const WORD_AT_END = /[\p{L}\p{M}\p{N}]$/u;
+const WORD_AT_START = /^[\p{L}\p{M}\p{N}]/u;
 
+// Each marker is judged by the text after it and by the output built so far, so in
+// a run of adjacent markers only the last one sees real text on both sides.
 function snippetText(html: string): string {
-  const withoutFootnotes = html.replace(FOOTNOTE, (marker: string, offset: number) => {
-    const before = html.slice(0, offset).replace(TAGS_AT_END, "").slice(-1);
-    const after = html
-      .slice(offset + marker.length)
-      .replace(TAGS_AT_START, "")
-      .charAt(0);
-    return WORD_CHAR.test(before) && WORD_CHAR.test(after) ? " " : "";
-  });
+  const [first, ...rest] = html.split(FOOTNOTE);
+  const withoutFootnotes = rest.reduce((out, part) => {
+    const joinsWords =
+      WORD_AT_END.test(out.replace(TAGS_AT_END, "")) &&
+      WORD_AT_START.test(part.replace(TAGS_AT_START, ""));
+    return out + (joinsWords ? " " : "") + part;
+  }, first);
   return stripTags(withoutFootnotes.replace(SPACE_BEFORE_PUNCT_AT_TAG, "$1"));
 }
 
