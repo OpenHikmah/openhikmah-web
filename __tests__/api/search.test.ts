@@ -336,6 +336,20 @@ describe("GET /api/search", () => {
     expect(body.results[0].snippet).toBe("Allah! Point de divinité à part Lui.");
   });
 
+  it("treats a numeric entity as its letter when it sits against a footnote marker", async () => {
+    mockFetch.mockResolvedValueOnce(
+      quranComResponse([
+        {
+          verse_key: "2:255",
+          translations: [{ text: "Allah! Point de divinit&#233;<sup>1</sup>à part Lui." }],
+        },
+      ])
+    );
+
+    const body = await (await GET(makeSearchReq("allah"))).json();
+    expect(body.results[0].snippet).toBe("Allah! Point de divinité à part Lui.");
+  });
+
   it.each([
     [
       "1:2",

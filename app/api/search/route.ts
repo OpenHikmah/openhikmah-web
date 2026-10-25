@@ -39,8 +39,6 @@ const MAX_PAGE = 100;
 // Some markers arrive entity-encoded (`&lt;sup&gt;1&lt;/sup&gt;`); stripTags
 // decodes those into tags and would then keep the marker text, so they go here too.
 const FOOTNOTE = /<sup\b[^>]*>[\s\S]*?<\/sup>|&lt;sup\b[\s\S]*?&gt;[\s\S]*?&lt;\/sup&gt;/gi;
-const TAGS_AT_END = /(?:<[^>]*>|&lt;\/?[a-z](?:(?!&[lg]t;)[^<>])*&gt;)+$/i;
-const TAGS_AT_START = /^(?:<[^>]*>|&lt;\/?[a-z](?:(?!&[lg]t;)[^<>])*&gt;)+/i;
 // Bridges' translation keeps a word's trailing space inside the closing tag
 // (`silk<i class="s">(garments) </i>;`), which would leave "silk(garments) ;".
 const SPACE_BEFORE_PUNCT_AT_TAG = /\s+((?:<\/[^>]+>)+)(?=[,.;:!?])/g;
@@ -49,13 +47,12 @@ const WORD_AT_END = /[\p{L}\p{M}\p{N}]$/u;
 const WORD_AT_START = /^[\p{L}\p{M}\p{N}]/u;
 
 // Each marker is judged by the text after it and by the output built so far, so in
-// a run of adjacent markers only the last one sees real text on both sides.
+// a run of adjacent markers only the last one sees real text on both sides. Both
+// sides are judged as stripTags output, so `&#101;` counts as the letter it encodes.
 function snippetText(html: string): string {
   const [first, ...rest] = html.split(FOOTNOTE);
   const withoutFootnotes = rest.reduce((out, part) => {
-    const joinsWords =
-      WORD_AT_END.test(out.replace(TAGS_AT_END, "")) &&
-      WORD_AT_START.test(part.replace(TAGS_AT_START, ""));
+    const joinsWords = WORD_AT_END.test(stripTags(out)) && WORD_AT_START.test(stripTags(part));
     return out + (joinsWords ? " " : "") + part;
   }, first);
   return stripTags(withoutFootnotes.replace(SPACE_BEFORE_PUNCT_AT_TAG, "$1"));
