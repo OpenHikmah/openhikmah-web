@@ -12,10 +12,15 @@ const ENTITIES: Record<string, string> = {
   nbsp: " ",
 };
 
+// String.fromCodePoint throws above U+10FFFF; an out-of-range reference stays as
+// literal text rather than failing the whole fragment.
+const fromCodePointOrKeep = (ref: string, codePoint: number): string =>
+  codePoint <= 0x10ffff ? String.fromCodePoint(codePoint) : ref;
+
 function decodeEntities(s: string): string {
   return s
-    .replace(/&#(\d+);/g, (_m, n: string) => String.fromCodePoint(parseInt(n, 10)))
-    .replace(/&#x([0-9a-f]+);/gi, (_m, n: string) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&#(\d+);/g, (m, n: string) => fromCodePointOrKeep(m, parseInt(n, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (m, n: string) => fromCodePointOrKeep(m, parseInt(n, 16)))
     .replace(/&([a-z]+);/gi, (m, name: string) => ENTITIES[name.toLowerCase()] ?? m);
 }
 
