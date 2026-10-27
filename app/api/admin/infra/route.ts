@@ -6,6 +6,7 @@ import { rateLimits } from "@/lib/infra/db/schema";
 import { redisStatus } from "@/lib/infra/redis";
 import { counterSnapshot, uptimeSeconds } from "@/lib/infra/metrics";
 import { tokenCache, broadcastFlushTokenCache, clearJwksCache } from "@/lib/auth/social-auth";
+import { jsonError, parseJson } from "@/lib/infra/http";
 
 /** Infrastructure snapshot: process metrics, cache sizes, Redis + rate-limit state. */
 export async function GET(req: NextRequest) {
@@ -38,12 +39,8 @@ export async function POST(req: NextRequest) {
   const limited = await rateLimitAdminMutation(auth);
   if (limited) return limited;
 
-  let body: { action?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+  const body = await parseJson<{ action?: string }>(req);
+  if (!body) return jsonError("Invalid request body", 400);
 
   const action = body.action as Action | undefined;
   if (!action || !(ACTIONS as readonly string[]).includes(action)) {

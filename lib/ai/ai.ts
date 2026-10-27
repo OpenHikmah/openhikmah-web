@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getFlagString } from "@/lib/admin/feature-flags";
-import { DEFAULT_MODEL, isModelForProvider } from "@/lib/ai/models";
+import { DEFAULT_MODEL, isModelForProvider, type Provider } from "@/lib/ai/models";
 import {
   AMBIGUOUS_429_ESCALATE_AFTER,
   GeminiDailyQuotaError,
@@ -12,8 +12,6 @@ import {
   perMinuteBackoffMs,
 } from "@/lib/ai/gemini-errors";
 import { interruptibleSleep } from "@/lib/infra/sleep";
-
-export type Provider = "claude" | "gemini";
 
 /** The distinct LLM-backed features that can be pointed at different providers. */
 export type AiFeature = "connections" | "names";

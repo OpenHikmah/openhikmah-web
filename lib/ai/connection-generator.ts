@@ -1,4 +1,5 @@
-import { callAIDetailed, type Provider } from "@/lib/ai/ai";
+import { callAIDetailed } from "@/lib/ai/ai";
+import type { Provider } from "@/lib/ai/models";
 import {
   GeminiDailyQuotaError,
   GeminiKeyInvalidError,

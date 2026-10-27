@@ -4,7 +4,7 @@ import { db } from "@/lib/infra/db";
 import { users } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
 import { effectiveStreak, localDateFromOffset } from "@/lib/social/streak";
-import { isUniqueViolation } from "@/lib/infra/http";
+import { isUniqueViolation, jsonError, parseJson } from "@/lib/infra/http";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
@@ -35,12 +35,8 @@ export async function PATCH(req: NextRequest) {
   const authed = await requireUser(req);
   if (authed instanceof NextResponse) return authed;
 
-  let body: { username?: string; displayName?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
-  }
+  const body = await parseJson<{ username?: string; displayName?: string }>(req);
+  if (!body) return jsonError("Invalid body", 400);
 
   const updates: { username?: string; displayName?: string | null } = {};
 

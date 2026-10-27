@@ -5,6 +5,7 @@ import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { promptVersions } from "@/lib/infra/db/schema";
 import { PROMPT_KEYS, invalidatePromptCache, type PromptKey } from "@/lib/ai/prompt-registry";
+import { jsonError, parseJson } from "@/lib/infra/http";
 
 /** All prompt versions, newest first, optionally filtered by `?key=`. */
 export async function GET(req: NextRequest) {
@@ -40,12 +41,8 @@ export async function POST(req: NextRequest) {
   const limited = await rateLimitAdminMutation(auth);
   if (limited) return limited;
 
-  let body: { key?: string; template?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+  const body = await parseJson<{ key?: string; template?: string }>(req);
+  if (!body) return jsonError("Invalid request body", 400);
 
   const key = body.key as PromptKey | undefined;
   if (!key || !(PROMPT_KEYS as readonly string[]).includes(key)) {

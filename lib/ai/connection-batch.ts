@@ -8,7 +8,8 @@ import {
 } from "@/lib/ai/connection-generator";
 import { translateReason, TranslationBudgetExhaustedError } from "@/lib/ai/translate";
 import { estimateCostUsd } from "@/lib/ai/ai-cost";
-import { resolveModel, type Provider } from "@/lib/ai/ai";
+import { resolveModel } from "@/lib/ai/ai";
+import type { Provider } from "@/lib/ai/models";
 import {
   GeminiDailyQuotaError,
   GeminiKeyInvalidError,

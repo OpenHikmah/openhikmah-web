@@ -58,7 +58,7 @@ export async function exportCanvasToPdf(nodes: Node[]): Promise<Blob> {
   const dataUrl = await exportCanvasToPng(nodes);
   const { jsPDF } = await import("jspdf");
   const pdf = new jsPDF({
-    orientation: IMAGE_WIDTH >= IMAGE_HEIGHT ? "landscape" : "portrait",
+    orientation: "landscape",
     unit: "px",
     format: [IMAGE_WIDTH, IMAGE_HEIGHT],
   });

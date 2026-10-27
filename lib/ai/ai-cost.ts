@@ -1,4 +1,5 @@
-import type { AiUsage, Provider } from "@/lib/ai/ai";
+import type { AiUsage } from "@/lib/ai/ai";
+import type { Provider } from "@/lib/ai/models";
 
 /**
  * Rough USD cost estimation for a single LLM call, used by the admin backfill

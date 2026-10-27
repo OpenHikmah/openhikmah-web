@@ -1,7 +1,8 @@
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { connections, connectionCoverage } from "@/lib/infra/db/schema";
-import { resolveModel, type Provider } from "@/lib/ai/ai";
+import { resolveModel } from "@/lib/ai/ai";
+import type { Provider } from "@/lib/ai/models";
 import {
   toResult,
   verifyConnections,

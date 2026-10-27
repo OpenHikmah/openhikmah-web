@@ -4,7 +4,7 @@ import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { nameContent, nameVerseReasons } from "@/lib/infra/db/schema";
-import { safeParse, parsePagination } from "@/lib/infra/http";
+import { safeParse, parsePagination, jsonError, parseJson } from "@/lib/infra/http";
 import { getVerses, isValidRef } from "@/lib/quran/quran-corpus";
 import { containsTashbih } from "@/lib/ai/theological-constraints";
 import { getNameBySlug } from "@/lib/names/divine-names";
@@ -155,12 +155,8 @@ export async function PATCH(req: NextRequest) {
   const limited = await rateLimitAdminMutation(auth);
   if (limited) return limited;
 
-  let body: { slug?: string; kind?: string; data?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+  const body = await parseJson<{ slug?: string; kind?: string; data?: unknown }>(req);
+  if (!body) return jsonError("Invalid request body", 400);
 
   const { slug, kind } = body;
   if (!slug || !kind || !(KINDS as readonly string[]).includes(kind)) {

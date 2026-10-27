@@ -1,5 +1,5 @@
 import type { EdgeKind, VerseRef } from "@/types/quran";
-import type { SavedCanvas } from "@/store/canvas";
+import type { SavedCanvas } from "@/lib/canvas/saved-canvas";
 
 export const SHARE_VERSION = 2;
 

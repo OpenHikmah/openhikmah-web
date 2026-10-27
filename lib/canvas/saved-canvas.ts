@@ -1,5 +1,26 @@
-import type { SavedCanvas, SavedEdge, SavedNode } from "@/store/canvas";
 import type { EdgeKind, Verse } from "@/types/quran";
+
+export interface SavedNode {
+  id: string;
+  x: number;
+  y: number;
+  verse: Verse;
+}
+
+export interface SavedEdge {
+  id: string;
+  source: string;
+  target: string;
+  kind: EdgeKind;
+  label: string;
+  reason: string;
+}
+
+export interface SavedCanvas {
+  v: 1;
+  nodes: SavedNode[];
+  edges: SavedEdge[];
+}
 
 const EDGE_KINDS: readonly EdgeKind[] = ["thematic", "root", "contrast"];
 

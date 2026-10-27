@@ -6,7 +6,7 @@ import { resolveVerse } from "@/lib/quran/verse-resolver";
 import { connectionLabel } from "@/lib/canvas/canvas-layout";
 import { SHARE_TTL_MS, parseSharePayload } from "@/lib/canvas/share-canvas";
 import type { SharePayload } from "@/lib/canvas/share-payload";
-import type { SavedCanvas, SavedEdge, SavedNode } from "@/store/canvas";
+import type { SavedCanvas, SavedEdge, SavedNode } from "@/lib/canvas/saved-canvas";
 import type { Verse } from "@/types/quran";
 
 export type LoadedShare =

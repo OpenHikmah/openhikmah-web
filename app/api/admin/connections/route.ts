@@ -4,7 +4,7 @@ import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { connections, connectionCoverage } from "@/lib/infra/db/schema";
-import { parsePagination } from "@/lib/infra/http";
+import { parsePagination, jsonError, parseJson } from "@/lib/infra/http";
 
 const STATUSES = ["active", "flagged", "retired"] as const;
 const KINDS = ["thematic", "root", "contrast"] as const;
@@ -69,12 +69,8 @@ export async function PATCH(req: NextRequest) {
   const limited = await rateLimitAdminMutation(auth);
   if (limited) return limited;
 
-  let body: { id?: number; status?: string; reviewed?: boolean };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+  const body = await parseJson<{ id?: number; status?: string; reviewed?: boolean }>(req);
+  if (!body) return jsonError("Invalid request body", 400);
 
   const { id, reviewed } = body;
   const status = body.status as Status | undefined;
