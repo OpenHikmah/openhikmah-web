@@ -4,23 +4,19 @@ import { ConnectionParseError } from "@/lib/ai/connection-generator";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
 import { RateLimitError } from "@/lib/infra/rate-limit";
-import { clientKey } from "@/lib/infra/http";
+import { clientKey, jsonError, parseJson } from "@/lib/infra/http";
 import { getQuranEdition, getUiLocale } from "@/lib/i18n/request-prefs";
 import type { EdgeKind } from "@/types/quran";
 
 const MAX_EXCLUDE_REFS = 100;
 
 export async function POST(req: NextRequest) {
-  let body: {
+  const body = await parseJson<{
     fromRef?: string;
     kind?: string;
     excludeRefs?: unknown;
-  };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+  }>(req);
+  if (!body) return jsonError("Invalid request body", 400);
 
   const { fromRef, kind, excludeRefs: rawExcludeRefs } = body;
 
