@@ -3,7 +3,7 @@ import { and, eq, or } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { friendships } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
-import { parsePgSerialId } from "@/lib/infra/http";
+import { parsePgSerialId, jsonError, parseJson } from "@/lib/infra/http";
 
 export async function PATCH(
   req: NextRequest,
@@ -18,12 +18,8 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  let body: { action?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
-  }
+  const body = await parseJson<{ action?: string }>(req);
+  if (!body) return jsonError("Invalid body", 400);
 
   const { action } = body;
   if (action !== "accept" && action !== "decline") {

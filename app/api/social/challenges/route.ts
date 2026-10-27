@@ -10,6 +10,7 @@ import {
   resolveExpiredPending,
 } from "@/lib/social/challenges";
 import { rateLimitOrNull } from "@/lib/infra/rate-limit";
+import { jsonError, parseJson } from "@/lib/infra/http";
 
 // First key of the two-int per-pair advisory lock taken while creating a challenge.
 const CHALLENGE_LOCK_NAMESPACE = 668;
@@ -98,17 +99,13 @@ export async function POST(req: NextRequest) {
   );
   if (limited) return limited;
 
-  let body: {
+  const body = await parseJson<{
     challengedUsername?: string;
     duration?: string;
     verseRef?: string;
     suggestionId?: number;
-  };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
-  }
+  }>(req);
+  if (!body) return jsonError("Invalid body", 400);
 
   const { challengedUsername, duration, verseRef } = body;
   const suggestionCandidate =
