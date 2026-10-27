@@ -3,6 +3,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { renderWithIntl } from "../../test-utils/render-with-intl";
 
 import { ContextSidebar } from "@/components/layout/ContextSidebar";
+import { TooltipProvider } from "@/components/ui";
 import { useCanvasStore } from "@/store/canvas";
 import { useAuthStore } from "@/store/auth";
 import type { Verse } from "@/types/quran";
@@ -19,6 +20,15 @@ const baseVerse: Verse = {
   surahName: "Al-Baqarah",
   surahNameArabic: "البقرة",
 };
+
+/** The panel reads its verse from the canvas store by card id. */
+function openVerse() {
+  useCanvasStore.setState({
+    nodes: [{ id: "n1", type: "verse", position: { x: 0, y: 0 }, data: baseVerse }] as never,
+    edges: [],
+  });
+  useCanvasStore.getState().setSidebarContent({ type: "node", nodeId: "n1" });
+}
 
 describe("ContextSidebar — notes textarea accessibility", () => {
   const mockFetch = vi.fn();
@@ -37,7 +47,7 @@ describe("ContextSidebar — notes textarea accessibility", () => {
       }))
     );
     useAuthStore.setState({ accessToken: "test-token" });
-    useCanvasStore.getState().setSidebarContent({ type: "node", verse: baseVerse });
+    openVerse();
   });
 
   afterEach(() => {
@@ -50,10 +60,14 @@ describe("ContextSidebar — notes textarea accessibility", () => {
 
   it("gives the notes textarea a programmatic accessible name", async () => {
     await act(async () => {
-      renderWithIntl(<ContextSidebar />);
+      renderWithIntl(
+        <TooltipProvider>
+          <ContextSidebar />
+        </TooltipProvider>
+      );
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Notes" }));
 
     expect(await screen.findByRole("textbox", { name: /add a private note/i })).toBeInTheDocument();
   });
@@ -76,7 +90,7 @@ describe("ContextSidebar — notes load", () => {
       }))
     );
     useAuthStore.setState({ accessToken: "stale" });
-    useCanvasStore.getState().setSidebarContent({ type: "node", verse: baseVerse });
+    openVerse();
   });
 
   afterEach(() => {
@@ -100,14 +114,18 @@ describe("ContextSidebar — notes load", () => {
     });
 
     await act(async () => {
-      renderWithIntl(<ContextSidebar />);
+      renderWithIntl(
+        <TooltipProvider>
+          <ContextSidebar />
+        </TooltipProvider>
+      );
     });
-    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Notes" }));
 
     expect(await screen.findByText("a private note")).toBeInTheDocument();
   });
 
-  it("does not treat a failed notes load as 'no notes' and retries on the next open", async () => {
+  it("does not treat a failed notes load as 'no notes' and retries on the next visit", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     let notesCalls = 0;
     mockFetch.mockImplementation(async (url: string) => {
@@ -124,9 +142,13 @@ describe("ContextSidebar — notes load", () => {
     });
 
     await act(async () => {
-      renderWithIntl(<ContextSidebar />);
+      renderWithIntl(
+        <TooltipProvider>
+          <ContextSidebar />
+        </TooltipProvider>
+      );
     });
-    const toggle = screen.getByRole("button", { name: "My Notes" });
+    const toggle = screen.getByRole("tab", { name: "Notes" });
     fireEvent.click(toggle);
     await vi.waitFor(() => expect(notesCalls).toBe(1));
     await act(async () => {
@@ -134,7 +156,8 @@ describe("ContextSidebar — notes load", () => {
     });
     expect(screen.queryByText("a private note")).not.toBeInTheDocument();
 
-    fireEvent.click(toggle);
+    // Leaving the tab and coming back retries the load.
+    fireEvent.click(screen.getByRole("tab", { name: /^Connections/ }));
     fireEvent.click(toggle);
 
     expect(await screen.findByText("a private note")).toBeInTheDocument();
@@ -170,7 +193,7 @@ describe("ContextSidebar — note delete checks response status", () => {
       }))
     );
     useAuthStore.setState({ accessToken: "test-token" });
-    useCanvasStore.getState().setSidebarContent({ type: "node", verse: baseVerse });
+    openVerse();
   });
 
   afterEach(() => {
@@ -183,9 +206,13 @@ describe("ContextSidebar — note delete checks response status", () => {
 
   it("removes the note from state when the DELETE response is ok", async () => {
     await act(async () => {
-      renderWithIntl(<ContextSidebar />);
+      renderWithIntl(
+        <TooltipProvider>
+          <ContextSidebar />
+        </TooltipProvider>
+      );
     });
-    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Notes" }));
     expect(await screen.findByText("a private note")).toBeInTheDocument();
 
     await act(async () => {
@@ -199,9 +226,13 @@ describe("ContextSidebar — note delete checks response status", () => {
     deleteResponse = async () => new Response(null, { status: 500 });
 
     await act(async () => {
-      renderWithIntl(<ContextSidebar />);
+      renderWithIntl(
+        <TooltipProvider>
+          <ContextSidebar />
+        </TooltipProvider>
+      );
     });
-    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Notes" }));
     expect(await screen.findByText("a private note")).toBeInTheDocument();
 
     await act(async () => {
@@ -223,9 +254,13 @@ describe("ContextSidebar — note delete checks response status", () => {
     );
 
     await act(async () => {
-      renderWithIntl(<ContextSidebar />);
+      renderWithIntl(
+        <TooltipProvider>
+          <ContextSidebar />
+        </TooltipProvider>
+      );
     });
-    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Notes" }));
     expect(await screen.findByText("note A")).toBeInTheDocument();
     const [deleteA, deleteB] = screen.getAllByRole("button", { name: "Delete note" });
 
@@ -276,9 +311,13 @@ describe("ContextSidebar — note delete checks response status", () => {
     });
 
     await act(async () => {
-      renderWithIntl(<ContextSidebar />);
+      renderWithIntl(
+        <TooltipProvider>
+          <ContextSidebar />
+        </TooltipProvider>
+      );
     });
-    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Notes" }));
     expect(await screen.findByText("note A")).toBeInTheDocument();
     const [deleteAButton, deleteBButton] = screen.getAllByRole("button", { name: "Delete note" });
 
@@ -320,9 +359,13 @@ describe("ContextSidebar — note delete checks response status", () => {
     deleteResponse = () => Promise.reject(new Error("network down"));
 
     await act(async () => {
-      renderWithIntl(<ContextSidebar />);
+      renderWithIntl(
+        <TooltipProvider>
+          <ContextSidebar />
+        </TooltipProvider>
+      );
     });
-    fireEvent.click(screen.getByRole("button", { name: "My Notes" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Notes" }));
     expect(await screen.findByText("a private note")).toBeInTheDocument();
 
     await act(async () => {
@@ -352,11 +395,13 @@ describe("ContextSidebar — server render does not read matchMedia", () => {
       removeEventListener: vi.fn(),
     });
     vi.stubGlobal("matchMedia", matchMedia);
-    useCanvasStore.getState().setSidebarContent({ type: "node", verse: baseVerse });
+    openVerse();
 
     renderToString(
       <NextIntlClientProvider locale="en" messages={en}>
-        <ContextSidebar />
+        <TooltipProvider>
+          <ContextSidebar />
+        </TooltipProvider>
       </NextIntlClientProvider>
     );
 

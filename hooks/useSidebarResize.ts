@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useCanvasStore, DEFAULT_SIDEBAR_WIDTH } from "@/store/canvas";
+import { useCanvasStore } from "@/store/canvas";
 
-const MIN_WIDTH = DEFAULT_SIDEBAR_WIDTH;
+const MIN_WIDTH = 340;
 const MAX_WIDTH_CAP = 720;
 const MAX_WIDTH_VIEWPORT_RATIO = 0.6;
 

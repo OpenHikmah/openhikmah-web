@@ -62,7 +62,6 @@ query.
   similarity — the AI only explains the reasoning, never the reference.
 - **Search** — Direct reference lookup (`2:255`), full-text keyword search, or semantic
   **search by meaning**.
-- **Find similar verses** — From any verse, surface the closest verses by meaning.
 - **Shareable canvases** — Every canvas state serializes to a single URL you can copy and share.
 - **Audio** — Play all canvas verses in Qur'an order with a single button.
 - **99 Divine Names** — Full Asma'ul Husna with Arabic script, root morphology, taxonomy, verse

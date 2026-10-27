@@ -14,6 +14,11 @@ export interface Verse {
   surahNameArabic: string;
   isRoot?: boolean;
   isLoading?: boolean;
+  /** Canvas only: id of the card whose expansion added this card. The layout
+   *  re-run places it in a column beside that card. */
+  placedFrom?: string;
+  /** Canvas only: the user moved this card by hand, so layout re-runs keep it. */
+  pinned?: boolean;
 }
 
 export type EdgeKind = "thematic" | "root" | "contrast";
@@ -23,7 +28,7 @@ export interface CanvasEdge {
   source: string;
   target: string;
   type: "hikmah";
-  data: { kind: EdgeKind; label: string; reason?: string };
+  data: { kind: EdgeKind; label: string; reason?: string; placeholder?: boolean };
 }
 
 export interface ConnectionResult {
@@ -71,16 +76,11 @@ export interface SearchResponse {
   related?: SearchResult[];
 }
 
+/** What the reading panel shows. It reads live node/edge data from the canvas
+ *  store by id, so it always matches the canvas. `contextNodeId` is the verse
+ *  whose connections the connection view steps through. */
 export type SidebarContent =
-  | { type: "node"; verse: Verse }
-  | {
-      type: "edge";
-      fromVerse: Verse;
-      toVerse: Verse;
-      reason: string;
-      kind: EdgeKind;
-      label: string;
-    };
+  { type: "node"; nodeId: string } | { type: "edge"; edgeId: string; contextNodeId: string };
 
 export interface PendingExpand {
   nodeId: string;

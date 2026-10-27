@@ -238,8 +238,8 @@ describe("canvas store", () => {
   });
 
   it("setSidebarContent stores sidebar content", () => {
-    useCanvasStore.getState().setSidebarContent({ type: "node", verse: baseVerse });
-    expect(useCanvasStore.getState().sidebarContent).toMatchObject({ type: "node" });
+    useCanvasStore.getState().setSidebarContent({ type: "node", nodeId: "n1" });
+    expect(useCanvasStore.getState().sidebarContent).toEqual({ type: "node", nodeId: "n1" });
   });
 
   it("setPendingExpand stores pending expand action", () => {
@@ -498,7 +498,7 @@ describe("deserializeCanvas", () => {
     expect(nodes[0].position).toEqual({ x: 50, y: 80 });
   });
 
-  it("restores edges with correct type and animated flag", () => {
+  it("restores edges with the hikmah type and their kind", () => {
     const saved = {
       v: 1 as const,
       nodes: [],
@@ -516,7 +516,8 @@ describe("deserializeCanvas", () => {
     const { edges } = deserializeCanvas(saved);
     expect(edges).toHaveLength(1);
     expect(edges[0].type).toBe("hikmah");
-    expect(edges[0].animated).toBe(true);
+    // Line motion is drawn by HikmahEdge only for the open connection, not by React Flow.
+    expect(edges[0].animated).toBeUndefined();
     expect((edges[0].data as { kind: string }).kind).toBe("root");
   });
 
@@ -559,7 +560,7 @@ describe("restoreCanvas", () => {
   it("loads saved state and clears UI state", () => {
     const store = useCanvasStore.getState();
     store.setSelectedNode("old-node");
-    store.setSidebarContent({ type: "node", verse: baseVerse });
+    store.setSidebarContent({ type: "node", nodeId: "old-node" });
 
     store.restoreCanvas({
       v: 1,
@@ -614,6 +615,40 @@ describe("restoreCanvas", () => {
 describe("appendWorkspace", () => {
   beforeEach(() => {
     useCanvasStore.getState().reset();
+  });
+
+  it("points a child card's placedFrom at its source's new id after a remap", () => {
+    useCanvasStore.setState({
+      nodes: [
+        { id: "node-1", type: "verse", position: { x: 0, y: 0 }, data: { ...baseVerse } } as Node,
+      ],
+      edges: [],
+    });
+
+    useCanvasStore.getState().appendWorkspace({
+      v: 1,
+      nodes: [
+        {
+          id: "node-1",
+          x: 0,
+          y: 0,
+          verse: { ...baseVerse, ref: "1:1" as const, surah: 1, ayah: 1 },
+        },
+        {
+          id: "node-9",
+          x: 400,
+          y: 0,
+          verse: { ...baseVerse, ref: "112:1" as const, surah: 112, ayah: 1, placedFrom: "node-1" },
+        },
+      ],
+      edges: [],
+    });
+
+    const nodes = useCanvasStore.getState().nodes;
+    const source = nodes.find((n) => (n.data as unknown as Verse).ref === "1:1")!;
+    const child = nodes.find((n) => n.id === "node-9")!;
+    expect(source.id).not.toBe("node-1");
+    expect((child.data as unknown as Verse).placedFrom).toBe(source.id);
   });
 
   it("merges a duplicate verse and a remapped expansion edge, updating both derived-index maps", () => {

@@ -110,6 +110,121 @@ export function viewportCenter(
   };
 }
 
+/** Column placement for verses an expansion adds — see `placeColumnGroup`. */
+export const COLUMN_GAP = 112;
+export const ROW_GAP = 20;
+/** Fallback card heights (flow units) for a card React Flow hasn't measured yet. */
+export const CARD_HEIGHT_WITH_ARABIC = 236;
+export const CARD_HEIGHT_WITHOUT_ARABIC = 172;
+export const PLACEHOLDER_HEIGHT = 196;
+
+const SLIDE_STEP = 20;
+const MAX_SLIDE_STEPS = 600;
+const EXTRA_COLUMNS = 2;
+// Moving a group one column further right costs about four card heights of
+// sliding, so a verse's groups only split across columns when the near column
+// is really crowded.
+const COLUMN_JUMP_COST = 900;
+
+export interface LayoutBox {
+  x: number;
+  y: number;
+  h: number;
+}
+
+/**
+ * Positions for a group of new cards, stacked top to bottom in a column to the
+ * right of `source` and centred on it. The group slides up or down to the
+ * nearest space that clears every obstacle in that column; when that is far
+ * away, a column further right at the source's own level can win instead.
+ * Obstacles are never moved.
+ */
+export function placeColumnGroup(
+  source: LayoutBox,
+  heights: number[],
+  obstacles: LayoutBox[]
+): XY[] {
+  if (heights.length === 0) return [];
+  const blockH = heights.reduce((a, b) => a + b, 0) + ROW_GAP * (heights.length - 1);
+  const desiredTop = source.y + source.h / 2 - blockH / 2;
+
+  let best: { x: number; top: number; cost: number } | null = null;
+  for (let col = 0; col <= EXTRA_COLUMNS; col++) {
+    const x = source.x + (NODE_WIDTH + COLUMN_GAP) * (col + 1);
+    const inColumn = obstacles.filter(
+      (o) => o.x < x + NODE_WIDTH + ROW_GAP && o.x + NODE_WIDTH + ROW_GAP > x
+    );
+    const fits = (top: number) =>
+      inColumn.every((o) => top + blockH + ROW_GAP <= o.y || top >= o.y + o.h + ROW_GAP);
+    for (let i = 0; i < MAX_SLIDE_STEPS; i++) {
+      const offset = Math.ceil(i / 2) * SLIDE_STEP * (i % 2 ? 1 : -1);
+      if (!fits(desiredTop + offset)) continue;
+      const cost = Math.abs(offset) + col * COLUMN_JUMP_COST;
+      if (!best || cost < best.cost) best = { x, top: desiredTop + offset, cost };
+      break;
+    }
+  }
+
+  const x = best?.x ?? source.x + NODE_WIDTH + COLUMN_GAP;
+  let y = best?.top ?? desiredTop;
+  return heights.map((h) => {
+    const p = { x, y };
+    y += h + ROW_GAP;
+    return p;
+  });
+}
+
+export interface LayoutNode extends LayoutBox {
+  id: string;
+  /** Source card of the expansion that added this card, if one did. */
+  placedFrom?: string;
+  /** Moved by hand — keeps its position. */
+  pinned?: boolean;
+}
+
+/**
+ * Re-places every card an expansion added, replaying the expansions in the
+ * order they happened (node order), with current card heights. Cards no
+ * expansion added (search results, surah ayahs) and cards moved by hand keep
+ * their positions and act as obstacles from the start. Consecutive cards from
+ * the same source form one group. Returns the new position of every card.
+ */
+export function relayoutCanvas(nodes: LayoutNode[]): Map<string, XY> {
+  const ids = new Set(nodes.map((n) => n.id));
+  const isAuto = (n: LayoutNode) => !!n.placedFrom && !n.pinned && ids.has(n.placedFrom);
+  const placed = new Map<string, LayoutBox>();
+  for (const n of nodes) if (!isAuto(n)) placed.set(n.id, { x: n.x, y: n.y, h: n.h });
+
+  let i = 0;
+  while (i < nodes.length) {
+    const n = nodes[i];
+    if (!isAuto(n)) {
+      i++;
+      continue;
+    }
+    const group = [n];
+    while (
+      i + group.length < nodes.length &&
+      isAuto(nodes[i + group.length]) &&
+      nodes[i + group.length].placedFrom === n.placedFrom
+    ) {
+      group.push(nodes[i + group.length]);
+    }
+    const source = placed.get(n.placedFrom as string);
+    const positions = source
+      ? placeColumnGroup(
+          source,
+          group.map((g) => g.h),
+          [...placed.values()]
+        )
+      : group.map((g) => ({ x: g.x, y: g.y }));
+    group.forEach((g, k) => placed.set(g.id, { ...positions[k], h: g.h }));
+    i += group.length;
+  }
+
+  return new Map([...placed].map(([id, b]) => [id, { x: b.x, y: b.y }]));
+}
+
 const EDGE_LABEL_MAX = 60;
 
 /** Short edge label derived from a connection's reason. */

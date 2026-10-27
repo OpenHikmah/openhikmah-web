@@ -4,7 +4,15 @@ import { create } from "zustand";
 import type { Verse, CanvasEdge, SidebarContent, PendingExpand, EdgeKind } from "@/types/quran";
 import type { Node, Edge, NodeChange, EdgeChange } from "@xyflow/react";
 import { applyNodeChanges, applyEdgeChanges } from "@xyflow/react";
-import { findFreeSlot, NODE_HEIGHT, NODE_GAP } from "@/lib/canvas/canvas-layout";
+import {
+  findFreeSlot,
+  placeColumnGroup,
+  relayoutCanvas,
+  NODE_HEIGHT,
+  NODE_GAP,
+  PLACEHOLDER_HEIGHT,
+  type LayoutBox,
+} from "@/lib/canvas/canvas-layout";
 import { parseSavedCanvas } from "@/lib/canvas/saved-canvas";
 
 // ─── Persistence helpers ───────────────────────────────────────────────────────
@@ -31,23 +39,32 @@ export interface SavedCanvas {
   edges: SavedEdge[];
 }
 
+export const PLACEHOLDER_NODE_TYPE = "placeholder";
+
+export const isPlaceholderNode = (n: Node) => n.type === PLACEHOLDER_NODE_TYPE;
+export const isPlaceholderEdge = (e: Edge) => !!(e.data as { placeholder?: boolean })?.placeholder;
+
 export function serializeCanvas(nodes: Node[], edges: Edge[]): SavedCanvas {
   return {
     v: 1,
-    nodes: nodes.map((n) => ({
-      id: n.id,
-      x: n.position.x,
-      y: n.position.y,
-      verse: n.data as unknown as Verse,
-    })),
-    edges: edges.map((e) => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      kind: ((e.data as { kind?: EdgeKind })?.kind ?? "thematic") as EdgeKind,
-      label: (e.data as { label?: string })?.label ?? "",
-      reason: (e.data as { reason?: string })?.reason ?? "",
-    })),
+    nodes: nodes
+      .filter((n) => !isPlaceholderNode(n))
+      .map((n) => ({
+        id: n.id,
+        x: n.position.x,
+        y: n.position.y,
+        verse: n.data as unknown as Verse,
+      })),
+    edges: edges
+      .filter((e) => !isPlaceholderEdge(e))
+      .map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        kind: ((e.data as { kind?: EdgeKind })?.kind ?? "thematic") as EdgeKind,
+        label: (e.data as { label?: string })?.label ?? "",
+        reason: (e.data as { reason?: string })?.reason ?? "",
+      })),
   };
 }
 
@@ -63,10 +80,85 @@ export function deserializeCanvas(saved: SavedCanvas): { nodes: Node[]; edges: E
     source: e.source,
     target: e.target,
     type: "hikmah",
-    animated: true,
     data: { kind: e.kind, label: e.label, reason: e.reason },
   }));
   return { nodes, edges };
+}
+
+/** Which cards and lines the canvas highlights. Every other card and line fades. */
+export interface CanvasFocus {
+  nodes: Set<string>;
+  edges: Set<string>;
+  /** The card the reading panel shows (gold border). */
+  selected: string | null;
+  /** The two cards of the connection the reading panel shows. */
+  paired: Set<string>;
+}
+
+export interface ExpansionFocus {
+  sourceId: string;
+  nodeIds: string[];
+}
+
+let focusCache: {
+  sidebar: SidebarContent | null;
+  expansion: ExpansionFocus | null;
+  edges: Edge[];
+  focus: CanvasFocus | null;
+} | null = null;
+
+/** Derived focus, memoised on its inputs so per-card selectors stay cheap. */
+export function selectFocus(s: {
+  sidebarContent: SidebarContent | null;
+  expansionFocus: ExpansionFocus | null;
+  edges: Edge[];
+}): CanvasFocus | null {
+  if (
+    focusCache &&
+    focusCache.sidebar === s.sidebarContent &&
+    focusCache.expansion === s.expansionFocus &&
+    focusCache.edges === s.edges
+  ) {
+    return focusCache.focus;
+  }
+  let focus: CanvasFocus | null = null;
+  const x = s.expansionFocus;
+  if (x) {
+    const nodes = new Set([x.sourceId, ...x.nodeIds]);
+    const edges = s.edges
+      .filter(
+        (e) =>
+          (e.source === x.sourceId && nodes.has(e.target)) ||
+          (e.target === x.sourceId && nodes.has(e.source))
+      )
+      .map((e) => e.id);
+    focus = { nodes, edges: new Set(edges), selected: x.sourceId, paired: new Set() };
+  } else if (s.sidebarContent?.type === "node") {
+    const id = s.sidebarContent.nodeId;
+    const own = s.edges.filter(
+      (e) => !isPlaceholderEdge(e) && (e.source === id || e.target === id)
+    );
+    const nodes = new Set([id]);
+    own.forEach((e) => {
+      nodes.add(e.source);
+      nodes.add(e.target);
+    });
+    focus = { nodes, edges: new Set(own.map((e) => e.id)), selected: id, paired: new Set() };
+  } else if (s.sidebarContent?.type === "edge") {
+    const edgeId = s.sidebarContent.edgeId;
+    const edge = s.edges.find((e) => e.id === edgeId);
+    if (edge) {
+      const pair = new Set([edge.source, edge.target]);
+      focus = { nodes: pair, edges: new Set([edge.id]), selected: null, paired: pair };
+    }
+  }
+  focusCache = { sidebar: s.sidebarContent, expansion: s.expansionFocus, edges: s.edges, focus };
+  return focus;
+}
+
+/** Connections of a card, in the order they were added, without placeholders. */
+export function connectionsOf(edges: Edge[], nodeId: string): Edge[] {
+  return edges.filter((e) => !isPlaceholderEdge(e) && (e.source === nodeId || e.target === nodeId));
 }
 
 interface CanvasViewport {
@@ -80,8 +172,14 @@ interface CanvasStore {
   edges: Edge[];
   selectedNodeId: string | null;
   expandingNodeId: string | null;
+  /** Kind of the expansion running on `expandingNodeId`. */
+  expandingKind: EdgeKind | null;
+  /** Line the reading panel's pointer is over, so the canvas can highlight it. */
+  hoveredEdgeId: string | null;
   openExpandNodeId: string | null;
   sidebarContent: SidebarContent | null;
+  /** What the reading panel showed last, so it can keep its content while it closes. */
+  lastSidebarContent: SidebarContent | null;
   pendingExpand: PendingExpand | null;
   pendingAutoExpand: string | null;
   pendingPanToNodeId: string | null;
@@ -100,6 +198,12 @@ interface CanvasStore {
   /** Per-source-node outgoing expansion-edge counts by kind. Recomputed by
    *  every action that touches `edges`, mirroring `duplicateNodeIdsByRef`. */
   expansionCountsByNode: Record<string, Partial<Record<EdgeKind, number>>>;
+  /** Highlights a running (or just finished) expansion: its source and new cards. */
+  expansionFocus: ExpansionFocus | null;
+  /** The canvas as it was before the last Clear, kept so Clear can be undone. */
+  clearedSnapshot: { nodes: Node[]; edges: Edge[] } | null;
+  /** Bumped when a layout re-run moves cards, so the canvas can animate the move. */
+  layoutToken: number;
 
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
@@ -111,7 +215,8 @@ interface CanvasStore {
   addSurahNodes: (verses: Verse[]) => string[];
   addConnectionEdge: (edge: CanvasEdge) => AddConnectionEdgeResult;
   setSelectedNode: (id: string | null) => void;
-  setExpandingNode: (id: string | null) => void;
+  setExpandingNode: (id: string | null, kind?: EdgeKind) => void;
+  setHoveredEdge: (id: string | null) => void;
   setOpenExpandNodeId: (id: string | null) => void;
   setSidebarContent: (content: SidebarContent | null) => void;
   setPendingExpand: (action: PendingExpand | null) => void;
@@ -132,6 +237,28 @@ interface CanvasStore {
   reset: () => void;
   restoreCanvas: (saved: unknown) => void;
   appendWorkspace: (saved: unknown) => void;
+
+  setExpansionFocus: (focus: ExpansionFocus | null) => void;
+  /** Adds `count` placeholder cards (and lines) in a column beside `sourceId`. */
+  addPlaceholders: (
+    sourceId: string,
+    kind: EdgeKind,
+    count: number,
+    fallbackHeight: number
+  ) => string[];
+  /** Turns a placeholder into a verse card in the same place. Returns the new card id. */
+  fillPlaceholder: (placeholderId: string, verse: Verse, sourceId: string) => string;
+  removePlaceholders: (ids: string[]) => void;
+  /** Re-places one new group beside its source with current card heights. */
+  settleGroup: (sourceId: string, ids: string[], fallbackHeight: number) => void;
+  /** Re-runs the column layout for every card an expansion added. */
+  relayout: (fallbackHeight: number) => void;
+  /** Forgets every hand move, then re-runs the layout. */
+  resetLayout: (fallbackHeight: number) => void;
+  /** Empties the canvas, keeping a snapshot for `undoClear`. */
+  clearCanvas: () => void;
+  undoClear: () => void;
+  dismissClearUndo: () => void;
 }
 
 let nodeIdCounter = 0;
@@ -153,7 +280,7 @@ function computeExpansionCountsMap(
   const map: Record<string, Partial<Record<EdgeKind, number>>> = {};
   for (const e of edges) {
     const kind = (e.data as { kind?: EdgeKind })?.kind;
-    if (!kind) continue;
+    if (!kind || isPlaceholderEdge(e)) continue;
     const counts = (map[e.source] ??= {});
     counts[kind] = (counts[kind] ?? 0) + 1;
   }
@@ -163,7 +290,36 @@ function computeExpansionCountsMap(
 export type AddConnectionEdgeResult =
   "added" | "duplicate-same-kind" | "duplicate-different-kind" | "missing-endpoint";
 
-export const DEFAULT_SIDEBAR_WIDTH = 288;
+export const DEFAULT_SIDEBAR_WIDTH = 400;
+
+let placeholderCounter = 0;
+
+function nodeHeight(n: Node, fallbackHeight: number): number {
+  if (n.measured?.height) return n.measured.height;
+  return isPlaceholderNode(n) ? PLACEHOLDER_HEIGHT : fallbackHeight;
+}
+
+function layoutBox(n: Node, fallbackHeight: number): LayoutBox {
+  return { x: n.position.x, y: n.position.y, h: nodeHeight(n, fallbackHeight) };
+}
+
+function relayoutNodes(nodes: Node[], fallbackHeight: number): Node[] {
+  const positions = relayoutCanvas(
+    nodes.map((n) => {
+      const data = n.data as unknown as Verse;
+      return {
+        id: n.id,
+        ...layoutBox(n, fallbackHeight),
+        placedFrom: data.placedFrom,
+        pinned: data.pinned,
+      };
+    })
+  );
+  return nodes.map((n) => {
+    const p = positions.get(n.id);
+    return p && (p.x !== n.position.x || p.y !== n.position.y) ? { ...n, position: p } : n;
+  });
+}
 
 // Pulse duration must exceed the CSS `.node-pulse` animation length (1.5s) so the
 // highlight class isn't stripped mid-animation.
@@ -175,8 +331,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   edges: [],
   selectedNodeId: null,
   expandingNodeId: null,
+  expandingKind: null,
+  hoveredEdgeId: null,
   openExpandNodeId: null,
   sidebarContent: null,
+  lastSidebarContent: null,
   pendingExpand: null,
   pendingAutoExpand: null,
   pendingPanToNodeId: null,
@@ -187,13 +346,24 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   restoreToken: 0,
   duplicateNodeIdsByRef: {},
   expansionCountsByNode: {},
+  expansionFocus: null,
+  clearedSnapshot: null,
+  layoutToken: 0,
 
   setNodes: (nodes) => set({ nodes, duplicateNodeIdsByRef: computeDuplicateMap(nodes) }),
   setEdges: (edges) => set({ edges, expansionCountsByNode: computeExpansionCountsMap(edges) }),
 
   onNodesChange: (changes) =>
     set((s) => {
-      const nodes = applyNodeChanges(changes, s.nodes);
+      // A card the user drags keeps its spot through later layout re-runs.
+      const dragged = new Set(
+        changes.flatMap((c) => (c.type === "position" && c.dragging ? [c.id] : []))
+      );
+      const nodes = applyNodeChanges(changes, s.nodes).map((n) =>
+        dragged.has(n.id) && !isPlaceholderNode(n) && !(n.data as unknown as Verse).pinned
+          ? { ...n, data: { ...n.data, pinned: true } }
+          : n
+      );
       return { nodes, duplicateNodeIdsByRef: computeDuplicateMap(nodes) };
     }),
 
@@ -218,7 +388,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       );
     set((s) => {
       const nodes = [...s.nodes, { id, type: "verse", position: pos, data: { ...verse } } as Node];
-      return { nodes, duplicateNodeIdsByRef: computeDuplicateMap(nodes) };
+      return { nodes, duplicateNodeIdsByRef: computeDuplicateMap(nodes), clearedSnapshot: null };
     });
     get().setNewlyAddedNode(id);
     return id;
@@ -285,7 +455,6 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
           target: edge.target,
           type: "hikmah",
           data: edge.data,
-          animated: true,
         } as Edge,
       ];
       return { edges, expansionCountsByNode: computeExpansionCountsMap(edges) };
@@ -294,9 +463,17 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   },
 
   setSelectedNode: (id) => set({ selectedNodeId: id }),
-  setExpandingNode: (id) => set({ expandingNodeId: id }),
+  setExpandingNode: (id, kind) =>
+    set({ expandingNodeId: id, expandingKind: id ? (kind ?? null) : null }),
+  setHoveredEdge: (id) => set({ hoveredEdgeId: id }),
   setOpenExpandNodeId: (id) => set({ openExpandNodeId: id }),
-  setSidebarContent: (content) => set({ sidebarContent: content }),
+  // Opening the reading panel ends any expansion highlight: the panel's focus wins.
+  setSidebarContent: (content) =>
+    set((s) => ({
+      sidebarContent: content,
+      lastSidebarContent: content ?? s.lastSidebarContent,
+      expansionFocus: content ? null : s.expansionFocus,
+    })),
   setPendingExpand: (action) => set({ pendingExpand: action }),
   setPendingAutoExpand: (nodeId) => set({ pendingAutoExpand: nodeId }),
   setPendingPanToNode: (nodeId) => set({ pendingPanToNodeId: nodeId }),
@@ -342,12 +519,15 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       expandingNodeId: null,
       openExpandNodeId: null,
       sidebarContent: null,
+      lastSidebarContent: null,
       pendingExpand: null,
       pendingAutoExpand: null,
       pendingPanToNodeId: null,
       newlyAddedNodeId: null,
       duplicateNodeIdsByRef: {},
       expansionCountsByNode: {},
+      expansionFocus: null,
+      clearedSnapshot: null,
     }),
 
   restoreCanvas: (saved: unknown) => {
@@ -366,12 +546,15 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       expandingNodeId: null,
       openExpandNodeId: null,
       sidebarContent: null,
+      lastSidebarContent: null,
       pendingExpand: null,
       pendingAutoExpand: null,
       pendingPanToNodeId: null,
       newlyAddedNodeId: null,
       duplicateNodeIdsByRef: computeDuplicateMap(nodes),
       expansionCountsByNode: computeExpansionCountsMap(edges),
+      expansionFocus: null,
+      clearedSnapshot: null,
       restoreToken: s.restoreToken + 1,
     }));
   },
@@ -401,6 +584,12 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         idRemap.set(node.id, id);
       }
       placed.push({ ...node, id, position: pos });
+    }
+    // A child card names its source by id, so follow the source's new id.
+    for (let i = 0; i < placed.length; i++) {
+      const from = (placed[i].data as unknown as Verse).placedFrom;
+      const remapped = from ? idRemap.get(from) : undefined;
+      if (remapped) placed[i] = { ...placed[i], data: { ...placed[i].data, placedFrom: remapped } };
     }
 
     const finalEdges = incomingEdges
@@ -434,4 +623,140 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       };
     });
   },
+
+  setExpansionFocus: (focus) => set({ expansionFocus: focus }),
+
+  addPlaceholders: (sourceId, kind, count, fallbackHeight) => {
+    const source = get().getNodeById(sourceId);
+    if (!source || count <= 0) return [];
+    const ids = Array.from({ length: count }, () => `placeholder-${++placeholderCounter}`);
+    set((s) => {
+      const positions = placeColumnGroup(
+        layoutBox(source, fallbackHeight),
+        ids.map(() => PLACEHOLDER_HEIGHT),
+        s.nodes.filter((n) => n.id !== sourceId).map((n) => layoutBox(n, fallbackHeight))
+      );
+      const nodes = [
+        ...s.nodes,
+        ...ids.map(
+          (id, i) =>
+            ({
+              id,
+              type: PLACEHOLDER_NODE_TYPE,
+              position: positions[i],
+              data: { kind },
+              draggable: false,
+              selectable: false,
+            }) as Node
+        ),
+      ];
+      const edges = [
+        ...s.edges,
+        ...ids.map(
+          (id) =>
+            ({
+              id: `edge-${sourceId}-${id}`,
+              source: sourceId,
+              target: id,
+              type: "hikmah",
+              data: { kind, label: "", placeholder: true },
+              selectable: false,
+            }) as Edge
+        ),
+      ];
+      return { nodes, edges };
+    });
+    return ids;
+  },
+
+  fillPlaceholder: (placeholderId, verse, sourceId) => {
+    const id = nextId();
+    set((s) => {
+      const nodes = s.nodes.map((n) =>
+        n.id === placeholderId
+          ? ({
+              id,
+              type: "verse",
+              position: n.position,
+              data: { ...verse, placedFrom: sourceId },
+            } as Node)
+          : n
+      );
+      const edges = s.edges.filter((e) => e.target !== placeholderId);
+      return {
+        nodes,
+        edges,
+        duplicateNodeIdsByRef: computeDuplicateMap(nodes),
+        clearedSnapshot: null,
+      };
+    });
+    get().setNewlyAddedNode(id);
+    return id;
+  },
+
+  removePlaceholders: (ids) => {
+    const gone = new Set(ids);
+    set((s) => ({
+      nodes: s.nodes.filter((n) => !gone.has(n.id)),
+      edges: s.edges.filter((e) => !gone.has(e.target)),
+    }));
+  },
+
+  settleGroup: (sourceId, ids, fallbackHeight) => {
+    const { nodes } = get();
+    const source = nodes.find((n) => n.id === sourceId);
+    const group = ids.map((id) => nodes.find((n) => n.id === id)).filter((n): n is Node => !!n);
+    if (!source || group.length === 0) return;
+    const inGroup = new Set(group.map((n) => n.id));
+    const positions = placeColumnGroup(
+      layoutBox(source, fallbackHeight),
+      group.map((n) => nodeHeight(n, fallbackHeight)),
+      nodes
+        .filter((n) => n.id !== sourceId && !inGroup.has(n.id))
+        .map((n) => layoutBox(n, fallbackHeight))
+    );
+    const byId = new Map(group.map((n, i) => [n.id, positions[i]]));
+    set((s) => ({
+      nodes: s.nodes.map((n) => (byId.has(n.id) ? { ...n, position: byId.get(n.id)! } : n)),
+    }));
+  },
+
+  relayout: (fallbackHeight) =>
+    set((s) => ({
+      nodes: relayoutNodes(s.nodes, fallbackHeight),
+      layoutToken: s.layoutToken + 1,
+    })),
+
+  resetLayout: (fallbackHeight) =>
+    set((s) => {
+      const unpinned = s.nodes.map((n) =>
+        (n.data as unknown as Verse).pinned ? { ...n, data: { ...n.data, pinned: false } } : n
+      );
+      return { nodes: relayoutNodes(unpinned, fallbackHeight), layoutToken: s.layoutToken + 1 };
+    }),
+
+  clearCanvas: () => {
+    const { nodes, edges, reset } = get();
+    const snapshot = {
+      nodes: nodes.filter((n) => !isPlaceholderNode(n)),
+      edges: edges.filter((e) => !isPlaceholderEdge(e)),
+    };
+    reset();
+    if (snapshot.nodes.length > 0) set({ clearedSnapshot: snapshot });
+  },
+
+  undoClear: () => {
+    const snapshot = get().clearedSnapshot;
+    if (!snapshot) return;
+    set({
+      nodes: snapshot.nodes,
+      edges: snapshot.edges,
+      duplicateNodeIdsByRef: computeDuplicateMap(snapshot.nodes),
+      expansionCountsByNode: computeExpansionCountsMap(snapshot.edges),
+      clearedSnapshot: null,
+    });
+    get().requestFit();
+  },
+
+  dismissClearUndo: () => set({ clearedSnapshot: null }),
 }));

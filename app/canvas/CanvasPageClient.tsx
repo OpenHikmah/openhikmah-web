@@ -177,11 +177,15 @@ export function CanvasPageClient() {
       <Header onSearchOpen={() => setSearchOpen(true)} />
       <MobileNavBar />
 
-      <main className="flex-1 relative overflow-hidden">
-        {nodes.length === 0 && <EmptyState onSearchOpen={() => setSearchOpen(true)} />}
-        <HikmahCanvas onSearchOpen={() => setSearchOpen(true)} />
+      {/* The reading panel docks beside the canvas (desktop), so it never covers
+          the verses it describes; on phones it slides over the canvas. */}
+      <main className="relative flex flex-1 overflow-hidden">
+        <div className="relative min-w-0 flex-1">
+          {nodes.length === 0 && <EmptyState onSearchOpen={() => setSearchOpen(true)} />}
+          <HikmahCanvas onSearchOpen={() => setSearchOpen(true)} />
+          <CanvasTour />
+        </div>
         <ContextSidebar />
-        <CanvasTour />
       </main>
 
       <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />

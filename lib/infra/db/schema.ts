@@ -428,9 +428,9 @@ export const rateLimits = pgTable(
 
 // ─── Verse Embeddings (semantic search) ───────────────────────────────────────
 // One vector per verse, produced once by scripts/embed-corpus.mjs via Gemini.
-// Powers "search by meaning" and "find similar verses", and supplies the real
-// thematic/contrast candidates for grounded connection discovery (data discovers,
-// AI articulates). Requires the pgvector extension — see migration 0008.
+// Powers "search by meaning", and supplies the real thematic/contrast candidates
+// for grounded connection discovery (data discovers, AI articulates). Requires the
+// pgvector extension — see migration 0008.
 
 export const verseEmbeddings = pgTable(
   "verse_embeddings",
