@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Deploy script — runs on the Hetzner server via GitHub Actions SSH.
 # Pulls latest code, rebuilds Docker image, health-checks, rolls back on failure.
 set -euo pipefail
 
