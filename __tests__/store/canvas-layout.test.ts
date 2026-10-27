@@ -74,6 +74,23 @@ describe("canvas store — placement and layout", () => {
     expect(store().getExpansionCounts("a")).toEqual({});
   });
 
+  it("does not count placeholder lines once a real connection is added beside them", () => {
+    store().setNodes([card("a", V153), card("b", V45)]);
+    store().addPlaceholders("a", "thematic", 2, H);
+
+    const result = store().addConnectionEdge({
+      id: "edge-a-b",
+      source: "a",
+      target: "b",
+      type: "hikmah",
+      data: { kind: "thematic", label: "", reason: "r" },
+    });
+
+    expect(result).toBe("added");
+    expect(store().edges).toHaveLength(3);
+    expect(store().getExpansionCounts("a")).toEqual({ thematic: 1 });
+  });
+
   it("turns a placeholder into a verse card in the same place, linked to its source", () => {
     store().setNodes([card("a", V153)]);
     const [ph] = store().addPlaceholders("a", "thematic", 1, H);

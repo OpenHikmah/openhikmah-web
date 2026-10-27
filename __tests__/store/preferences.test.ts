@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { usePreferencesStore, LOCALE_COOKIE, EDITION_COOKIE } from "@/store/preferences";
+import {
+  usePreferencesStore,
+  fallbackCardHeight,
+  LOCALE_COOKIE,
+  EDITION_COOKIE,
+} from "@/store/preferences";
 import { DEFAULT_RECITER } from "@/lib/quran/audio";
+import { CARD_HEIGHT_WITH_ARABIC, CARD_HEIGHT_WITHOUT_ARABIC } from "@/lib/canvas/canvas-layout";
 
 function getCookie(name: string): string | undefined {
   return document.cookie
@@ -84,5 +90,15 @@ describe("preferences store", () => {
     );
     await usePreferencesStore.persist.rehydrate();
     expect(usePreferencesStore.getState().canvasPrefs.showArabic).toBe(false);
+  });
+
+  it("assumes the taller card height only while Arabic is shown on cards", () => {
+    expect(CARD_HEIGHT_WITH_ARABIC).toBeGreaterThan(CARD_HEIGHT_WITHOUT_ARABIC);
+
+    usePreferencesStore.getState().setCanvasPrefs({ showArabic: true });
+    expect(fallbackCardHeight()).toBe(CARD_HEIGHT_WITH_ARABIC);
+
+    usePreferencesStore.getState().setCanvasPrefs({ showArabic: false });
+    expect(fallbackCardHeight()).toBe(CARD_HEIGHT_WITHOUT_ARABIC);
   });
 });

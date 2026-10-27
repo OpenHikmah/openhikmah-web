@@ -31,7 +31,62 @@ describe("placeColumnGroup", () => {
     const out = placeColumnGroup(source, [200], [obstacle]);
     expect(out[0].x).toBe(COL);
     expect(overlaps({ ...out[0], h: 200 }, obstacle)).toBe(false);
-    expect(Math.abs(out[0].y)).toBeLessThan(400);
+    expect(out[0].y).toBe(280);
+  });
+
+  it("keeps ROW_GAP clear below an obstacle", () => {
+    const source = { x: 0, y: 0, h: 200 };
+    const obstacle = { x: COL, y: -200, h: 200 };
+    const [p] = placeColumnGroup(source, [200], [obstacle]);
+    expect(p.y).toBe(obstacle.y + obstacle.h + ROW_GAP);
+  });
+
+  it("keeps ROW_GAP clear above an obstacle", () => {
+    const source = { x: 0, y: 0, h: 200 };
+    const obstacle = { x: COL, y: 200, h: 200 };
+    const [p] = placeColumnGroup(source, [200], [obstacle]);
+    expect(p.y + 200).toBe(obstacle.y - ROW_GAP);
+  });
+
+  it("slides up when the free space above is nearer than the space below", () => {
+    const source = { x: 0, y: 0, h: 200 };
+    const obstacle = { x: COL, y: -30, h: 350 };
+    const [p] = placeColumnGroup(source, [200], [obstacle]);
+    expect(p.y).toBe(-260);
+  });
+
+  it("slides down when the free space below is nearer than the space above", () => {
+    const source = { x: 0, y: 0, h: 200 };
+    const obstacle = { x: COL, y: -100, h: 150 };
+    const [p] = placeColumnGroup(source, [200], [obstacle]);
+    expect(p.y).toBe(80);
+  });
+
+  it("falls back to the first column at the source level when no column has room", () => {
+    const source = { x: 0, y: 0, h: 200 };
+    const walls = [1, 2, 3].map((n) => ({ x: n * COL, y: -50000, h: 100000 }));
+    const out = placeColumnGroup(source, [200, 200], walls);
+    expect(out).toEqual([
+      { x: COL, y: -110 },
+      { x: COL, y: 110 },
+    ]);
+  });
+
+  it("ignores obstacles that sit outside the column", () => {
+    const source = { x: 0, y: 0, h: 200 };
+    const reach = NODE_WIDTH + ROW_GAP;
+    const farRight = { x: COL + reach, y: 0, h: 200 };
+    const farLeft = { x: COL - reach, y: 0, h: 200 };
+    expect(placeColumnGroup(source, [200], [farRight, farLeft])).toEqual([{ x: COL, y: 0 }]);
+  });
+
+  it("treats an obstacle that reaches into the column as blocking", () => {
+    const source = { x: 0, y: 0, h: 200 };
+    const reach = NODE_WIDTH + ROW_GAP;
+    const nearRight = { x: COL + reach - 1, y: 0, h: 200 };
+    const nearLeft = { x: COL - reach + 1, y: 0, h: 200 };
+    expect(placeColumnGroup(source, [200], [nearRight])[0].y).not.toBe(0);
+    expect(placeColumnGroup(source, [200], [nearLeft])[0].y).not.toBe(0);
   });
 
   it("moves one column further right when the near column is crowded", () => {
