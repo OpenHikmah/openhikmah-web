@@ -126,7 +126,7 @@ export default function PromptsPage() {
             <Button
               size="sm"
               variant={createArmed ? "danger" : "primary"}
-              disabled={saving || !draft.trim()}
+              disabled={busyId !== null || !draft.trim()}
               onClick={triggerCreate}
             >
               {saving ? "Saving…" : createArmed ? "Create & activate?" : "Create & activate"}
@@ -172,7 +172,7 @@ export default function PromptsPage() {
                       {!v.active && (
                         <ConfirmButton
                           variant="secondary"
-                          disabled={busyId === v.id}
+                          disabled={busyId !== null}
                           onConfirm={() => rollback(v.id)}
                           confirmLabel="Roll back?"
                         >

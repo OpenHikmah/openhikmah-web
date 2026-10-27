@@ -1,13 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { AdminLiveRegion } from "@/components/admin/AdminLiveRegion";
 import { AdminApiError } from "@/components/admin/AdminContext";
 import { useRowAction } from "@/components/admin/useRowAction";
 
 const text = { success: "Done.", failure: "Failed." };
 
 function setup() {
-  return renderHook(() => useRowAction<number>(), { wrapper: AdminLiveRegion });
+  return renderHook(() => useRowAction<number>());
 }
 
 describe("useRowAction", () => {
