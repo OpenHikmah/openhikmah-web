@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, Input, Textarea, ReflectionNote } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { StateNote, ConfirmButton } from "@/components/admin/primitives";
+import { StateNote, ConfirmButton, ErrorState } from "@/components/admin/primitives";
 import { Field } from "@/components/admin/Field";
 import { Feedback } from "@/components/admin/Feedback";
 import { useActionMessage } from "@/components/admin/useActionMessage";
@@ -214,7 +214,7 @@ export default function VotdPage() {
             </div>
           </div>
 
-          {error && <StateNote tone="error">{error}</StateNote>}
+          {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
 
           <div
             ref={gridRef}

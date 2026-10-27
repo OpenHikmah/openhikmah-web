@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import { NativeSelect } from "@/components/ui";
-import { Table, Th, Td, Pill, StatTile, StateNote } from "@/components/admin/primitives";
+import {
+  Table,
+  Th,
+  Td,
+  Pill,
+  StatTile,
+  StateNote,
+  ErrorState,
+} from "@/components/admin/primitives";
 import { SectionHeading } from "@/components/admin/SectionHeading";
 import { useAdminFetch } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
@@ -38,7 +46,7 @@ export function CoverageReport() {
 
   return (
     <div className="space-y-6">
-      {error && <StateNote tone="error">{error}</StateNote>}
+      {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
       {loading && !data && <SkeletonRows n={8} />}
 
       {data && (

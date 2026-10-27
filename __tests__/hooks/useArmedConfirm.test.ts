@@ -61,4 +61,18 @@ describe("useArmedConfirm", () => {
 
     expect(clearTimeoutSpy).toHaveBeenCalled();
   });
+
+  it("disarms on Escape without confirming", () => {
+    const onConfirm = vi.fn();
+    const { result } = renderHook(() => useArmedConfirm(onConfirm));
+
+    act(() => result.current.trigger());
+    expect(result.current.armed).toBe(true);
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    expect(result.current.armed).toBe(false);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
 });

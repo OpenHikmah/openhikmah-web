@@ -11,9 +11,12 @@ import {
   StateNote,
   ConfirmButton,
   LoadMore,
+  ErrorState,
 } from "@/components/admin/primitives";
 import { SkeletonRows } from "@/components/admin/Skeleton";
-import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
+import { useAdminFetch } from "@/components/admin/AdminContext";
+import { Feedback } from "@/components/admin/Feedback";
+import { useRowAction } from "@/components/admin/useRowAction";
 import { usePaginated } from "@/components/admin/usePaginated";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
 
@@ -37,51 +40,46 @@ export default function NamesPage() {
     }, "names");
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const { run: action, busyId, message, fail, clear } = useRowAction();
 
   const startEdit = (r: Row) => {
     setEditing(`${r.slug}/${r.kind}`);
     setDraft(JSON.stringify(r.data, null, 2));
-    setMsg(null);
+    clear();
   };
 
   const save = async (r: Row) => {
-    setMsg(null);
     let parsed: unknown;
     try {
       parsed = JSON.parse(draft);
     } catch {
-      setMsg("Data must be valid JSON.");
+      fail("Data must be valid JSON.");
       return;
     }
-    const id = `${r.slug}/${r.kind}`;
-    setBusyId(id);
-    try {
-      await api("/names", { method: "PATCH", json: { slug: r.slug, kind: r.kind, data: parsed } });
+    const done = await action(
+      `${r.slug}/${r.kind}`,
+      () => api("/names", { method: "PATCH", json: { slug: r.slug, kind: r.kind, data: parsed } }),
+      { success: `Saved ${r.slug}/${r.kind}.`, failure: "Save failed." }
+    );
+    if (done) {
       setEditing(null);
       reload();
-    } catch (e) {
-      setMsg(e instanceof AdminApiError ? e.message : "Save failed.");
-    } finally {
-      setBusyId(null);
     }
   };
 
   const invalidate = async (r: Row) => {
-    setMsg(null);
-    const id = `${r.slug}/${r.kind}`;
-    setBusyId(id);
-    try {
-      await api(`/names?slug=${encodeURIComponent(r.slug)}&kind=${encodeURIComponent(r.kind)}`, {
-        method: "DELETE",
-      });
-      reload();
-    } catch (e) {
-      setMsg(e instanceof AdminApiError ? e.message : "Invalidate failed.");
-    } finally {
-      setBusyId(null);
-    }
+    const done = await action(
+      `${r.slug}/${r.kind}`,
+      () =>
+        api(`/names?slug=${encodeURIComponent(r.slug)}&kind=${encodeURIComponent(r.kind)}`, {
+          method: "DELETE",
+        }),
+      {
+        success: `Invalidated ${r.slug}/${r.kind}; it will regenerate.`,
+        failure: "Invalidate failed.",
+      }
+    );
+    if (done) reload();
   };
 
   return (
@@ -91,8 +89,8 @@ export default function NamesPage() {
         subtitle="Cached AI content per Divine Name. Edit the payload or invalidate to regenerate."
       />
       <div className="space-y-6 p-7">
-        {error && <StateNote tone="error">{error}</StateNote>}
-        {msg && <StateNote tone="error">{msg}</StateNote>}
+        {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
+        {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
         {loading && <SkeletonRows />}
         {!loading && !error && rows.length === 0 && (
           <StateNote>No cached name content yet.</StateNote>

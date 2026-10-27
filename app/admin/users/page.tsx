@@ -11,12 +11,14 @@ import {
   StateNote,
   ConfirmButton,
   LoadMore,
+  ErrorState,
 } from "@/components/admin/primitives";
 import { formatTimestamp } from "@/lib/admin/format";
-import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
+import { useAdminFetch } from "@/components/admin/AdminContext";
+import { Feedback } from "@/components/admin/Feedback";
+import { useRowAction } from "@/components/admin/useRowAction";
 import { usePaginated } from "@/components/admin/usePaginated";
 import { SkeletonRows } from "@/components/admin/Skeleton";
-import { useAdminAnnounce } from "@/components/admin/AdminLiveRegion";
 
 interface AdminUser {
   id: number;
@@ -32,11 +34,9 @@ interface AdminUser {
 
 export default function UsersPage() {
   const api = useAdminFetch();
-  const announce = useAdminAnnounce();
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const { run: action, busyId, message } = useRowAction<number>();
 
   const { rows, hasMore, error, loading, loadingMore, loadMoreError, reload, loadMore } =
     usePaginated<AdminUser>(async ({ offset }) => {
@@ -49,19 +49,15 @@ export default function UsersPage() {
     }, `users:${submitted}`);
 
   const setDisabled = async (id: number, disabled: boolean) => {
-    setActionError(null);
-    setBusyId(id);
-    try {
-      await api("/users", { method: "PATCH", json: { id, disabled } });
-      announce(`User ${id} ${disabled ? "disabled" : "re-enabled"}.`);
-      reload();
-    } catch (e) {
-      const msg = e instanceof AdminApiError ? e.message : "Failed to update user.";
-      setActionError(msg);
-      announce(msg);
-    } finally {
-      setBusyId(null);
-    }
+    const done = await action(
+      id,
+      () => api("/users", { method: "PATCH", json: { id, disabled } }),
+      {
+        success: `User ${id} ${disabled ? "disabled" : "re-enabled"}.`,
+        failure: "Failed to update user.",
+      }
+    );
+    if (done) reload();
   };
 
   return (
@@ -85,8 +81,8 @@ export default function UsersPage() {
           </Button>
         </form>
 
-        {error && <StateNote tone="error">{error}</StateNote>}
-        {actionError && <StateNote tone="error">{actionError}</StateNote>}
+        {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
+        {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
         {loading && <SkeletonRows />}
         {!loading && !error && rows.length === 0 && <StateNote>No users found.</StateNote>}
 

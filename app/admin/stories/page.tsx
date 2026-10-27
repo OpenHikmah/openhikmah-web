@@ -3,9 +3,19 @@
 import { useState } from "react";
 import { Button, Input } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
+import {
+  Table,
+  Th,
+  Td,
+  Pill,
+  StateNote,
+  ConfirmButton,
+  ErrorState,
+} from "@/components/admin/primitives";
 import { SkeletonRows } from "@/components/admin/Skeleton";
-import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
+import { useAdminFetch } from "@/components/admin/AdminContext";
+import { Feedback } from "@/components/admin/Feedback";
+import { useRowAction } from "@/components/admin/useRowAction";
 import { useAsync } from "@/components/admin/useAsync";
 
 interface AdminStory {
@@ -21,8 +31,7 @@ interface AdminStory {
 
 export default function AdminStoriesPage() {
   const api = useAdminFetch();
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [busySlug, setBusySlug] = useState<string | null>(null);
+  const { run: action, busyId: busySlug, message } = useRowAction();
   const [reasonDraft, setReasonDraft] = useState<Record<string, string>>({});
 
   const { data, error, loading, reload } = useAsync<{ stories: AdminStory[] }>(
@@ -31,32 +40,25 @@ export default function AdminStoriesPage() {
   );
 
   const flag = async (slug: string) => {
-    setActionError(null);
-    setBusySlug(slug);
-    try {
-      await api("/stories", {
-        method: "PATCH",
-        json: { slug, hidden: true, reason: reasonDraft[slug]?.trim() || undefined },
-      });
-      reload();
-    } catch (e) {
-      setActionError(e instanceof AdminApiError ? e.message : "Failed to flag story.");
-    } finally {
-      setBusySlug(null);
-    }
+    const done = await action(
+      slug,
+      () =>
+        api("/stories", {
+          method: "PATCH",
+          json: { slug, hidden: true, reason: reasonDraft[slug]?.trim() || undefined },
+        }),
+      { success: "Story hidden from /stories.", failure: "Failed to flag story." }
+    );
+    if (done) reload();
   };
 
   const unflag = async (slug: string) => {
-    setActionError(null);
-    setBusySlug(slug);
-    try {
-      await api("/stories", { method: "PATCH", json: { slug, hidden: false } });
-      reload();
-    } catch (e) {
-      setActionError(e instanceof AdminApiError ? e.message : "Failed to restore story.");
-    } finally {
-      setBusySlug(null);
-    }
+    const done = await action(
+      slug,
+      () => api("/stories", { method: "PATCH", json: { slug, hidden: false } }),
+      { success: "Story restored.", failure: "Failed to restore story." }
+    );
+    if (done) reload();
   };
 
   return (
@@ -66,8 +68,8 @@ export default function AdminStoriesPage() {
         subtitle="Hardcoded prophetic narratives. Flag one to pull it from /stories immediately if something in it is wrong — it stays hidden until you restore it, no redeploy needed."
       />
       <div className="space-y-6 p-7">
-        {error && <StateNote tone="error">{error}</StateNote>}
-        {actionError && <StateNote tone="error">{actionError}</StateNote>}
+        {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
+        {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
         {loading && <SkeletonRows />}
         {data && data.stories.length === 0 && <StateNote>No stories found.</StateNote>}
 

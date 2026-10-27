@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Table, Th, Td, Pill, StateNote, ConfirmButton } from "@/components/admin/primitives";
+import { useEffect } from "react";
+import { Table, Th, Td, Pill, ConfirmButton, ErrorState } from "@/components/admin/primitives";
 import { SkeletonRows } from "@/components/admin/Skeleton";
 import { formatTimestamp } from "@/lib/admin/format";
-import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
+import { useAdminFetch } from "@/components/admin/AdminContext";
+import { Feedback } from "@/components/admin/Feedback";
+import { useRowAction } from "@/components/admin/useRowAction";
 import { useAsync } from "@/components/admin/useAsync";
 
 interface JobStatus {
@@ -35,8 +37,7 @@ const RUN_FROM_COVERAGE = new Set([
 
 export function JobRunner() {
   const api = useAdminFetch();
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const { run: action, busyId, message } = useRowAction();
 
   const { data, error, loading, reload } = useAsync<JobsResponse>(() => api("/jobs"), "admin-jobs");
 
@@ -54,35 +55,26 @@ export function JobRunner() {
   }, [anyRunning, reload]);
 
   const run = async (jobId: JobStatus["id"]) => {
-    setActionError(null);
-    setBusyId(jobId);
-    try {
-      await api("/jobs", { method: "POST", json: { jobId } });
-      reload();
-    } catch (e) {
-      setActionError(e instanceof AdminApiError ? e.message : "Failed to start job.");
-    } finally {
-      setBusyId(null);
-    }
+    const done = await action(jobId, () => api("/jobs", { method: "POST", json: { jobId } }), {
+      success: "Job started.",
+      failure: "Failed to start job.",
+    });
+    if (done) reload();
   };
 
   const stop = async (jobId: JobStatus["id"]) => {
-    setActionError(null);
-    setBusyId(jobId);
-    try {
-      await api("/jobs", { method: "POST", json: { jobId, action: "stop" } });
-      reload();
-    } catch (e) {
-      setActionError(e instanceof AdminApiError ? e.message : "Failed to stop job.");
-    } finally {
-      setBusyId(null);
-    }
+    const done = await action(
+      jobId,
+      () => api("/jobs", { method: "POST", json: { jobId, action: "stop" } }),
+      { success: "Stop requested.", failure: "Failed to stop job." }
+    );
+    if (done) reload();
   };
 
   return (
     <div className="space-y-4">
-      {error && <StateNote tone="error">{error}</StateNote>}
-      {actionError && <StateNote tone="error">{actionError}</StateNote>}
+      {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
+      {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
       {loading && !data && <SkeletonRows n={3} />}
 
       {data && (

@@ -1,7 +1,7 @@
 "use client";
 
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { StatTile, Table, Th, Td, StateNote } from "@/components/admin/primitives";
+import { StatTile, Table, Th, Td, StateNote, ErrorState } from "@/components/admin/primitives";
 import { SectionHeading } from "@/components/admin/SectionHeading";
 import { SkeletonRows } from "@/components/admin/Skeleton";
 import { useAdminFetch } from "@/components/admin/AdminContext";
@@ -27,7 +27,7 @@ function cost(c: number | null): string {
 
 export default function AiPage() {
   const api = useAdminFetch();
-  const { data, error, loading } = useAsync<AiData>(() => api("/ai"), "ai");
+  const { data, error, loading, reload } = useAsync<AiData>(() => api("/ai"), "ai");
 
   const maxTokens = Math.max(1, ...(data?.daily ?? []).map((d) => d.tokens));
 
@@ -39,7 +39,7 @@ export default function AiPage() {
       />
       <div className="space-y-6 p-7">
         {loading && !data && <SkeletonRows n={6} />}
-        {error && <StateNote tone="error">{error}</StateNote>}
+        {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
 
         {data && (
           <>
