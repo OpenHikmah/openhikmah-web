@@ -7,11 +7,8 @@ import {
   type BatchOptions,
   type StoppedReason,
 } from "@/lib/ai/connection-batch";
-import {
-  runConnectionBatchLoop,
-  type LoopOptions,
-  type LoopStoppedReason,
-} from "@/lib/ai/connection-batch-loop";
+import { runConnectionBatchLoop, type LoopOptions } from "@/lib/ai/connection-batch-loop";
+import type { LoopStoppedReason } from "@/lib/ai/key-rotation";
 import type { Provider } from "@/lib/ai/models";
 import { runVerifyBatch, type VerifyOptions } from "@/lib/ai/connection-verify-batch";
 import { runVerifyLoop, type VerifyLoopOptions } from "@/lib/ai/connection-verify-loop";

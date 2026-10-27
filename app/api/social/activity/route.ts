@@ -13,6 +13,7 @@ import {
 import { resolveActivityDate } from "@/lib/social/activity-date";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { rateLimitOrNull, consume, MUTATION_WINDOW_SECONDS } from "@/lib/infra/rate-limit";
+import { jsonError, parseJson } from "@/lib/infra/http";
 
 // Activity pings fire on ordinary reading (each verse/connection), so a genuinely
 // engaged session can log far more than a typical "create a row" mutation —
@@ -75,17 +76,13 @@ export async function POST(req: NextRequest) {
   );
   if (limited) return limited;
 
-  let body: {
+  const body = await parseJson<{
     type?: string;
     verse_ref?: string;
     local_date?: string;
     tz_offset_minutes?: number;
-  };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
-  }
+  }>(req);
+  if (!body) return jsonError("Invalid body", 400);
 
   if (!body.type || !VALID_TYPES.has(body.type)) {
     return NextResponse.json({ error: "Invalid activity type" }, { status: 400 });

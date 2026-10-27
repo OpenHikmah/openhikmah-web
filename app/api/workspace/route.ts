@@ -4,6 +4,7 @@ import { db } from "@/lib/infra/db";
 import { savedWorkspaces } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
 import { rateLimitOrNull } from "@/lib/infra/rate-limit";
+import { jsonError, parseJson } from "@/lib/infra/http";
 
 export async function GET(req: NextRequest) {
   const authed = await requireUser(req);
@@ -41,12 +42,8 @@ export async function POST(req: NextRequest) {
   );
   if (limited) return limited;
 
-  let body: { name?: string; data?: unknown; nodeCount?: number };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
-  }
+  const body = await parseJson<{ name?: string; data?: unknown; nodeCount?: number }>(req);
+  if (!body) return jsonError("Invalid body", 400);
 
   if (!body.data) {
     return NextResponse.json({ error: "Missing data" }, { status: 400 });

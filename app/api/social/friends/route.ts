@@ -4,7 +4,7 @@ import { db } from "@/lib/infra/db";
 import { friendships, users } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
 import { rateLimitOrNull } from "@/lib/infra/rate-limit";
-import { isUniqueViolation, parsePagination } from "@/lib/infra/http";
+import { isUniqueViolation, parsePagination, jsonError, parseJson } from "@/lib/infra/http";
 import { effectiveStreak } from "@/lib/social/streak";
 
 export async function GET(req: NextRequest) {
@@ -90,12 +90,8 @@ export async function POST(req: NextRequest) {
   );
   if (limited) return limited;
 
-  let body: { username?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
-  }
+  const body = await parseJson<{ username?: string }>(req);
+  if (!body) return jsonError("Invalid body", 400);
 
   const targetUsername = body.username?.trim();
   if (!targetUsername) {

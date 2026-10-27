@@ -1,10 +1,15 @@
-import { resetGeminiRateLimitState } from "@/lib/ai/ai";
 import {
   runConnectionBatch,
   type BatchHooks,
   type BatchMode,
   type BatchSummary,
 } from "@/lib/ai/connection-batch";
+import {
+  newRotationSummary,
+  runKeyRotation,
+  type KeyRotationOptions,
+  type KeyRotationSummary,
+} from "@/lib/ai/key-rotation";
 import type { Locale } from "@/lib/i18n/config";
 
 /**
@@ -30,47 +35,15 @@ import type { Locale } from "@/lib/i18n/config";
  * "error" fail-fast path as if the provider itself were down.
  */
 
-export interface LoopOptions {
+export interface LoopOptions extends KeyRotationOptions {
   mode: BatchMode;
-  /** Gemini model id, or undefined for the resolved default. */
-  model?: string;
   locales: Locale[];
-  /** Key VALUES, in rotation order. Non-empty. */
-  apiKeys: string[];
-  /** Parallel labels ("GEMINI_API2") for the job log — never the values. */
-  apiKeyLabels: string[];
-  /** Delay between LLM calls, ms. */
-  callDelayMs: number;
-  /** Optional safety ceilings across the whole loop. `Number.POSITIVE_INFINITY`
-   *  when the admin left the field blank. */
-  maxCalls: number;
-  maxCostUsd: number;
 }
 
-export type LoopStoppedReason =
-  "work-exhausted" | "all-keys-daily" | "call-budget" | "cost-budget" | "cancelled" | "error";
-
-export interface LoopSummary {
-  stoppedReason: LoopStoppedReason;
-  passes: number;
-  keysUsed: number;
-  /** Labels of keys that hit their daily quota this run. */
-  keysExhausted: string[];
-  /** Labels of keys that turned out to be invalid / revoked this run. */
-  keysInvalid: string[];
-  /** Labels of keys rotated away from after a sustained per-minute 429 (issue
-   *  #567 C1) — not necessarily out for the day, just rate-limited right now. */
-  keysRateLimited: string[];
-  cellsProcessed: number;
-  callsUsed: number;
-  costUsd: number;
+export interface LoopSummary extends KeyRotationSummary {
   generated: number;
   translated: number;
   exhausted: number;
-  cellsFailed: number;
-  /** Whole-loop failure message (a non-quota pass error). Drives `job_runs.error`. */
-  error?: string;
-  lastError?: string;
 }
 
 /** Defensive ceiling per key — the productivity guards below should always stop a
@@ -92,37 +65,12 @@ function passWasProductive(pass: BatchSummary): boolean {
   return pass.generated > 0 || pass.translated > 0 || pass.exhausted > 0;
 }
 
-function mergeCounters(agg: LoopSummary, pass: BatchSummary): void {
-  agg.cellsProcessed += pass.cellsProcessed;
-  agg.callsUsed += pass.callsUsed;
-  agg.costUsd += pass.costUsd;
-  agg.generated += pass.generated;
-  agg.translated += pass.translated;
-  agg.exhausted += pass.exhausted;
-  agg.cellsFailed += pass.cellsFailed;
-  if (pass.lastError) agg.lastError = pass.lastError;
-}
-
-export async function runConnectionBatchLoop(
+export function runConnectionBatchLoop(
   opts: LoopOptions,
   hooks: BatchHooks,
   signal: AbortSignal
 ): Promise<LoopSummary> {
-  const agg: LoopSummary = {
-    stoppedReason: "all-keys-daily",
-    passes: 0,
-    keysUsed: 0,
-    keysExhausted: [],
-    keysInvalid: [],
-    keysRateLimited: [],
-    cellsProcessed: 0,
-    callsUsed: 0,
-    costUsd: 0,
-    generated: 0,
-    translated: 0,
-    exhausted: 0,
-    cellsFailed: 0,
-  };
+  const agg: LoopSummary = { ...newRotationSummary(), generated: 0, translated: 0, exhausted: 0 };
 
   const n = opts.apiKeys.length;
   hooks.onProgress(
@@ -133,168 +81,69 @@ export async function runConnectionBatchLoop(
       `maxCost=${Number.isFinite(opts.maxCostUsd) ? `$${opts.maxCostUsd}` : "∞"}`
   );
 
-  for (let k = 0; k < n; k++) {
-    if (signal.aborted) {
-      agg.stoppedReason = "cancelled";
-      return finish(agg, hooks);
-    }
+  let unproductivePasses = 0;
+  let failingPasses = 0;
 
-    const label = opts.apiKeyLabels[k];
-    agg.keysUsed = k + 1;
-    hooks.onProgress(`[loop] key ${k + 1}/${n} (${label}) — starting`);
-    // Per-key: the ambiguous-429 escalation counter in ai.ts is keyed by the key
-    // value, so clear THIS key's before we start (a redeploy or a previous run
-    // could have left a stale count).
-    resetGeminiRateLimitState(opts.apiKeys[k]);
-
-    let unproductivePasses = 0;
-    let failingPasses = 0;
-    let rotate = false;
-
-    for (let p = 0; p < MAX_PASSES_PER_KEY && !rotate; p++) {
-      if (signal.aborted) {
-        agg.stoppedReason = "cancelled";
-        return finish(agg, hooks);
-      }
-      if (agg.callsUsed >= opts.maxCalls) {
-        agg.stoppedReason = "call-budget";
-        return finish(agg, hooks);
-      }
-      if (agg.costUsd >= opts.maxCostUsd) {
-        agg.stoppedReason = "cost-budget";
-        return finish(agg, hooks);
-      }
-
-      const pass = await runConnectionBatch(
-        {
-          mode: opts.mode,
-          provider: "gemini",
-          model: opts.model,
-          locales: opts.locales,
-          maxCalls: opts.maxCalls - agg.callsUsed,
-          maxCostUsd: opts.maxCostUsd - agg.costUsd,
-          apiKey: opts.apiKeys[k],
-          callDelayMs: opts.callDelayMs,
-        },
-        { onProgress: (line) => hooks.onProgress(`  ${line}`) },
-        signal
-      );
-      agg.passes++;
-      mergeCounters(agg, pass);
-
-      switch (pass.stoppedReason) {
-        case "quota-daily":
-          agg.keysExhausted.push(label);
-          hooks.onProgress(
-            `[loop] key ${k + 1}/${n} (${label}) daily quota hit after ${agg.passes} pass(es) — rotating`
+  return runKeyRotation<LoopSummary, BatchSummary>(
+    opts,
+    agg,
+    {
+      prefix: "[loop]",
+      maxPassesPerKey: MAX_PASSES_PER_KEY,
+      runPass: (apiKey, budget, passHooks) =>
+        runConnectionBatch(
+          {
+            mode: opts.mode,
+            provider: "gemini",
+            model: opts.model,
+            locales: opts.locales,
+            maxCalls: budget.maxCalls,
+            maxCostUsd: budget.maxCostUsd,
+            apiKey,
+            callDelayMs: opts.callDelayMs,
+          },
+          passHooks,
+          signal
+        ),
+      mergeCounters: (a, pass) => {
+        a.generated += pass.generated;
+        a.translated += pass.translated;
+        a.exhausted += pass.exhausted;
+      },
+      onKeyStart: () => {
+        unproductivePasses = 0;
+        failingPasses = 0;
+      },
+      onCompleted: (a, pass, label, log) => {
+        if (passWasProductive(pass)) {
+          unproductivePasses = 0;
+          failingPasses = 0;
+          log(
+            `pass ${a.passes} done (gen=${pass.generated} xlt=${pass.translated} ` +
+              `exh=${pass.exhausted} fail=${pass.cellsFailed}) — work remains, continuing on ${label}`
           );
-          rotate = true;
-          break;
-
-        case "key-invalid":
-          // Per-key fault (revoked / invalid key) — rotate, don't stop.
-          agg.keysInvalid.push(label);
-          hooks.onProgress(`[loop] key ${k + 1}/${n} (${label}) invalid/blocked — rotating`);
-          rotate = true;
-          break;
-
-        case "rate-limited":
-          // A sustained per-minute 429 that survived callGemini's own retries
-          // — not necessarily out for the day, but rotate rather than fail
-          // fast as if the provider itself were down (issue #567 C1).
-          agg.keysRateLimited.push(label);
-          hooks.onProgress(`[loop] key ${k + 1}/${n} (${label}) rate-limited — rotating`);
-          rotate = true;
-          break;
-
-        case "cancelled":
-          agg.stoppedReason = "cancelled";
-          return finish(agg, hooks);
-
-        case "call-budget":
-          agg.stoppedReason = "call-budget";
-          return finish(agg, hooks);
-
-        case "cost-budget":
-          agg.stoppedReason = "cost-budget";
-          return finish(agg, hooks);
-
-        case "error":
-          // Non-quota failure — every key would hit the same wall. Stop.
-          agg.stoppedReason = "error";
-          agg.error = pass.error;
-          hooks.onProgress(`[loop] pass failed (${pass.error}) — stopping the loop`);
-          return finish(agg, hooks);
-
-        case "completed": {
-          if (passWasProductive(pass)) {
-            unproductivePasses = 0;
-            failingPasses = 0;
-            hooks.onProgress(
-              `[loop] pass ${agg.passes} done (gen=${pass.generated} xlt=${pass.translated} ` +
-                `exh=${pass.exhausted} fail=${pass.cellsFailed}) — work remains, continuing on ${label}`
-            );
-            break;
-          }
-          // Nothing useful this pass.
-          if (pass.workListSize === 0 || pass.cellsFailed === 0) {
-            if (
-              ++unproductivePasses >= UNPRODUCTIVE_PASSES_BEFORE_DONE ||
-              pass.workListSize === 0
-            ) {
-              agg.stoppedReason = "work-exhausted";
-              hooks.onProgress(`[loop] ${opts.mode} work list fully covered — done`);
-              return finish(agg, hooks);
-            }
-          } else if (++failingPasses >= FAILING_PASSES_BEFORE_ABORT) {
-            agg.stoppedReason = "error";
-            agg.error = `${failingPasses} consecutive passes generated nothing and only failed cells — last error: ${pass.lastError ?? "unknown"}`;
-            hooks.onProgress(`[loop] ${agg.error} — stopping the loop`);
-            return finish(agg, hooks);
-          }
-          hooks.onProgress(
-            `[loop] pass ${agg.passes} made no progress (fail=${pass.cellsFailed}) — retrying on ${label}`
-          );
-          break;
+          return false;
         }
-      }
-    }
-
-    if (!rotate) {
-      // Inner loop hit MAX_PASSES_PER_KEY without converging or rotating — the
-      // productivity guards above should have caught this, so treat it as a bug.
-      agg.stoppedReason = "error";
-      agg.error = `key ${label} ran ${MAX_PASSES_PER_KEY} passes without converging`;
-      hooks.onProgress(`[loop] ${agg.error} — stopping the loop`);
-      return finish(agg, hooks);
-    }
-  }
-
-  // Fell out of the key loop → every key rotated (daily quota, invalid, and/or
-  // rate-limited).
-  if (agg.keysExhausted.length === 0) {
-    // No key ever confirmed a real daily-quota hit — every rotation was
-    // invalid/rate-limited, so labeling this "all-keys-daily" would be wrong.
-    agg.stoppedReason = "error";
-    agg.error = `all ${n} selected key(s) are invalid or rate-limited (none hit a daily quota)`;
-    hooks.onProgress(`[loop] ${agg.error} — stopping the loop`);
-    return finish(agg, hooks);
-  }
-  agg.stoppedReason = "all-keys-daily";
-  hooks.onProgress(
-    `[loop] all ${n} selected key(s) exhausted, invalid, or rate-limited — stopping`
+        // Nothing useful this pass.
+        if (pass.workListSize === 0 || pass.cellsFailed === 0) {
+          if (++unproductivePasses >= UNPRODUCTIVE_PASSES_BEFORE_DONE || pass.workListSize === 0) {
+            a.stoppedReason = "work-exhausted";
+            log(`${opts.mode} work list fully covered — done`);
+            return true;
+          }
+        } else if (++failingPasses >= FAILING_PASSES_BEFORE_ABORT) {
+          a.stoppedReason = "error";
+          a.error = `${failingPasses} consecutive passes generated nothing and only failed cells — last error: ${pass.lastError ?? "unknown"}`;
+          log(`${a.error} — stopping the loop`);
+          return true;
+        }
+        log(`pass ${a.passes} made no progress (fail=${pass.cellsFailed}) — retrying on ${label}`);
+        return false;
+      },
+      describeCounters: (a) =>
+        `gen=${a.generated} xlt=${a.translated} exh=${a.exhausted} fail=${a.cellsFailed}`,
+    },
+    hooks,
+    signal
   );
-  return finish(agg, hooks);
-}
-
-function finish(agg: LoopSummary, hooks: BatchHooks): LoopSummary {
-  hooks.onProgress(
-    `[loop] DONE (${agg.stoppedReason}) | ${agg.passes} pass(es) | ${agg.keysUsed} key(s) | ` +
-      `${agg.callsUsed} calls | $${agg.costUsd.toFixed(2)} | ` +
-      `gen=${agg.generated} xlt=${agg.translated} exh=${agg.exhausted} fail=${agg.cellsFailed}` +
-      (agg.keysExhausted.length ? ` | exhausted: ${agg.keysExhausted.join(", ")}` : "") +
-      (agg.keysInvalid.length ? ` | invalid: ${agg.keysInvalid.join(", ")}` : "") +
-      (agg.keysRateLimited.length ? ` | rate-limited: ${agg.keysRateLimited.join(", ")}` : "")
-  );
-  return agg;
 }

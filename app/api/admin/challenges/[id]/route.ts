@@ -6,6 +6,7 @@ import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { challenges } from "@/lib/infra/db/schema";
 import { scoreBoth, pickWinner } from "@/lib/social/challenges";
+import { jsonError, parseJson } from "@/lib/infra/http";
 
 /**
  * Moderate a single challenge:
@@ -24,12 +25,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  let body: { action?: string; winnerId?: number | null };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
-  }
+  const body = await parseJson<{ action?: string; winnerId?: number | null }>(req);
+  if (!body) return jsonError("Invalid body", 400);
 
   try {
     const [challenge] = await db

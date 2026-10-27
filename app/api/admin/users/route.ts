@@ -5,7 +5,7 @@ import { logAdminAction } from "@/lib/admin/admin-audit";
 import { broadcastUserCacheInvalidation } from "@/lib/auth/social-auth";
 import { db } from "@/lib/infra/db";
 import { users } from "@/lib/infra/db/schema";
-import { parsePagination } from "@/lib/infra/http";
+import { parsePagination, jsonError, parseJson } from "@/lib/infra/http";
 
 /** List users (newest-active first) with optional `?q=` username search. */
 export async function GET(req: NextRequest) {
@@ -53,12 +53,8 @@ export async function PATCH(req: NextRequest) {
   const limited = await rateLimitAdminMutation(auth);
   if (limited) return limited;
 
-  let body: { id?: number; disabled?: boolean };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+  const body = await parseJson<{ id?: number; disabled?: boolean }>(req);
+  if (!body) return jsonError("Invalid request body", 400);
 
   const { id, disabled } = body;
   if (!Number.isInteger(id) || typeof disabled !== "boolean") {

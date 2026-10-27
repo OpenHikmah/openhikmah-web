@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { challenges } from "@/lib/infra/db/schema";
 import { requireUser } from "@/lib/auth/social-auth";
-import { parsePgSerialId } from "@/lib/infra/http";
+import { parsePgSerialId, jsonError, parseJson } from "@/lib/infra/http";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authed = await requireUser(req);
@@ -16,12 +16,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  let body: { action?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
-  }
+  const body = await parseJson<{ action?: string }>(req);
+  if (!body) return jsonError("Invalid body", 400);
 
   const { action } = body;
   if (action !== "accept" && action !== "decline" && action !== "cancel") {

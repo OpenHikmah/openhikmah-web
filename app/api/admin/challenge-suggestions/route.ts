@@ -6,6 +6,7 @@ import { db } from "@/lib/infra/db";
 import { challengeSuggestions } from "@/lib/infra/db/schema";
 import { isDuration } from "@/lib/social/challenges";
 import { isValidRef } from "@/lib/quran/quran-corpus";
+import { jsonError, parseJson } from "@/lib/infra/http";
 
 /** Validates an incoming suggestion payload; returns an error string or null. */
 function validate(body: {
@@ -51,12 +52,8 @@ export async function POST(req: NextRequest) {
   const limited = await rateLimitAdminMutation(auth);
   if (limited) return limited;
 
-  let body: Record<string, unknown>;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
-  }
+  const body = await parseJson<Record<string, unknown>>(req);
+  if (!body) return jsonError("Invalid body", 400);
 
   const err = validate(body);
   if (err) return NextResponse.json({ error: err }, { status: 400 });
@@ -97,12 +94,8 @@ export async function PUT(req: NextRequest) {
   const limited = await rateLimitAdminMutation(auth);
   if (limited) return limited;
 
-  let body: Record<string, unknown>;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
-  }
+  const body = await parseJson<Record<string, unknown>>(req);
+  if (!body) return jsonError("Invalid body", 400);
 
   const id = Number(body.id);
   if (!Number.isInteger(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });

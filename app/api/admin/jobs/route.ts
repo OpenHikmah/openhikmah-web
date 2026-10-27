@@ -9,6 +9,7 @@ import {
   stopJob,
   configuredGeminiKeys,
 } from "@/lib/admin/job-runner";
+import { jsonError, parseJson } from "@/lib/infra/http";
 
 /** Job list + latest run status, plus the embedding-coverage check. */
 export async function GET(req: NextRequest) {
@@ -34,12 +35,12 @@ export async function POST(req: NextRequest) {
   const limited = await rateLimitAdminMutation(auth);
   if (limited) return limited;
 
-  let body: { jobId?: string; params?: Record<string, unknown>; action?: "start" | "stop" };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+  const body = await parseJson<{
+    jobId?: string;
+    params?: Record<string, unknown>;
+    action?: "start" | "stop";
+  }>(req);
+  if (!body) return jsonError("Invalid request body", 400);
 
   const jobId = body.jobId;
   if (!jobId || !JOBS.some((j) => j.id === jobId)) {
