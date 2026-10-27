@@ -51,6 +51,13 @@ export default function ConnectionsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
+  const filtersAreDefault = status === "all" && kind === "all" && reviewed === "pending";
+  const resetFilters = () => {
+    setStatus("all");
+    setKind("all");
+    setReviewed("pending");
+  };
+
   const baseParams = () => {
     const p = new URLSearchParams();
     if (status !== "all") p.set("status", status);
@@ -127,7 +134,20 @@ export default function ConnectionsPage() {
             value={kind}
             onChange={setKind}
           />
+          {!filtersAreDefault && (
+            <Button variant="ghost" size="sm" onClick={resetFilters}>
+              Reset filters
+            </Button>
+          )}
         </div>
+
+        {!loading && !error && rows.length > 0 && (
+          <p className="text-xs text-text-muted" aria-live="polite">
+            {rows.length}
+            {hasMore ? "+" : ""} {rows.length === 1 && !hasMore ? "connection" : "connections"} ·
+            review: {reviewed}, status: {status}, kind: {kind}
+          </p>
+        )}
 
         {error && <StateNote tone="error">{error}</StateNote>}
         {actionError && <StateNote tone="error">{actionError}</StateNote>}

@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Button, Input, Textarea, NativeSelect } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Table, Th, Td, StateNote, ConfirmButton, Panel } from "@/components/admin/primitives";
 import { Field } from "@/components/admin/Field";
 import { Feedback } from "@/components/admin/Feedback";
+import { useActionMessage } from "@/components/admin/useActionMessage";
 import { SectionHeading } from "@/components/admin/SectionHeading";
 import { formatTimestamp } from "@/lib/admin/format";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
@@ -36,6 +37,54 @@ interface FlagsResponse {
   resolvedAi: { default: ResolvedRoute; connections: ResolvedRoute; names: ResolvedRoute };
 }
 
+const NUMBER_SETTINGS = [
+  { key: "ai_gen_limit", label: "AI generation limit (per window)", placeholder: "20" },
+  { key: "ai_gen_window_seconds", label: "AI generation window (seconds)", placeholder: "60" },
+  { key: "mutation_limit", label: "Mutation limit (per window)", placeholder: "60" },
+  { key: "mutation_window_seconds", label: "Mutation window (seconds)", placeholder: "600" },
+] as const;
+
+/** One positive-number setting. Held in local state so Save stays disabled until
+ *  the value differs from what the server has; the parent remounts it (via `key`)
+ *  when a reload brings a new server value. */
+function NumberSetting({
+  label,
+  placeholder,
+  current,
+  busy,
+  onSave,
+}: {
+  label: string;
+  placeholder: string;
+  current: string;
+  busy: boolean;
+  onSave: (raw: string) => void;
+}) {
+  const [draft, setDraft] = useState(current);
+  return (
+    <Field label={label}>
+      <div className="flex gap-2">
+        <Input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          step={1}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={placeholder}
+        />
+        <Button
+          variant="secondary"
+          disabled={busy || draft.trim() === current}
+          onClick={() => onSave(draft)}
+        >
+          Save
+        </Button>
+      </div>
+    </Field>
+  );
+}
+
 /** Purpose-built controls for the settings that runtime code actually reads —
  *  everything else stays in the generic key/value editor below. Each control
  *  writes through the same `PUT /flags` route as the generic editor, so
@@ -50,7 +99,7 @@ function OperationalSettings({
   reload: () => void;
 }) {
   const api = useAdminFetch();
-  const [msg, setMsg] = useState<string | null>(null);
+  const { message, ok, fail, clear } = useActionMessage();
   const [busy, setBusy] = useState(false);
 
   const byKey = new Map(flags.map((f) => [f.key, f.value]));
@@ -70,31 +119,24 @@ function OperationalSettings({
         ? resolvedAi.names
         : resolvedAi.default;
 
-  // Uncontrolled: each number field reads its live DOM value on save and is
-  // reset (via `key`) whenever the flag list is reloaded from the server.
-  const aiGenLimitRef = useRef<HTMLInputElement>(null);
-  const aiGenWindowRef = useRef<HTMLInputElement>(null);
-  const mutationLimitRef = useRef<HTMLInputElement>(null);
-  const mutationWindowRef = useRef<HTMLInputElement>(null);
-
   const setFlag = async (key: string, value: unknown) => {
-    setMsg(null);
+    clear();
     setBusy(true);
     try {
       await api("/flags", { method: "PUT", json: { key, value } });
+      ok(`Saved ${key}.`);
       reload();
     } catch (e) {
-      setMsg(e instanceof AdminApiError ? e.message : "Save failed.");
+      fail(e instanceof AdminApiError ? e.message : "Save failed.");
     } finally {
       setBusy(false);
     }
   };
 
-  const setNumberFlag = (key: string, ref: React.RefObject<HTMLInputElement | null>) => {
-    const raw = ref.current?.value ?? "";
+  const setNumberFlag = (key: string, raw: string) => {
     const n = Number(raw);
     if (!raw.trim() || !Number.isFinite(n) || n <= 0) {
-      setMsg("Value must be a positive number.");
+      fail("Value must be a positive number.");
       return;
     }
     void setFlag(key, n);
@@ -104,10 +146,10 @@ function OperationalSettings({
     <Panel className="space-y-4">
       <SectionHeading title="Operational settings" />
 
-      <div className="space-y-2">
-        <span className="text-xs text-text-secondary">
+      <fieldset className="space-y-2">
+        <legend className="mb-2 text-xs text-text-secondary">
           AI routing (provider &amp; model per feature)
-        </span>
+        </legend>
         <div className="space-y-2 rounded-md border border-border p-3">
           {AI_ROUTES.map((route) => {
             const resolved = routeFor(route.key);
@@ -157,94 +199,44 @@ function OperationalSettings({
           A model that doesn&apos;t belong to the selected provider is ignored at call time and the
           provider default is used instead.
         </p>
-      </div>
+      </fieldset>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <span className="block text-xs text-text-secondary">Maintenance mode</span>
-          <Button
-            variant={maintenanceOn ? "primary" : "secondary"}
-            disabled={busy}
-            onClick={() => setFlag("maintenance_mode", !maintenanceOn)}
-          >
-            {maintenanceOn ? "On — click to disable" : "Off — click to enable"}
-          </Button>
-        </div>
-
-        <Field label="AI generation limit (per window)">
-          <div className="flex gap-2">
-            <Input
-              key={`ai_gen_limit:${numOrEmpty(byKey.get("ai_gen_limit"))}`}
-              ref={aiGenLimitRef}
-              defaultValue={numOrEmpty(byKey.get("ai_gen_limit"))}
-              placeholder="20"
-            />
+        <fieldset className="space-y-1.5">
+          <legend className="mb-1.5 text-xs text-text-secondary">Maintenance mode</legend>
+          {maintenanceOn ? (
             <Button
+              variant="primary"
+              disabled={busy}
+              onClick={() => setFlag("maintenance_mode", false)}
+            >
+              On — click to disable
+            </Button>
+          ) : (
+            <ConfirmButton
               variant="secondary"
               disabled={busy}
-              onClick={() => setNumberFlag("ai_gen_limit", aiGenLimitRef)}
+              onConfirm={() => setFlag("maintenance_mode", true)}
+              confirmLabel="Enable? Users are locked out."
             >
-              Save
-            </Button>
-          </div>
-        </Field>
+              Off — click to enable
+            </ConfirmButton>
+          )}
+        </fieldset>
 
-        <Field label="AI generation window (seconds)">
-          <div className="flex gap-2">
-            <Input
-              key={`ai_gen_window_seconds:${numOrEmpty(byKey.get("ai_gen_window_seconds"))}`}
-              ref={aiGenWindowRef}
-              defaultValue={numOrEmpty(byKey.get("ai_gen_window_seconds"))}
-              placeholder="60"
-            />
-            <Button
-              variant="secondary"
-              disabled={busy}
-              onClick={() => setNumberFlag("ai_gen_window_seconds", aiGenWindowRef)}
-            >
-              Save
-            </Button>
-          </div>
-        </Field>
-
-        <Field label="Mutation limit (per window)">
-          <div className="flex gap-2">
-            <Input
-              key={`mutation_limit:${numOrEmpty(byKey.get("mutation_limit"))}`}
-              ref={mutationLimitRef}
-              defaultValue={numOrEmpty(byKey.get("mutation_limit"))}
-              placeholder="60"
-            />
-            <Button
-              variant="secondary"
-              disabled={busy}
-              onClick={() => setNumberFlag("mutation_limit", mutationLimitRef)}
-            >
-              Save
-            </Button>
-          </div>
-        </Field>
-
-        <Field label="Mutation window (seconds)">
-          <div className="flex gap-2">
-            <Input
-              key={`mutation_window_seconds:${numOrEmpty(byKey.get("mutation_window_seconds"))}`}
-              ref={mutationWindowRef}
-              defaultValue={numOrEmpty(byKey.get("mutation_window_seconds"))}
-              placeholder="600"
-            />
-            <Button
-              variant="secondary"
-              disabled={busy}
-              onClick={() => setNumberFlag("mutation_window_seconds", mutationWindowRef)}
-            >
-              Save
-            </Button>
-          </div>
-        </Field>
+        {NUMBER_SETTINGS.map(({ key, label, placeholder }) => (
+          <NumberSetting
+            key={`${key}:${numOrEmpty(byKey.get(key))}`}
+            label={label}
+            placeholder={placeholder}
+            current={numOrEmpty(byKey.get(key))}
+            busy={busy}
+            onSave={(raw) => setNumberFlag(key, raw)}
+          />
+        ))}
       </div>
 
-      {msg && <Feedback tone="error">{msg}</Feedback>}
+      {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
     </Panel>
   );
 }
@@ -259,27 +251,30 @@ export default function FlagsPage() {
 
   const [key, setKey] = useState("");
   const [value, setValue] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
+  const { message, ok, fail, clear } = useActionMessage();
   const [saving, setSaving] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const draftDirty = key.trim() !== "" || value.trim() !== "";
 
   const save = async () => {
-    setMsg(null);
+    clear();
     let parsed: unknown;
     try {
       parsed = JSON.parse(value);
     } catch {
-      setMsg('Value must be valid JSON (e.g. true, 42, "text", {"a":1}).');
+      fail('Value must be valid JSON (e.g. true, 42, "text", {"a":1}).');
       return;
     }
     setSaving(true);
     try {
-      await api("/flags", { method: "PUT", json: { key: key.trim(), value: parsed } });
+      const name = key.trim();
+      await api("/flags", { method: "PUT", json: { key: name, value: parsed } });
+      ok(`Saved ${name}.`);
       setKey("");
       setValue("");
       reload();
     } catch (e) {
-      setMsg(e instanceof AdminApiError ? e.message : "Save failed.");
+      fail(e instanceof AdminApiError ? e.message : "Save failed.");
     } finally {
       setSaving(false);
     }
@@ -288,17 +283,24 @@ export default function FlagsPage() {
   const edit = (f: Flag) => {
     setKey(f.key);
     setValue(JSON.stringify(f.value));
-    setMsg(null);
+    clear();
+  };
+
+  const clearDraft = () => {
+    setKey("");
+    setValue("");
+    clear();
   };
 
   const remove = async (k: string) => {
-    setMsg(null);
+    clear();
     setBusyKey(k);
     try {
       await api(`/flags?key=${encodeURIComponent(k)}`, { method: "DELETE" });
+      ok(`Deleted ${k}.`);
       reload();
     } catch (e) {
-      setMsg(e instanceof AdminApiError ? e.message : "Delete failed.");
+      fail(e instanceof AdminApiError ? e.message : "Delete failed.");
     } finally {
       setBusyKey(null);
     }
@@ -342,7 +344,12 @@ export default function FlagsPage() {
             >
               Save flag
             </Button>
-            {msg && <Feedback tone="error">{msg}</Feedback>}
+            {draftDirty && (
+              <Button variant="ghost" onClick={clearDraft}>
+                Clear
+              </Button>
+            )}
+            {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
           </div>
         </Panel>
 
@@ -372,14 +379,25 @@ export default function FlagsPage() {
                   </Td>
                   <Td>
                     <div className="flex justify-end gap-1.5">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={busyKey === f.key}
-                        onClick={() => edit(f)}
-                      >
-                        Edit
-                      </Button>
+                      {draftDirty && key !== f.key ? (
+                        <ConfirmButton
+                          variant="secondary"
+                          disabled={busyKey === f.key}
+                          onConfirm={() => edit(f)}
+                          confirmLabel="Replace draft?"
+                        >
+                          Edit
+                        </ConfirmButton>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={busyKey === f.key}
+                          onClick={() => edit(f)}
+                        >
+                          Edit
+                        </Button>
+                      )}
                       <ConfirmButton
                         disabled={busyKey === f.key}
                         onConfirm={() => remove(f.key)}

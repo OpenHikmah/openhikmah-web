@@ -83,3 +83,42 @@ describe("ConnectionsPage — confidence column", () => {
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
   });
 });
+
+describe("ConnectionsPage — filter summary", () => {
+  beforeEach(() => {
+    mockApi.mockReset();
+  });
+
+  it("shows how many connections are loaded and the active filters", async () => {
+    mockApi.mockResolvedValue({
+      connections: [{ ...baseConnection, confidence: 80 }],
+      hasMore: true,
+    });
+
+    render(<ConnectionsPage />);
+
+    expect(
+      await screen.findByText(/1\+ connections · review: pending, status: all, kind: all/)
+    ).toBeInTheDocument();
+  });
+
+  it("offers Reset filters only once a filter has moved off its default, and restores them", async () => {
+    mockApi.mockResolvedValue({
+      connections: [{ ...baseConnection, confidence: 80 }],
+      hasMore: false,
+    });
+
+    render(<ConnectionsPage />);
+    await screen.findByText("2:255 → 24:35");
+    expect(screen.queryByRole("button", { name: "Reset filters" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retired" }));
+    const reset = await screen.findByRole("button", { name: "Reset filters" });
+
+    fireEvent.click(reset);
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Reset filters" })).not.toBeInTheDocument()
+    );
+    expect(await screen.findByText(/review: pending, status: all, kind: all/)).toBeInTheDocument();
+  });
+});
