@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { parseSavedCanvas } from "@/lib/canvas/saved-canvas";
-import type { SavedCanvas } from "@/store/canvas";
+import type { SavedCanvas } from "@/lib/canvas/saved-canvas";
 import type { Verse } from "@/types/quran";
 
 const verse = (ref: Verse["ref"] = "2:255"): Verse => ({

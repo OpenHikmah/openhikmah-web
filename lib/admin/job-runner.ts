@@ -12,7 +12,7 @@ import {
   type LoopOptions,
   type LoopStoppedReason,
 } from "@/lib/ai/connection-batch-loop";
-import type { Provider } from "@/lib/ai/ai";
+import type { Provider } from "@/lib/ai/models";
 import { runVerifyBatch, type VerifyOptions } from "@/lib/ai/connection-verify-batch";
 import { runVerifyLoop, type VerifyLoopOptions } from "@/lib/ai/connection-verify-loop";
 import { runTranslationVerifyBatch, TRANSLATIONS_VARIANT } from "@/lib/ai/translation-verify-batch";

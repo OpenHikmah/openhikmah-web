@@ -10,7 +10,7 @@ import { Card } from "@/components/ui";
 import { VerseOfDayCard } from "@/components/today/VerseOfDayCard";
 import { CANVAS_STORAGE_KEY } from "@/hooks/useCanvasPersistence";
 import type { Verse } from "@/types/quran";
-import type { SavedCanvas } from "@/store/canvas";
+import type { SavedCanvas } from "@/lib/canvas/saved-canvas";
 import { authFetch } from "@/lib/auth/auth-fetch";
 
 /** A compact destination row: icon, title, supporting count, and a hover arrow. */

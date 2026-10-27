@@ -20,7 +20,7 @@
  *   BACKFILL_MODEL        optional model id (must match BACKFILL_PROVIDER)
  */
 import { runConnectionBatch, type BatchMode } from "@/lib/ai/connection-batch";
-import type { Provider } from "@/lib/ai/ai";
+import type { Provider } from "@/lib/ai/models";
 import { SELECTABLE_MODELS, isModelForProvider } from "@/lib/ai/models";
 import { LOCALES, type Locale } from "@/lib/i18n/config";
 

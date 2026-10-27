@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { nameContent, nameVerseReasons, type NameContentKind } from "@/lib/infra/db/schema";
-import { resolveModel, resolveProvider, type Provider } from "@/lib/ai/ai";
+import { resolveModel, resolveProvider } from "@/lib/ai/ai";
+import type { Provider } from "@/lib/ai/models";
 import { incr } from "@/lib/infra/metrics";
 import type { Locale } from "@/lib/i18n/config";
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { toSharePayload } from "@/lib/canvas/share-payload";
-import type { SavedCanvas } from "@/store/canvas";
+import type { SavedCanvas } from "@/lib/canvas/saved-canvas";
 
 const verse = {
   surah: 2,

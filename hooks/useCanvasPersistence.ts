@@ -2,8 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import type { Node, Edge } from "@xyflow/react";
-import { useCanvasStore, serializeCanvas, type SavedCanvas } from "@/store/canvas";
-import { parseSavedCanvas } from "@/lib/canvas/saved-canvas";
+import { useCanvasStore, serializeCanvas } from "@/store/canvas";
+import { parseSavedCanvas, type SavedCanvas } from "@/lib/canvas/saved-canvas";
 import { toSharePayload } from "@/lib/canvas/share-payload";
 
 /** localStorage key for the in-progress canvas. Exported so the home screen can

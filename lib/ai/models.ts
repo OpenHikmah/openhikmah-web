@@ -1,4 +1,4 @@
-import type { Provider } from "@/lib/ai/ai";
+export type Provider = "claude" | "gemini";
 
 /**
  * The model ids an admin may pick per provider (the `/admin/flags` dropdowns and

@@ -13,31 +13,9 @@ import {
   PLACEHOLDER_HEIGHT,
   type LayoutBox,
 } from "@/lib/canvas/canvas-layout";
-import { parseSavedCanvas } from "@/lib/canvas/saved-canvas";
+import { parseSavedCanvas, type SavedCanvas } from "@/lib/canvas/saved-canvas";
 
 // ─── Persistence helpers ───────────────────────────────────────────────────────
-
-export interface SavedNode {
-  id: string;
-  x: number;
-  y: number;
-  verse: Verse;
-}
-
-export interface SavedEdge {
-  id: string;
-  source: string;
-  target: string;
-  kind: EdgeKind;
-  label: string;
-  reason: string;
-}
-
-export interface SavedCanvas {
-  v: 1;
-  nodes: SavedNode[];
-  edges: SavedEdge[];
-}
 
 export const PLACEHOLDER_NODE_TYPE = "placeholder";
 
