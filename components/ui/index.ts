@@ -9,3 +9,4 @@ export { NativeSelect } from "./NativeSelect";
 export { Switch, type SwitchProps } from "./Switch";
 export { ReflectionNote } from "./ReflectionNote";
 export { Pagination, type PaginationProps } from "./Pagination";
+export { Checkbox } from "./Checkbox";

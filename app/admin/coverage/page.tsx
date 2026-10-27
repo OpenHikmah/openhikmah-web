@@ -10,7 +10,7 @@ export default function CoveragePage() {
         title="Coverage"
         subtitle="Which verses have no connection yet, per language — and run the backfill job to fill them."
       />
-      <div className="p-7">
+      <div className="p-4 sm:p-7">
         <CoverageReport />
       </div>
     </>

@@ -67,7 +67,7 @@ export default function UsersPage() {
   return (
     <>
       <AdminPageHeader title="Users" subtitle="View activity and moderate accounts." />
-      <div className="space-y-6 p-7">
+      <div className="space-y-6 p-4 sm:p-7">
         <form
           className="flex max-w-sm gap-2"
           onSubmit={(e) => {
@@ -79,6 +79,7 @@ export default function UsersPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search username…"
+            aria-label="Search username"
           />
           <Button type="submit" variant="secondary">
             Search

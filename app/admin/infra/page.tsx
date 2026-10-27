@@ -69,7 +69,7 @@ export default function InfraPage() {
           <RefreshButton onClick={() => reload({ keepDataOnError: true })} loading={loading} />
         }
       />
-      <div className="space-y-6 p-7">
+      <div className="space-y-6 p-4 sm:p-7">
         {error && <StateNote tone="error">{error}</StateNote>}
         {loading && !data && <SkeletonRows n={4} />}
 
