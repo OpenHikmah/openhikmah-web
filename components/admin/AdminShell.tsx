@@ -241,6 +241,19 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
+  // The drawer is `sm:hidden`, so crossing into the desktop layout would hide it
+  // while it stays mounted and keeps the body scroll locked. Close it instead.
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const desktop = window.matchMedia?.("(min-width: 640px)");
+    if (!desktop) return;
+    const onChange = (e: MediaQueryListEvent) => {
+      if (e.matches) setMobileNavOpen(false);
+    };
+    desktop.addEventListener("change", onChange);
+    return () => desktop.removeEventListener("change", onChange);
+  }, [mobileNavOpen]);
+
   return (
     <div className="flex min-h-dvh flex-col bg-bg text-text-primary sm:flex-row">
       <div className="sticky top-0 z-40 flex items-center gap-2 border-b border-border bg-surface px-3 py-2.5 sm:hidden">

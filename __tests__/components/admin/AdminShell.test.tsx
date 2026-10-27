@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/admin" }));
@@ -68,7 +68,7 @@ describe("AdminShell — navigation structure", () => {
     for (const heading of ["Insight", "Content", "People", "Operations"]) {
       expect(nav).toHaveTextContent(heading);
     }
-    expect(nav.querySelectorAll("a")).toHaveLength(15);
+    expect(within(nav).getAllByRole("link")).toHaveLength(15);
   });
 
   it("marks only the current module with aria-current", () => {
@@ -109,5 +109,31 @@ describe("AdminPageHeader", () => {
   it("renders its actions", () => {
     render(<AdminPageHeader title="Users" actions={<button>Refresh</button>} />);
     expect(screen.getByRole("button", { name: "Refresh" })).toBeInTheDocument();
+  });
+});
+
+describe("AdminShell — drawer across the sm breakpoint", () => {
+  it("closes the drawer and releases the scroll lock when the layout becomes desktop", () => {
+    let listener: ((e: MediaQueryListEvent) => void) | undefined;
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: (_: string, cb: (e: MediaQueryListEvent) => void) => (listener = cb),
+      removeEventListener: () => (listener = undefined),
+    })) as unknown as typeof window.matchMedia;
+
+    try {
+      renderShell();
+      fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
+      expect(document.body.style.overflow).toBe("hidden");
+
+      act(() => listener?.({ matches: true } as MediaQueryListEvent));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(document.body.style.overflow).not.toBe("hidden");
+    } finally {
+      window.matchMedia = original;
+    }
   });
 });
