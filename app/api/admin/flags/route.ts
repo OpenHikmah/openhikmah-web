@@ -6,7 +6,7 @@ import { db } from "@/lib/infra/db";
 import { featureFlags } from "@/lib/infra/db/schema";
 import { invalidateFlagCache, validateFlagType } from "@/lib/admin/feature-flags";
 import { resolveProvider, resolveModel, type AiFeature } from "@/lib/ai/ai";
-import { safeParse } from "@/lib/infra/http";
+import { safeParse, jsonError, parseJson } from "@/lib/infra/http";
 
 async function resolveRoute(feature: AiFeature | undefined) {
   const provider = await resolveProvider(feature);
@@ -52,12 +52,8 @@ export async function PUT(req: NextRequest) {
   const limited = await rateLimitAdminMutation(auth);
   if (limited) return limited;
 
-  let body: { key?: string; value?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+  const body = await parseJson<{ key?: string; value?: unknown }>(req);
+  if (!body) return jsonError("Invalid request body", 400);
 
   const key = body.key?.trim();
   if (!key || !KEY_RE.test(key)) {

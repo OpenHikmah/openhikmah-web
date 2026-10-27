@@ -7,6 +7,7 @@ import { curatedVotd } from "@/lib/infra/db/schema";
 import { isValidRef } from "@/lib/quran/quran-corpus";
 import { resolveVerse } from "@/lib/quran/verse-resolver";
 import { getCuratedVerseOfDayEntry, verseOfDayRef, votdDateKey } from "@/lib/quran/verse-of-day";
+import { jsonError, parseJson } from "@/lib/infra/http";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -116,12 +117,10 @@ export async function PUT(req: NextRequest) {
   const limited = await rateLimitAdminMutation(auth);
   if (limited) return limited;
 
-  let body: { date?: string; verseRef?: string; reflection?: string | null };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+  const body = await parseJson<{ date?: string; verseRef?: string; reflection?: string | null }>(
+    req
+  );
+  if (!body) return jsonError("Invalid request body", 400);
 
   const { date, verseRef } = body;
   // Guard the runtime type — a client could send a non-string reflection.

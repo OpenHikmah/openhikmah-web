@@ -5,6 +5,7 @@ import { logAdminAction } from "@/lib/admin/admin-audit";
 import { db } from "@/lib/infra/db";
 import { promptVersions } from "@/lib/infra/db/schema";
 import { invalidatePromptCache, type PromptKey } from "@/lib/ai/prompt-registry";
+import { jsonError, parseJson } from "@/lib/infra/http";
 
 /**
  * Roll back to a prior prompt version: `{ id }`. Reactivates that row and
@@ -17,12 +18,8 @@ export async function POST(req: NextRequest) {
   const limited = await rateLimitAdminMutation(auth);
   if (limited) return limited;
 
-  let body: { id?: number };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+  const body = await parseJson<{ id?: number }>(req);
+  if (!body) return jsonError("Invalid request body", 400);
 
   if (!Number.isInteger(body.id)) {
     return NextResponse.json({ error: "Invalid version id" }, { status: 400 });

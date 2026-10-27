@@ -3,6 +3,7 @@ import { requireAdmin, rateLimitAdminMutation } from "@/lib/admin/admin-auth";
 import { logAdminAction } from "@/lib/admin/admin-audit";
 import { STORIES, getStoryBySlug } from "@/lib/stories";
 import { getAllFlags, flagStory, unflagStory } from "@/lib/stories/story-flags";
+import { jsonError, parseJson } from "@/lib/infra/http";
 
 /** List every story (static catalog) merged with its flag row, if any. */
 export async function GET(req: NextRequest) {
@@ -45,12 +46,8 @@ export async function PATCH(req: NextRequest) {
   const limited = await rateLimitAdminMutation(auth);
   if (limited) return limited;
 
-  let body: { slug?: string; hidden?: boolean; reason?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+  const body = await parseJson<{ slug?: string; hidden?: boolean; reason?: string }>(req);
+  if (!body) return jsonError("Invalid request body", 400);
   if (typeof body !== "object" || body === null || Array.isArray(body)) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
