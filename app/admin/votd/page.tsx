@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, Input, Textarea, ReflectionNote } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
+import { SkeletonRows } from "@/components/admin/Skeleton";
 import { StateNote, ConfirmButton } from "@/components/admin/primitives";
 import { Field } from "@/components/admin/Field";
 import { Feedback } from "@/components/admin/Feedback";
@@ -190,7 +191,7 @@ export default function VotdPage() {
         title="Verse of the Day"
         subtitle="Curate the daily verse. A set day overrides the algorithmic pick."
       />
-      <div className="grid gap-6 p-7 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid gap-6 p-4 sm:p-7 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-medium text-text-primary">{monthLabel(month)}</h2>
@@ -293,7 +294,7 @@ export default function VotdPage() {
               </div>
             ))}
           </div>
-          {loading && <StateNote>Loading…</StateNote>}
+          {loading && !data && <SkeletonRows n={4} />}
         </div>
 
         <DayEditor

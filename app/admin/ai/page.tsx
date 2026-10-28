@@ -3,7 +3,7 @@
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { StatTile, Table, Th, Td, StateNote } from "@/components/admin/primitives";
 import { SectionHeading } from "@/components/admin/SectionHeading";
-import { SkeletonRows } from "@/components/admin/Skeleton";
+import { SkeletonTiles } from "@/components/admin/Skeleton";
 import { useAdminFetch } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
 
@@ -37,8 +37,8 @@ export default function AiPage() {
         title="AI & Cost"
         subtitle="Generation volume and token spend. One row per cache miss — the bill flattens as the graph fills."
       />
-      <div className="space-y-6 p-7">
-        {loading && !data && <SkeletonRows n={6} />}
+      <div className="space-y-6 p-4 sm:p-7">
+        {loading && !data && <SkeletonTiles n={6} />}
         {error && <StateNote tone="error">{error}</StateNote>}
 
         {data && (

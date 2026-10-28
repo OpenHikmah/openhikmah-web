@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button, Input, Textarea, NativeSelect } from "@/components/ui";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
+import { SkeletonRows } from "@/components/admin/Skeleton";
 import { Table, Th, Td, StateNote, ConfirmButton, Panel } from "@/components/admin/primitives";
 import { Field } from "@/components/admin/Field";
 import { Feedback } from "@/components/admin/Feedback";
@@ -312,7 +313,7 @@ export default function FlagsPage() {
         title="Feature Flags"
         subtitle="Runtime config read by subsystems. A missing key falls back to its code default."
       />
-      <div className="space-y-6 p-7">
+      <div className="space-y-6 p-4 sm:p-7">
         {data && (
           <OperationalSettings flags={data.flags} resolvedAi={data.resolvedAi} reload={reload} />
         )}
@@ -354,7 +355,7 @@ export default function FlagsPage() {
         </Panel>
 
         {error && <StateNote tone="error">{error}</StateNote>}
-        {loading && <StateNote>Loading…</StateNote>}
+        {loading && !data && <SkeletonRows n={4} />}
         {data && data.flags.length === 0 && <StateNote>No flags set.</StateNote>}
 
         {data && data.flags.length > 0 && (

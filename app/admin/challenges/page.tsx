@@ -25,7 +25,7 @@ export default function AdminChallengesPage() {
           <AdminToggle options={SECTIONS} value={section} onChange={setSection} label="Section" />
         }
       />
-      <div className="p-7">
+      <div className="p-4 sm:p-7">
         {section === "moderation" ? <ChallengesModeration /> : <ChallengeSuggestionsManager />}
       </div>
     </>

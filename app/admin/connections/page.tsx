@@ -114,7 +114,7 @@ export default function ConnectionsPage() {
         title="Connections"
         subtitle="Moderate AI-generated edges. Flag suspect links or retire them from the graph."
       />
-      <div className="space-y-6 p-7">
+      <div className="space-y-6 p-4 sm:p-7">
         <div className="flex flex-wrap items-center gap-4">
           <AdminToggle
             label="Review"

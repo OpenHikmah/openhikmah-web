@@ -10,7 +10,7 @@ export default function JobsPage() {
         title="Jobs"
         subtitle="Trigger and monitor the corpus seed, morphology seed, and embedding backfills."
       />
-      <div className="p-7">
+      <div className="p-4 sm:p-7">
         <JobRunner />
       </div>
     </>
