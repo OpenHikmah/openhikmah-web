@@ -14,7 +14,7 @@ import {
 } from "@/components/admin/primitives";
 import { SkeletonRows } from "@/components/admin/Skeleton";
 import { useAdminFetch } from "@/components/admin/AdminContext";
-import { Feedback } from "@/components/admin/Feedback";
+import { ActionFeedback } from "@/components/admin/Feedback";
 import { useRowAction } from "@/components/admin/useRowAction";
 import { useAsync } from "@/components/admin/useAsync";
 
@@ -69,7 +69,7 @@ export default function AdminStoriesPage() {
       />
       <div className="space-y-6 p-4 sm:p-7">
         {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
-        {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
+        <ActionFeedback message={message} />
         {loading && <SkeletonRows />}
         {data && data.stories.length === 0 && <StateNote>No stories found.</StateNote>}
 

@@ -8,7 +8,7 @@ import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { SkeletonRows } from "@/components/admin/Skeleton";
 import { ConfirmButton, ErrorState } from "@/components/admin/primitives";
 import { Field } from "@/components/admin/Field";
-import { Feedback } from "@/components/admin/Feedback";
+import { ActionFeedback } from "@/components/admin/Feedback";
 import { useActionMessage } from "@/components/admin/useActionMessage";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
@@ -86,7 +86,16 @@ function addDays(date: string, delta: number): string {
 export default function VotdPage() {
   const api = useAdminFetch();
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelectedRaw] = useState<string | null>(null);
+  // Lives here, not in the keyed DayEditor: a save's reload re-keys the editor,
+  // and the status region + its "Saved." must survive that remount.
+  const feedback = useActionMessage();
+  const { message, clear: clearMsg } = feedback;
+
+  const setSelected = (date: string | null) => {
+    setSelectedRaw(date);
+    clearMsg();
+  };
 
   // Changing month clears the selection so the editor can't act on a day from a
   // different month than the one being viewed.
@@ -297,15 +306,19 @@ export default function VotdPage() {
           {loading && !data && <SkeletonRows n={4} />}
         </div>
 
-        <DayEditor
-          // Re-key on the entry's content too, so the editor re-initialises when an
-          // async reload changes the curated entry for the same selected day.
-          key={`${selected ?? "none"}:${selected ? (byDate.get(selected)?.updatedAt ?? "new") : ""}`}
-          date={selected}
-          existing={selected ? (byDate.get(selected) ?? null) : null}
-          todayRef={data?.today?.date === selected ? (data.today.ref ?? null) : null}
-          onSaved={reload}
-        />
+        <div className="space-y-2">
+          <DayEditor
+            // Re-key on the entry's content too, so the editor re-initialises when an
+            // async reload changes the curated entry for the same selected day.
+            key={`${selected ?? "none"}:${selected ? (byDate.get(selected)?.updatedAt ?? "new") : ""}`}
+            date={selected}
+            existing={selected ? (byDate.get(selected) ?? null) : null}
+            todayRef={data?.today?.date === selected ? (data.today.ref ?? null) : null}
+            onSaved={reload}
+            feedback={feedback}
+          />
+          <ActionFeedback message={message} />
+        </div>
       </div>
     </>
   );
@@ -316,6 +329,7 @@ function DayEditor({
   existing,
   todayRef,
   onSaved,
+  feedback: { ok, fail, clear: clearMsg },
 }: {
   date: string | null;
   existing: Entry | null;
@@ -324,6 +338,7 @@ function DayEditor({
    *  showing and either keep it (save as-is) or overwrite it. */
   todayRef?: string | null;
   onSaved: () => void;
+  feedback: Pick<ReturnType<typeof useActionMessage>, "ok" | "fail" | "clear">;
 }) {
   const api = useAdminFetch();
   const [verseRef, setVerseRef] = useState(existing?.verseRef ?? todayRef ?? "");
@@ -331,7 +346,6 @@ function DayEditor({
   const [preview, setPreview] = useState<Verse | null>(null);
   const [busy, setBusy] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
-  const { message, ok, fail, clear: clearMsg } = useActionMessage();
   // `todayRef` arrives from an async fetch (useAsync) that can resolve after
   // this component has already mounted with it still null/undefined — sync
   // the field once it lands, but only while the admin hasn't started typing,
@@ -463,8 +477,6 @@ function DayEditor({
           </ConfirmButton>
         )}
       </div>
-
-      {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
     </div>
   );
 }

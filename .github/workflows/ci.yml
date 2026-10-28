@@ -377,17 +377,17 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
-          timeout_minutes: 4
+          timeout_minutes: 5
           max_attempts: 3
-          command: timeout -k 15 180 bunx playwright install --with-deps chromium
+          command: bash .github/scripts/playwright-install.sh install --with-deps chromium
 
       - name: Install Playwright system dependencies only
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
-          timeout_minutes: 4
+          timeout_minutes: 5
           max_attempts: 3
-          command: timeout -k 15 180 bunx playwright install-deps chromium
+          command: bash .github/scripts/playwright-install.sh install-deps chromium
 
       - name: E2E tests
         run: bun run test:e2e
