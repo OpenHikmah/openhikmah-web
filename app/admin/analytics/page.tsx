@@ -1,7 +1,7 @@
 "use client";
 
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { StatTile, Table, Th, Td, StateNote } from "@/components/admin/primitives";
+import { StatTile, Table, Th, Td, StateNote, ErrorState } from "@/components/admin/primitives";
 import { SectionHeading } from "@/components/admin/SectionHeading";
 import { useAdminFetch } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
@@ -40,7 +40,7 @@ export default function AnalyticsPage() {
         }
       />
       <div className="space-y-6 p-4 sm:p-7">
-        {error && <StateNote tone="error">{error}</StateNote>}
+        {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
         {loading && !data && <SkeletonRows n={5} />}
 
         {data && (

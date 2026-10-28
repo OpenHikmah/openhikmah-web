@@ -10,6 +10,7 @@ import {
   StateNote,
   ConfirmButton,
   Panel,
+  ErrorState,
 } from "@/components/admin/primitives";
 import { Field } from "@/components/admin/Field";
 import { Feedback } from "@/components/admin/Feedback";
@@ -207,7 +208,7 @@ export function ChallengeSuggestionsManager() {
         </div>
       </Panel>
 
-      {error && <StateNote tone="error">{error}</StateNote>}
+      {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
       {loading && !data && <SkeletonRows />}
       {data && data.suggestions.length === 0 && <StateNote>No suggestions yet.</StateNote>}
 

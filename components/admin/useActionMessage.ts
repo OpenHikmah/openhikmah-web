@@ -12,6 +12,8 @@ export interface ActionMessage {
  * The standard feedback slot for an imperative admin handler (save / clear /
  * run). Keeps the tone attached to the text so the render can't accidentally
  * show a failure in the success colour. Render `message` through `<Feedback>`.
+ * `Feedback` is itself a live region (status / alert), so the result is
+ * announced once, by the element that shows it.
  */
 export function useActionMessage() {
   const [message, setMessage] = useState<ActionMessage | null>(null);

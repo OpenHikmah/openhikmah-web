@@ -1,7 +1,7 @@
 "use client";
 
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { StatTile, StateNote, Pill } from "@/components/admin/primitives";
+import { StatTile, ErrorState, Pill } from "@/components/admin/primitives";
 import { SkeletonTiles } from "@/components/admin/Skeleton";
 import { useAdminFetch } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
@@ -16,14 +16,14 @@ interface Overview {
 
 export default function OverviewPage() {
   const api = useAdminFetch();
-  const { data, error, loading } = useAsync<Overview>(() => api("/overview"), "overview");
+  const { data, error, loading, reload } = useAsync<Overview>(() => api("/overview"), "overview");
 
   return (
     <>
       <AdminPageHeader title="Overview" subtitle="A snapshot of the project right now." />
       <div className="p-4 sm:p-7">
         {loading && !data && <SkeletonTiles n={5} />}
-        {error && <StateNote tone="error">{error}</StateNote>}
+        {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
         {data && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             <StatTile

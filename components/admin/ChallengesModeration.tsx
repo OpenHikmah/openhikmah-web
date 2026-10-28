@@ -10,6 +10,7 @@ import {
   ConfirmButton,
   StatTile,
   LoadMore,
+  ErrorState,
 } from "@/components/admin/primitives";
 import { AdminToggle } from "@/components/admin/AdminToggle";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
@@ -166,7 +167,7 @@ export function ChallengesModeration() {
       </div>
 
       {finalizeMsg && <StateNote>{finalizeMsg}</StateNote>}
-      {error && <StateNote tone="error">{error}</StateNote>}
+      {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
       {actionError && <StateNote tone="error">{actionError}</StateNote>}
       {loading && <SkeletonRows />}
       {!loading && !error && rows.length === 0 && <StateNote>No challenges match.</StateNote>}

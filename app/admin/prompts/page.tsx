@@ -11,11 +11,14 @@ import {
   StateNote,
   ConfirmButton,
   Panel,
+  ErrorState,
 } from "@/components/admin/primitives";
 import { AdminToggle } from "@/components/admin/AdminToggle";
 import { SkeletonRows } from "@/components/admin/Skeleton";
 import { formatTimestamp } from "@/lib/admin/format";
-import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
+import { useAdminFetch } from "@/components/admin/AdminContext";
+import { Feedback } from "@/components/admin/Feedback";
+import { useRowAction } from "@/components/admin/useRowAction";
 import { useAsync } from "@/components/admin/useAsync";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
 
@@ -34,9 +37,8 @@ export default function PromptsPage() {
   const api = useAdminFetch();
   const [key, setKey] = useState<(typeof PROMPT_KEYS)[number]>(PROMPT_KEYS[0]);
   const [draft, setDraft] = useState("");
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const { run: action, busyId, message } = useRowAction<number | "create">();
+  const saving = busyId === "create";
 
   const { data, error, loading, reload } = useAsync<{ versions: PromptVersionRow[] }>(
     () => api(`/prompts?key=${encodeURIComponent(key)}`),
@@ -47,16 +49,17 @@ export default function PromptsPage() {
 
   const createVersion = async () => {
     if (!draft.trim()) return;
-    setActionError(null);
-    setSaving(true);
-    try {
-      await api("/prompts", { method: "POST", json: { key, template: draft } });
+    const done = await action(
+      "create",
+      () => api("/prompts", { method: "POST", json: { key, template: draft } }),
+      {
+        success: "New prompt version created and activated.",
+        failure: "Failed to save prompt version.",
+      }
+    );
+    if (done) {
       setDraft("");
       reload();
-    } catch (e) {
-      setActionError(e instanceof AdminApiError ? e.message : "Failed to save prompt version.");
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -67,16 +70,12 @@ export default function PromptsPage() {
   const { armed: createArmed, trigger: triggerCreate } = useArmedConfirm(createVersion);
 
   const rollback = async (id: number) => {
-    setActionError(null);
-    setBusyId(id);
-    try {
-      await api("/prompts/rollback", { method: "POST", json: { id } });
-      reload();
-    } catch (e) {
-      setActionError(e instanceof AdminApiError ? e.message : "Failed to roll back.");
-    } finally {
-      setBusyId(null);
-    }
+    const done = await action(
+      id,
+      () => api("/prompts/rollback", { method: "POST", json: { id } }),
+      { success: "Rolled back to the selected version.", failure: "Failed to roll back." }
+    );
+    if (done) reload();
   };
 
   return (
@@ -99,8 +98,8 @@ export default function PromptsPage() {
           onChange={setKey}
         />
 
-        {error && <StateNote tone="error">{error}</StateNote>}
-        {actionError && <StateNote tone="error">{actionError}</StateNote>}
+        {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
+        {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
 
         <Panel className="space-y-2">
           <div className="flex items-center justify-between">
@@ -127,7 +126,7 @@ export default function PromptsPage() {
             <Button
               size="sm"
               variant={createArmed ? "danger" : "primary"}
-              disabled={saving || !draft.trim()}
+              disabled={busyId !== null || !draft.trim()}
               onClick={triggerCreate}
             >
               {saving ? "Saving…" : createArmed ? "Create & activate?" : "Create & activate"}
@@ -173,7 +172,7 @@ export default function PromptsPage() {
                       {!v.active && (
                         <ConfirmButton
                           variant="secondary"
-                          disabled={busyId === v.id}
+                          disabled={busyId !== null}
                           onConfirm={() => rollback(v.id)}
                           confirmLabel="Roll back?"
                         >

@@ -1,7 +1,7 @@
 "use client";
 
 import { AdminPageHeader } from "@/components/admin/AdminShell";
-import { Table, Th, Td, StateNote, LoadMore } from "@/components/admin/primitives";
+import { Table, Th, Td, StateNote, ErrorState, LoadMore } from "@/components/admin/primitives";
 import { SkeletonRows } from "@/components/admin/Skeleton";
 import { useAdminFetch } from "@/components/admin/AdminContext";
 import { usePaginated } from "@/components/admin/usePaginated";
@@ -19,7 +19,7 @@ interface Entry {
 
 export default function AuditPage() {
   const api = useAdminFetch();
-  const { rows, hasMore, error, loading, loadingMore, loadMoreError, loadMore } =
+  const { rows, hasMore, error, loading, loadingMore, loadMoreError, reload, loadMore } =
     usePaginated<Entry>(async ({ offset }) => {
       const d = await api<{ entries: Entry[]; hasMore: boolean }>(
         `/audit${offset ? `?offset=${offset}` : ""}`
@@ -31,7 +31,7 @@ export default function AuditPage() {
     <>
       <AdminPageHeader title="Audit Log" subtitle="Every mutating admin action, newest first." />
       <div className="space-y-6 p-4 sm:p-7">
-        {error && <StateNote tone="error">{error}</StateNote>}
+        {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
         {loading && <SkeletonRows />}
         {!loading && !error && rows.length === 0 && (
           <StateNote>No admin actions recorded yet.</StateNote>

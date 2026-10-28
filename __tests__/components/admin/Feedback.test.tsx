@@ -9,6 +9,7 @@ describe("Feedback", () => {
     const el = screen.getByText("Save failed.");
     expect(el).toHaveClass("text-error");
     expect(el).toHaveAttribute("aria-live", "assertive");
+    expect(el).toHaveAttribute("role", "alert");
   });
 
   it("renders a success in the teal colour, politely", () => {
@@ -16,6 +17,7 @@ describe("Feedback", () => {
     const el = screen.getByText("Saved.");
     expect(el).toHaveClass("text-teal");
     expect(el).toHaveAttribute("aria-live", "polite");
+    expect(el).toHaveAttribute("role", "status");
   });
 });
 

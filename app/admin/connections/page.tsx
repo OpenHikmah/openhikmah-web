@@ -11,14 +11,16 @@ import {
   StateNote,
   ConfirmButton,
   LoadMore,
+  ErrorState,
 } from "@/components/admin/primitives";
 import { AdminToggle } from "@/components/admin/AdminToggle";
 import { formatTimestamp } from "@/lib/admin/format";
-import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
+import { useAdminFetch } from "@/components/admin/AdminContext";
+import { Feedback } from "@/components/admin/Feedback";
+import { useRowAction } from "@/components/admin/useRowAction";
 import { usePaginated } from "@/components/admin/usePaginated";
 import { ExpandableText } from "@/components/admin/ExpandableText";
 import { SkeletonRows } from "@/components/admin/Skeleton";
-import { useAdminAnnounce } from "@/components/admin/AdminLiveRegion";
 import { cn } from "@/lib/utils";
 
 interface Connection {
@@ -44,12 +46,10 @@ function toOptions<T extends string>(values: readonly T[]): { value: T; label: s
 
 export default function ConnectionsPage() {
   const api = useAdminFetch();
-  const announce = useAdminAnnounce();
   const [status, setStatus] = useState<(typeof STATUS_FILTERS)[number]>("all");
   const [kind, setKind] = useState<(typeof KIND_FILTERS)[number]>("all");
   const [reviewed, setReviewed] = useState<(typeof REVIEWED_FILTERS)[number]>("pending");
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const { run: action, busyId, message } = useRowAction<number>();
 
   const filtersAreDefault = status === "all" && kind === "all" && reviewed === "pending";
   const resetFilters = () => {
@@ -76,37 +76,23 @@ export default function ConnectionsPage() {
       return { rows: d.connections, hasMore: d.hasMore };
     }, `connections:${status}:${kind}:${reviewed}`);
 
-  const setStatusOf = async (id: number, next: Connection["status"]) => {
-    setActionError(null);
-    setBusyId(id);
-    try {
-      await api("/connections", { method: "PATCH", json: { id, status: next } });
-      announce(`Connection ${id} set to ${next}.`);
-      reload();
-    } catch (e) {
-      const msg = e instanceof AdminApiError ? e.message : "Failed to update connection.";
-      setActionError(msg);
-      announce(msg);
-    } finally {
-      setBusyId(null);
-    }
+  const patch = async (id: number, json: Record<string, unknown>, success: string) => {
+    const done = await action(
+      id,
+      () => api("/connections", { method: "PATCH", json: { id, ...json } }),
+      {
+        success,
+        failure: "Failed to update connection.",
+      }
+    );
+    if (done) reload();
   };
 
-  const markReviewed = async (id: number) => {
-    setActionError(null);
-    setBusyId(id);
-    try {
-      await api("/connections", { method: "PATCH", json: { id, reviewed: true } });
-      announce(`Connection ${id} marked reviewed.`);
-      reload();
-    } catch (e) {
-      const msg = e instanceof AdminApiError ? e.message : "Failed to update connection.";
-      setActionError(msg);
-      announce(msg);
-    } finally {
-      setBusyId(null);
-    }
-  };
+  const setStatusOf = (id: number, next: Connection["status"]) =>
+    patch(id, { status: next }, `Connection ${id} set to ${next}.`);
+
+  const markReviewed = (id: number) =>
+    patch(id, { reviewed: true }, `Connection ${id} marked reviewed.`);
 
   return (
     <>
@@ -149,8 +135,8 @@ export default function ConnectionsPage() {
           </p>
         )}
 
-        {error && <StateNote tone="error">{error}</StateNote>}
-        {actionError && <StateNote tone="error">{actionError}</StateNote>}
+        {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
+        {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
         {loading && <SkeletonRows />}
         {!loading && !error && rows.length === 0 && <StateNote>No connections match.</StateNote>}
 

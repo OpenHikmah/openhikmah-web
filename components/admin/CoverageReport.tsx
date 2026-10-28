@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import { NativeSelect } from "@/components/ui";
-import { Table, Th, Td, Pill, StatTile, StateNote } from "@/components/admin/primitives";
+import {
+  Table,
+  Th,
+  Td,
+  Pill,
+  StatTile,
+  StateNote,
+  ErrorState,
+} from "@/components/admin/primitives";
 import { AdminToggle } from "@/components/admin/AdminToggle";
 import { SectionHeading } from "@/components/admin/SectionHeading";
 import { useAdminFetch } from "@/components/admin/AdminContext";
@@ -50,7 +58,7 @@ export function CoverageReport() {
       <AdminToggle options={TABS} value={tab} onChange={setTab} label="View" />
 
       <div hidden={tab !== "report"} className="space-y-6">
-        {error && <StateNote tone="error">{error}</StateNote>}
+        {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
         {loading && !data && <SkeletonRows n={8} />}
 
         {data && (

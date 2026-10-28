@@ -87,3 +87,38 @@ describe("PromptsPage — Create & activate requires confirmation", () => {
     );
   });
 });
+
+describe("PromptsPage — one write at a time", () => {
+  beforeEach(() => {
+    mockApi.mockReset();
+  });
+
+  it("keeps rollback and the slot locked while a create is still in flight", async () => {
+    let finishCreate!: () => void;
+    mockApi.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === "/prompts" && opts?.method === "POST")
+        return new Promise((res) => (finishCreate = () => res({})));
+      return Promise.resolve({
+        versions: [
+          { id: 1, key: "connection.legacy", version: 1, template: "old", active: false },
+          { id: 2, key: "connection.legacy", version: 2, template: "cur", active: true },
+        ],
+      });
+    });
+
+    render(<PromptsPage />);
+    const textarea = await screen.findByPlaceholderText(/Reference: {{fromRef}}/);
+    fireEvent.change(textarea, { target: { value: "New body" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create & activate" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Create & activate?" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled());
+    const rollbacks = screen.getAllByRole("button", { name: "Roll back to this" });
+    expect(rollbacks.length).toBeGreaterThan(0);
+    for (const rollback of rollbacks) expect(rollback).toBeDisabled();
+    expect(textarea).toBeDisabled();
+
+    finishCreate();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Saving…" })).toBeNull());
+  });
+});

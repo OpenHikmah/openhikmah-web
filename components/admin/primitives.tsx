@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button, type ButtonProps } from "@/components/ui";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
 import { InfoHint } from "./InfoHint";
+import { useAdminAnnounce } from "./AdminLiveRegion";
 
 /** A compact dashboard stat: a label, a large gold value, and optional hint. An
  *  `info` string adds a hover "i" explanation in the top-right corner. */
@@ -138,6 +140,10 @@ export function ConfirmButton({
   // `variant` is the resting look; the button always turns `danger` once armed,
   // so a non-destructive default (e.g. a "Create & activate" primary) works too.
   const { armed, trigger } = useArmedConfirm(onConfirm);
+  const announce = useAdminAnnounce();
+  useEffect(() => {
+    if (armed) announce(`${confirmLabel} Press again to confirm, Escape to cancel.`);
+  }, [armed, confirmLabel, announce]);
 
   return (
     <Button variant={armed ? "danger" : variant} size={size} onClick={trigger} {...props}>
@@ -168,6 +174,29 @@ export function LoadMore({
         {loading ? "Loading…" : "Load more"}
       </Button>
       {error && <StateNote tone="error">Couldn&apos;t load more.</StateNote>}
+    </div>
+  );
+}
+
+/**
+ * A failed load: the message plus a Retry button, so an error is never a dead
+ * end. For the result of an imperative action use `Feedback` instead.
+ */
+export function ErrorState({
+  children,
+  onRetry,
+}: {
+  children: React.ReactNode;
+  onRetry?: () => void;
+}) {
+  return (
+    <div role="alert" className="flex flex-col items-center gap-3 px-1 py-8 text-center">
+      <p className="text-sm text-error">{children}</p>
+      {onRetry && (
+        <Button variant="secondary" size="sm" onClick={onRetry}>
+          Retry
+        </Button>
+      )}
     </div>
   );
 }

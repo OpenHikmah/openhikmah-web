@@ -11,6 +11,7 @@ import {
   StateNote,
   ConfirmButton,
   Panel,
+  ErrorState,
 } from "@/components/admin/primitives";
 import { InfoHint } from "@/components/admin/InfoHint";
 import { SectionHeading } from "@/components/admin/SectionHeading";
@@ -70,7 +71,7 @@ export default function InfraPage() {
         }
       />
       <div className="space-y-6 p-4 sm:p-7">
-        {error && <StateNote tone="error">{error}</StateNote>}
+        {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
         {loading && !data && <SkeletonRows n={4} />}
 
         {data && (
