@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 import { Table, Th, Td, Pill, ConfirmButton, ErrorState } from "@/components/admin/primitives";
 import { SkeletonRows } from "@/components/admin/Skeleton";
@@ -125,12 +126,12 @@ export function JobRunner() {
                     )}
                     {RUN_FROM_COVERAGE.has(job.id) ? (
                       job.status !== "running" && (
-                        <a
+                        <Link
                           href="/admin/coverage"
                           className="text-xs text-text-muted underline hover:text-text-secondary"
                         >
                           Run from Coverage →
-                        </a>
+                        </Link>
                       )
                     ) : (
                       <ConfirmButton

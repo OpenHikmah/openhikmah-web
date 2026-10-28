@@ -100,3 +100,101 @@ describe("FlagsPage — AI routing grid", () => {
     expect(within(defaultModel).queryByText("claude-opus-4-7")).toBeNull();
   });
 });
+
+describe("FlagsPage — operational settings", () => {
+  beforeEach(() => {
+    mockApi.mockReset();
+  });
+
+  function load(rows: Record<string, unknown>) {
+    mockApi.mockImplementation((_path: string, opts?: { method?: string }) =>
+      opts?.method === "PUT" ? Promise.resolve({}) : Promise.resolve(response(rows))
+    );
+    render(<FlagsPage />);
+  }
+
+  it("keeps a number setting's Save disabled until the value changes, then saves a positive number", async () => {
+    load({ ai_gen_limit: 20 });
+
+    const input = await screen.findByLabelText("AI generation limit (per window)");
+    const save = within(input.closest("label")!).getByRole("button", { name: "Save" });
+    expect(save).toBeDisabled();
+
+    fireEvent.change(input, { target: { value: "45" } });
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+
+    await waitFor(() =>
+      expect(mockApi).toHaveBeenCalledWith(
+        "/flags",
+        expect.objectContaining({ method: "PUT", json: { key: "ai_gen_limit", value: 45 } })
+      )
+    );
+    expect(await screen.findByText("Saved ai_gen_limit.")).toBeInTheDocument();
+  });
+
+  it("rejects a non-positive number without calling the API", async () => {
+    load({ ai_gen_limit: 20 });
+
+    const input = await screen.findByLabelText("AI generation limit (per window)");
+    fireEvent.change(input, { target: { value: "0" } });
+    fireEvent.click(within(input.closest("label")!).getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Value must be a positive number.")).toBeInTheDocument();
+    expect(mockApi).not.toHaveBeenCalledWith("/flags", expect.objectContaining({ method: "PUT" }));
+  });
+
+  it("needs a second click to switch maintenance mode on", async () => {
+    load({});
+
+    const enable = await screen.findByRole("button", { name: "Off — click to enable" });
+    fireEvent.click(enable);
+    expect(mockApi).not.toHaveBeenCalledWith("/flags", expect.objectContaining({ method: "PUT" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Enable? Users are locked out." }));
+    await waitFor(() =>
+      expect(mockApi).toHaveBeenCalledWith(
+        "/flags",
+        expect.objectContaining({
+          method: "PUT",
+          json: { key: "maintenance_mode", value: true },
+        })
+      )
+    );
+  });
+
+  it("switches maintenance mode off in one click", async () => {
+    load({ maintenance_mode: true });
+
+    fireEvent.click(await screen.findByRole("button", { name: "On — click to disable" }));
+    await waitFor(() =>
+      expect(mockApi).toHaveBeenCalledWith(
+        "/flags",
+        expect.objectContaining({
+          method: "PUT",
+          json: { key: "maintenance_mode", value: false },
+        })
+      )
+    );
+  });
+
+  it("asks before an Edit overwrites a draft, and Clear empties it", async () => {
+    load({ some_flag: 1, other_flag: 2 });
+
+    const keyInput = await screen.findByPlaceholderText("rate_limit.window_s");
+    const editButtons = await screen.findAllByRole("button", { name: "Edit" });
+    fireEvent.click(editButtons[0]);
+    expect((keyInput as HTMLInputElement).value).not.toBe("");
+    const firstKey = (keyInput as HTMLInputElement).value;
+
+    // Draft now holds the first row; editing the other row must confirm.
+    const other = screen.getAllByRole("button", { name: "Edit" })[1];
+    fireEvent.click(other);
+    const confirm = screen.getByRole("button", { name: "Replace draft?" });
+    fireEvent.click(confirm);
+    expect((keyInput as HTMLInputElement).value).not.toBe(firstKey);
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect((keyInput as HTMLInputElement).value).toBe("");
+  });
+});

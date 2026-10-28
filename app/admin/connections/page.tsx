@@ -51,6 +51,13 @@ export default function ConnectionsPage() {
   const [reviewed, setReviewed] = useState<(typeof REVIEWED_FILTERS)[number]>("pending");
   const { run: action, busyId, message } = useRowAction<number>();
 
+  const filtersAreDefault = status === "all" && kind === "all" && reviewed === "pending";
+  const resetFilters = () => {
+    setStatus("all");
+    setKind("all");
+    setReviewed("pending");
+  };
+
   const baseParams = () => {
     const p = new URLSearchParams();
     if (status !== "all") p.set("status", status);
@@ -93,7 +100,7 @@ export default function ConnectionsPage() {
         title="Connections"
         subtitle="Moderate AI-generated edges. Flag suspect links or retire them from the graph."
       />
-      <div className="space-y-6 p-7">
+      <div className="space-y-6 p-4 sm:p-7">
         <div className="flex flex-wrap items-center gap-4">
           <AdminToggle
             label="Review"
@@ -113,7 +120,20 @@ export default function ConnectionsPage() {
             value={kind}
             onChange={setKind}
           />
+          {!filtersAreDefault && (
+            <Button variant="ghost" size="sm" onClick={resetFilters}>
+              Reset filters
+            </Button>
+          )}
         </div>
+
+        {!loading && !error && rows.length > 0 && (
+          <p className="text-xs text-text-muted" aria-live="polite">
+            {rows.length}
+            {hasMore ? "+" : ""} {rows.length === 1 && !hasMore ? "connection" : "connections"} ·
+            review: {reviewed}, status: {status}, kind: {kind}
+          </p>
+        )}
 
         {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
         {message && <Feedback tone={message.tone}>{message.text}</Feedback>}

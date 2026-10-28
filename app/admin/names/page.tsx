@@ -88,7 +88,7 @@ export default function NamesPage() {
         title="Names Content"
         subtitle="Cached AI content per Divine Name. Edit the payload or invalidate to regenerate."
       />
-      <div className="space-y-6 p-7">
+      <div className="space-y-6 p-4 sm:p-7">
         {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
         {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
         {loading && <SkeletonRows />}

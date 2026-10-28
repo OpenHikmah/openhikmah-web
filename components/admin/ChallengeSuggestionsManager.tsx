@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Input, Textarea, NativeSelect } from "@/components/ui";
+import { Button, Checkbox, Input, Textarea, NativeSelect } from "@/components/ui";
 import {
   Table,
   Th,
@@ -188,8 +188,7 @@ export function ChallengeSuggestionsManager() {
             />
           </Field>
           <label className="flex items-center gap-2 pb-2.5 text-sm text-text-secondary">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={form.isActive}
               onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
             />

@@ -312,8 +312,10 @@ function OverrideButton({
 
   return (
     <button
+      type="button"
       disabled={disabled}
       onClick={trigger}
+      aria-label={armed ? `Confirm: ${label}` : undefined}
       className={cn(
         "rounded px-1 text-[11px] transition-colors disabled:opacity-50",
         armed ? "text-error" : "text-text-secondary hover:text-gold"

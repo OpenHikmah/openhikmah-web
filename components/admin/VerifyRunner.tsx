@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Input, NativeSelect } from "@/components/ui";
+import { Checkbox, Input, NativeSelect } from "@/components/ui";
 import { StateNote, ConfirmButton, Panel } from "@/components/admin/primitives";
 import { Field } from "@/components/admin/Field";
 import { SectionHeading } from "@/components/admin/SectionHeading";
@@ -453,8 +453,7 @@ export function VerifyRunner({
 
       <div className="mt-4 border-t border-border pt-3">
         <label className="flex items-start gap-2 text-xs">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={loop}
             className="mt-0.5"
             onChange={(e) => toggleLoop(e.target.checked)}
@@ -492,8 +491,7 @@ export function VerifyRunner({
               <div className="flex flex-wrap gap-3">
                 {geminiKeys.map((k) => (
                   <label key={k} className="flex items-center gap-1">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={selectedKeys[k] ?? false}
                       onChange={(e) => setSelectedKeys((s) => ({ ...s, [k]: e.target.checked }))}
                     />

@@ -21,7 +21,7 @@ export default function OverviewPage() {
   return (
     <>
       <AdminPageHeader title="Overview" subtitle="A snapshot of the project right now." />
-      <div className="p-7">
+      <div className="p-4 sm:p-7">
         {loading && !data && <SkeletonTiles n={5} />}
         {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
         {data && (
@@ -67,16 +67,6 @@ export default function OverviewPage() {
             />
           </div>
         )}
-
-        {/* Tiny deploy-config reminder (always visible). */}
-        <p className="mt-8 border-t border-border-subtle pt-3 text-[11px] leading-relaxed text-text-muted">
-          Deploy note: set <code className="text-text-secondary">ADMIN_QF_IDS</code> in the env (see{" "}
-          <code className="text-text-secondary">.env.example</code>) — without it the panel is
-          locked to everyone. Optional{" "}
-          <code className="text-text-secondary">AI_USD_PER_1K_TOKENS</code> enables the cost
-          estimate. Migration <code className="text-text-secondary">0010</code> runs via{" "}
-          <code className="text-text-secondary">scripts/migrate.mjs</code> on deploy.
-        </p>
       </div>
     </>
   );

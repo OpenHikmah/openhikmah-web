@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { FocusScope } from "@radix-ui/react-focus-scope";
@@ -34,29 +33,57 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-// The console's modules, in the order they appear in the sidebar. Keep the
-// highest-frequency operator tasks near the top.
-const NAV: NavItem[] = [
-  { href: "/admin", label: "Overview", icon: LayoutDashboard },
-  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/admin/votd", label: "Verse of the Day", icon: CalendarDays },
-  { href: "/admin/connections", label: "Connections", icon: Network },
-  { href: "/admin/coverage", label: "Coverage", icon: ListChecks },
-  { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/challenges", label: "Challenges", icon: Swords },
-  { href: "/admin/ai", label: "AI & Cost", icon: Coins },
-  { href: "/admin/prompts", label: "Prompts", icon: MessageSquareText },
-  { href: "/admin/flags", label: "Feature Flags", icon: Flag },
-  { href: "/admin/names", label: "Names Content", icon: BookOpen },
-  { href: "/admin/stories", label: "Stories", icon: BookMarked },
-  { href: "/admin/infra", label: "Infra", icon: Server },
-  { href: "/admin/jobs", label: "Jobs", icon: PlayCircle },
-  { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
+// The console's modules, grouped by the kind of work. Within a group the
+// highest-frequency operator tasks come first.
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: "Insight",
+    items: [
+      { href: "/admin", label: "Overview", icon: LayoutDashboard },
+      { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+      { href: "/admin/coverage", label: "Coverage", icon: ListChecks },
+      { href: "/admin/ai", label: "AI & Cost", icon: Coins },
+    ],
+  },
+  {
+    label: "Content",
+    items: [
+      { href: "/admin/votd", label: "Verse of the Day", icon: CalendarDays },
+      { href: "/admin/connections", label: "Connections", icon: Network },
+      { href: "/admin/names", label: "Names Content", icon: BookOpen },
+      { href: "/admin/stories", label: "Stories", icon: BookMarked },
+      { href: "/admin/prompts", label: "Prompts", icon: MessageSquareText },
+    ],
+  },
+  {
+    label: "People",
+    items: [
+      { href: "/admin/users", label: "Users", icon: Users },
+      { href: "/admin/challenges", label: "Challenges", icon: Swords },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { href: "/admin/flags", label: "Feature Flags", icon: Flag },
+      { href: "/admin/jobs", label: "Jobs", icon: PlayCircle },
+      { href: "/admin/infra", label: "Infra", icon: Server },
+      { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
+    ],
+  },
 ];
+
+const NAV = NAV_GROUPS.flatMap((g) => g.items);
+
+const DRAWER_ID = "admin-mobile-nav";
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/admin") return pathname === "/admin";
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function currentTitle(pathname: string): string {
+  return NAV.find((n) => isActive(pathname, n.href))?.label ?? "Admin";
 }
 
 /** The module list + operator identity footer, shared by the persistent desktop
@@ -81,27 +108,34 @@ function SidebarContent({
         </span>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-0.5 px-2.5">
-        {NAV.map(({ href, label, icon: Icon }) => {
-          const active = isActive(pathname, href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onNavigate}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-[color,background-color] duration-[120ms]",
-                active
-                  ? "bg-gold/10 font-medium text-gold"
-                  : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" strokeWidth={active ? 2.25 : 1.75} />
-              {label}
-            </Link>
-          );
-        })}
+      <nav aria-label="Admin" className="flex flex-1 flex-col gap-4 px-2.5 pb-3">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label} className="flex flex-col gap-0.5">
+            <p className="px-3 pb-1 font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+              {group.label}
+            </p>
+            {group.items.map(({ href, label, icon: Icon }) => {
+              const active = isActive(pathname, href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={onNavigate}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-[color,background-color] duration-[120ms]",
+                    active
+                      ? "bg-gold/10 font-medium text-gold"
+                      : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" strokeWidth={active ? 2.25 : 1.75} />
+                  {label}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       <div className="border-t border-border px-5 py-3.5">
@@ -149,6 +183,14 @@ function MobileSidebarDrawer({
   }, [onClose, triggerRef]);
 
   useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
@@ -164,7 +206,11 @@ function MobileSidebarDrawer({
       <FocusScope asChild trapped loop>
         <div
           ref={drawerRef}
-          className="flex h-full w-64 max-w-[80vw] flex-col border-r border-border bg-surface"
+          id={DRAWER_ID}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Admin navigation"
+          className="flex h-full w-64 max-w-[80vw] flex-col overflow-y-auto border-r border-border bg-surface"
         >
           <div className="flex items-center justify-end px-2.5 pt-2.5">
             <button
@@ -195,15 +241,29 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
+  // The drawer is `sm:hidden`, so crossing into the desktop layout would hide it
+  // while it stays mounted and keeps the body scroll locked. Close it instead.
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const desktop = window.matchMedia?.("(min-width: 640px)");
+    if (!desktop) return;
+    const onChange = (e: MediaQueryListEvent) => {
+      if (e.matches) setMobileNavOpen(false);
+    };
+    desktop.addEventListener("change", onChange);
+    return () => desktop.removeEventListener("change", onChange);
+  }, [mobileNavOpen]);
+
   return (
     <div className="flex min-h-dvh flex-col bg-bg text-text-primary sm:flex-row">
-      <div className="flex items-center gap-2 border-b border-border bg-surface px-3 py-2.5 sm:hidden">
+      <div className="sticky top-0 z-40 flex items-center gap-2 border-b border-border bg-surface px-3 py-2.5 sm:hidden">
         <button
           ref={menuButtonRef}
           type="button"
           onClick={() => setMobileNavOpen((v) => !v)}
           aria-label="Open menu"
           aria-expanded={mobileNavOpen}
+          aria-controls={DRAWER_ID}
           className="rounded-md p-1.5 text-text-secondary hover:bg-white/5 hover:text-text-primary"
         >
           <Menu className="h-5 w-5" />
@@ -211,8 +271,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         <span lang="ar" dir="rtl" className="font-arabic text-base text-gold">
           حكمة
         </span>
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-text-muted">
-          admin
+        <span className="truncate text-sm font-medium text-text-primary">
+          {currentTitle(pathname)}
         </span>
       </div>
 
@@ -225,28 +285,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-surface sm:flex">
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface sm:flex">
         <SidebarContent pathname={pathname} username={username} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
-    </div>
-  );
-}
-
-/** The Open Hikmah letterhead — logo + name in Amiri serif, "Hikmah" in gold.
- *  Right-aligned in every admin page header. */
-function AdminBrand() {
-  return (
-    <div className="flex shrink-0 items-center gap-2.5">
-      <Image src="/logo-mark.png" alt="" width={20} height={20} className="size-5" />
-      <span
-        lang="ar"
-        dir="rtl"
-        className="font-arabic text-[19px] leading-none tracking-wide text-text-primary"
-      >
-        Open <span className="text-gold">Hikmah</span>
-      </span>
     </div>
   );
 }
@@ -264,24 +307,25 @@ export function AdminPageHeader({
   subtitle?: string;
   actions?: React.ReactNode;
 }) {
+  useEffect(() => {
+    document.title = `${title} — Admin — Open Hikmah`;
+  }, [title]);
+
   return (
     <>
-      {/* Single branded header: page title (with a gold tick) + subtitle on the
-          left, the Open Hikmah letterhead on the right. */}
-      <header className="flex items-start justify-between gap-4 px-7 pb-4 pt-5">
+      <header className="px-4 pb-4 pt-5 sm:px-7">
         <div className="min-w-0">
           <h1 className="relative pl-3 text-xl font-semibold text-text-primary before:absolute before:bottom-1 before:left-0 before:top-1 before:w-[3px] before:rounded-full before:bg-gold before:content-['']">
             {title}
           </h1>
           {subtitle && <p className="mt-1 pl-3 text-sm text-text-secondary">{subtitle}</p>}
         </div>
-        <AdminBrand />
       </header>
       {/* Gold accent rule, fading to the right. */}
       <div className="h-px bg-gradient-to-r from-gold/70 to-transparent" />
       {actions && (
-        <div className="border-b border-border px-7 py-3">
-          <div className="flex items-center gap-2">{actions}</div>
+        <div className="border-b border-border px-4 py-3 sm:px-7">
+          <div className="flex flex-wrap items-center gap-2">{actions}</div>
         </div>
       )}
     </>

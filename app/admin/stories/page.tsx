@@ -67,7 +67,7 @@ export default function AdminStoriesPage() {
         title="Stories"
         subtitle="Hardcoded prophetic narratives. Flag one to pull it from /stories immediately if something in it is wrong — it stays hidden until you restore it, no redeploy needed."
       />
-      <div className="space-y-6 p-7">
+      <div className="space-y-6 p-4 sm:p-7">
         {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
         {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
         {loading && <SkeletonRows />}

@@ -30,7 +30,7 @@ export default function AuditPage() {
   return (
     <>
       <AdminPageHeader title="Audit Log" subtitle="Every mutating admin action, newest first." />
-      <div className="space-y-6 p-7">
+      <div className="space-y-6 p-4 sm:p-7">
         {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
         {loading && <SkeletonRows />}
         {!loading && !error && rows.length === 0 && (

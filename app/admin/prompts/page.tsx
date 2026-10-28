@@ -84,7 +84,7 @@ export default function PromptsPage() {
         title="Prompts"
         subtitle="Versioned templates for the AI connection generator. No active version means the hardcoded fallback is used."
       />
-      <div className="space-y-6 p-7">
+      <div className="space-y-6 p-4 sm:p-7">
         {/* Locked during the armed window — otherwise a confirmed create could
             activate the draft in a slot the user never confirmed for. */}
         <AdminToggle
