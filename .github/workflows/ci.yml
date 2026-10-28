@@ -379,7 +379,7 @@ jobs:
         with:
           timeout_minutes: 4
           max_attempts: 3
-          command: timeout -k 15 180 bunx playwright install --with-deps chromium
+          command: bash .github/scripts/playwright-install.sh install --with-deps chromium
 
       - name: Install Playwright system dependencies only
         if: steps.playwright-cache.outputs.cache-hit == 'true'
@@ -387,7 +387,7 @@ jobs:
         with:
           timeout_minutes: 4
           max_attempts: 3
-          command: timeout -k 15 180 bunx playwright install-deps chromium
+          command: bash .github/scripts/playwright-install.sh install-deps chromium
 
       - name: E2E tests
         run: bun run test:e2e

@@ -8,7 +8,7 @@ import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { SkeletonRows } from "@/components/admin/Skeleton";
 import { ConfirmButton, ErrorState } from "@/components/admin/primitives";
 import { Field } from "@/components/admin/Field";
-import { Feedback } from "@/components/admin/Feedback";
+import { ActionFeedback } from "@/components/admin/Feedback";
 import { useActionMessage } from "@/components/admin/useActionMessage";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
@@ -464,7 +464,7 @@ function DayEditor({
         )}
       </div>
 
-      {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
+      <ActionFeedback message={message} />
     </div>
   );
 }
