@@ -75,7 +75,7 @@ export default function MentionsPage() {
 
   return (
     <AuthShell>
-      <div className="mx-auto w-full max-w-2xl">
+      <div className="mx-auto px-4 py-8 w-full max-w-2xl">
         <div className="mb-8 flex items-center gap-3">
           <AtSign className="h-5 w-5 text-gold" />
           <h1 className="text-lg font-semibold text-text-primary">{t("pageTitle")}</h1>
