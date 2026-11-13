@@ -41,6 +41,13 @@ export function isValidReciter(reciter: string): boolean {
   return RECITER_BITRATES.has(reciter);
 }
 
+/** `Mishary_Alafasy_002_255.mp3` — credits the reciter and sorts by surah/ayah. */
+export function audioDownloadFilename(surah: number, ayah: number, reciter: string): string {
+  const label = RECITERS.find((r) => r.id === reciter)?.label ?? reciter;
+  const slug = label.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  return `${slug}_${String(surah).padStart(3, "0")}_${String(ayah).padStart(3, "0")}.mp3`;
+}
+
 export function getAudioUrl(
   surah: number,
   ayah: number,

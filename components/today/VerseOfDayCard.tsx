@@ -10,6 +10,7 @@ import { Card, IconButton, Tooltip, ReflectionNote, buttonVariants } from "@/com
 import { useAudioStore } from "@/store/audio";
 import { useAuthStore } from "@/store/auth";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
+import { DownloadAudioButton } from "@/components/audio/DownloadAudioButton";
 
 /**
  * The full Verse of the Day card (design.md §5.1): a floating, shareable surface
@@ -136,6 +137,8 @@ export function VerseOfDayCard({ verse, reflection }: { verse: Verse; reflection
               {copied ? <Check /> : <Share2 />}
             </IconButton>
           </Tooltip>
+
+          <DownloadAudioButton surah={verse.surah} ayah={verse.ayah} />
         </div>
       </div>
     </Card>

@@ -8,6 +8,8 @@
     "changeLanguage": "Change language",
     "removeBookmark": "Remove bookmark",
     "bookmarkVerse": "Bookmark verse",
+    "downloadAudio": "Download recitation",
+    "downloadStarted": "Download started",
     "loading": "Loading"
   },
   "nav": {

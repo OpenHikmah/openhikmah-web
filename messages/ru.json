@@ -8,6 +8,8 @@
     "changeLanguage": "Изменить язык",
     "removeBookmark": "Удалить закладку",
     "bookmarkVerse": "Добавить в закладки",
+    "downloadAudio": "Скачать чтение",
+    "downloadStarted": "Загрузка началась",
     "loading": "Загрузка"
   },
   "nav": {
