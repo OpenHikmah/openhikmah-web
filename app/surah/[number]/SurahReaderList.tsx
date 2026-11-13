@@ -5,6 +5,7 @@ import { Pause, Volume2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Card, IconButton, Tooltip } from "@/components/ui";
 import { useAudioStore } from "@/store/audio";
+import { DownloadAudioButton } from "@/components/audio/DownloadAudioButton";
 import { cn } from "@/lib/utils";
 import type { Verse } from "@/types/quran";
 
@@ -46,26 +47,29 @@ export function SurahReaderList({ verses }: { verses: Verse[] }) {
               <span className="rounded border border-gold bg-gold/10 px-1.5 py-0.5 font-mono text-xs text-gold">
                 {verse.ref}
               </span>
-              <Tooltip label={isThisPlaying ? t("pauseRecitation") : t("listen")}>
-                <IconButton
-                  tone="teal"
-                  onClick={() => {
-                    if (isThisPlaying) pause();
-                    else if (isActive) resume();
-                    else
-                      playVerse({
-                        ref: verse.ref,
-                        surah: verse.surah,
-                        ayah: verse.ayah,
-                        surahName: verse.surahName,
-                      });
-                  }}
-                  aria-label={isThisPlaying ? t("pauseRecitation") : t("listenToRecitation")}
-                  className={cn(isActive && "border-teal text-teal")}
-                >
-                  {isThisPlaying ? <Pause /> : <Volume2 />}
-                </IconButton>
-              </Tooltip>
+              <div className="flex items-center gap-2">
+                <DownloadAudioButton surah={verse.surah} ayah={verse.ayah} />
+                <Tooltip label={isThisPlaying ? t("pauseRecitation") : t("listen")}>
+                  <IconButton
+                    tone="teal"
+                    onClick={() => {
+                      if (isThisPlaying) pause();
+                      else if (isActive) resume();
+                      else
+                        playVerse({
+                          ref: verse.ref,
+                          surah: verse.surah,
+                          ayah: verse.ayah,
+                          surahName: verse.surahName,
+                        });
+                    }}
+                    aria-label={isThisPlaying ? t("pauseRecitation") : t("listenToRecitation")}
+                    className={cn(isActive && "border-teal text-teal")}
+                  >
+                    {isThisPlaying ? <Pause /> : <Volume2 />}
+                  </IconButton>
+                </Tooltip>
+              </div>
             </div>
 
             <p
