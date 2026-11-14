@@ -66,7 +66,7 @@ export default function BookmarksPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
       <LandingHeader />
-      <div className="mx-auto w-full max-w-2xl flex-1">
+      <div className="mx-auto px-4 py-8 w-full max-w-2xl flex-1">
         {/* Page header */}
         <div className="mb-8 flex items-center gap-3">
           <Heart className="h-5 w-5 text-gold" />
