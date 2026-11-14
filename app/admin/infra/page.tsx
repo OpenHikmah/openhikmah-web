@@ -15,7 +15,7 @@ import {
 } from "@/components/admin/primitives";
 import { InfoHint } from "@/components/admin/InfoHint";
 import { SectionHeading } from "@/components/admin/SectionHeading";
-import { Feedback } from "@/components/admin/Feedback";
+import { ActionFeedback } from "@/components/admin/Feedback";
 import { useActionMessage } from "@/components/admin/useActionMessage";
 import { useAdminFetch, AdminApiError } from "@/components/admin/AdminContext";
 import { useAsync } from "@/components/admin/useAsync";
@@ -142,7 +142,7 @@ export default function InfraPage() {
                   Reset rate limits
                 </ConfirmButton>
               </div>
-              {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
+              <ActionFeedback message={message} />
             </Panel>
 
             <section>

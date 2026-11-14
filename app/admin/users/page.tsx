@@ -15,7 +15,7 @@ import {
 } from "@/components/admin/primitives";
 import { formatTimestamp } from "@/lib/admin/format";
 import { useAdminFetch } from "@/components/admin/AdminContext";
-import { Feedback } from "@/components/admin/Feedback";
+import { ActionFeedback } from "@/components/admin/Feedback";
 import { useRowAction } from "@/components/admin/useRowAction";
 import { usePaginated } from "@/components/admin/usePaginated";
 import { SkeletonRows } from "@/components/admin/Skeleton";
@@ -83,7 +83,7 @@ export default function UsersPage() {
         </form>
 
         {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
-        {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
+        <ActionFeedback message={message} />
         {loading && <SkeletonRows />}
         {!loading && !error && rows.length === 0 && <StateNote>No users found.</StateNote>}
 

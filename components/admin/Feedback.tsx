@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import type { ActionMessage } from "./useActionMessage";
 
 export type FeedbackTone = "success" | "error" | "info";
 
@@ -30,5 +31,31 @@ export function Feedback({
     >
       {children}
     </p>
+  );
+}
+
+/**
+ * Renders an `ActionMessage` slot. The polite `role="status"` region stays
+ * mounted (empty) so a success set later is announced as a text change — a
+ * live region that mounts already filled is often missed by screen readers.
+ * Errors stay a conditionally rendered `role="alert"`.
+ */
+export function ActionFeedback({ message }: { message: ActionMessage | null }) {
+  const isError = message?.tone === "error";
+  return (
+    <>
+      <p
+        role="status"
+        aria-live="polite"
+        className={cn(
+          "text-xs empty:my-0",
+          message?.tone === "success" && "text-teal",
+          message?.tone === "info" && "text-text-muted"
+        )}
+      >
+        {message && !isError ? message.text : null}
+      </p>
+      {message && isError && <Feedback tone="error">{message.text}</Feedback>}
+    </>
   );
 }

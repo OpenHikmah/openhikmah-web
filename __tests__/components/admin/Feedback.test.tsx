@@ -1,6 +1,6 @@
 import { render, screen, renderHook, act } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
-import { Feedback } from "@/components/admin/Feedback";
+import { ActionFeedback, Feedback } from "@/components/admin/Feedback";
 import { useActionMessage } from "@/components/admin/useActionMessage";
 
 describe("Feedback", () => {
@@ -18,6 +18,30 @@ describe("Feedback", () => {
     expect(el).toHaveClass("text-teal");
     expect(el).toHaveAttribute("aria-live", "polite");
     expect(el).toHaveAttribute("role", "status");
+  });
+});
+
+describe("ActionFeedback", () => {
+  it("keeps the status region mounted while empty, then fills the same node", () => {
+    const { rerender } = render(<ActionFeedback message={null} />);
+    const region = screen.getByRole("status");
+    expect(region).toBeEmptyDOMElement();
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    rerender(<ActionFeedback message={{ tone: "success", text: "Saved." }} />);
+    expect(screen.getByRole("status")).toBe(region);
+    expect(region).toHaveTextContent("Saved.");
+  });
+
+  it("renders an error as a conditional alert and leaves the status region empty", () => {
+    const { rerender } = render(
+      <ActionFeedback message={{ tone: "error", text: "Save failed." }} />
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent("Save failed.");
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+
+    rerender(<ActionFeedback message={null} />);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
 

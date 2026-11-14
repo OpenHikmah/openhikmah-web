@@ -6,7 +6,7 @@ import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { SkeletonRows } from "@/components/admin/Skeleton";
 import { Table, Th, Td, StateNote, ConfirmButton, Panel } from "@/components/admin/primitives";
 import { Field } from "@/components/admin/Field";
-import { Feedback } from "@/components/admin/Feedback";
+import { ActionFeedback } from "@/components/admin/Feedback";
 import { useActionMessage } from "@/components/admin/useActionMessage";
 import { SectionHeading } from "@/components/admin/SectionHeading";
 import { formatTimestamp } from "@/lib/admin/format";
@@ -237,7 +237,7 @@ function OperationalSettings({
         ))}
       </div>
 
-      {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
+      <ActionFeedback message={message} />
     </Panel>
   );
 }
@@ -350,7 +350,7 @@ export default function FlagsPage() {
                 Clear
               </Button>
             )}
-            {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
+            <ActionFeedback message={message} />
           </div>
         </Panel>
 

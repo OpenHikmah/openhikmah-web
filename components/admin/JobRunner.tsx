@@ -6,7 +6,7 @@ import { Table, Th, Td, Pill, ConfirmButton, ErrorState } from "@/components/adm
 import { SkeletonRows } from "@/components/admin/Skeleton";
 import { formatTimestamp } from "@/lib/admin/format";
 import { useAdminFetch } from "@/components/admin/AdminContext";
-import { Feedback } from "@/components/admin/Feedback";
+import { ActionFeedback } from "@/components/admin/Feedback";
 import { useRowAction } from "@/components/admin/useRowAction";
 import { useAsync } from "@/components/admin/useAsync";
 
@@ -75,7 +75,7 @@ export function JobRunner() {
   return (
     <div className="space-y-4">
       {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
-      {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
+      <ActionFeedback message={message} />
       {loading && !data && <SkeletonRows n={3} />}
 
       {data && (

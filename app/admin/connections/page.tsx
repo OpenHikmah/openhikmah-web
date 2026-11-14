@@ -16,7 +16,7 @@ import {
 import { AdminToggle } from "@/components/admin/AdminToggle";
 import { formatTimestamp } from "@/lib/admin/format";
 import { useAdminFetch } from "@/components/admin/AdminContext";
-import { Feedback } from "@/components/admin/Feedback";
+import { ActionFeedback } from "@/components/admin/Feedback";
 import { useRowAction } from "@/components/admin/useRowAction";
 import { usePaginated } from "@/components/admin/usePaginated";
 import { ExpandableText } from "@/components/admin/ExpandableText";
@@ -136,7 +136,7 @@ export default function ConnectionsPage() {
         )}
 
         {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
-        {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
+        <ActionFeedback message={message} />
         {loading && <SkeletonRows />}
         {!loading && !error && rows.length === 0 && <StateNote>No connections match.</StateNote>}
 

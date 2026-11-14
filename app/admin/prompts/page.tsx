@@ -17,7 +17,7 @@ import { AdminToggle } from "@/components/admin/AdminToggle";
 import { SkeletonRows } from "@/components/admin/Skeleton";
 import { formatTimestamp } from "@/lib/admin/format";
 import { useAdminFetch } from "@/components/admin/AdminContext";
-import { Feedback } from "@/components/admin/Feedback";
+import { ActionFeedback } from "@/components/admin/Feedback";
 import { useRowAction } from "@/components/admin/useRowAction";
 import { useAsync } from "@/components/admin/useAsync";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
@@ -99,7 +99,7 @@ export default function PromptsPage() {
         />
 
         {error && <ErrorState onRetry={() => reload()}>{error}</ErrorState>}
-        {message && <Feedback tone={message.tone}>{message.text}</Feedback>}
+        <ActionFeedback message={message} />
 
         <Panel className="space-y-2">
           <div className="flex items-center justify-between">
