@@ -33,7 +33,8 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const uiLocale = usePreferencesStore((s) => s.uiLocale);
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [selectionLoading, setSelectionLoading] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [previewVerse, setPreviewVerse] = useState<Verse | null>(null);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [relatedResults, setRelatedResults] = useState<SearchResult[]>([]);
@@ -67,7 +68,8 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   }, [open]);
 
   const fetchPreview = useCallback(async (ref: string, signal: AbortSignal) => {
-    setLoading(true);
+    setIsSearching(false);
+    setPreviewLoading(true);
     setPreviewVerse(null);
     setPreviewError(false);
     try {
@@ -80,17 +82,20 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
         setPreviewError(true);
       }
     } finally {
-      if (!signal.aborted) setLoading(false);
+      if (!signal.aborted) setPreviewLoading(false);
     }
   }, []);
 
   const fetchSearch = useCallback(async (q: string, signal: AbortSignal) => {
+    setPreviewLoading(false);
     setIsSearching(true);
     setSearchResults([]);
     setRelatedResults([]);
     setTotalResults(0);
     setSelectError(false);
     setSearchError(null);
+    setPreviewVerse(null);
+    setPreviewError(false);
     try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal });
       if (res.status === 429) {
@@ -179,7 +184,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
       selectAbortRef.current?.abort();
       const controller = new AbortController();
       selectAbortRef.current = controller;
-      setLoading(true);
+      setSelectionLoading(true);
       try {
         const res = await fetch(`/api/verse/${ref.replace(":", "/")}`, {
           signal: controller.signal,
@@ -193,7 +198,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
         console.error("Failed to fetch seed verse:", err);
         setSelectError(true);
       } finally {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) setSelectionLoading(false);
       }
     },
     [mapConnections]
@@ -204,7 +209,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
       selectAbortRef.current?.abort();
       const controller = new AbortController();
       selectAbortRef.current = controller;
-      setLoading(true);
+      setSelectionLoading(true);
       setSelectError(false);
       try {
         const res = await fetch(`/api/verse/${result.ref.replace(":", "/")}`, {
@@ -218,7 +223,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
         console.error("Failed to fetch selected search result:", err);
         setSelectError(true);
       } finally {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) setSelectionLoading(false);
       }
     },
     [mapConnections]
@@ -246,7 +251,8 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     setRelatedResults([]);
     setTotalResults(0);
     setPreviewError(false);
-    setLoading(false);
+    setSelectionLoading(false);
+    setPreviewLoading(false);
     setIsSearching(false);
     setSearchError(null);
     setHighlightedIndex(-1);
@@ -261,6 +267,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     if (!open) cancelAndReset();
   }, [open, cancelAndReset]);
 
+  const loading = selectionLoading || previewLoading;
   const busy = loading || isSearching;
   const showSeedVerses = !query.trim();
   const showPreview = !!previewVerse && !loading;
@@ -313,7 +320,8 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                     setRelatedResults([]);
                     setTotalResults(0);
                     setPreviewError(false);
-                    setLoading(false);
+                    setSelectionLoading(false);
+                    setPreviewLoading(false);
                     setIsSearching(false);
                     setHighlightedIndex(-1);
                     setSelectError(false);

@@ -314,6 +314,136 @@ describe("SearchDialog — rate-limit vs. genuine empty results", () => {
   });
 });
 
+describe("SearchDialog query transitions", () => {
+  const mockFetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>();
+  const emptyResults: SearchResponse = { results: [], total: 0, page: 1, pageSize: 10 };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockFetch.mockReset();
+    vi.stubGlobal("fetch", mockFetch);
+    useCanvasStore.getState().reset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  async function typeQuery(value: string) {
+    fireEvent.change(screen.getByRole("combobox"), { target: { value } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(420);
+    });
+  }
+
+  function pendingRequest(_url: string, init?: RequestInit) {
+    return new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () =>
+        reject(new DOMException("Aborted", "AbortError"))
+      );
+    });
+  }
+
+  it("clears the verse preview when switching to text search", async () => {
+    mockFetch
+      .mockResolvedValueOnce(Response.json(makeVerse("2:1")))
+      .mockResolvedValueOnce(Response.json(emptyResults));
+    renderWithIntl(<SearchDialog open onClose={vi.fn()} />);
+
+    await typeQuery("2:1");
+    expect(screen.getByText(VERSE_TEXT["2:1"].translation)).toBeInTheDocument();
+
+    await typeQuery("mercy");
+    expect(screen.queryByText(VERSE_TEXT["2:1"].translation)).not.toBeInTheDocument();
+    expect(screen.getByText(/no results found/i)).toBeInTheDocument();
+  });
+
+  it("clears the preview error so empty search results can appear", async () => {
+    mockFetch
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(Response.json(emptyResults));
+    renderWithIntl(<SearchDialog open onClose={vi.fn()} />);
+
+    await typeQuery("99:99");
+    expect(screen.getByText(/verse not found/i)).toBeInTheDocument();
+
+    await typeQuery("mercy");
+    expect(screen.queryByText(/verse not found/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/no results found/i)).toBeInTheDocument();
+  });
+
+  it("stops showing busy after switching from a pending search to a preview", async () => {
+    mockFetch
+      .mockImplementationOnce(pendingRequest)
+      .mockResolvedValueOnce(Response.json(makeVerse("2:1")));
+    renderWithIntl(<SearchDialog open onClose={vi.fn()} />);
+
+    await typeQuery("mercy");
+    expect(mockFetch).toHaveBeenCalledWith("/api/search?q=mercy", expect.anything());
+    const signal = mockFetch.mock.calls[0][1]?.signal;
+    expect(signal?.aborted).toBe(false);
+    expect(screen.getByRole("dialog").querySelector(".animate-spin")).not.toBeNull();
+
+    await typeQuery("2:1");
+    expect(signal?.aborted).toBe(true);
+    expect(screen.getByText(VERSE_TEXT["2:1"].translation)).toBeInTheDocument();
+    expect(screen.getByRole("dialog").querySelector(".animate-spin")).toBeNull();
+  });
+
+  it("stops showing busy after switching from a pending preview to search", async () => {
+    mockFetch
+      .mockImplementationOnce(pendingRequest)
+      .mockResolvedValueOnce(Response.json(emptyResults));
+    renderWithIntl(<SearchDialog open onClose={vi.fn()} />);
+
+    await typeQuery("2:1");
+    expect(mockFetch).toHaveBeenCalledWith("/api/verse/2/1", expect.anything());
+    const signal = mockFetch.mock.calls[0][1]?.signal;
+    expect(signal?.aborted).toBe(false);
+    expect(screen.getByRole("dialog").querySelector(".animate-spin")).not.toBeNull();
+
+    await typeQuery("mercy");
+    expect(signal?.aborted).toBe(true);
+    expect(screen.getByText(/no results found/i)).toBeInTheDocument();
+    expect(screen.getByRole("dialog").querySelector(".animate-spin")).toBeNull();
+  });
+
+  it("keeps showing busy for a pending selection when a new search finishes", async () => {
+    const results = [makeResult("2:1", "Al-Baqarah")];
+    let resolveSelection!: (response: Response) => void;
+    mockFetch
+      .mockResolvedValueOnce(Response.json({ ...emptyResults, results, total: 1 }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveSelection = resolve;
+          })
+      )
+      .mockResolvedValueOnce(Response.json(emptyResults));
+    const onClose = vi.fn();
+    renderWithIntl(<SearchDialog open onClose={onClose} />);
+
+    await typeQuery("guidance");
+    fireEvent.click(screen.getByRole("option"));
+    expect(mockFetch).toHaveBeenCalledWith("/api/verse/2/1", expect.anything());
+    const signal = mockFetch.mock.calls[1][1]?.signal;
+
+    await typeQuery("mercy");
+    expect(signal?.aborted).toBe(false);
+    expect(screen.getByRole("dialog").querySelector(".animate-spin")).not.toBeNull();
+    expect(screen.queryByText(/no results found/i)).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveSelection(Response.json(makeVerse("2:1")));
+    });
+    expect(screen.getByRole("dialog").querySelector(".animate-spin")).toBeNull();
+    expect(useCanvasStore.getState().nodes).toHaveLength(1);
+    expect(useCanvasStore.getState().nodes[0].data.ref).toBe("2:1");
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+});
+
 describe("SearchDialog — related-by-meaning results", () => {
   const mockFetch = vi.fn();
   const related = [makeResult("94:5", "Ash-Sharh")];
