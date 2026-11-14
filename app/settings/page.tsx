@@ -4,6 +4,7 @@ import { Settings as SettingsIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { LandingHeader } from "@/components/layout/LandingHeader";
+import { PageContainer } from "@/components/layout/PageContainer";
 import { Card, Select, Switch, type SelectOption } from "@/components/ui";
 import { RECITERS } from "@/lib/quran/audio";
 import {
@@ -69,7 +70,7 @@ export default function SettingsPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
       <LandingHeader />
-      <div className="mx-auto px-4 py-8 w-full max-w-2xl flex-1 space-y-4">
+      <PageContainer className="space-y-4">
         <div className="mb-4 flex items-center gap-3">
           <SettingsIcon className="h-5 w-5 text-gold" />
           <h1 className="text-lg font-semibold text-text-primary">{t("title")}</h1>
@@ -125,7 +126,7 @@ export default function SettingsPage() {
             />
           </div>
         </SettingsSection>
-      </div>
+      </PageContainer>
     </div>
   );
 }

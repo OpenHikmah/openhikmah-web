@@ -10,6 +10,7 @@ import { useCanvasStore } from "@/store/canvas";
 import { parseSavedCanvas } from "@/lib/canvas/saved-canvas";
 import { Card, IconButton, Tooltip } from "@/components/ui";
 import { AuthShell } from "@/components/layout/AuthShell";
+import { PageContainer } from "@/components/layout/PageContainer";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
 import { authFetch } from "@/lib/auth/auth-fetch";
 
@@ -157,7 +158,7 @@ export default function WorkspacesPage() {
 
   return (
     <AuthShell>
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
+      <PageContainer>
         {/* Page header */}
         <div className="mb-8 flex items-center gap-3">
           <FolderOpen className="h-5 w-5 text-gold" />
@@ -211,7 +212,7 @@ export default function WorkspacesPage() {
             ))}
           </div>
         )}
-      </main>
+      </PageContainer>
     </AuthShell>
   );
 }

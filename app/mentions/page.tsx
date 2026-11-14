@@ -7,6 +7,7 @@ import { useTranslations, useFormatter } from "next-intl";
 import { useAuthStore } from "@/store/auth";
 import { useSocialStore } from "@/store/social";
 import { AuthShell } from "@/components/layout/AuthShell";
+import { PageContainer } from "@/components/layout/PageContainer";
 import { Card, Tooltip, iconButtonVariants } from "@/components/ui";
 import { authFetch } from "@/lib/auth/auth-fetch";
 
@@ -75,7 +76,7 @@ export default function MentionsPage() {
 
   return (
     <AuthShell>
-      <div className="mx-auto px-4 py-8 w-full max-w-2xl">
+      <PageContainer>
         <div className="mb-8 flex items-center gap-3">
           <AtSign className="h-5 w-5 text-gold" />
           <h1 className="text-lg font-semibold text-text-primary">{t("pageTitle")}</h1>
@@ -137,7 +138,7 @@ export default function MentionsPage() {
             ))}
           </div>
         )}
-      </div>
+      </PageContainer>
     </AuthShell>
   );
 }
