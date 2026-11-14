@@ -409,6 +409,85 @@ describe("SearchDialog query transitions", () => {
     expect(screen.getByRole("dialog").querySelector(".animate-spin")).toBeNull();
   });
 
+  it.each(["clear button", "empty input"])("clears a pending preview via %s", async (method) => {
+    mockFetch.mockImplementationOnce(pendingRequest);
+    renderWithIntl(<SearchDialog open onClose={vi.fn()} />);
+
+    await typeQuery("2:1");
+    expect(mockFetch).toHaveBeenCalledWith("/api/verse/2/1", expect.anything());
+    const signal = mockFetch.mock.calls[0][1]?.signal;
+    expect(signal?.aborted).toBe(false);
+    expect(screen.getByRole("dialog").querySelector(".animate-spin")).not.toBeNull();
+
+    if (method === "clear button") {
+      fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    } else {
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: "" } });
+    }
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(420);
+    });
+
+    expect(screen.getByRole("combobox")).toHaveValue("");
+    expect(signal?.aborted).toBe(true);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("dialog").querySelector(".animate-spin")).toBeNull();
+    for (const button of screen.getAllByRole("button")) {
+      expect(button).toBeEnabled();
+    }
+  });
+
+  it.each(["clear button", "empty input"])(
+    "preserves pending selection loading when clearing via %s",
+    async (method) => {
+      const results = [makeResult("2:1", "Al-Baqarah")];
+      let resolveSelection!: (response: Response) => void;
+      mockFetch
+        .mockResolvedValueOnce(Response.json({ ...emptyResults, results, total: 1 }))
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              resolveSelection = resolve;
+            })
+        );
+      const onClose = vi.fn();
+      renderWithIntl(<SearchDialog open onClose={onClose} />);
+
+      await typeQuery("guidance");
+      fireEvent.click(screen.getByRole("option"));
+      expect(mockFetch).toHaveBeenCalledWith("/api/verse/2/1", expect.anything());
+      const signal = mockFetch.mock.calls[1][1]?.signal;
+
+      if (method === "clear button") {
+        fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+      } else {
+        fireEvent.change(screen.getByRole("combobox"), { target: { value: "" } });
+      }
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(420);
+      });
+
+      expect(signal?.aborted).toBe(false);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole("option")).not.toBeInTheDocument();
+      expect(screen.getByRole("dialog").querySelector(".animate-spin")).not.toBeNull();
+      const seedButtons = screen
+        .getAllByRole("button")
+        .filter((button) => button.getAttribute("aria-label") !== "Close search");
+      expect(seedButtons).toHaveLength(6);
+      for (const button of seedButtons) expect(button).toBeDisabled();
+
+      await act(async () => {
+        resolveSelection(Response.json(makeVerse("2:1")));
+      });
+      expect(screen.getByRole("dialog").querySelector(".animate-spin")).toBeNull();
+      for (const button of seedButtons) expect(button).toBeEnabled();
+      expect(useCanvasStore.getState().nodes).toHaveLength(1);
+      expect(useCanvasStore.getState().nodes[0].data.ref).toBe("2:1");
+      expect(onClose).toHaveBeenCalledOnce();
+    }
+  );
+
   it("keeps showing busy for a pending selection when a new search finishes", async () => {
     const results = [makeResult("2:1", "Al-Baqarah")];
     let resolveSelection!: (response: Response) => void;

@@ -267,6 +267,24 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     if (!open) cancelAndReset();
   }, [open, cancelAndReset]);
 
+  function handleQueryChange(value: string) {
+    setQuery(value);
+    if (!value.trim()) {
+      abortRef.current?.abort();
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      setPreviewVerse(null);
+      setSearchResults([]);
+      setRelatedResults([]);
+      setTotalResults(0);
+      setPreviewError(false);
+      setPreviewLoading(false);
+      setIsSearching(false);
+      setHighlightedIndex(-1);
+      setSelectError(false);
+      setSearchError(null);
+    }
+  }
+
   const loading = selectionLoading || previewLoading;
   const busy = loading || isSearching;
   const showSeedVerses = !query.trim();
@@ -309,25 +327,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                     : undefined
                 }
                 value={query}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setQuery(v);
-                  if (!v.trim()) {
-                    abortRef.current?.abort();
-                    if (debounceRef.current) clearTimeout(debounceRef.current);
-                    setPreviewVerse(null);
-                    setSearchResults([]);
-                    setRelatedResults([]);
-                    setTotalResults(0);
-                    setPreviewError(false);
-                    setSelectionLoading(false);
-                    setPreviewLoading(false);
-                    setIsSearching(false);
-                    setHighlightedIndex(-1);
-                    setSelectError(false);
-                    setSearchError(null);
-                  }
-                }}
+                onChange={(e) => handleQueryChange(e.target.value)}
                 onKeyDown={(e) => {
                   if (showResults && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
                     e.preventDefault();
@@ -353,7 +353,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
               />
               <button
                 type="button"
-                onClick={query ? () => setQuery("") : onClose}
+                onClick={query ? () => handleQueryChange("") : onClose}
                 aria-label={query ? t("clearSearch") : t("closeSearch")}
                 className="text-text-muted transition-colors hover:text-text-secondary"
               >
