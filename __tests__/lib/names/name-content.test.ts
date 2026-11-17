@@ -22,30 +22,45 @@ function makeSelectChain(resolveWith: unknown[]) {
   return chain;
 }
 
-const { mockSelect, mockInsert, mockValues, mockOnConflict, mockOnConflictDoNothing } = vi.hoisted(
-  () => {
-    const mockOnConflict = vi.fn().mockResolvedValue(undefined);
-    // Default: the insert "wins" (no conflict) — `.returning()` yields a
-    // non-empty array. Tests that simulate a losing conflict override this
-    // to resolve `.returning()` to `[]`.
-    const mockOnConflictDoNothing = vi.fn(() => ({
-      returning: vi.fn().mockResolvedValue([{ reason: "unused" }]),
-    }));
-    const mockValues = vi.fn((..._args: unknown[]) => ({
-      onConflictDoUpdate: mockOnConflict,
-      onConflictDoNothing: mockOnConflictDoNothing,
-    }));
-    return {
-      mockSelect: vi.fn(),
-      mockInsert: vi.fn(() => ({ values: mockValues })),
-      mockValues,
-      mockOnConflict,
-      mockOnConflictDoNothing,
-    };
-  }
-);
+const {
+  mockSelect,
+  mockInsert,
+  mockValues,
+  mockOnConflict,
+  mockOnConflictDoNothing,
+  mockUpdateSet,
+} = vi.hoisted(() => {
+  const mockOnConflict = vi.fn().mockResolvedValue(undefined);
+  const mockUpdateSet = vi.fn(() => ({
+    where: vi.fn().mockResolvedValue(undefined),
+  }));
+  // Default: the insert "wins" (no conflict) — `.returning()` yields a
+  // non-empty array. Tests that simulate a losing conflict override this
+  // to resolve `.returning()` to `[]`.
+  const mockOnConflictDoNothing = vi.fn(() => ({
+    returning: vi.fn().mockResolvedValue([{ reason: "unused" }]),
+  }));
+  const mockValues = vi.fn((..._args: unknown[]) => ({
+    onConflictDoUpdate: mockOnConflict,
+    onConflictDoNothing: mockOnConflictDoNothing,
+  }));
+  return {
+    mockSelect: vi.fn(),
+    mockInsert: vi.fn(() => ({ values: mockValues })),
+    mockValues,
+    mockOnConflict,
+    mockOnConflictDoNothing,
+    mockUpdateSet,
+  };
+});
 
-vi.mock("@/lib/infra/db", () => ({ db: { select: mockSelect, insert: mockInsert } }));
+vi.mock("@/lib/infra/db", () => ({
+  db: {
+    select: mockSelect,
+    insert: mockInsert,
+    update: vi.fn(() => ({ set: mockUpdateSet })),
+  },
+}));
 
 import {
   getOrGenerateNameContent,
@@ -63,6 +78,7 @@ describe("getOrGenerateNameContent", () => {
     mockValues.mockClear();
     mockOnConflict.mockClear();
     mockOnConflictDoNothing.mockClear();
+    mockUpdateSet.mockClear();
   });
 
   it("returns the cached value on a hit WITHOUT generating", async () => {
@@ -506,6 +522,7 @@ describe("getCachedNameContent", () => {
   beforeEach(() => {
     mockSelect.mockReset();
     mockInsert.mockClear();
+    mockUpdateSet.mockClear();
   });
 
   it("returns the cached value on a hit at the current version", async () => {
@@ -577,6 +594,7 @@ describe("getCachedNameContentBulk", () => {
   beforeEach(() => {
     mockSelect.mockReset();
     mockInsert.mockClear();
+    mockUpdateSet.mockClear();
   });
 
   it("returns an empty map without querying when given no slugs", async () => {
@@ -659,6 +677,7 @@ describe("getOrGenerateVerseReason", () => {
     mockValues.mockClear();
     mockOnConflict.mockClear();
     mockOnConflictDoNothing.mockClear();
+    mockUpdateSet.mockClear();
   });
 
   it("returns a cached translation without calling generate", async () => {
@@ -817,5 +836,213 @@ describe("getOrGenerateVerseReason", () => {
     const [a, b] = await all;
     expect(a).toBe("sonuç");
     expect(b).toBe("sonuç");
+  });
+});
+
+describe("legacy source_hash re-validation", () => {
+  beforeEach(() => {
+    mockSelect.mockReset();
+    mockInsert.mockClear();
+    mockValues.mockClear();
+    mockUpdateSet.mockClear();
+  });
+
+  it("serves a fresh legacy row and backfills its hash", async () => {
+    mockSelect
+      .mockReturnValueOnce(
+        makeSelectChain([
+          {
+            data: JSON.stringify("çevrilmiş tefekkür"),
+            version: 1,
+            sourceHash: null,
+            updatedAt: new Date("2026-01-02T00:00:00Z"),
+          },
+        ])
+      )
+      .mockReturnValueOnce(makeSelectChain([{ updatedAt: new Date("2026-01-01T00:00:00Z") }]));
+    const generate = vi.fn();
+    const isEmpty = (v: string) => v.trim() === "";
+
+    const out = await getOrGenerateNameContent(
+      "ar-rahman",
+      "reflection",
+      "tr",
+      1,
+      generate,
+      isEmpty,
+      undefined,
+      "current-hash"
+    );
+
+    expect(out).toBe("çevrilmiş tefekkür");
+    expect(generate).not.toHaveBeenCalled();
+    expect(mockUpdateSet).toHaveBeenCalledWith({ sourceHash: "current-hash" });
+  });
+
+  it("regenerates a legacy row whose English was rewritten after it", async () => {
+    mockSelect
+      .mockReturnValueOnce(
+        makeSelectChain([
+          {
+            data: JSON.stringify("eski tefekkür"),
+            version: 1,
+            sourceHash: null,
+            updatedAt: new Date("2026-01-01T00:00:00Z"),
+          },
+        ])
+      )
+      .mockReturnValueOnce(makeSelectChain([{ updatedAt: new Date("2026-01-02T00:00:00Z") }]));
+    const ai = await import("@/lib/ai/ai");
+    const providerSpy = vi.spyOn(ai, "resolveProvider").mockResolvedValue("gemini");
+    const modelSpy = vi.spyOn(ai, "resolveModel").mockResolvedValue("gemini-3.7-flash");
+    const generate = vi.fn().mockResolvedValue("yeni tefekkür");
+    const isEmpty = (v: string) => v.trim() === "";
+
+    const out = await getOrGenerateNameContent(
+      "ar-rahman",
+      "reflection",
+      "tr",
+      1,
+      generate,
+      isEmpty,
+      undefined,
+      "current-hash"
+    );
+
+    expect(out).toBe("yeni tefekkür");
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+    providerSpy.mockRestore();
+    modelSpy.mockRestore();
+  });
+
+  it("keeps serving a legacy meaning row, which has no English row to compare against", async () => {
+    mockSelect.mockReturnValueOnce(
+      makeSelectChain([
+        {
+          data: JSON.stringify("eski anlam"),
+          version: 1,
+          sourceHash: null,
+          updatedAt: new Date("2026-01-02T00:00:00Z"),
+        },
+      ])
+    );
+    mockSelect.mockReturnValueOnce(makeSelectChain([]));
+    const generate = vi.fn();
+    const isEmpty = (v: string) => v.trim() === "";
+
+    const out = await getOrGenerateNameContent(
+      "ar-rahman",
+      "meaning",
+      "tr",
+      1,
+      generate,
+      isEmpty,
+      undefined,
+      "current-hash"
+    );
+
+    expect(out).toBe("eski anlam");
+    expect(generate).not.toHaveBeenCalled();
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
+  it("getCachedNameContent serves a fresh legacy row and hides a stale one", async () => {
+    mockSelect
+      .mockReturnValueOnce(
+        makeSelectChain([
+          {
+            data: JSON.stringify("taze"),
+            version: 1,
+            sourceHash: null,
+            updatedAt: new Date("2026-01-02T00:00:00Z"),
+          },
+        ])
+      )
+      .mockReturnValueOnce(makeSelectChain([{ updatedAt: new Date("2026-01-01T00:00:00Z") }]))
+      .mockReturnValueOnce(
+        makeSelectChain([
+          {
+            data: JSON.stringify("bayat"),
+            version: 1,
+            sourceHash: null,
+            updatedAt: new Date("2026-01-01T00:00:00Z"),
+          },
+        ])
+      )
+      .mockReturnValueOnce(makeSelectChain([{ updatedAt: new Date("2026-01-02T00:00:00Z") }]));
+
+    const fresh = await getCachedNameContent<string>("ar-rahman", "reflection", "tr", 1, "h");
+    const stale = await getCachedNameContent<string>("al-malik", "reflection", "tr", 1, "h");
+    expect(fresh).toBe("taze");
+    expect(stale).toBeNull();
+    expect(mockUpdateSet).toHaveBeenCalledTimes(1);
+    expect(mockUpdateSet).toHaveBeenCalledWith({ sourceHash: "h" });
+  });
+
+  it("getCachedNameContentBulk validates each legacy row separately", async () => {
+    mockSelect
+      .mockReturnValueOnce(
+        makeSelectChain([
+          {
+            slug: "al-malik",
+            data: JSON.stringify("Hükümdar"),
+            version: 1,
+            sourceHash: null,
+            updatedAt: new Date("2026-01-02T00:00:00Z"),
+          },
+          {
+            slug: "ar-rahman",
+            data: JSON.stringify("Rahman"),
+            version: 1,
+            sourceHash: null,
+            updatedAt: new Date("2026-01-01T00:00:00Z"),
+          },
+        ])
+      )
+      .mockReturnValueOnce(makeSelectChain([{ updatedAt: new Date("2026-01-01T00:00:00Z") }]))
+      .mockReturnValueOnce(makeSelectChain([{ updatedAt: new Date("2026-01-02T00:00:00Z") }]));
+
+    const out = await getCachedNameContentBulk<string>(
+      ["al-malik", "ar-rahman"],
+      "reflection",
+      "tr",
+      1,
+      new Map([
+        ["al-malik", "h1"],
+        ["ar-rahman", "h2"],
+      ])
+    );
+
+    expect(out.get("al-malik")).toBe("Hükümdar");
+    expect(out.has("ar-rahman")).toBe(false);
+  });
+
+  it("serves a fresh legacy verse reason and backfills its hash", async () => {
+    mockSelect
+      .mockReturnValueOnce(
+        makeSelectChain([
+          {
+            reason: "eski sebep",
+            sourceHash: null,
+            createdAt: new Date("2026-01-02T00:00:00Z"),
+          },
+        ])
+      )
+      .mockReturnValueOnce(makeSelectChain([{ updatedAt: new Date("2026-01-01T00:00:00Z") }]));
+    const generate = vi.fn();
+
+    const out = await getOrGenerateVerseReason(
+      "ar-rahman",
+      "2:255",
+      "tr",
+      generate,
+      undefined,
+      "current-hash"
+    );
+
+    expect(out).toBe("eski sebep");
+    expect(generate).not.toHaveBeenCalled();
+    expect(mockUpdateSet).toHaveBeenCalledWith({ sourceHash: "current-hash" });
   });
 });

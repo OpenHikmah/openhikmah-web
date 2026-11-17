@@ -179,12 +179,117 @@ export function hashNameSource(source: string | string[]): string {
 
 /**
  * Whether a stored row is still valid for the caller's current source. No
- * expectation (English rows, callers without a source) always matches, and a row
- * with no stored hash predates the column — its source is unknown, so it is
- * served rather than mass-retranslated; only a known, different hash is stale.
+ * expectation (English rows, callers without a source) always matches, and only
+ * a known, different hash is stale. A row with no stored hash predates the
+ * column — its source is unknown, so callers re-validate it lazily (see
+ * nameRowMatches) instead of trusting it.
  */
 function sourceMatches(stored: string | null, expected: string | undefined): boolean {
   return expected === undefined || !stored || stored === expected;
+}
+
+/**
+ * A row written before `source_hash` existed stores NULL, so its source is
+ * unknown and cannot be hash-checked. Write times are the only evidence: the
+ * translation is still good when it was written at/after the English row's last
+ * update, and the current hash is backfilled so later reads are plain hits. When
+ * the English row was rewritten after the translation, the row is stale and the
+ * caller regenerates it — only rows whose English really changed cost an AI
+ * call.
+ *
+ * A kind with no English row at all (`meaning`/`description`: the English is
+ * static code data, never stored in this table) has nothing that could prove the
+ * row stale, and retranslating every such row would be the mass AI cost this
+ * check exists to avoid — so it stays served, exactly as before.
+ */
+async function legacyRowIsFresh(
+  slug: string,
+  kind: NameContentKind,
+  locale: Locale,
+  version: number,
+  writtenAt: Date,
+  expected: string
+): Promise<boolean> {
+  const [english] = await db
+    .select({ updatedAt: nameContent.updatedAt })
+    .from(nameContent)
+    .where(
+      and(
+        eq(nameContent.slug, slug),
+        eq(nameContent.kind, kind),
+        eq(nameContent.locale, "en"),
+        eq(nameContent.version, version)
+      )
+    )
+    .limit(1);
+  if (!english) return true;
+  if (writtenAt.getTime() < english.updatedAt.getTime()) return false;
+  try {
+    await db
+      .update(nameContent)
+      .set({ sourceHash: expected })
+      .where(
+        and(eq(nameContent.slug, slug), eq(nameContent.kind, kind), eq(nameContent.locale, locale))
+      );
+  } catch (err) {
+    console.error("Failed to backfill name_content source_hash:", err);
+  }
+  return true;
+}
+
+/**
+ * Same lazy re-validation as `legacyRowIsFresh`, for a per-verse reason: its
+ * English source is the "verses" name_content row it was translated from
+ * (name_verse_reasons has no updatedAt of its own, so createdAt is the only
+ * write-time signal).
+ */
+async function legacyVerseReasonIsFresh(
+  slug: string,
+  ref: string,
+  locale: Locale,
+  writtenAt: Date,
+  expected: string
+): Promise<boolean> {
+  const [english] = await db
+    .select({ updatedAt: nameContent.updatedAt })
+    .from(nameContent)
+    .where(
+      and(eq(nameContent.slug, slug), eq(nameContent.kind, "verses"), eq(nameContent.locale, "en"))
+    )
+    .limit(1);
+  const fresh = !!english && writtenAt.getTime() >= english.updatedAt.getTime();
+  if (!fresh) return false;
+  try {
+    await db
+      .update(nameVerseReasons)
+      .set({ sourceHash: expected })
+      .where(
+        and(
+          eq(nameVerseReasons.slug, slug),
+          eq(nameVerseReasons.ref, ref),
+          eq(nameVerseReasons.locale, locale)
+        )
+      );
+  } catch (err) {
+    console.error("Failed to backfill name_verse_reasons source_hash:", err);
+  }
+  return true;
+}
+
+/** Hash check plus the legacy-NULL case: an English read (no expected source)
+ * or a row with a stored hash validates as before; a stored NULL with an
+ * expected source is re-validated against write times instead of being trusted.
+ */
+async function nameRowMatches(
+  row: { sourceHash: string | null; updatedAt: Date },
+  slug: string,
+  kind: NameContentKind,
+  locale: Locale,
+  version: number,
+  expected: string | undefined
+): Promise<boolean> {
+  if (row.sourceHash != null || expected == null) return sourceMatches(row.sourceHash, expected);
+  return legacyRowIsFresh(slug, kind, locale, version, row.updatedAt, expected);
 }
 
 // Per-process single-flight: concurrent first-loads of the same (slug, kind,
@@ -230,6 +335,7 @@ export async function getOrGenerateNameContent<T>(
       data: nameContent.data,
       version: nameContent.version,
       sourceHash: nameContent.sourceHash,
+      updatedAt: nameContent.updatedAt,
     })
     .from(nameContent)
     .where(
@@ -237,7 +343,11 @@ export async function getOrGenerateNameContent<T>(
     )
     .limit(1);
 
-  if (row && row.version === version && sourceMatches(row.sourceHash, sourceHash)) {
+  if (
+    row &&
+    row.version === version &&
+    (await nameRowMatches(row, slug, kind, locale, version, sourceHash))
+  ) {
     try {
       return JSON.parse(row.data) as T;
     } catch (err) {
@@ -268,10 +378,11 @@ export async function getOrGenerateNameContent<T>(
 }
 
 /**
- * Read-only cache lookup for `(slug, kind, locale)` at the current `version` —
- * never generates, never consumes rate limit. Used for server-side prefetch
- * (e.g. SSR) where a cache miss should fall through to the existing
- * client-fetch-and-generate path rather than block the page render on an AI call.
+ * Cache lookup for `(slug, kind, locale)` at the current `version` — never
+ * generates, never consumes rate limit. Used for server-side prefetch (e.g. SSR)
+ * where a cache miss should fall through to the existing client-fetch-and-generate
+ * path rather than block the page render on an AI call. The only write it may do
+ * is backfilling a legacy row's missing `source_hash`.
  */
 export async function getCachedNameContent<T>(
   slug: string,
@@ -280,13 +391,15 @@ export async function getCachedNameContent<T>(
   version: number,
   sourceHash?: string
 ): Promise<T | null> {
-  let row: { data: string; version: number; sourceHash: string | null } | undefined;
+  let row:
+    { data: string; version: number; sourceHash: string | null; updatedAt: Date } | undefined;
   try {
     [row] = await db
       .select({
         data: nameContent.data,
         version: nameContent.version,
         sourceHash: nameContent.sourceHash,
+        updatedAt: nameContent.updatedAt,
       })
       .from(nameContent)
       .where(
@@ -301,7 +414,13 @@ export async function getCachedNameContent<T>(
     return null;
   }
 
-  if (!row || row.version !== version || !sourceMatches(row.sourceHash, sourceHash)) return null;
+  if (
+    !row ||
+    row.version !== version ||
+    !(await nameRowMatches(row, slug, kind, locale, version, sourceHash))
+  ) {
+    return null;
+  }
   try {
     return JSON.parse(row.data) as T;
   } catch (err) {
@@ -311,8 +430,8 @@ export async function getCachedNameContent<T>(
 }
 
 /**
- * Read-only, read-many cache lookup across `slugs` for one `(kind, locale)` at
- * the current `version` — one query instead of one per slug. Used by the
+ * Read-many cache lookup across `slugs` for one `(kind, locale)` at the current
+ * `version` — one query instead of one per slug. Used by the
  * /names grid, which needs a translated `meaning` for up to all 99 names on a
  * single render and must never trigger 99 AI generations to do it (a miss is
  * just absent from the returned map; callers fall back to the canonical
@@ -328,7 +447,13 @@ export async function getCachedNameContentBulk<T>(
   const out = new Map<string, T>();
   if (slugs.length === 0) return out;
 
-  let rows: Array<{ slug: string; data: string; version: number; sourceHash: string | null }>;
+  let rows: Array<{
+    slug: string;
+    data: string;
+    version: number;
+    sourceHash: string | null;
+    updatedAt: Date;
+  }>;
   try {
     rows = await db
       .select({
@@ -336,6 +461,7 @@ export async function getCachedNameContentBulk<T>(
         data: nameContent.data,
         version: nameContent.version,
         sourceHash: nameContent.sourceHash,
+        updatedAt: nameContent.updatedAt,
       })
       .from(nameContent)
       .where(
@@ -352,7 +478,11 @@ export async function getCachedNameContentBulk<T>(
 
   for (const row of rows) {
     if (row.version !== version) continue;
-    if (!sourceMatches(row.sourceHash, sourceHashes?.get(row.slug))) continue;
+    if (
+      !(await nameRowMatches(row, row.slug, kind, locale, version, sourceHashes?.get(row.slug)))
+    ) {
+      continue;
+    }
     try {
       out.set(row.slug, JSON.parse(row.data) as T);
     } catch (err) {
@@ -413,7 +543,11 @@ export async function getOrGenerateVerseReason(
   sourceHash?: string
 ): Promise<string> {
   const [row] = await db
-    .select({ reason: nameVerseReasons.reason, sourceHash: nameVerseReasons.sourceHash })
+    .select({
+      reason: nameVerseReasons.reason,
+      sourceHash: nameVerseReasons.sourceHash,
+      createdAt: nameVerseReasons.createdAt,
+    })
     .from(nameVerseReasons)
     .where(
       and(
@@ -424,7 +558,16 @@ export async function getOrGenerateVerseReason(
     )
     .limit(1);
 
-  if (row && sourceMatches(row.sourceHash, sourceHash)) return row.reason;
+  if (row) {
+    if (sourceHash == null) return row.reason;
+    if (row.sourceHash === sourceHash) return row.reason;
+    if (
+      row.sourceHash == null &&
+      (await legacyVerseReasonIsFresh(slug, ref, locale, row.createdAt, sourceHash))
+    ) {
+      return row.reason;
+    }
+  }
   // A row whose English source changed is overwritten below instead of being
   // left to win the unique key (DO NOTHING) and keep serving the stale text.
   const replacing = row !== undefined;

@@ -88,24 +88,33 @@ export default async function NameDetailPage({ params }: Props) {
           getCachedNameContent<string>(slug, "reflection", "en", REFLECTION_VERSION),
           getCachedNameContent<Pairing[]>(slug, "pairings", "en", PAIRINGS_VERSION),
         ]);
+  // Without the English row there is no expected hash, and a missing hash makes
+  // sourceMatches serve any stored translation unchecked — so skip the prefetch
+  // and let the client fetch (which always has the English) regenerate it.
+  const reflectionSourceHash =
+    englishReflection != null ? hashNameSource(englishReflection) : undefined;
+  const pairingsSourceHash =
+    englishPairings != null ? hashNameSource(englishPairings.map((p) => p.explanation)) : undefined;
   const [initialReflection, initialPairings, initialMeaning, initialDescription] =
     await Promise.all([
-      getCachedNameContent<string>(
-        slug,
-        "reflection",
-        locale,
-        REFLECTION_VERSION,
-        englishReflection != null ? hashNameSource(englishReflection) : undefined
-      ),
-      getCachedNameContent<Pairing[]>(
-        slug,
-        "pairings",
-        locale,
-        PAIRINGS_VERSION,
-        englishPairings != null
-          ? hashNameSource(englishPairings.map((p) => p.explanation))
-          : undefined
-      ),
+      locale === "en" || reflectionSourceHash != null
+        ? getCachedNameContent<string>(
+            slug,
+            "reflection",
+            locale,
+            REFLECTION_VERSION,
+            reflectionSourceHash
+          )
+        : Promise.resolve(null),
+      locale === "en" || pairingsSourceHash != null
+        ? getCachedNameContent<Pairing[]>(
+            slug,
+            "pairings",
+            locale,
+            PAIRINGS_VERSION,
+            pairingsSourceHash
+          )
+        : Promise.resolve(null),
       locale === "en"
         ? Promise.resolve(null)
         : getCachedNameContent<string>(
