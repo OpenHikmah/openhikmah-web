@@ -916,7 +916,7 @@ describe("legacy source_hash re-validation", () => {
     modelSpy.mockRestore();
   });
 
-  it("keeps serving a legacy meaning row, which has no English row to compare against", async () => {
+  it("keeps serving a legacy meaning row without querying for an English row that cannot exist", async () => {
     mockSelect.mockReturnValueOnce(
       makeSelectChain([
         {
@@ -927,7 +927,6 @@ describe("legacy source_hash re-validation", () => {
         },
       ])
     );
-    mockSelect.mockReturnValueOnce(makeSelectChain([]));
     const generate = vi.fn();
     const isEmpty = (v: string) => v.trim() === "";
 
@@ -944,7 +943,94 @@ describe("legacy source_hash re-validation", () => {
 
     expect(out).toBe("eski anlam");
     expect(generate).not.toHaveBeenCalled();
+    expect(mockSelect).toHaveBeenCalledTimes(1);
     expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
+  it("treats a legacy reflection as stale when its English row is missing", async () => {
+    mockSelect
+      .mockReturnValueOnce(
+        makeSelectChain([
+          {
+            data: JSON.stringify("eski tefekkür"),
+            version: 1,
+            sourceHash: null,
+            updatedAt: new Date("2026-01-02T00:00:00Z"),
+          },
+        ])
+      )
+      .mockReturnValueOnce(makeSelectChain([]));
+
+    const out = await getCachedNameContent<string>("ar-rahman", "reflection", "tr", 1, "h");
+
+    expect(out).toBeNull();
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
+  it("getCachedNameContent returns null instead of throwing when the English lookup fails", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockSelect
+      .mockReturnValueOnce(
+        makeSelectChain([
+          {
+            data: JSON.stringify("eski tefekkür"),
+            version: 1,
+            sourceHash: null,
+            updatedAt: new Date("2026-01-02T00:00:00Z"),
+          },
+        ])
+      )
+      .mockImplementationOnce(() => {
+        throw new Error("db down");
+      });
+
+    const out = await getCachedNameContent<string>("ar-rahman", "reflection", "tr", 1, "h");
+
+    expect(out).toBeNull();
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("getCachedNameContentBulk skips a row whose English lookup fails and keeps the rest", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockSelect
+      .mockReturnValueOnce(
+        makeSelectChain([
+          {
+            slug: "al-malik",
+            data: JSON.stringify("Hükümdar"),
+            version: 1,
+            sourceHash: null,
+            updatedAt: new Date("2026-01-02T00:00:00Z"),
+          },
+          {
+            slug: "ar-rahman",
+            data: JSON.stringify("Rahman"),
+            version: 1,
+            sourceHash: "h2",
+            updatedAt: new Date("2026-01-02T00:00:00Z"),
+          },
+        ])
+      )
+      .mockImplementationOnce(() => {
+        throw new Error("db down");
+      });
+
+    const out = await getCachedNameContentBulk<string>(
+      ["al-malik", "ar-rahman"],
+      "reflection",
+      "tr",
+      1,
+      new Map([
+        ["al-malik", "h1"],
+        ["ar-rahman", "h2"],
+      ])
+    );
+
+    expect(out.has("al-malik")).toBe(false);
+    expect(out.get("ar-rahman")).toBe("Rahman");
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 
   it("getCachedNameContent serves a fresh legacy row and hides a stale one", async () => {

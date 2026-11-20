@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { nameContent, nameVerseReasons, type NameContentKind } from "@/lib/infra/db/schema";
 import { resolveModel, resolveProvider } from "@/lib/ai/ai";
@@ -197,10 +197,12 @@ function sourceMatches(stored: string | null, expected: string | undefined): boo
  * caller regenerates it — only rows whose English really changed cost an AI
  * call.
  *
- * A kind with no English row at all (`meaning`/`description`: the English is
+ * A kind with no English row by design (`meaning`/`description`: the English is
  * static code data, never stored in this table) has nothing that could prove the
  * row stale, and retranslating every such row would be the mass AI cost this
- * check exists to avoid — so it stays served, exactly as before.
+ * check exists to avoid — so it stays served, exactly as before, without a
+ * pointless lookup. For every other kind a missing English row means the source
+ * cannot be verified, so the row is stale and gets regenerated with a hash.
  */
 async function legacyRowIsFresh(
   slug: string,
@@ -210,6 +212,7 @@ async function legacyRowIsFresh(
   writtenAt: Date,
   expected: string
 ): Promise<boolean> {
+  if (kind === "meaning" || kind === "description") return true;
   const [english] = await db
     .select({ updatedAt: nameContent.updatedAt })
     .from(nameContent)
@@ -222,14 +225,19 @@ async function legacyRowIsFresh(
       )
     )
     .limit(1);
-  if (!english) return true;
+  if (!english) return false;
   if (writtenAt.getTime() < english.updatedAt.getTime()) return false;
   try {
     await db
       .update(nameContent)
       .set({ sourceHash: expected })
       .where(
-        and(eq(nameContent.slug, slug), eq(nameContent.kind, kind), eq(nameContent.locale, locale))
+        and(
+          eq(nameContent.slug, slug),
+          eq(nameContent.kind, kind),
+          eq(nameContent.locale, locale),
+          isNull(nameContent.sourceHash)
+        )
       );
   } catch (err) {
     console.error("Failed to backfill name_content source_hash:", err);
@@ -267,7 +275,8 @@ async function legacyVerseReasonIsFresh(
         and(
           eq(nameVerseReasons.slug, slug),
           eq(nameVerseReasons.ref, ref),
-          eq(nameVerseReasons.locale, locale)
+          eq(nameVerseReasons.locale, locale),
+          isNull(nameVerseReasons.sourceHash)
         )
       );
   } catch (err) {
@@ -290,6 +299,24 @@ async function nameRowMatches(
 ): Promise<boolean> {
   if (row.sourceHash != null || expected == null) return sourceMatches(row.sourceHash, expected);
   return legacyRowIsFresh(slug, kind, locale, version, row.updatedAt, expected);
+}
+
+/** For the read-only cache lookups, whose contract is to never throw: a failed
+ * legacy-source query is logged and the row treated as a miss. */
+async function cachedRowMatches(
+  row: { sourceHash: string | null; updatedAt: Date },
+  slug: string,
+  kind: NameContentKind,
+  locale: Locale,
+  version: number,
+  expected: string | undefined
+): Promise<boolean> {
+  try {
+    return await nameRowMatches(row, slug, kind, locale, version, expected);
+  } catch (err) {
+    console.error(`Failed to validate name_content for ${slug}/${kind}/${locale}:`, err);
+    return false;
+  }
 }
 
 // Per-process single-flight: concurrent first-loads of the same (slug, kind,
@@ -417,7 +444,7 @@ export async function getCachedNameContent<T>(
   if (
     !row ||
     row.version !== version ||
-    !(await nameRowMatches(row, slug, kind, locale, version, sourceHash))
+    !(await cachedRowMatches(row, slug, kind, locale, version, sourceHash))
   ) {
     return null;
   }
@@ -479,7 +506,7 @@ export async function getCachedNameContentBulk<T>(
   for (const row of rows) {
     if (row.version !== version) continue;
     if (
-      !(await nameRowMatches(row, row.slug, kind, locale, version, sourceHashes?.get(row.slug)))
+      !(await cachedRowMatches(row, row.slug, kind, locale, version, sourceHashes?.get(row.slug)))
     ) {
       continue;
     }
