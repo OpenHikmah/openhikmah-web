@@ -43,6 +43,8 @@ vi.mock("@/lib/infra/db", () => ({
         onConflictDoNothing: () => ({ returning: async () => [{ reason: "unused" }] }),
       }),
     }),
+    // Legacy-row re-validation backfills the hash once it proves the row current.
+    update: () => ({ set: () => ({ where: async () => undefined }) }),
   },
 }));
 
@@ -210,7 +212,11 @@ describe("GET /api/names/[slug]/meta", () => {
     // resolve concurrently, so asserting per-field values by call order would be
     // flaky) — return the same cached string for either and check both fields got it.
     withLocale("tr");
-    mockSelect.mockReturnValue(makeSelectChain([{ data: JSON.stringify("çeviri"), version: 1 }]));
+    mockSelect.mockReturnValue(
+      makeSelectChain([
+        { data: JSON.stringify("çeviri"), version: 1, sourceHash: null, updatedAt: new Date() },
+      ])
+    );
 
     const res = await getMeta(req("al-malik"), params("al-malik"));
 
