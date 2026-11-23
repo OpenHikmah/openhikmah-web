@@ -43,7 +43,9 @@ const MIN_STEM_LENGTH = 3;
 
 /** Every spelling of `word` that should count as the same name. */
 function forms(word: string): Set<string> {
-  const base = fold(word);
+  // ذو declines (ذو/ذي/ذا): 55:78 has the genitive ذِى where the name spells ذُو.
+  const folded = fold(word);
+  const base = folded === "ذي" || folded === "ذا" ? "ذو" : folded;
   const out = new Set<string>([base, base.replace(PROCLITICS, "")]);
   const fused = ARTICLE_WITH_PROCLITICS.exec(base);
   if (fused) {
@@ -90,11 +92,17 @@ export function verseContainsName(
   name: Pick<DivineName, "arabic" | "root">,
   morphology?: MorphologyWord[]
 ): boolean {
-  const wanted = forms(name.arabic);
-  const isName = (word: string) => [...forms(word)].some((f) => wanted.has(f));
-  if (arabicText.split(/\s+/).some((token) => token !== "" && isName(token))) return true;
+  // A multi-word name (مالك الملك, ذو الجلال والإكرام) matches as a run of
+  // consecutive tokens, one per word; a single-word name is a run of one.
+  const wanted = name.arabic.split(/\s+/).filter(Boolean).map(forms);
+  const sameWord = (word: Set<string>, target: Set<string>) => [...word].some((f) => target.has(f));
+  const tokens = arabicText.split(/\s+/).filter(Boolean).map(forms);
+  for (let i = 0; i + wanted.length <= tokens.length; i++) {
+    if (wanted.every((target, j) => sameWord(tokens[i + j], target))) return true;
+  }
 
   if (morphology) {
+    const isName = (word: string) => wanted.length === 1 && sameWord(forms(word), wanted[0]);
     const root = rootLetters(name.root);
     const rootIsSpecific = !SHARED_ROOTS.has(name.root.replace(/-/g, ""));
     for (const w of morphology) {
