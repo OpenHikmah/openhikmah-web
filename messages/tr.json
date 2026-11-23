@@ -429,6 +429,9 @@
     "mentionHint": "Bir arkadaşınız bir ayet notunda @kullaniciadinizla sizden bahsedebilir.",
     "couldntMarkRead": "Bahsedilmeler okundu olarak işaretlenemedi. Okunmamış sayısı senkronize olmayabilir.",
     "couldntLoadMentions": "Bahsedilmeler yüklenemedi.",
+    "loadMore": "Daha fazla yükle",
+    "loading": "Yükleniyor…",
+    "newMention": "Yeni",
     "mentionedYouOn": "sizden bahsetti:",
     "openInCanvas": "Kanvasta aç"
   },

@@ -429,6 +429,9 @@
     "mentionHint": "Bir dost ayə qeydində sizi @istifadəçiadınızla qeyd edə bilər.",
     "couldntMarkRead": "Qeyd edilmələr oxunmuş kimi işarələnmədi. Oxunmamış sayı sinxron olmaya bilər.",
     "couldntLoadMentions": "Qeyd edilmələr yüklənmədi.",
+    "loadMore": "Daha çox yüklə",
+    "loading": "Yüklənir…",
+    "newMention": "Yeni",
     "mentionedYouOn": "sizi qeyd etdi:",
     "openInCanvas": "Kanvasda aç"
   },
