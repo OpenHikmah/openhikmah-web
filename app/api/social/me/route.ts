@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/infra/db";
 import { users } from "@/lib/infra/db/schema";
-import { requireUser } from "@/lib/auth/social-auth";
+import { broadcastUserCacheInvalidation, requireUser } from "@/lib/auth/social-auth";
 import { effectiveStreak, localDateFromOffset } from "@/lib/social/streak";
 import { isUniqueViolation, jsonError, parseJson } from "@/lib/infra/http";
 
@@ -75,6 +75,10 @@ export async function PATCH(req: NextRequest) {
       .set(updates)
       .where(eq(users.id, authed.userId))
       .returning();
+
+    // requireUser caches the user row per token (L1, ~5 min); without this GET /me
+    // keeps serving the old name, and other instances keep theirs.
+    broadcastUserCacheInvalidation(authed.userId);
 
     return NextResponse.json({
       id: updated.id,
