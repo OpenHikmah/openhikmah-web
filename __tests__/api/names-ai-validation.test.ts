@@ -166,6 +166,77 @@ describe("names AI routes — model output validation", () => {
     expect(body.every((p: { name: string }) => p.name.length > 0)).toBe(true);
   });
 
+  it("pairings: the stored Arabic and transliteration are the canonical ones, not the model's", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        {
+          // Transliteration matches, Arabic is garbled — must not be stored as-is.
+          transliteration: "Ar-Rahīm",
+          arabic: "الرحيم؟؟",
+          explanation: "Mercy directed specifically toward the believers.",
+        },
+      ])
+    );
+
+    const res = await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveLength(1);
+    expect(body[0]).toMatchObject({
+      name: "ar-rahim",
+      transliteration: "Ar-Rahīm",
+      arabic: "الرَّحِيم",
+    });
+  });
+
+  it("pairings: a name paired with itself is dropped and logged", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        {
+          transliteration: "Ar-Rahmān",
+          arabic: "الرَّحْمَٰن",
+          explanation: "Pairs with itself — must be dropped.",
+        },
+        {
+          transliteration: "Ar-Rahīm",
+          arabic: "الرَّحِيم",
+          explanation: "A genuine pairing — kept.",
+        },
+      ])
+    );
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
+
+    expect((await res.json()).map((p: { name: string }) => p.name)).toEqual(["ar-rahim"]);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("self-pairing"));
+    errorSpy.mockRestore();
+  });
+
+  it("pairings: two entries resolving to the same name are de-duplicated", async () => {
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        {
+          transliteration: "Ar-Rahīm",
+          arabic: "الرَّحِيم",
+          explanation: "First mention — kept.",
+        },
+        {
+          transliteration: "Ar-Rahīm",
+          arabic: "الرحيم",
+          explanation: "Second mention of the same name — dropped.",
+        },
+      ])
+    );
+
+    const res = await getPairings(req("ar-rahman", "pairings"), params("ar-rahman"));
+
+    const body = await res.json();
+    expect(body).toHaveLength(1);
+    expect(body[0].explanation).toBe("First mention — kept.");
+  });
+
   it("reflection: a model refusal is not cached — returns 200 with empty content", async () => {
     mockCallAI.mockResolvedValue("I'm sorry, but I can't help with religious interpretation.");
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
