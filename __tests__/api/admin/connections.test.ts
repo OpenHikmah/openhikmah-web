@@ -56,6 +56,7 @@ const connectionRow = {
   fromRef: "2:255",
   toRef: "24:35",
   kind: "thematic",
+  locale: "en",
   status: "active",
   createdAt: new Date("2026-01-01"),
 };
@@ -234,6 +235,23 @@ describe("PATCH /api/admin/connections", () => {
     // Only the connections row update — flagged→retired is inactive→inactive.
     expect(mockUpdate).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    ["retired", "active"],
+    ["active", "retired"],
+  ])(
+    "leaves the English coverage cell alone when a non-English row goes %s→%s",
+    async (priorStatus, nextStatus) => {
+      mockSelect.mockReturnValue(makeDbChain([{ status: priorStatus }]));
+      mockUpdate.mockReturnValue(
+        makeDbChain([{ ...connectionRow, locale: "tr", status: nextStatus }])
+      );
+      const res = await PATCH(patch({ id: 7, status: nextStatus }));
+      expect(res.status).toBe(200);
+      // Only the connections row update; no coverage update.
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it("increments coverage and un-strands the cell when a connection is reactivated", async () => {
     const setCalls: Array<Record<string, unknown>> = [];

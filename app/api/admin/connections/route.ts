@@ -108,7 +108,8 @@ export async function PATCH(req: NextRequest) {
         // Keep the coverage cell's activeCount honest, and only move it on a real
         // transition — re-submitting `retired` on an already-retired row, or
         // flipping flagged↔retired, must not double-decrement. The cell keys on
-        // the English locale (see upsertCoverage, which only writes `en`).
+        // the English locale (see upsertCoverage, which only writes `en`), so a
+        // translated row's transition must leave it alone.
         const wasActive = prior.status === "active";
         const nowActive = status === "active";
         const coverageWhere = and(
@@ -116,7 +117,8 @@ export async function PATCH(req: NextRequest) {
           eq(connectionCoverage.kind, row.kind),
           eq(connectionCoverage.locale, "en")
         );
-        if (wasActive && !nowActive) {
+        const isEnglish = row.locale === "en";
+        if (isEnglish && wasActive && !nowActive) {
           // Lost an active connection: un-strand the cell so the backfill job
           // reconsiders this verse instead of skipping it forever.
           await tx
@@ -127,7 +129,7 @@ export async function PATCH(req: NextRequest) {
               updatedAt: new Date(),
             })
             .where(coverageWhere);
-        } else if (!wasActive && nowActive) {
+        } else if (isEnglish && !wasActive && nowActive) {
           await tx
             .update(connectionCoverage)
             .set({
