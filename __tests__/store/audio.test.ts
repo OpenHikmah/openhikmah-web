@@ -435,6 +435,49 @@ describe("audio store", () => {
       expect(pendingPlays.length).toBe(playCallsBefore); // no new play() call
     });
 
+    it("resuming a paused track after a reciter change reloads it under the new reciter", async () => {
+      useAudioStore.getState().playGraph([verseA, verseB]);
+      pendingPlays[0].resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      useAudioStore.getState().pause();
+      expect(capturedAudioEl!.src).toContain(`/${DEFAULT_RECITER}/`);
+
+      usePreferencesStore.getState().setReciter("ar.husary");
+      const playCallsBefore = pendingPlays.length;
+      useAudioStore.getState().resume();
+
+      expect(pendingPlays.length).toBe(playCallsBefore + 1);
+      expect(capturedAudioEl!.src).toContain("/ar.husary/");
+      expect(useAudioStore.getState()).toMatchObject({
+        currentRef: "2:255",
+        queueIndex: 0,
+        isPlaying: true,
+        isLoading: true,
+      });
+    });
+
+    it("resuming without a reciter change keeps the loaded source (plain resume)", async () => {
+      useAudioStore.getState().playGraph([verseA, verseB]);
+      pendingPlays[0].resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      useAudioStore.getState().pause();
+      const srcBefore = capturedAudioEl!.src;
+      const loadCallsBefore = vi.mocked(window.HTMLMediaElement.prototype.load).mock.calls.length;
+
+      useAudioStore.getState().resume();
+      pendingPlays[pendingPlays.length - 1].resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(capturedAudioEl!.src).toBe(srcBefore);
+      expect(vi.mocked(window.HTMLMediaElement.prototype.load).mock.calls.length).toBe(
+        loadCallsBefore
+      );
+      expect(useAudioStore.getState().isPlaying).toBe(true);
+    });
+
     it("does nothing when nothing is queued", () => {
       expect(() => usePreferencesStore.getState().setReciter("ar.husary")).not.toThrow();
       expect(useAudioStore.getState().currentRef).toBeNull();

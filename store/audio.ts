@@ -61,6 +61,10 @@ function prefetchNext(queue: AudioVerse[], index: number) {
 // when the user switches tracks faster than a play() promise settles.
 let playGen = 0;
 
+// The reciter the element's current `src` was built with, so a paused track can
+// tell on resume that the preference has changed since it was loaded.
+let loadedReciter: string | null = null;
+
 const MAX_LOAD_RETRIES = 2;
 const RETRY_DELAY_MS = 600;
 
@@ -101,7 +105,8 @@ function loadAndPlay(
       onEnded();
     }
   };
-  a.src = getAudioUrl(verse.surah, verse.ayah, usePreferencesStore.getState().reciter);
+  loadedReciter = usePreferencesStore.getState().reciter;
+  a.src = getAudioUrl(verse.surah, verse.ayah, loadedReciter);
   a.load();
   return a.play();
 }
@@ -163,6 +168,13 @@ export const useAudioStore = create<AudioStore>((set, get) => {
 
     resume: () => {
       if (!_audio) return;
+      // The reciter changed while paused: the loaded src is the old one, so
+      // reload this verse under the new reciter instead of resuming it.
+      if (get().currentRef && loadedReciter !== usePreferencesStore.getState().reciter) {
+        set({ isPlaying: true });
+        get()._restartCurrentTrack();
+        return;
+      }
       _audio
         .play()
         .then(() => set({ isPlaying: true }))
@@ -235,8 +247,8 @@ export const useAudioStore = create<AudioStore>((set, get) => {
 
 // Changing reciter mid-playback should be heard immediately, not just on the
 // next verse — restart only the currently-playing track (queue position is
-// unchanged). A paused track picks up the new reciter next time the user
-// presses play, same as before.
+// unchanged). A paused track picks up the new reciter when the user presses
+// play (`resume` reloads it if the loaded reciter is stale).
 if (typeof window !== "undefined") {
   usePreferencesStore.subscribe((state, prevState) => {
     if (state.reciter === prevState.reciter) return;
