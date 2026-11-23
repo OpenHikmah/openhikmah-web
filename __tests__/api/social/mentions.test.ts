@@ -107,10 +107,34 @@ describe("PATCH /api/social/mentions", () => {
     expect((await PATCH(req("PATCH"))).status).toBe(401);
   });
 
-  it("marks unread mentions as read", async () => {
+  function patchWith(body: unknown) {
+    return new NextRequest("http://localhost/api/social/mentions", {
+      method: "PATCH",
+      headers: { Authorization: "Bearer t", "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("marks only the given mentions as read and returns what is still unread", async () => {
     authed();
-    const res = await PATCH(req("PATCH"));
+    mockSelect.mockReturnValue(makeDbChain([{ count: 4 }]));
+    const res = await PATCH(patchWith({ ids: [3, 5] }));
     expect(res.status).toBe(200);
-    expect(mockUpdate).toHaveBeenCalled();
+    expect(await res.json()).toEqual({ ok: true, unreadCount: 4 });
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["no body", undefined],
+    ["a missing ids field", {}],
+    ["an empty ids array", { ids: [] }],
+    ["a non-integer id", { ids: [1, "2"] }],
+    ["a non-positive id", { ids: [0] }],
+    ["too many ids", { ids: Array.from({ length: 101 }, (_, i) => i + 1) }],
+  ])("400 for %s, without touching the database", async (_label, body) => {
+    authed();
+    const res = await PATCH(body === undefined ? req("PATCH") : patchWith(body));
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });

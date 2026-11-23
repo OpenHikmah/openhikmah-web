@@ -429,6 +429,9 @@
     "mentionHint": "A friend can tag you with your @username in a verse note.",
     "couldntMarkRead": "Couldn't mark mentions as read. The unread count may be out of sync.",
     "couldntLoadMentions": "Couldn't load mentions.",
+    "loadMore": "Load more",
+    "loading": "Loading…",
+    "newMention": "New",
     "mentionedYouOn": "mentioned you on",
     "openInCanvas": "Open in canvas"
   },
