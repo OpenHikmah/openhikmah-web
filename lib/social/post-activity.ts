@@ -60,8 +60,18 @@ function enqueueDispatch(task: () => Promise<void>): Promise<void> {
  */
 async function drainQueue(gen: number): Promise<void> {
   while (queue.length > 0 && generation === gen) {
-    const { result } = await sendWithRetry(queue[0]);
-    if (generation !== gen || !result) return;
+    const { result, rejectedStatus } = await sendWithRetry(queue[0]);
+    if (generation !== gen) return;
+    if (!result) {
+      // A payload the server refuses (400/403/404...) will never succeed, so it
+      // must not block every later event. A 401 says the session is bad, not the
+      // event, so that one stays queued; retryable/network failures stop the drain.
+      if (rejectedStatus === undefined || rejectedStatus === 401) return;
+      console.error(
+        `postActivity: dropping queued event rejected with ${rejectedStatus}`,
+        queue[0].type
+      );
+    }
     queue.shift();
   }
 }
@@ -85,7 +95,7 @@ function delay(ms: number): Promise<void> {
 
 async function sendOnce(
   input: QueuedActivity
-): Promise<{ result: ActivityResult | null; retryable: boolean }> {
+): Promise<{ result: ActivityResult | null; retryable: boolean; status?: number }> {
   try {
     const res = await authFetch("/api/social/activity", {
       method: "POST",
@@ -101,7 +111,7 @@ async function sendOnce(
       const data = (await res.json()) as ActivityResult;
       return { result: data, retryable: false };
     }
-    return { result: null, retryable: RETRYABLE_STATUS.has(res.status) };
+    return { result: null, retryable: RETRYABLE_STATUS.has(res.status), status: res.status };
   } catch (err) {
     // A network-level failure is retryable, but it must not vanish: a fully
     // exhausted event only lives in the in-memory queue and is lost on reload.
@@ -112,14 +122,14 @@ async function sendOnce(
 
 async function sendWithRetry(
   input: QueuedActivity
-): Promise<{ result: ActivityResult | null; exhausted: boolean }> {
+): Promise<{ result: ActivityResult | null; exhausted: boolean; rejectedStatus?: number }> {
   for (let attempt = 0; attempt < RETRY_BACKOFF_MS.length; attempt++) {
     if (attempt > 0) {
       await delay(RETRY_BACKOFF_MS[attempt] + Math.random() * 250);
     }
-    const { result, retryable } = await sendOnce(input);
+    const { result, retryable, status } = await sendOnce(input);
     if (result) return { result, exhausted: false };
-    if (!retryable) return { result: null, exhausted: false };
+    if (!retryable) return { result: null, exhausted: false, rejectedStatus: status };
   }
   return { result: null, exhausted: true };
 }

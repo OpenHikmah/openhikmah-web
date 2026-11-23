@@ -147,6 +147,71 @@ describe("postActivity", () => {
     expect(pendingActivityCount()).toBe(0);
   });
 
+  describe("a queued head the server rejects (issue #749)", () => {
+    async function queueOneEvent(fetchMock: ReturnType<typeof vi.fn>) {
+      fetchMock.mockResolvedValue(errStatus(503));
+      const p = postActivity("tok", { type: "verse_added", verseRef: "1:1" });
+      await vi.runAllTimersAsync();
+      await p;
+      expect(pendingActivityCount()).toBe(1);
+    }
+
+    it("is dropped and logged on a non-retryable 4xx, and later events still go out", async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      await queueOneEvent(fetchMock);
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const sent: string[] = [];
+      fetchMock.mockImplementation((_url: string, init: { body: string }) => {
+        const ref = JSON.parse(init.body).verse_ref;
+        sent.push(ref);
+        return Promise.resolve(
+          ref === "1:1"
+            ? errStatus(400)
+            : okJson({ streak: 1, longestStreak: 1, activityDate: "2026-08-28" })
+        );
+      });
+
+      const p = postActivity("tok", { type: "verse_added", verseRef: "2:2" });
+      await vi.runAllTimersAsync();
+      const result = await p;
+
+      expect(sent).toEqual(["1:1", "2:2"]);
+      expect(result?.streak).toBe(1);
+      expect(pendingActivityCount()).toBe(0);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("dropping queued event rejected with 400"),
+        "verse_added"
+      );
+      errorSpy.mockRestore();
+    });
+
+    it("stays queued on a 401 (the session is bad, not the event)", async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      await queueOneEvent(fetchMock);
+
+      fetchMock.mockResolvedValue(errStatus(401));
+      await flushQueue("tok");
+      await vi.runAllTimersAsync();
+
+      expect(pendingActivityCount()).toBe(1);
+    });
+
+    it("stays queued on a retryable failure", async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      await queueOneEvent(fetchMock);
+
+      const p = flushQueue("tok");
+      await vi.runAllTimersAsync();
+      await p;
+
+      expect(pendingActivityCount()).toBe(1);
+    });
+  });
+
   it("resetActivityQueue drops deferred events so they can't flush under a new token", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(errStatus(503)));
     const p = postActivity("tok-a", { type: "verse_added", verseRef: "1:1" });
