@@ -4,7 +4,8 @@ import type { User } from "@/lib/infra/db/schema";
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
 
-vi.mock("@/lib/auth/social-auth", () => ({
+vi.mock("@/lib/auth/social-auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/auth/social-auth")>()),
   requireUser: vi.fn(),
 }));
 
@@ -46,7 +47,7 @@ vi.mock("@/lib/infra/db", () => ({
 }));
 
 import { GET, PATCH } from "@/app/api/social/me/route";
-import { requireUser } from "@/lib/auth/social-auth";
+import { requireUser, tokenCache } from "@/lib/auth/social-auth";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -247,6 +248,42 @@ describe("PATCH /api/social/me", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.username).toBe("scholar_one");
+  });
+
+  it("evicts the user's cached auth entries so the next GET /me is not stale", async () => {
+    const user = makeUser({ id: 1 });
+    authedAs(user);
+    tokenCache.set("valid-token", { user, expiresAt: Date.now() + 60_000 });
+    tokenCache.set("other-device-token", { user, expiresAt: Date.now() + 60_000 });
+    tokenCache.set("someone-else", {
+      user: makeUser({ id: 2 }),
+      expiresAt: Date.now() + 60_000,
+    });
+    mockUpdate.mockReturnValue(makeDbChain([{ id: 1, username: "renamed", displayName: null }]));
+
+    const res = await PATCH(makePatchReq({ username: "renamed" }));
+
+    expect(res.status).toBe(200);
+    expect(tokenCache.has("valid-token")).toBe(false);
+    expect(tokenCache.has("other-device-token")).toBe(false);
+    expect(tokenCache.has("someone-else")).toBe(true);
+    tokenCache.clear();
+  });
+
+  it("keeps the cache when the update fails", async () => {
+    const user = makeUser({ id: 1 });
+    authedAs(user);
+    tokenCache.set("valid-token", { user, expiresAt: Date.now() + 60_000 });
+    mockUpdate.mockImplementation(() => {
+      throw new Error("db down");
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await PATCH(makePatchReq({ username: "renamed" }));
+
+    expect(res.status).toBe(500);
+    expect(tokenCache.has("valid-token")).toBe(true);
+    tokenCache.clear();
   });
 
   it("accepts valid username formats", async () => {
