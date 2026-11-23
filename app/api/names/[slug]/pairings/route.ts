@@ -153,14 +153,21 @@ async function getPairings(
             );
             return null;
           }
+          if (match.slug === slug) {
+            console.error(`Pairings: dropping self-pairing for ${slug}`);
+            return null;
+          }
+          // Name and Arabic come from the canonical entry, never the model: either
+          // field alone is enough to match, so the model's own strings can be wrong.
           return {
             name: match.slug,
-            transliteration: p.transliteration,
-            arabic: p.arabic,
+            transliteration: match.transliteration,
+            arabic: match.arabic,
             explanation: p.explanation,
           };
         })
-        .filter((p): p is Pairing => p !== null);
+        .filter((p): p is Pairing => p !== null)
+        .filter((p, i, all) => all.findIndex((q) => q.name === p.name) === i);
       // Second-pass review before these are cached for every user: only
       // explicitly approved pairings survive, and any failure is empty, so
       // not cached and retried.
