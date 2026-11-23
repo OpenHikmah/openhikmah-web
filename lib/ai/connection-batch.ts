@@ -199,15 +199,18 @@ async function findTranslationGaps(targetLocales: Locale[]): Promise<Set<string>
       toRef: connections.toRef,
       kind: connections.kind,
       locale: connections.locale,
+      status: connections.status,
     })
     .from(connections)
-    .where(
-      and(eq(connections.status, "active"), inArray(connections.locale, ["en", ...targetLocales]))
-    );
+    .where(inArray(connections.locale, ["en", ...targetLocales]));
 
   // key = `${fromRef}|${kind}` → locale → set of toRefs
   const byCell = new Map<string, Map<string, Set<string>>>();
   for (const r of rows) {
+    // A flagged/retired translation still occupies the unique key and was hidden
+    // on purpose, so it counts as settled; a non-active English row is not a
+    // canonical edge to translate.
+    if (r.locale === "en" && r.status !== "active") continue;
     const key = cellKey(r.fromRef, r.kind);
     let locales = byCell.get(key);
     if (!locales) byCell.set(key, (locales = new Map()));
@@ -336,6 +339,23 @@ async function activeToRefs(fromRef: string, kind: EdgeKind, locale: Locale): Pr
   return rows.map((r) => r.toRef);
 }
 
+/** Target refs with a row in this locale in ANY status. A flagged/retired
+ *  translation was hidden on purpose and still holds the unique key, so it is
+ *  settled — never re-translated (mirrors `readBlockedRefs` in graph-service). */
+async function settledToRefs(fromRef: string, kind: EdgeKind, locale: Locale): Promise<string[]> {
+  const rows = await db
+    .select({ toRef: connections.toRef })
+    .from(connections)
+    .where(
+      and(
+        eq(connections.fromRef, fromRef),
+        eq(connections.kind, kind),
+        eq(connections.locale, locale)
+      )
+    );
+  return rows.map((r) => r.toRef);
+}
+
 /**
  * Ensures every target locale has a translated copy of each English reason for
  * this cell. Skips rows that already exist. Returns the rows inserted and, if a
@@ -372,7 +392,7 @@ async function translateCellReasons(
   let inserted = 0;
 
   for (const locale of locales) {
-    const existing = new Set(await activeToRefs(fromRef, kind, locale));
+    const existing = new Set(await settledToRefs(fromRef, kind, locale));
     for (const en of enRows) {
       if (existing.has(en.toRef)) continue;
       if (!budget.spend()) return { inserted, stoppedReason: budget.stoppedReason };

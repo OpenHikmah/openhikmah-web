@@ -660,6 +660,49 @@ describe("runConnectionBatch (integration, real Postgres)", () => {
     expect(pass3.translated).toBe(0);
   });
 
+  it("a flagged translation is settled: it is neither a gap nor re-translated on later passes (issue #747)", async () => {
+    await seed("1:1");
+    await seed("2:255");
+    mockCallAI.mockResolvedValue(
+      JSON.stringify([
+        { ref: "1:1", reason: "A well-formed reason connecting these two verses directly." },
+        { ref: "2:255", reason: "A well-formed reason connecting these two verses directly." },
+      ])
+    );
+    await runConnectionBatch(
+      { mode: "baseline", provider: "gemini", locales: [], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+
+    mockCallAI.mockReset();
+    mockCallAI.mockResolvedValue("localized text for testing purposes");
+    const translate = await runConnectionBatch(
+      { mode: "baseline", provider: "gemini", locales: ["tr"], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+    expect(translate.translated).toBeGreaterThan(0);
+
+    // Moderation hides every translation (verify job / admin flag).
+    await db.execute(sql`UPDATE connections SET status = 'flagged' WHERE locale = 'tr'`);
+
+    mockCallAI.mockClear();
+    mockCheckCall.mockClear();
+    const after = await runConnectionBatch(
+      { mode: "baseline", provider: "gemini", locales: ["tr"], maxCalls: 500, maxCostUsd: 100 },
+      hooks
+    );
+
+    expect(after.translated).toBe(0);
+    expect(after.cellsProcessed).toBe(0);
+    expect(mockCallAI).not.toHaveBeenCalled();
+    expect(mockCheckCall).not.toHaveBeenCalled();
+    const stillFlagged = await db
+      .select()
+      .from(connections)
+      .where(sql`${connections.locale} = 'tr' AND ${connections.status} = 'flagged'`);
+    expect(stillFlagged.length).toBeGreaterThan(0);
+  });
+
   it("per-minute retries exhausted: ends the pass 'rate-limited' so the loop rotates, not a fail-fast error (issue #567 C1)", async () => {
     for (const r of ["1:1", "2:255", "3:18"]) await seed(r);
     mockCallAI.mockRejectedValue(
