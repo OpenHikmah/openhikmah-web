@@ -13,6 +13,7 @@ import {
   Loader2,
   Check,
   AlertCircle,
+  LogIn,
 } from "lucide-react";
 import { FocusScope } from "@radix-ui/react-focus-scope";
 import { useTranslations, useFormatter } from "next-intl";
@@ -27,6 +28,7 @@ import { useState, useEffect, useRef, forwardRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 import { useArmedConfirm } from "@/hooks/useArmedConfirm";
+import { useSignIn } from "@/hooks/useSignIn";
 import {
   exportCanvasToPng,
   exportCanvasToPdf,
@@ -81,6 +83,8 @@ function MoreSheet({
   onExport,
   exporting,
   onSave,
+  onSignIn,
+  signingIn,
   saving,
   saved,
   saveError,
@@ -90,7 +94,10 @@ function MoreSheet({
   onClose: () => void;
   onExport: (format: "png" | "pdf") => void;
   exporting: boolean;
+  /** Null when signed out — the sheet then offers sign-in in Save's place. */
   onSave: (() => void) | null;
+  onSignIn: () => void;
+  signingIn: boolean;
   saving: boolean;
   saved: boolean;
   saveError: boolean;
@@ -135,6 +142,18 @@ function MoreSheet({
         ref={sheetRef}
         className="fixed inset-x-3 bottom-[calc(58px+env(safe-area-inset-bottom)+8px)] z-50 rounded-lg border border-border bg-surface-overlay shadow-floating md:hidden"
       >
+        {!onSave && (
+          // Don't hide Save when signed out — offer the way to enable it. The
+          // canvas is kept in localStorage, so it is still here after sign-in.
+          <button
+            onClick={onSignIn}
+            disabled={signingIn}
+            className="flex w-full items-center gap-2.5 px-4 py-3 text-left disabled:opacity-40"
+          >
+            <LogIn className="h-4 w-4 shrink-0 text-text-muted" />
+            <span className="text-sm font-medium text-text-primary">{t("signInToSave")}</span>
+          </button>
+        )}
         {onSave && (
           <button
             onClick={onSave}
@@ -197,6 +216,8 @@ export function Header({ onSearchOpen }: HeaderProps) {
   const format = useFormatter();
   const { copied, copy } = useCopyFeedback();
   const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState(false);
+  const { signIn, signingIn } = useSignIn();
   const [moreOpen, setMoreOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(false);
@@ -300,9 +321,12 @@ export function Header({ onSearchOpen }: HeaderProps) {
     setSharing(true);
     try {
       const url = await buildShareUrl(serializeCanvas(nodes, edges));
-      await copy(url);
-    } catch {
-      // Share API or clipboard failed — silent on mobile bar
+      // `copy` swallows clipboard errors and reports them as `false`.
+      if (!(await copy(url))) throw new Error("clipboard write failed");
+    } catch (err) {
+      console.error("Header: share failed", err);
+      setShareError(true);
+      setTimeout(() => setShareError(false), 2500);
     } finally {
       setSharing(false);
     }
@@ -385,11 +409,20 @@ export function Header({ onSearchOpen }: HeaderProps) {
               active={!!audioCurrentRef}
             />
             <BarButton
-              icon={<Share2 />}
-              label={sharing ? t("sharing") : copied ? t("copied") : t("share")}
+              icon={shareError ? <AlertCircle /> : <Share2 />}
+              label={
+                sharing
+                  ? t("sharing")
+                  : copied
+                    ? t("copied")
+                    : shareError
+                      ? t("shareFailed")
+                      : t("share")
+              }
               onClick={handleShare}
               disabled={sharing}
               active={copied}
+              danger={shareError}
             />
             <BarButton
               ref={moreButtonRef}
@@ -411,6 +444,8 @@ export function Header({ onSearchOpen }: HeaderProps) {
               onExport={handleExport}
               exporting={exporting}
               onSave={accessToken ? handleSave : null}
+              onSignIn={signIn}
+              signingIn={signingIn}
               saving={saving}
               saved={saved}
               saveError={saveError}
