@@ -1,3 +1,4 @@
+import { arabicFor } from "../test-utils/arabic-fixtures";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
@@ -26,7 +27,7 @@ async function seedVerse(ref: string, root: string) {
     ref,
     surah: Number(s),
     ayah: Number(a),
-    arabicText: `arabic-${ref}`,
+    arabicText: arabicFor(ref),
     translation: `translation-${ref}`,
   });
   await db.insert(wordMorphology).values({ ref, position: 1, surface: `w-${ref}`, root });

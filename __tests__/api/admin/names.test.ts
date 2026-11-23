@@ -1,3 +1,4 @@
+import { arabicFor } from "../../test-utils/arabic-fixtures";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import type { User } from "@/lib/infra/db/schema";
@@ -279,10 +280,10 @@ describe("PATCH /api/admin/names", () => {
             ref: "999:999",
             surah: 999,
             ayah: 999,
-            arabicText: "a",
+            arabicText: arabicFor("1:1"),
             translation: "t",
             surahName: "s",
-            surahNameArabic: "s",
+            surahNameArabic: "الفاتحة",
             reason: "r",
           },
         ],
@@ -303,7 +304,7 @@ describe("PATCH /api/admin/names", () => {
             ref: "1:8",
             surah: 1,
             ayah: 8,
-            arabicText: "a",
+            arabicText: arabicFor("1:1"),
             translation: "t",
             surahName: "Al-Fatihah",
             surahNameArabic: "الفاتحة",
