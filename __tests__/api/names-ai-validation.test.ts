@@ -585,6 +585,65 @@ describe("names AI routes — model output validation", () => {
     expect(mockCallAI).toHaveBeenCalledTimes(1);
     errorSpy.mockRestore();
   });
+  describe("verses: malformed-but-not-throwing replies are logged and metered (issue #748)", () => {
+    const malformedCount = () => counterSnapshot().names_ai_malformed_reply ?? 0;
+
+    // The route retries an empty result on another provider, so the counter can
+    // move more than once per request — assert it moved, not by how much.
+    it("AI fallback: prose with no JSON array", async () => {
+      mockCallAI.mockResolvedValue("Here are some verses you may like.");
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const before = malformedCount();
+
+      const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual([]);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("fallback reply had no JSON array")
+      );
+      expect(malformedCount()).toBeGreaterThan(before);
+      errorSpy.mockRestore();
+    });
+
+    it("per-verse reasons: prose with no JSON object keeps the default reason", async () => {
+      mockFetch.mockImplementation(async (url: unknown) => {
+        if (typeof url !== "string") return { ok: false };
+        if (url.includes("api.quran.com/api/v4/search")) {
+          return {
+            ok: true,
+            json: async () => ({ search: { results: [{ verse_key: "2:255" }] } }),
+          };
+        }
+        if (url.includes("ar.alafasy"))
+          return {
+            ok: true,
+            json: async () => ({
+              data: { text: "هُوَ ٱلرَّحْمَٰنُ ٱلرَّحِيمُ ٱلْعَلِيمُ ٱلْقَدِيرُ" },
+            }),
+          };
+        if (url.includes("en.sahih"))
+          return { ok: true, json: async () => ({ data: { text: "EN" } }) };
+        return { ok: false };
+      });
+      mockCallAI.mockResolvedValue("These verses are lovely.");
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const before = malformedCount();
+
+      const res = await getVerses(req("ar-rahman", "verses"), params("ar-rahman"));
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toHaveLength(1);
+      expect(body[0].reason).toMatch(/^Contains a form of/);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("reasons reply had no JSON object")
+      );
+      expect(malformedCount()).toBeGreaterThan(before);
+      errorSpy.mockRestore();
+    });
+  });
+
   it("reflection: Tashbih phrasing is rejected (not cached) and retried against Gemini", async () => {
     mockCallAI.mockResolvedValue("This shows God literally has a physical body.");
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
