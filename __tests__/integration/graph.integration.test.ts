@@ -1,3 +1,4 @@
+import { arabicFor } from "../test-utils/arabic-fixtures";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -74,7 +75,7 @@ async function seed(ref: string) {
     ref,
     surah: Number(s),
     ayah: Number(a),
-    arabicText: `arabic-${ref}`,
+    arabicText: arabicFor(ref),
     translation: `translation-${ref}`,
   });
 }
@@ -92,7 +93,7 @@ beforeEach(async () => {
   await db.delete(connectionCoverage);
 });
 
-const source = { arabicText: "x", translation: "y" };
+const source = { arabicText: arabicFor("2:255"), translation: "y" };
 
 describe("connection graph (integration, real Postgres)", () => {
   it("miss generates + persists; hit serves from DB with zero further AI calls", async () => {

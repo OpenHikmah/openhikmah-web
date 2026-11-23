@@ -1,3 +1,4 @@
+import { arabicFor } from "../test-utils/arabic-fixtures";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { sql, eq } from "drizzle-orm";
 
@@ -23,7 +24,7 @@ async function seedVerse(ref: string, translation = `en-${ref}`) {
     ref,
     surah: Number(s),
     ayah: Number(a),
-    arabicText: `arabic-${ref}`,
+    arabicText: arabicFor(ref),
     translation,
   });
 }

@@ -1,5 +1,8 @@
+import { arabicFor } from "../test-utils/arabic-fixtures";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+
+const ARABIC = arabicFor("1:1");
 
 // ── DB mock (chainable + thenable proxy) ────────────────────────────────────────
 function makeDbChain(resolveWith: unknown = []) {
@@ -167,13 +170,13 @@ describe("POST /api/connections", () => {
   });
 
   it("returns 400 when fromRef is missing", async () => {
-    const req = makeRequest({ kind: "thematic", arabicText: "text", translation: "trans" });
+    const req = makeRequest({ kind: "thematic", arabicText: ARABIC, translation: "trans" });
     const res = await POST(req);
     expect(res.status).toBe(400);
   });
 
   it("returns 400 when kind is missing", async () => {
-    const req = makeRequest({ fromRef: "1:1", arabicText: "text", translation: "trans" });
+    const req = makeRequest({ fromRef: "1:1", arabicText: ARABIC, translation: "trans" });
     const res = await POST(req);
     expect(res.status).toBe(400);
   });
@@ -182,7 +185,7 @@ describe("POST /api/connections", () => {
     const req = makeRequest({
       fromRef: "1:1",
       kind: "bogus",
-      arabicText: "text",
+      arabicText: ARABIC,
       translation: "trans",
     });
     const res = await POST(req);
@@ -193,7 +196,7 @@ describe("POST /api/connections", () => {
     const req = makeRequest({
       fromRef: "999:1",
       kind: "thematic",
-      arabicText: "t",
+      arabicText: ARABIC,
       translation: "t",
     });
     const res = await POST(req);
@@ -228,7 +231,7 @@ describe("POST /api/connections", () => {
     const req = makeRequest({
       fromRef: "garbage",
       kind: "thematic",
-      arabicText: "t",
+      arabicText: ARABIC,
       translation: "t",
     });
     const res = await POST(req);
@@ -292,7 +295,7 @@ describe("POST /api/connections", () => {
       return { ok: false };
     });
     const req = makeRequest(
-      { fromRef: "1:1", kind: "thematic", arabicText: "x", translation: "y" },
+      { fromRef: "1:1", kind: "thematic", arabicText: ARABIC, translation: "y" },
       { "x-forwarded-for": "203.0.113.7, 70.41.3.18" }
     );
     await POST(req);
@@ -307,7 +310,7 @@ describe("POST /api/connections", () => {
       return { ok: false };
     });
     const req = makeRequest(
-      { fromRef: "1:1", kind: "thematic", arabicText: "x", translation: "y" },
+      { fromRef: "1:1", kind: "thematic", arabicText: ARABIC, translation: "y" },
       { "x-forwarded-for": "x".repeat(500) }
     );
     await POST(req);
@@ -321,7 +324,7 @@ describe("POST /api/connections", () => {
     const req = makeRequest({
       fromRef: "1:1",
       kind: "thematic",
-      arabicText: "x",
+      arabicText: ARABIC,
       translation: "y",
     });
     const res = await POST(req);
@@ -356,7 +359,7 @@ describe("POST /api/connections", () => {
     const req = makeRequest({
       fromRef: "2:255",
       kind: "thematic",
-      arabicText: "x",
+      arabicText: ARABIC,
       translation: "y",
     });
     const res = await POST(req);
@@ -372,7 +375,7 @@ describe("POST /api/connections", () => {
     const req = makeRequest({
       fromRef: "1:1",
       kind: "thematic",
-      arabicText: "x",
+      arabicText: ARABIC,
       translation: "y",
       excludeRefs: "2:255" as unknown as string[],
     });
@@ -384,7 +387,7 @@ describe("POST /api/connections", () => {
     const req = makeRequest({
       fromRef: "1:1",
       kind: "thematic",
-      arabicText: "x",
+      arabicText: ARABIC,
       translation: "y",
       excludeRefs: ["2:255", "garbage"],
     });
@@ -396,7 +399,7 @@ describe("POST /api/connections", () => {
     const req = makeRequest({
       fromRef: "1:1",
       kind: "thematic",
-      arabicText: "x",
+      arabicText: ARABIC,
       translation: "y",
       excludeRefs: Array.from({ length: 101 }, (_, i) => `2:${i + 1}`),
     });
@@ -413,7 +416,7 @@ describe("POST /api/connections", () => {
     const req = makeRequest({
       fromRef: "1:1",
       kind: "thematic",
-      arabicText: "x",
+      arabicText: ARABIC,
       translation: "y",
     });
     const res = await POST(req);
@@ -452,7 +455,7 @@ describe("POST /api/connections", () => {
     const req = makeRequest({
       fromRef: "2:255",
       kind: "thematic",
-      arabicText: "x",
+      arabicText: ARABIC,
       translation: "y",
       excludeRefs: ["3:18", "112:1"],
     });
