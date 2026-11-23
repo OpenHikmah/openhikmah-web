@@ -41,6 +41,38 @@ describe("verseContainsName", () => {
     expect(verseContainsName(V_2_255, name("ar-rahim"))).toBe(false);
   });
 
+  describe("multi-word names", () => {
+    const V_3_26 = "قُلِ ٱللَّهُمَّ مَـٰلِكَ ٱلْمُلْكِ تُؤْتِى ٱلْمُلْكَ مَن تَشَآءُ";
+    const V_55_27 = "وَيَبْقَىٰ وَجْهُ رَبِّكَ ذُو ٱلْجَلَـٰلِ وَٱلْإِكْرَامِ";
+    const V_55_78 = "تَبَـٰرَكَ ٱسْمُ رَبِّكَ ذِى ٱلْجَلَـٰلِ وَٱلْإِكْرَامِ";
+    const V_85_15 = "ذُو ٱلْعَرْشِ ٱلْمَجِيدُ";
+
+    it("matches Mālik al-Mulk (83) as consecutive tokens in 3:26", () => {
+      expect(verseContainsName(V_3_26, name("malik-ul-mulk"))).toBe(true);
+    });
+
+    it("matches Dhū al-Jalāl wa-l-Ikrām (84) in 55:27 and, with the genitive ذِى, in 55:78", () => {
+      expect(verseContainsName(V_55_27, name("dhul-jalali-wal-ikram"))).toBe(true);
+      expect(verseContainsName(V_55_78, name("dhul-jalali-wal-ikram"))).toBe(true);
+    });
+
+    it("needs every word of the phrase: one word alone is not the name", () => {
+      expect(verseContainsName(V_59_23, name("malik-ul-mulk"))).toBe(false); // ٱلْمَلِكُ only
+      expect(verseContainsName(V_85_15, name("dhul-jalali-wal-ikram"))).toBe(false); // ذُو only
+    });
+
+    it("needs the words adjacent and in order", () => {
+      expect(verseContainsName("ٱلْمُلْكِ مَـٰلِكَ", name("malik-ul-mulk"))).toBe(false);
+      expect(
+        verseContainsName("ذُو رَبِّكَ ٱلْجَلَـٰلِ وَٱلْإِكْرَامِ", name("dhul-jalali-wal-ikram"))
+      ).toBe(false);
+    });
+
+    it("leaves the single-word sibling unaffected", () => {
+      expect(verseContainsName(V_3_26, name("al-malik"))).toBe(true);
+    });
+  });
+
   it("does not let a name that merely shares a root match its sibling", () => {
     // ar-rahman and ar-rahim share ر-ح-م; the verse text only has ar-rahman.
     expect(verseContainsName("ٱلرَّحْمَٰنُ عَلَّمَ ٱلْقُرْءَانَ", name("ar-rahim"))).toBe(false);
