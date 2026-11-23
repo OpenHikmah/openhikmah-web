@@ -120,7 +120,10 @@ Output format:
       return new Map();
     }
     const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return new Map();
+    if (!match) {
+      noteMalformedReply(transliteration, "reasons reply had no JSON object");
+      return new Map();
+    }
     const obj: unknown = JSON.parse(match[0]);
     if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return new Map();
     return new Map(
@@ -139,6 +142,13 @@ Output format:
     console.error(`Name verses: failed to parse AI reasons for ${transliteration}:`, err);
     return new Map();
   }
+}
+
+// A reply that parses but has the wrong shape degrades to empty (fail closed,
+// not cached), so it must be visible in logs and metrics, not just a re-billed retry.
+function noteMalformedReply(transliteration: string, what: string): void {
+  console.error(`Name verses: AI ${what} for ${transliteration}`);
+  incr("names_ai_malformed_reply");
 }
 
 // Fallback: AI-only verse finding (used when search returns no results)
@@ -176,7 +186,10 @@ Return ONLY a JSON array:
       return [];
     }
     const match = text.match(/\[[\s\S]*\]/);
-    if (!match) return [];
+    if (!match) {
+      noteMalformedReply(transliteration, "fallback reply had no JSON array");
+      return [];
+    }
     const raw: unknown = JSON.parse(match[0]);
     // The model proposes refs from memory here — validate shape AND that each
     // ref is a real Quran reference before anything downstream touches it.
