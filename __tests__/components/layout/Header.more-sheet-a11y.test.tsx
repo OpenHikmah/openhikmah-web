@@ -32,8 +32,9 @@ describe("Header mobile More sheet — keyboard accessibility", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "More" }));
 
-    const pngButton = await screen.findByRole("button", { name: "Export as PNG" });
-    expect(document.activeElement).toBe(pngButton);
+    // Signed out, the first control is the sign-in action that stands in for Save.
+    const firstButton = await screen.findByRole("button", { name: "Sign in to save" });
+    expect(document.activeElement).toBe(firstButton);
   });
 
   it("traps Tab within the sheet, wrapping from the last control back to the first instead of leaking to the bar behind it", async () => {
@@ -41,16 +42,16 @@ describe("Header mobile More sheet — keyboard accessibility", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "More" }));
 
-    const pngButton = await screen.findByRole("button", { name: "Export as PNG" });
+    const firstButton = await screen.findByRole("button", { name: "Sign in to save" });
     const pdfButton = screen.getByRole("button", { name: "Export as PDF" });
 
     await act(async () => {
       pdfButton.focus();
     });
     fireEvent.keyDown(pdfButton, { key: "Tab" });
-    expect(document.activeElement).toBe(pngButton);
+    expect(document.activeElement).toBe(firstButton);
 
-    fireEvent.keyDown(pngButton, { key: "Tab", shiftKey: true });
+    fireEvent.keyDown(firstButton, { key: "Tab", shiftKey: true });
     expect(document.activeElement).toBe(pdfButton);
   });
 
